@@ -1,0 +1,125 @@
+/*
+ * If you want to create a generic set of controller,
+ * just update generic parts below and you're good to go
+ */
+// START OF GENERIC //
+const Module = require('../modules/{{MODELINITIAL}}.module');
+const HttpHandler = require('../../../Core/http-handler');
+// END OF GENERIC //
+
+/**
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+const get = async (request, response, next) => {
+    try {
+        const data = await Module.get(request.params, request.user);
+
+        const responseBody = {
+            data: data.docs ? data.docs : data,
+            total: data.total,
+            limit: data.limit,
+            page: data.page,
+            pages: data.pages,
+        };
+
+        response.send(responseBody);
+        
+        return next();
+
+    } catch (error) {
+        console.error(error);
+        
+        return next(HttpHandler.errorHandler(error));
+    }
+};
+
+/**
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+const show = async (request, response, next) => {
+    try {
+        const data = await Module.show(request.params, request.user);
+        
+        response.send({
+            data,
+        });
+        
+        return next();
+    } catch (error) {
+        console.error(error)
+        return next(HttpHandler.errorHandler(error));
+    }
+};
+
+/**
+ * @param {*} request - restify request
+ * @param {*} response - restify response
+ * @param {*} next
+ */
+const create = async (request, response, next) => {
+    try {
+        const data = await Module.insert(request.params, request.user);
+
+        response.send({
+            data,
+        });
+
+        return next();
+
+    } catch (error) {
+        console.error(error)
+        return next(HttpHandler.errorHandler(error));
+    }
+};
+
+/**
+ * @param {*} request - restify request
+ * @param {*} response - restify response
+ * @param {*} next
+ */
+const update = async (request, response, next) => {
+    try {
+        await Module.update(request.params, request.user);
+
+        response.send({
+            status: 'completed',
+        });
+
+        return next();
+    } catch (error) {
+        console.error(error)
+        return next(HttpHandler.errorHandler(error));
+    }
+};
+
+/**
+ * @param {*} request - restify request
+ * @param {*} response - restify response
+ * @param {*} next
+ */
+const destroy = async (request, response, next) => {
+    try {
+        await Module.destroy(request.params, request.user);
+        
+        response.send({
+            status: 'completed',
+        });
+
+        return next();
+    } catch (error) {
+        console.error(error)
+        return next(HttpHandler.errorHandler(error));
+    }
+};
+
+module.exports = {
+    get,
+    show,
+    create,
+    update,
+    destroy,
+};

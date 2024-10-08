@@ -1,0 +1,31 @@
+const mongoose = require('mongoose');
+
+const Schema = mongoose.Schema;
+
+const {
+    ObjectId,
+    String,
+} = mongoose.Schema.Types
+
+const {
+    // requiredEnumField,
+    // requiredField,
+    // refField,
+    // defaultField,
+    addBasicPlugins
+} = require('../../../Core/mongoose-utils')
+
+const {{MODELNAME}}Schema = new Schema({
+    //add your fields here
+    //client: refField(ObjectId, 'Client'),
+    //status: requiredEnumField(String, ['fail', 'validated', 'new'], 'new'),
+    //countryCode: requiredField(String),
+    //phone: requiredField(String),
+    //name: String
+});
+
+addBasicPlugins({{MODELNAME}}Schema)
+
+const {{MODELNAME}} = mongoose.model('{{MODELNAME}}', {{MODELNAME}}Schema);
+
+module.exports = {{MODELNAME}};

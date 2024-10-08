@@ -1,1 +1,2 @@
-# zelf-online-version
+# Verifik Wallet API
+

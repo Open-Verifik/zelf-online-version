@@ -1,0 +1,26 @@
+/*
+ * If you want to create a generic set of routes,
+ * just update generic parts below and you're good to go
+ */
+// START OF GENERIC //
+const config = require("../../../Core/config");
+
+const Controller = require("../controllers/{{MODELINITIAL}}.controller");
+const Middleware = require("../middlewares/{{MODELINITIAL}}.middleware");
+const primaryKey = "{{PRIMARYKEY}}";
+const base = "/{{BASEPATH}}";
+// END OF GENERIC //
+
+module.exports = (server) => {
+	const PATH = config.basePath(base);
+
+	server.get(PATH, [Middleware.getValidation, Controller.get]);
+
+	server.get(`${PATH}/:${primaryKey}`, [Middleware.showValidation, Controller.show]);
+
+	server.post(`${PATH}`, [Middleware.createValidation, Controller.create]);
+
+	server.put(`${PATH}/:${primaryKey}`, [Middleware.updateValidation, Controller.update]);
+
+	server.del(`${PATH}/:${primaryKey}`, [Middleware.destroyValidation, Controller.destroy]);
+};

@@ -1,0 +1,95 @@
+const restifyErrors = require("restify-errors");
+const {ForbiddenError} = require('restify-errors');
+
+/**
+ * Get Validation
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+
+const {
+	//import the validations
+	//documentType, // example
+	validate,
+} = require("../../../Core/JoiUtils");
+
+const schemas = {
+	// insert: {
+	// 	string1: string().required(),
+	// 	string2: string().required(),
+	// 	objectId: ().required(),
+	// },
+};
+
+const getValidation = async (request, response, next) => {
+	if (request.user.superAdminId) return next();
+	if (request.user.clientId) return next();
+
+	return next(new restifyErrors.ForbiddenError("not allowed"));
+};
+
+/**
+ * Show Validation
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+const showValidation = async (request, response, next) => {
+	if (request.user.superAdminId) return next();
+	if (request.user.clientId) return next();
+
+	return next(new restifyErrors.ForbiddenError("not allowed"));
+};
+
+/**
+ * Create Validation
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+const createValidation = async (request, response, next) => {
+	const valid = validate(schemas.insert, request.params);
+
+	if (valid.error) {
+		return next(new restifyErrors.MissingParameterError(valid.error.message));
+	}
+
+	return next();
+};
+
+/**
+ * Update Validation
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+const updateValidation = async (request, response, next) => {
+	const valid = validate(schemas.schemaGet, request.params);
+
+	if (valid.error) {
+		return next(new restifyErrors.MissingParameterError(valid.error.message));
+	}
+
+	return next();
+};
+
+/**
+ * Destroy Validation
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+const destroyValidation = async (request, response, next) => {
+	if (request.user.superAdminId) return next();
+	if (request.user.clientId) return next();
+	return next(new restifyErrors.ForbiddenError("not allowed"));
+};
+
+module.exports = {
+	getValidation,
+	showValidation,
+	createValidation,
+	updateValidation,
+	destroyValidation,
+};

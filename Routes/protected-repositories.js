@@ -1,0 +1,36 @@
+module.exports = (server) => {
+	//A
+	require("../Repositories/api-mina/routes/mina-scrapping.route")(server);
+	//B
+	require("../Repositories/binance/routes/binance.route")(server);
+	//C
+	//D
+	//E
+	require("../Repositories/etherscan/routes/etherscan.route")(server);
+	require("../Repositories/etherscan/routes/etherscan-scrapping.route")(server);
+	//F
+	//G
+	//H
+	require("../Repositories/ZelfProof/routes/zelf-proof.route")(server);
+	//I
+	require("../Repositories/IPFS/routes/ipfs.routes")(server);
+	//J
+	//K
+	//L
+	//M
+	//N
+	//O
+	//P
+	//Q
+	//R
+	//S
+	//T
+	//U
+	//V
+	//W
+	require("../Repositories/Wallet/routes/wallet.route")(server);
+	//X
+	//Y
+	//Z
+};
+// end

@@ -1,0 +1,15 @@
+FROM --platform=linux/amd64 node:10-alpine
+
+WORKDIR /usr/src/app
+
+RUN apk add python3 build-base openssl curl bash && npm install pm2 -g
+
+COPY package*.json ./
+
+RUN npm install
+
+ENV PATH /usr/src/app/node_modules/.bin:$PATH
+
+EXPOSE 5050
+
+CMD ["pm2-runtime","server.js"]

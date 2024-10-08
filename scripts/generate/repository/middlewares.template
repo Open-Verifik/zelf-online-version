@@ -1,0 +1,76 @@
+const restifyErrors = require('restify-errors');
+
+{{MIDDLEWARE_REQUIRES}}/**
+ * Get Validation
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+
+ const {
+    //import the validations
+    //documentType, // example
+    validate
+} = require('../../../Core/JoiUtils')
+
+const schema = {
+    //documentType: documentType().required(),
+}
+
+const getValidation = async (request, response, next) => {
+    const valid = validate(schema, request.params)
+
+    if (valid.error) {
+        return next(new restifyErrors.MissingParameterError(valid.error.message))
+    }
+    
+    return next();
+};
+
+/**
+ * Show Validation
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+const showValidation = async (request, response, next) => {
+{{MIDDLEWARE_SHOW_VALIDATION}}
+};
+
+/**
+ * Create Validation
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+const createValidation = async (request, response, next) => {
+{{MIDDLEWARE_CREATE_VALIDATION}}
+};
+
+/**
+ * Update Validation
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+const updateValidation = async (request, response, next) => {
+{{MIDDLEWARE_UPDATE_VALIDATION}}
+};
+
+/**
+ * Destroy Validation
+ * @param {*} request
+ * @param {*} response
+ * @param {*} next
+ */
+const destroyValidation = async (request, response, next) => {
+{{MIDDLEWARE_DESTROY_VALIDATION}}
+};
+
+module.exports = {
+    getValidation,
+    showValidation,
+    createValidation,
+    updateValidation,
+    destroyValidation,
+};

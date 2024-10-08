@@ -1,0 +1,102 @@
+const Model = require("../models/{{MODELINITIAL}}.model");
+
+const MongoORM = require("../../../Core/mongo-orm");
+
+const updateFields = [];
+
+const populates = [];
+
+/**
+ * @param {*} params
+ * @param {*} authUser
+ */
+const get = async (params, authUser = {}) => {
+	const queryParams = {
+		...params,
+	};
+
+	if (authUser.clientId) {
+		queryParams.where_client = authUser.clientId;
+	}
+
+	return await MongoORM.buildQuery(queryParams, Model, null, populates);
+};
+
+/**
+ * @param {*} params
+ * @param {*} authUser
+ */
+const show = async (params, authUser = {}) => {
+	let queryParams = {
+		findOne: true,
+		...params,
+	};
+
+	if (params.id || params._id) {
+		queryParams.where__id = params.id || params._id;
+	}
+
+	if (authUser.clientId) {
+		queryParams.where_client = authUser.clientId;
+	}
+
+	return await MongoORM.buildQuery(queryParams, Model, null, populates);
+};
+
+/**
+ * @param {*} params
+ * @param {*} authUser
+ */
+const insert = async (params, authUser = {}) => {
+	const newData = new Model(params);
+
+	await newData.save();
+
+	return newData;
+};
+
+/**
+ * @param {*} params
+ * @param {*} authUser
+ */
+const update = async (params, authUser = {}) => {
+	const dataDB = await show(params, authUser);
+
+	if (!dataDB) {
+		throw new Error("404:not_found");
+	}
+
+	if (authUser.clientId && dataDB.client !== authUser.clientId) {
+		throw new Error("409");
+	}
+
+	for (const key in params) {
+		if (updateFields.includes(key)) {
+			dataDB[key] = params[key];
+		}
+	}
+
+	await dataDB.save();
+
+	return dataDB;
+};
+
+/**
+ * @param {*} params
+ * @param {*} authUser
+ */
+const destroy = async (params, authUser = {}) => {
+	const record = await show(params, authUser)
+
+    if (!record) throw new Error('404:not_found');
+
+    return await Model.findByIdAndDelete(record._id);
+};
+
+module.exports = {
+	get,
+	show,
+	insert,
+	update,
+	destroy,
+};

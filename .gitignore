@@ -1,0 +1,13 @@
+node_modules
+.env
+.DS_Store
+._.DS_Store
+/**/.DS_Store
+**/._.DS_Store
+.DS_Store
+legacy/.DS_Store
+Repositories/.DS_Store
+facetec_front/node_modules
+.vscode
+
+
