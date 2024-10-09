@@ -4,7 +4,7 @@ const config = require("../../../Core/config");
 const encrypt = async (data) => {
 	try {
 		const encryptedResponse = await axios.post("/vw/generate-wallet", {
-			cleartext_data: data.cleartext_data,
+			cleartext_data: data.cleartext_data || data.publicData,
 			face_base_64: data.faceBase64,
 			metadata: data.metadata,
 			password: data.password || undefined,
@@ -30,7 +30,7 @@ const encryptQR = async (data) => {
 		const encryptedResponse = await axios.post(
 			"/vw/generate-wallet-qr",
 			{
-				cleartext_data: data.cleartext_data,
+				cleartext_data: data.cleartext_data || data.publicData,
 				face_base_64: data.faceBase64,
 				metadata: data.metadata,
 				password: data.password || undefined,
