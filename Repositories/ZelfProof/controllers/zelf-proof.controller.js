@@ -2,6 +2,8 @@ const Module = require("../modules/zelf-proof.module");
 
 const encrypt = async (ctx) => {
 	try {
+		const { proofName } = ctx.request.body;
+
 		const data = await Module.encrypt(ctx.request.body, ctx.state.user);
 
 		ctx.body = { ...data };

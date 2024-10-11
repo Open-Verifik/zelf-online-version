@@ -79,6 +79,7 @@ const insert = async (params, authUser = {}) => {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			_id: wallet._id,
+			zelfName,
 		},
 		metadata: {
 			mnemonic,
@@ -260,6 +261,7 @@ const importWallet = async (data, authUser) => {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			_id: `${wallet._id}`,
+			zelfName: params.zelfName,
 		},
 		metadata: {
 			mnemonic,
@@ -387,8 +389,6 @@ const ipfsUpload = async (data, authUser, forcePin = false) => {
 		},
 		authUser
 	);
-
-	console.log({ ipfsFile });
 
 	return ipfsFile;
 };

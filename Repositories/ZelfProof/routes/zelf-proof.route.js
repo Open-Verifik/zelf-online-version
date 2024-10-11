@@ -1,6 +1,7 @@
 const config = require("../../../Core/config");
 
 const Controller = require("../controllers/zelf-proof.controller");
+
 const Middleware = require("../middlewares/zelf-proof.middleware");
 
 const base = "/zelf-proof";
