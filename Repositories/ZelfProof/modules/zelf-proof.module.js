@@ -39,7 +39,7 @@ const encrypt = async (data) => {
 
 		return { zelfProof };
 	} catch (exception) {
-		console.log({
+		console.error({
 			data: exception.response?.data,
 		});
 

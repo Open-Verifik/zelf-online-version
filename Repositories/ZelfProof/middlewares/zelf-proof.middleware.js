@@ -47,8 +47,6 @@ const schemas = {
 const encryptValidation = async (ctx, next) => {
 	const authUser = ctx.state.user;
 
-	console.log({ authUser });
-
 	if (!authUser.superAdminId && !authUser.clientId) {
 		ctx.status = 403;
 

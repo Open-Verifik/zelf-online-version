@@ -17,8 +17,6 @@ const generateKey = async (type = "session", identifier, name, email, password) 
 		passphrase: type === "session" ? passphrase : globalPassphrase,
 	});
 
-	console.log({ passphrase: type === "session" ? passphrase : globalPassphrase, type, identifier });
-
 	await _saveKey(type, identifier, privateKey, publicKey, { name, email });
 
 	return { publicKey, privateKey };
@@ -39,7 +37,7 @@ const _saveKey = async (type = "session", identifier, privateKey, publicKey, use
 
 		await keyToStore.save();
 	} catch (exception) {
-		console.log({
+		console.error({
 			keyToStoreExcp: exception,
 			type,
 			identifier: `${identifier}`,
@@ -84,8 +82,6 @@ const decryptKey = async (type = "session", encryptedKey) => {
 
 	let decrypted = null;
 
-	console.log({ message, passwords: [type === "session" ? passphrase : globalPassphrase] });
-
 	try {
 		decrypted = await openpgp.decrypt({
 			message,
@@ -95,8 +91,6 @@ const decryptKey = async (type = "session", encryptedKey) => {
 	} catch (exception) {
 		console.error({ exception });
 	}
-
-	console.log({ decrypted });
 
 	return decrypted?.data;
 };

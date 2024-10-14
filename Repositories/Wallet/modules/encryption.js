@@ -16,7 +16,7 @@ const encrypt = async (data) => {
 
 		return encryptedResponse?.data?.zelfProof;
 	} catch (exception) {
-		console.log({
+		console.error({
 			exception,
 			data: exception.response?.data,
 		});
@@ -51,7 +51,7 @@ const encryptQR = async (data) => {
 			return `data:image/png;base64,${base64Image}`;
 		}
 	} catch (exception) {
-		console.log({ VWEx: exception });
+		console.error({ VWEx: exception });
 
 		return exception?.message;
 	}
@@ -96,7 +96,7 @@ const preview = async (data) => {
 
 		return encryptedResponse.data;
 	} catch (exception) {
-		console.log({
+		console.error({
 			exception,
 			_exception: exception.response?.data,
 		});
