@@ -126,9 +126,11 @@ const encryptContent = async (message) => {
 const _getPrivateKey = async (authUser) => {
 	const pgpRecord = await PGPKeyModule.findKey(authUser.identifier);
 
+	console.log({ pgpRecord });
+
 	if (!pgpRecord) throw new Error("key_not_found");
 
-	const privateKey = await PGPKeyModule.decryptKey(pgpRecord.type, pgpRecord.key, authUser.identifier, undefined);
+	const privateKey = await PGPKeyModule.decryptKey(pgpRecord.type, pgpRecord.key);
 
 	return privateKey;
 };
@@ -137,7 +139,11 @@ const sessionDecrypt = async (content, authUser) => {
 	try {
 		const privateKey = await _getPrivateKey(authUser);
 
+		console.log({ privateKey, authUser });
+
 		const decryptedContent = await PGPKeyModule.decryptContent("session", privateKey, content);
+
+		console.log({ decryptedContent });
 
 		return decryptedContent;
 	} catch (exception) {

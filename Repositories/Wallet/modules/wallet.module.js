@@ -233,6 +233,8 @@ const _decryptParams = async (data, authUser) => {
 		};
 	}
 
+	console.log({ authUser });
+
 	const password = data.password ? await sessionModule.sessionDecrypt(data.password, authUser) : undefined;
 
 	const mnemonic = data.phrase ? await sessionModule.sessionDecrypt(data.phrase, authUser) : undefined;

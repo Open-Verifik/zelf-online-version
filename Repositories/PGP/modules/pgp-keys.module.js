@@ -7,6 +7,7 @@ const MongoORM = require("../../../Core/mongo-orm");
 
 const generateKey = async (type = "session", identifier, name, email, password) => {
 	name = name || "Miguel T";
+
 	email = email || "miguel@zelf.world";
 
 	const { privateKey, publicKey } = await openpgp.generateKey({
@@ -16,14 +17,15 @@ const generateKey = async (type = "session", identifier, name, email, password) 
 		passphrase: type === "session" ? passphrase : globalPassphrase,
 	});
 
-	await _saveKey(type, identifier, privateKey, publicKey, { name, email }, password);
+	console.log({ passphrase: type === "session" ? passphrase : globalPassphrase, type, identifier });
+
+	await _saveKey(type, identifier, privateKey, publicKey, { name, email });
 
 	return { publicKey, privateKey };
 };
 
-const _saveKey = async (type, identifier, privateKey, publicKey, userIDs, password) => {
-	// Encrypt the private key before storing
-	const encryptedPrivateKey = await encryptKey(type, privateKey, identifier, password);
+const _saveKey = async (type = "session", identifier, privateKey, publicKey, userIDs) => {
+	const encryptedPrivateKey = await encryptKey(type, privateKey);
 
 	try {
 		const keyToStore = new Model({
@@ -63,7 +65,7 @@ const findKey = async (identifier) => {
 	return pgpRecord;
 };
 
-const encryptKey = async (type = "session", key, identifier = "generic", password = "password") => {
+const encryptKey = async (type = "session", key) => {
 	const encryptedKey = await openpgp.encrypt({
 		message: await openpgp.createMessage({ text: key }), // input as Message object
 		passwords: [type === "session" ? passphrase : globalPassphrase],
@@ -73,7 +75,7 @@ const encryptKey = async (type = "session", key, identifier = "generic", passwor
 	return encryptedKey;
 };
 
-const decryptKey = async (type = "session", encryptedKey, identifier = "identifier", password = "password") => {
+const decryptKey = async (type = "session", encryptedKey) => {
 	if (!encryptedKey) return null;
 
 	const message = await openpgp.readMessage({
@@ -81,6 +83,8 @@ const decryptKey = async (type = "session", encryptedKey, identifier = "identifi
 	});
 
 	let decrypted = null;
+
+	console.log({ message, passwords: [type === "session" ? passphrase : globalPassphrase] });
 
 	try {
 		decrypted = await openpgp.decrypt({
@@ -91,6 +95,8 @@ const decryptKey = async (type = "session", encryptedKey, identifier = "identifi
 	} catch (exception) {
 		console.error({ exception });
 	}
+
+	console.log({ decrypted });
 
 	return decrypted?.data;
 };
