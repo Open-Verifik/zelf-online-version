@@ -95,7 +95,7 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 			metadata,
 		};
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 	}
 
 	return null;

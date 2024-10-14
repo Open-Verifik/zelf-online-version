@@ -261,7 +261,7 @@ const importWallet = async (data, authUser) => {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			_id: `${wallet._id}`,
-			zelfName: params.zelfName,
+			zelfName: data.zelfName,
 		},
 		metadata: {
 			mnemonic,
