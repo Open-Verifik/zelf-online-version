@@ -1,7 +1,3 @@
-Based on the provided code and PPT summary, here's a professional `README.md` for your GitHub repository:
-
----
-
 # Zelf Name Service (ZNS) - Backend API
 
 Welcome to the official repository for the **Zelf Name Service (ZNS)** Backend API, part of the **Zelf Wallet** project. This API offers essential functionalities for searching and registering Zelf names, encrypting and decrypting wallets, and managing ZelfProofs.
