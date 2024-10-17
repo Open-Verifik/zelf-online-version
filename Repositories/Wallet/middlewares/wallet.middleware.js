@@ -14,6 +14,14 @@ const schemas = {
 		zelfProof: string(),
 		addServerPassword: boolean(),
 	},
+	zkProof: {
+		faceBase64: string().required(),
+		identifier: string(),
+		password: string(),
+		zelfProof: string(),
+		addServerPassword: boolean(),
+		zkProof: string().required(),
+	},
 	seeWallet: {
 		identifier: string(),
 		zelfProof: string().required(),
@@ -74,6 +82,20 @@ const createValidation = async (ctx, next) => {
 
 const decryptWalletValidation = async (ctx, next) => {
 	const valid = validate(schemas.decryptWallet, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	await next();
+};
+
+const zkProofValidation = async (ctx, next) => {
+	const valid = validate(schemas.zkProof, ctx.request.body);
 
 	if (valid.error) {
 		ctx.status = 409;
@@ -168,4 +190,5 @@ module.exports = {
 	importValidation,
 	searchOpenWalletsValidation,
 	ipfsValidation,
+	zkProofValidation,
 };

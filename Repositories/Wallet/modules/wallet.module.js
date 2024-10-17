@@ -74,6 +74,8 @@ const insert = async (params, authUser = {}) => {
 
 	const { face, password } = await _decryptParams(params, authUser);
 
+	const zkProof = await OfflineProofModule.createProof(mnemonic);
+
 	const dataToEncrypt = {
 		cleartext_data: {
 			ethAddress: eth.address,
@@ -83,6 +85,7 @@ const insert = async (params, authUser = {}) => {
 		},
 		metadata: {
 			mnemonic,
+			zkProof,
 		},
 		faceBase64: face,
 		password,
@@ -91,15 +94,15 @@ const insert = async (params, authUser = {}) => {
 		addServerPassword: Boolean(params.addServerPassword),
 	};
 
-	const encryptedWallet = await encrypt(dataToEncrypt);
+	const zelfProof = await encrypt(dataToEncrypt);
 
-	if (!encryptedWallet) throw new Error("409:Wallet_could_not_be_encrypted");
+	if (!zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
 
 	const response = {
-		encryptedWallet,
+		zelfProof,
 	};
 
-	if (params.seeWallet) {
+	if (params.previewZelfProof) {
 		response.metadata = dataToEncrypt.metadata;
 		response.cleartext_data = dataToEncrypt.cleartext_data;
 		response.record_id = wallet._id;
@@ -114,9 +117,7 @@ const insert = async (params, authUser = {}) => {
 
 	wallet.publicData = dataToEncrypt.cleartext_data;
 
-	wallet.zelfProof = await sessionModule.walletEncrypt(encryptedWallet, eth.address, password);
-
-	// wallet.zkProof = await OfflineProofModule.createProof(encryptedWallet);
+	// wallet.zelfProof = await sessionModule.walletEncrypt(zelfProof, eth.address, password);
 
 	wallet.ethAddress = eth.address;
 
@@ -135,7 +136,7 @@ const insert = async (params, authUser = {}) => {
 						ethAddress: wallet.ethAddress,
 						solanaAddress: wallet.solanaAddress,
 						hasPassword: `${wallet.hasPassword}`,
-						zelfProof: encryptedWallet,
+						zelfProof,
 					},
 				},
 				{ ...authUser, pro: true }
@@ -146,8 +147,9 @@ const insert = async (params, authUser = {}) => {
 		...wallet.toJSON(),
 		qrCode,
 		zelfNameService,
-		zelfProof: encryptedWallet,
-		metadata: params.seeWallet ? dataToEncrypt.metadata : undefined,
+		zelfProof,
+		metadata: params.previewZelfProof ? dataToEncrypt.metadata : undefined,
+		zkProof,
 	};
 };
 
@@ -160,24 +162,16 @@ const decryptWallet = async (params, authUser) => {
 
 	let zelfProof = params.zelfProof;
 
+	const zelfName = params.zelfName;
+
+	if (!zelfProof && zelfName) {
+		// TODO
+	}
+
 	if (!zelfProof) {
-		const wallet = await searchOpenWallets(
-			{
-				address: params.identifier,
-			},
-			true
-		);
-
-		if (!wallet) {
-			const error = new Error("wallet_not_found");
-
-			error.status = 404;
-
-			throw error;
-		}
-
-		// decrypt hash
-		zelfProof = await sessionModule.walletDecrypt(wallet.zelfProof, wallet.ethAddress, password);
+		const error = new Error("wallet_not_found");
+		error.status = 404;
+		throw error;
 	}
 
 	const decryptedWallet = await decrypt({
@@ -204,6 +198,44 @@ const decryptWallet = async (params, authUser) => {
 		image,
 		// zkProof: await OfflineProofModule.createProof(zelfProof),
 		zelfProof,
+	};
+};
+
+const validateZkProof = async (params, authUser) => {
+	const { face, password } = await _decryptParams(params, authUser);
+
+	let zelfProof = params.zelfProof;
+
+	const { zelfName, zkProof } = params;
+
+	if (!zelfProof && zelfName) {
+		// TODO
+	}
+
+	if (!zelfProof) {
+		const error = new Error("wallet_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const decryptedZelfProof = await decrypt({
+		zelfProof,
+		faceBase64: face,
+		password,
+		addServerPassword: Boolean(params.addServerPassword),
+	});
+
+	if (decryptedZelfProof.error) {
+		const error = new Error(decryptedZelfProof.error.code);
+		error.status = 409;
+		throw error;
+	}
+
+	const validation = await OfflineProofModule.validateProof(decryptedZelfProof.metadata.zkProof, decryptedZelfProof.metadata.mnemonic);
+
+	return {
+		sameZKProof: Boolean(zkProof === decryptedZelfProof.metadata.zkProof),
+		validation,
 	};
 };
 
@@ -402,4 +434,5 @@ module.exports = {
 	importWallet,
 	searchOpenWallets,
 	ipfsUpload,
+	validateZkProof,
 };

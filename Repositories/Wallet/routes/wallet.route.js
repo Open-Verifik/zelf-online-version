@@ -19,4 +19,6 @@ module.exports = (server) => {
 	server.post(`${PATH}/decrypt`, Middleware.decryptWalletValidation, Controller.decryptWallet);
 
 	server.post(`${PATH}/ipfs`, Middleware.ipfsValidation, Controller.ipfsUpload);
+
+	server.post(`${PATH}/validate-zk-proof`, Middleware.zkProofValidation, Controller.zkProof);
 };
