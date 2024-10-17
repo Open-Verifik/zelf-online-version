@@ -51,7 +51,7 @@ const create = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.log({ error });
+		console.error({ error });
 
 		ctx.status = error.status || 500;
 
@@ -99,7 +99,7 @@ const getPublicKey = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.log({ error });
+		console.error({ error });
 
 		ctx.status = error?.status || 500;
 

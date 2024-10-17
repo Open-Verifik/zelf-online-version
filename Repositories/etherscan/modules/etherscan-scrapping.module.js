@@ -282,7 +282,8 @@ const getGasTracker = async (params) => {
 
 		return response;
 	} catch (error) {
-		console.log({ error: error });
+		console.error({ error: error });
+		return null;
 	}
 };
 

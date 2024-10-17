@@ -1,4 +1,4 @@
-const { Field, Poseidon, isReady, shutdown } = require("o1js");
+const { Field, Poseidon } = require("o1js");
 
 const createProof = async (content) => {
 	// Convert the hash to a BigInt

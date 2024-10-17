@@ -74,7 +74,7 @@ const create = async (ctx) => {
 const decryptWallet = async (ctx) => {
 	try {
 		const data = await Module.decryptWallet(ctx.request.body, ctx.state.user);
-		// delete the session
+
 		await SessionModule.deleteSession(ctx.state.user);
 		ctx.body = { data };
 	} catch (error) {
@@ -82,7 +82,28 @@ const decryptWallet = async (ctx) => {
 
 		ctx.status = error.status || 500;
 
-		// delete the session
+		await SessionModule.deleteSession(ctx.state.user);
+
+		ctx.body = { error: error.message };
+	}
+};
+
+/**
+ * validate a zkProof
+ * @param {Object} ctx
+ */
+const zkProof = async (ctx) => {
+	try {
+		const data = await Module.validateZkProof(ctx.request.body, ctx.state.user);
+
+		await SessionModule.deleteSession(ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error(error);
+
+		ctx.status = error.status || 500;
+
 		await SessionModule.deleteSession(ctx.state.user);
 
 		ctx.body = { error: error.message };
@@ -167,4 +188,5 @@ module.exports = {
 	importWallet,
 	searchOpenWallets,
 	ipfsUpload,
+	zkProof,
 };

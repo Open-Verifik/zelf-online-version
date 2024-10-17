@@ -6,8 +6,6 @@ const webhookHandler = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.log({ error });
-
 		ctx.status = error?.status || 500;
 
 		ctx.body = { error: error?.message || error };

@@ -66,8 +66,6 @@ const _addToMailgun = async (params, subscriber) => {
 			},
 			headers: formData.getHeaders(),
 		});
-
-		console.log({ response: response?.data });
 	} catch (exception) {
 		console.error({ exception: exception?.response?.data });
 	}
@@ -108,7 +106,6 @@ const sendWelcomeEmail = async (email) => {
 
 	try {
 		const result = await mgClient.messages.create(domain, data);
-		console.log({ emailSent: result });
 	} catch (error) {
 		console.error("Error sending email:", { error });
 	}
