@@ -50,6 +50,8 @@ const show = async (params, authUser = {}) => {
 const insert = async (params, authUser = {}) => {
 	const { zelfName } = params;
 
+	params.previewZelfProof = true; // making sure the app always display it for now, for our demos
+
 	const wallet = new Model({});
 
 	const mnemonic = params.mnemonic || generateMnemonic(params.wordsCount);
