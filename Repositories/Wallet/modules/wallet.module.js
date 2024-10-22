@@ -44,11 +44,42 @@ const show = async (params, authUser = {}) => {
 };
 
 /**
+ *
+ * @param {string} zelfName
+ */
+const findDuplicatedZelfName = async (zelfName) => {
+	let ipfsFile;
+
+	try {
+		ipfsFile = await IPFSModule.get({
+			key: "zelfName",
+			value: zelfName,
+		});
+	} catch (exception) {
+		return;
+	}
+
+	if (ipfsFile) {
+		const error = new Error("zelfName_is_taken");
+
+		error.status = 409;
+
+		throw error;
+	}
+
+	return ipfsFile;
+};
+
+/**
  * @param {*} params
  * @param {*} authUser
  */
 const insert = async (params, authUser = {}) => {
 	const { zelfName } = params;
+
+	await findDuplicatedZelfName(zelfName);
+
+	throw new Error("stop_here_for_now");
 
 	params.previewZelfProof = true; // making sure the app always display it for now, for our demos
 

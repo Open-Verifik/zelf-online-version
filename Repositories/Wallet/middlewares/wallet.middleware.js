@@ -2,6 +2,7 @@ const { string, validate, boolean, number } = require("../../../Core/JoiUtils");
 
 const schemas = {
 	createWallet: {
+		zelfName: string().required(),
 		faceBase64: string().required(),
 		password: string(),
 		addServerPassword: boolean(),
@@ -28,6 +29,7 @@ const schemas = {
 		addServerPassword: boolean(),
 	},
 	import: {
+		zelfName: string().required(),
 		faceBase64: string().required(),
 		password: string(),
 		phrase: string().required(),

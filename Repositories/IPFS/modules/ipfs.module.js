@@ -9,7 +9,9 @@ const get = async (data) => {
 
 	if (name) return await IPFS.filter("name", name);
 
-	if (key) return await IPFS.filter(key, value);
+	if (key && value) return await IPFS.filter(key, value);
+
+	return null;
 };
 
 const show = async (data, authUser) => {
