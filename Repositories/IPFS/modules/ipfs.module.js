@@ -11,7 +11,11 @@ const get = async (data) => {
 
 	if (key && value) return await IPFS.filter(key, value);
 
-	return null;
+	const error = new Error("Conditions_not_acceptable");
+
+	error.status = 412;
+
+	throw error;
 };
 
 const show = async (data, authUser) => {
