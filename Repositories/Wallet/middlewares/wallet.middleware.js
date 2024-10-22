@@ -77,7 +77,50 @@ const createValidation = async (ctx, next) => {
 		return;
 	}
 
+	const invalidZelfName = _isZelfNameInvalid(ctx.request.body);
+
+	if (invalidZelfName) {
+		ctx.status = invalidZelfName.status;
+
+		ctx.body = invalidZelfName.body;
+
+		return;
+	}
+
 	await next();
+};
+
+const _isZelfNameInvalid = (body) => {
+	if (!body.zelfName) return;
+
+	body.zelfName = body.zelfName.toLowerCase();
+
+	// First, check if the name ends with '.zelf'
+	if (!body.zelfName.endsWith(".zelf")) {
+		return {
+			status: 409,
+			body: { validationError: "Zelf name must end with '.zelf'." },
+		};
+	}
+
+	if (body.zelfName.length > 20) {
+		return {
+			status: 409,
+			body: { validationError: "Zelf name must be 20 characters or fewer." },
+		};
+	}
+
+	// Extract the part before '.zelf'
+	const nameWithoutSuffix = body.zelfName.slice(0, -5); // Remove the last '.zelf'
+
+	const zelfNamePattern = /^[a-z]+[a-z0-9]*(?:[.-][a-z0-9]+)*[a-z0-9]$/;
+
+	if (!zelfNamePattern.test(nameWithoutSuffix)) {
+		return {
+			status: 409,
+			body: { validationError: "Zelf name must include '.zelf', contain only letters, and have no special characters or numbers." },
+		};
+	}
 };
 
 const decryptWalletValidation = async (ctx, next) => {
