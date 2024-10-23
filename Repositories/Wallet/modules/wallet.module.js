@@ -79,8 +79,6 @@ const insert = async (params, authUser = {}) => {
 
 	await findDuplicatedZelfName(zelfName);
 
-	throw new Error("stop_here_for_now");
-
 	params.previewZelfProof = true; // making sure the app always display it for now, for our demos
 
 	const wallet = new Model({});
