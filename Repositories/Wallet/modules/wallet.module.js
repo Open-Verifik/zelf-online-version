@@ -4,6 +4,7 @@ const { encrypt, decrypt, preview, encryptQR } = require("./encryption");
 const MongoORM = require("../../../Core/mongo-orm");
 const { createEthWallet } = require("./eth");
 const { createSolanaWallet } = require("./solana");
+const { createBTCWallet } = require("./btc");
 const sessionModule = require("../../Session/modules/session.module");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
@@ -70,6 +71,24 @@ const findDuplicatedZelfName = async (zelfName) => {
 	return ipfsFile;
 };
 
+const evmCompatibleTickers = [
+	"ETH", // Ethereum
+	"BNB", // Binance Smart Chain
+	"MATIC", // Polygon
+	"AVAX", // Avalanche
+	"FTM", // Fantom
+	"ARB", // Arbitrum
+	"OP", // Optimism
+	"CRO", // Cronos
+	"ONE", // Harmony
+	"KLAY", // Klaytn
+	"xDAI", // Gnosis Chain
+	"GLMR", // Moonbeam
+	"CELO", // Celo
+	"OKT", // OKX Chain
+	"AURORA", // Aurora (NEAR EVM)
+].join(","); // Create a single string of tickers;
+
 /**
  * @param {*} params
  * @param {*} authUser
@@ -81,37 +100,28 @@ const insert = async (params, authUser = {}) => {
 
 	params.previewZelfProof = true; // making sure the app always display it for now, for our demos
 
-	const wallet = new Model({});
+	const wallet = {};
 
 	const mnemonic = params.mnemonic || generateMnemonic(params.wordsCount);
 
-	const words = {};
-
 	const wordsArray = mnemonic.split(" ");
 
-	if (wordsArray.length !== 12 && wordsArray.length !== 24) {
-		throw new Error("409:wallet_cannot_be_generated_phase_error");
-	}
+	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:wallet_cannot_be_generated_phase_error");
 
 	const eth = createEthWallet(mnemonic);
-
+	const btc = createBTCWallet(mnemonic);
 	const solana = await createSolanaWallet(mnemonic);
-
-	for (let index = 0; index < wordsArray.length; index++) {
-		const word = wordsArray[index];
-
-		words[index + 1] = word;
-	}
 
 	const { face, password } = await _decryptParams(params, authUser);
 
 	const zkProof = await OfflineProofModule.createProof(mnemonic);
 
 	const dataToEncrypt = {
-		cleartext_data: {
+		publicData: {
 			ethAddress: eth.address,
+			evm: evmCompatibleTickers,
 			solanaAddress: solana.address,
-			_id: wallet._id,
+			btcAddress: btc.address,
 			zelfName,
 		},
 		metadata: {
@@ -120,7 +130,7 @@ const insert = async (params, authUser = {}) => {
 		},
 		faceBase64: face,
 		password,
-		_id: wallet._id,
+		_id: zelfName,
 		tolerance: params.tolerance,
 		addServerPassword: Boolean(params.addServerPassword),
 	};
@@ -129,29 +139,16 @@ const insert = async (params, authUser = {}) => {
 
 	if (!zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
 
-	const response = {
-		zelfProof,
-	};
-
-	if (params.previewZelfProof) {
-		response.metadata = dataToEncrypt.metadata;
-		response.cleartext_data = dataToEncrypt.cleartext_data;
-		response.record_id = wallet._id;
-		response.mnemonic = mnemonic;
-	}
-
-	let qrCode = null;
-
 	if (!params.skipQRCode) {
 		wallet.image = await encryptQR(dataToEncrypt);
 	}
 
-	wallet.publicData = dataToEncrypt.cleartext_data;
+	wallet.publicData = dataToEncrypt.publicData;
 
 	// wallet.zelfProof = await sessionModule.walletEncrypt(zelfProof, eth.address, password);
 
 	wallet.ethAddress = eth.address;
-
+	wallet.btcAddress = btc.address;
 	wallet.solanaAddress = solana.address;
 
 	wallet.hasPassword = Boolean(password);
@@ -165,6 +162,8 @@ const insert = async (params, authUser = {}) => {
 					metadata: {
 						zelfName,
 						ethAddress: wallet.ethAddress,
+						btcAddress: btc.address,
+						evm: evmCompatibleTickers,
 						solanaAddress: wallet.solanaAddress,
 						hasPassword: `${wallet.hasPassword}`,
 						zelfProof,
@@ -175,8 +174,7 @@ const insert = async (params, authUser = {}) => {
 		: {};
 
 	return {
-		...wallet.toJSON(),
-		qrCode,
+		...wallet,
 		zelfNameService,
 		zelfProof,
 		metadata: params.previewZelfProof ? dataToEncrypt.metadata : undefined,
