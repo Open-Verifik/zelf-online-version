@@ -310,8 +310,12 @@ const _decryptParams = async (data, authUser) => {
  * @param {Object} data
  * @returns Wallet
  */
-const importWallet = async (data, authUser) => {
-	const { password, mnemonic, face } = await _decryptParams(data, authUser);
+const importWallet = async (params, authUser) => {
+	const { password, mnemonic, face } = await _decryptParams(params, authUser);
+
+	const { zelfName } = params;
+
+	await findDuplicatedZelfName(zelfName);
 
 	const eth = createEthWallet(mnemonic);
 
@@ -324,7 +328,7 @@ const importWallet = async (data, authUser) => {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			_id: `${wallet._id}`,
-			zelfName: data.zelfName,
+			zelfName: params.zelfName,
 		},
 		metadata: {
 			mnemonic,
@@ -332,11 +336,11 @@ const importWallet = async (data, authUser) => {
 		faceBase64: face,
 		password,
 		_id: eth.address,
-		tolerance: data.tolerance || undefined,
-		addServerPassword: Boolean(data.addServerPassword),
+		tolerance: params.tolerance || undefined,
+		addServerPassword: Boolean(params.addServerPassword),
 	};
 
-	return _saveImportedWallet(wallet, data, dataToEncrypt, password, authUser);
+	return _saveImportedWallet(wallet, params, dataToEncrypt, password, authUser);
 };
 
 /**

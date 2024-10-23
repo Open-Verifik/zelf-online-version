@@ -194,6 +194,16 @@ const importValidation = async (ctx, next) => {
 		return;
 	}
 
+	const invalidZelfName = _isZelfNameInvalid(ctx.request.body);
+
+	if (invalidZelfName) {
+		ctx.status = invalidZelfName.status;
+
+		ctx.body = invalidZelfName.body;
+
+		return;
+	}
+
 	await next();
 };
 
