@@ -171,13 +171,13 @@ const _uploadZelfProof = async (zelfProofQRCode) => {
 
 const search = async (zelfName, extraConditions = {}) => {
 	if (!zelfName) return null;
-	// // owners: ["vzrsUNMg17WFPmh73xZguPbn_cZzqnef3btvmn6-YDk"]
 
 	const query = {
 		query: `
     {
  		transactions(
 			tags: [{ name: "zelfName", values: "${zelfName}" }],
+			owners: ["vzrsUNMg17WFPmh73xZguPbn_cZzqnef3btvmn6-YDk"]
 		) {
 			edges {
 				node {
