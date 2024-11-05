@@ -4,10 +4,6 @@ const QRCode = require("qrcode");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 
 const encrypt = async (data) => {
-	const { proofName } = data;
-
-	let zelfNameService = undefined;
-
 	try {
 		const encryptedResponse = await axios.post("/zelf/encrypt", {
 			cleartext_data: data.publicData,
@@ -22,28 +18,23 @@ const encrypt = async (data) => {
 
 		const zelfProof = encryptedResponse.data.zelfProof;
 
-		// if (proofName) {
-		// 	zelfNameService = await IPFSModule.insert(
-		// 		{
-		// 			name,
-		// 			metadata: metadata || wallet.publicData,
-		// 			pinIt,
-		// 			base64: qrCode,
-		// 			forcePin,
-		// 		},
-		// 		authUser
-		// 	);
-		// }
-
-		// proofName: string (Optional) - The unique Zelf Proof Name associated with the ZelfProof (e.g., miguel:nextflix.proof). It is used for querying and retrieving the ZelfProof stored on the Zelf Name Service (ZNS), enabling secure decryption with additional factors such as face + password. This name simplifies user interactions with the system by providing a memorable identifier for accessing and managing their encrypted data.
-
 		return { zelfProof };
 	} catch (exception) {
-		console.error({
-			data: exception.response?.data,
-		});
+		const _error = exception.response?.data;
 
-		return null;
+		let error = new Error(_error?.message || "Something went wrong");
+
+		switch (_error.code) {
+			case "ERR_INVALID_IMAGE":
+				error.status = 400;
+
+				break;
+
+			default:
+				break;
+		}
+
+		throw error;
 	}
 };
 

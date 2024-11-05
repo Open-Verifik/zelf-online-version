@@ -16,12 +16,24 @@ const encrypt = async (data) => {
 
 		return encryptedResponse?.data?.zelfProof;
 	} catch (exception) {
+		const _error = exception.response?.data;
 		console.error({
-			exception,
-			data: exception.response?.data,
+			data: _error,
 		});
 
-		return null;
+		let error = new Error(_error?.message || "Something went wrong");
+
+		switch (_error.code) {
+			case "ERR_INVALID_IMAGE":
+				error.status = 400;
+
+				break;
+
+			default:
+				break;
+		}
+
+		throw error;
 	}
 };
 
