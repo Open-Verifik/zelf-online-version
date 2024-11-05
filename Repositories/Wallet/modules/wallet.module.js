@@ -10,6 +10,7 @@ const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
 const populates = [];
+const ArwaveModule = require("../../Arweave/modules/arweave.module");
 
 /**
  * @param {*} params
@@ -150,7 +151,6 @@ const insert = async (params, authUser = {}) => {
 	wallet.ethAddress = eth.address;
 	wallet.btcAddress = btc.address;
 	wallet.solanaAddress = solana.address;
-
 	wallet.hasPassword = Boolean(password);
 
 	const zelfNameService = zelfName

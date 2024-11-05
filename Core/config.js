@@ -95,6 +95,17 @@ const configuration = {
 		zk: process.env.ZK1 || "_",
 		_zk: process.env.ZELF1 || "_",
 	},
+	arwave: {
+		key: process.env.ARWAVE_KEY,
+		n: process.env.ARWAVE_N,
+		e: process.env.ARWAVE_E,
+		d: process.env.ARWAVE_D,
+		p: process.env.ARWAVE_P,
+		q: process.env.ARWAVE_Q,
+		dp: process.env.ARWAVE_DP,
+		dq: process.env.ARWAVE_DQ,
+		qi: process.env.ARWAVE_QI,
+	},
 };
 
 module.exports = configuration;
