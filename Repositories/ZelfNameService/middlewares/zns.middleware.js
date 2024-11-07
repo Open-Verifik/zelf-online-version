@@ -3,6 +3,7 @@ const { string, validate, boolean, number, stringEnum } = require("../../../Core
 const schemas = {
 	lease: {
 		type: stringEnum(["create", "import"]).required(),
+		// years: number().required(),
 	},
 	create: {
 		zelfName: string().required(),

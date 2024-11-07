@@ -28,6 +28,27 @@ const evmCompatibleTickers = [
 	"AURORA", // Aurora (NEAR EVM)
 ].join(","); // Create a single string of tickers;
 
+const _calculateZelfNamePrice = (nameLength) => {
+	const basePrice = 24;
+
+	const priceMultipliers = {
+		1: 3,
+		2: 2,
+		3: 1.5,
+		4: 1.25,
+	};
+
+	if (nameLength >= 1 && nameLength <= 4) {
+		return basePrice * priceMultipliers[nameLength];
+	} else if (nameLength >= 5 && nameLength <= 15) {
+		return basePrice;
+	} else if (nameLength >= 15 && nameLength <= 20) {
+		return basePrice * 0.75;
+	} else {
+		return basePrice * 0.5;
+	}
+};
+
 /**
  *
  * @param {*} params
@@ -35,6 +56,12 @@ const evmCompatibleTickers = [
  */
 const searchZelfName = async (params, authUser) => {
 	const searchResults = await ArweaveModule.search(params.zelfName, {});
+
+	if (searchResults?.available)
+		return {
+			price: _calculateZelfNamePrice(params.zelfName.split(".zelf")[0].length),
+			...searchResults,
+		};
 
 	const zelfNames = [];
 
@@ -166,11 +193,9 @@ const _decryptParams = async (data, authUser) => {
 };
 
 const _findDuplicatedZelfName = async (zelfName, authUser) => {
-	try {
-		await searchZelfName({ zelfName }, authUser);
-	} catch (exception) {
-		return null;
-	}
+	const zelfNameObject = await searchZelfName({ zelfName }, authUser);
+
+	if (zelfNameObject.available) return null;
 
 	const error = new Error("zelfName_is_taken");
 

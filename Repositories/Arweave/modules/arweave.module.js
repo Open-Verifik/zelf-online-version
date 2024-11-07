@@ -4,6 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const config = require("../../../Core/config");
 const axios = require("axios");
+const arweaveUrl = `https://arweave.net`;
+const explorerUrl = `https://viewblock.io/arweave/tx`;
 
 const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 	/**
@@ -85,7 +87,11 @@ const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 	// Clean up the temporary file after upload
 	fs.unlinkSync(tempFilePath);
 
-	return { uploadResult, address };
+	return {
+		...uploadResult,
+		url: `${arweaveUrl}/${uploadResult.id}`,
+		explorerUrl: `${explorerUrl}/${uploadResult.id}`,
+	};
 };
 
 const _uploadZelfProof = async (zelfProofQRCode) => {
@@ -207,11 +213,10 @@ const search = async (zelfName, extraConditions = {}) => {
 	const searchResults = result.data?.data?.transactions?.edges;
 
 	if (!searchResults || !searchResults.length) {
-		const error = new Error("zelfName_not_found");
-
-		error.status = 404;
-
-		throw error;
+		return {
+			zelfName,
+			available: true,
+		};
 	}
 
 	return searchResults;
