@@ -38,28 +38,34 @@ const searchZelfName = async (params, authUser) => {
 
 	const zelfNames = [];
 
-	// now let's get the image and put as base64
 	for (let index = 0; index < searchResults.length; index++) {
-		const transactionRecord = searchResults[index];
+		const zelfNameObject = await _formatArweaveSearchResult(searchResults[index]);
 
-		const zelfName = {
-			id: transactionRecord.node?.id,
-			tags: transactionRecord.node?.tags,
-			url: `${arweaveUrl}/${transactionRecord.node?.id}`,
-			explorerUrl: `${explorerUrl}/${transactionRecord.node?.id}`,
-		};
-
-		// Find the "zelfProof" tag and get its value
-		const zelfProofTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfProof");
-
-		zelfName.zelfProof = zelfProofTag ? zelfProofTag.value : null;
-
-		zelfName.zelfProofQRCode = await _convertZelfProofToBase64(zelfName.id);
-
-		zelfNames.push(zelfName);
+		zelfNames.push(zelfNameObject);
 	}
 
 	return zelfNames;
+};
+
+const _formatArweaveSearchResult = async (transactionRecord) => {
+	const zelfNameObject = {
+		id: transactionRecord.node?.id,
+		tags: transactionRecord.node?.tags,
+		url: `${arweaveUrl}/${transactionRecord.node?.id}`,
+		explorerUrl: `${explorerUrl}/${transactionRecord.node?.id}`,
+	};
+
+	const zelfProofTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfProof");
+
+	const zelfNameTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfName");
+
+	zelfNameObject.zelfProof = zelfProofTag ? zelfProofTag.value : null;
+
+	zelfNameObject.zelfName = zelfNameTag.value;
+
+	zelfNameObject.zelfProofQRCode = await _convertZelfProofToBase64(zelfNameObject.id);
+
+	return zelfNameObject;
 };
 
 const _convertZelfProofToBase64 = async (id) => {
