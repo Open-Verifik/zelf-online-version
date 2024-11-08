@@ -10,6 +10,7 @@ const sessionModule = require("../../Session/modules/session.module");
 const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
+const { zelfProof } = require("../../../Core/config");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -105,6 +106,8 @@ const _searchInIPFS = async (params, authUser, foundInArweave) => {
 
 		return foundInArweave ? zelfNamesInIPFS : { ipfs: zelfNamesInIPFS };
 	} catch (exception) {
+		console.error({ error__searchInIPFS: exception });
+
 		return {
 			price: _calculateZelfNamePrice(params.zelfName.split(".zelf")[0].length),
 			zelfName: params.zelfName,
@@ -147,6 +150,7 @@ const _formatIPFSSearchResult = async (ipfsRecord, foundInArweave) => {
 			name: ipfsRecord.metadata.name,
 			...ipfsRecord.metadata.keyvalues,
 		},
+		zelfName: ipfsRecord.metadata.name,
 	};
 
 	if (!foundInArweave) {
@@ -306,35 +310,70 @@ const _findDuplicatedZelfName = async (zelfName, authUser) => {
  * @param {Object} authUser
  */
 const previewZelfName = async (params, authUser) => {
-	const searchResults = await ArweaveModule.search(params.zelfName, {});
+	try {
+		const searchResults = await ArweaveModule.search(params.zelfName, {});
 
-	const zelfNames = [];
+		if (!searchResults.length) throw new Error("404");
 
-	// now let's get the image and put as base64
-	for (let index = 0; index < searchResults.length; index++) {
-		const transactionRecord = searchResults[index];
+		const zelfNames = [];
 
-		const zelfName = {
-			id: transactionRecord.node?.id,
-			// tags: transactionRecord.node?.tags,
-			url: `${arweaveUrl}/${transactionRecord.node?.id}`,
-			explorerUrl: `${explorerUrl}/${transactionRecord.node?.id}`,
-		};
-		// Find the "zelfProof" tag and get its value
-		const zelfProofTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfProof");
-		zelfName.zelfProof = zelfProofTag ? zelfProofTag.value : null;
+		for (let index = 0; index < searchResults.length; index++) {
+			const transactionRecord = searchResults[index];
 
-		// Pass the zelfProof to the preview function
-		if (zelfName.zelfProof) {
-			zelfName.preview = await preview({ zelfProof: zelfName.zelfProof });
+			const zelfName = {
+				id: transactionRecord.node?.id,
+				// tags: transactionRecord.node?.tags,
+				url: `${arweaveUrl}/${transactionRecord.node?.id}`,
+				explorerUrl: `${explorerUrl}/${transactionRecord.node?.id}`,
+			};
+			// Find the "zelfProof" tag and get its value
+			const zelfProofTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfProof");
+			zelfName.zelfProof = zelfProofTag ? zelfProofTag.value : null;
+
+			// Pass the zelfProof to the preview function
+			if (zelfName.zelfProof) {
+				zelfName.preview = await preview({ zelfProof: zelfName.zelfProof });
+			}
+
+			zelfName.zelfProofQRCode = await _arweaveIDToBase64(zelfName.id);
+
+			zelfNames.push(zelfName);
 		}
 
-		zelfName.zelfProofQRCode = await _arweaveIDToBase64(zelfName.id);
-
-		zelfNames.push(zelfName);
+		return zelfNames;
+	} catch (exception) {
+		return await _previewWithIPFS(params, authUser);
 	}
+};
 
-	return zelfNames;
+/**
+ * preview with IPFS
+ * @param {Object} params
+ * @param {Object} authUser
+ * @author Miguel Trevino
+ */
+const _previewWithIPFS = async (params, authUser) => {
+	try {
+		const searchResult = await _searchInIPFS(params, authUser, false);
+
+		if (searchResult.available) throw new Error("404");
+
+		for (let index = 0; index < searchResult.ipfs.length; index++) {
+			const ipfsRecord = searchResult.ipfs[index];
+
+			ipfsRecord.preview = await preview({ zelfProof: ipfsRecord.zelfProof });
+		}
+
+		return searchResult;
+	} catch (exception) {
+		console.log({ exception });
+
+		const error = new Error("zelfName_not_found");
+
+		error.status = 404;
+
+		throw error;
+	}
 };
 
 /**
