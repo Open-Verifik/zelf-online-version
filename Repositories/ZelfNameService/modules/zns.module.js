@@ -60,11 +60,7 @@ const searchZelfName = async (params, authUser) => {
 	try {
 		const searchResults = await ArweaveModule.search(params.zelfName, {});
 
-		if (searchResults?.available)
-			return {
-				price: _calculateZelfNamePrice(params.zelfName.split(".zelf")[0].length),
-				...searchResults,
-			};
+		if (searchResults?.available) throw new Error("404:not_found_in_arweave");
 
 		const zelfNames = [];
 
@@ -108,11 +104,13 @@ const _searchInIPFS = async (params, authUser, foundInArweave) => {
 	} catch (exception) {
 		console.error({ error__searchInIPFS: exception });
 
-		return {
-			price: _calculateZelfNamePrice(params.zelfName.split(".zelf")[0].length),
-			zelfName: params.zelfName,
-			available: true,
-		};
+		return foundInArweave
+			? []
+			: {
+					price: _calculateZelfNamePrice(params.zelfName.split(".zelf")[0].length),
+					zelfName: params.zelfName,
+					available: true,
+			  };
 	}
 };
 
