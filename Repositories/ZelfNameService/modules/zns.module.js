@@ -9,6 +9,7 @@ const { createBTCWallet } = require("../../Wallet/modules/btc");
 const sessionModule = require("../../Session/modules/session.module");
 const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
+const IPFSModule = require("../../IPFS/modules/ipfs.module");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -55,32 +56,76 @@ const _calculateZelfNamePrice = (nameLength) => {
  * @param {*} authUser
  */
 const searchZelfName = async (params, authUser) => {
-	const searchResults = await ArweaveModule.search(params.zelfName, {});
+	try {
+		const searchResults = await ArweaveModule.search(params.zelfName, {});
 
-	if (searchResults?.available)
+		if (searchResults?.available)
+			return {
+				price: _calculateZelfNamePrice(params.zelfName.split(".zelf")[0].length),
+				...searchResults,
+			};
+
+		const zelfNames = [];
+
+		for (let index = 0; index < searchResults.length; index++) {
+			const zelfNameObject = await _formatArweaveSearchResult(searchResults[index]);
+
+			zelfNames.push(zelfNameObject);
+		}
+
+		return { arweave: zelfNames, ipfs: await _searchInIPFS(params, authUser, true) };
+	} catch (exception) {
+		return await _searchInIPFS(params, authUser);
+	}
+};
+
+/**
+ * search in IPFS
+ * @param {Object} params
+ * @param {Object} authUser
+ * @author Miguel Trevino
+ */
+const _searchInIPFS = async (params, authUser, foundInArweave) => {
+	try {
+		const ipfsRecords = await IPFSModule.get(
+			{
+				key: "zelfName",
+				value: params.zelfName,
+			},
+			authUser
+		);
+
+		const zelfNamesInIPFS = [];
+
+		for (let index = 0; index < ipfsRecords.length; index++) {
+			const ipfsRecord = ipfsRecords[index];
+
+			zelfNamesInIPFS.push(await _formatIPFSSearchResult(ipfsRecord, foundInArweave));
+		}
+
+		return foundInArweave ? zelfNamesInIPFS : { ipfs: zelfNamesInIPFS };
+	} catch (exception) {
 		return {
 			price: _calculateZelfNamePrice(params.zelfName.split(".zelf")[0].length),
-			...searchResults,
+			zelfName: params.zelfName,
+			available: true,
 		};
-
-	const zelfNames = [];
-
-	for (let index = 0; index < searchResults.length; index++) {
-		const zelfNameObject = await _formatArweaveSearchResult(searchResults[index]);
-
-		zelfNames.push(zelfNameObject);
 	}
-
-	return zelfNames;
 };
 
 const _formatArweaveSearchResult = async (transactionRecord) => {
 	const zelfNameObject = {
 		id: transactionRecord.node?.id,
-		tags: transactionRecord.node?.tags,
 		url: `${arweaveUrl}/${transactionRecord.node?.id}`,
 		explorerUrl: `${explorerUrl}/${transactionRecord.node?.id}`,
+		publicData: {},
 	};
+
+	for (let index = 0; index < transactionRecord.node?.tags.length; index++) {
+		const tag = transactionRecord.node?.tags[index];
+
+		zelfNameObject.publicData[tag.name] = tag.value;
+	}
 
 	const zelfProofTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfProof");
 
@@ -90,12 +135,48 @@ const _formatArweaveSearchResult = async (transactionRecord) => {
 
 	zelfNameObject.zelfName = zelfNameTag.value;
 
-	zelfNameObject.zelfProofQRCode = await _convertZelfProofToBase64(zelfNameObject.id);
+	zelfNameObject.zelfProofQRCode = await _arweaveIDToBase64(zelfNameObject.id);
 
 	return zelfNameObject;
 };
 
-const _convertZelfProofToBase64 = async (id) => {
+const _formatIPFSSearchResult = async (ipfsRecord, foundInArweave) => {
+	const zelfNameObject = {
+		...ipfsRecord,
+		publicData: {
+			name: ipfsRecord.metadata.name,
+			...ipfsRecord.metadata.keyvalues,
+		},
+	};
+
+	if (!foundInArweave) {
+		zelfNameObject.zelfProof = zelfNameObject.publicData.zelfProof;
+
+		zelfNameObject.zelfProofQRCode = await _IPFSToBase64(zelfNameObject.url);
+	}
+
+	delete zelfNameObject.metadata;
+
+	return zelfNameObject;
+};
+
+const _IPFSToBase64 = async (url) => {
+	try {
+		const encryptedResponse = await axios.get(url, { responseType: "arraybuffer" });
+
+		if (encryptedResponse?.data) {
+			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
+
+			return `data:image/png;base64,${base64Image}`;
+		}
+	} catch (exception) {
+		console.error({ VWEx: exception });
+
+		return exception?.message;
+	}
+};
+
+const _arweaveIDToBase64 = async (id) => {
 	try {
 		const encryptedResponse = await axios.get(`https://arweave.net/${id}`, { responseType: "arraybuffer" });
 
@@ -165,10 +246,25 @@ const leaseZelfName = async (params, authUser) => {
 	zelfNameObject.hasPassword = Boolean(password);
 	zelfNameObject.metadata = params.previewZelfProof ? dataToEncrypt.metadata : undefined;
 
-	if (!params.skipQRCode) {
+	if (!params.skipZNS) {
 		zelfNameObject.image = await encryptQR(dataToEncrypt);
 
 		zelfNameObject.leaseTransaction = await ArweaveModule.uploadZelfProof(zelfNameObject.image, zelfNameObject);
+
+		zelfNameObject.ipfs = await IPFSModule.insert(
+			{
+				base64: zelfNameObject.image,
+				name: zelfNameObject.zelfName,
+				metadata: {
+					...zelfNameObject.publicData,
+					arweaveId: zelfNameObject.leaseTransaction.id,
+					zelfProof: zelfNameObject.zelfProof,
+					hasPassword: `${zelfNameObject.hasPassword}`,
+				},
+				pinIt: true,
+			},
+			{ ...authUser, pro: true }
+		);
 	}
 
 	return zelfNameObject;
@@ -233,7 +329,7 @@ const previewZelfName = async (params, authUser) => {
 			zelfName.preview = await preview({ zelfProof: zelfName.zelfProof });
 		}
 
-		zelfName.zelfProofQRCode = await _convertZelfProofToBase64(zelfName.id);
+		zelfName.zelfProofQRCode = await _arweaveIDToBase64(zelfName.id);
 
 		zelfNames.push(zelfName);
 	}

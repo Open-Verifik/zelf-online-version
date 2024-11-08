@@ -55,7 +55,7 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	const { type } = ctx.request.body;
+	const { type, zelfName } = ctx.request.body;
 
 	const typeValid = validate(schemas[type], ctx.request.body);
 
@@ -63,6 +63,14 @@ const leaseValidation = async (ctx, next) => {
 		ctx.status = 409;
 
 		ctx.body = { validationError: typeValid.error.message };
+
+		return;
+	}
+
+	if (!zelfName.includes(".zelf")) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: "Not a valid zelf name" };
 
 		return;
 	}
