@@ -6,6 +6,7 @@ const searchZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
+		console.error({ error });
 		ctx.status = error.status || 500;
 
 		ctx.body = { error: error.message };

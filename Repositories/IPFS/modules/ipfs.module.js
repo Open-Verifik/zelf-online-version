@@ -11,6 +11,8 @@ const get = async (data) => {
 
 	if (key && value) return await IPFS.filter(key, value);
 
+	console.log({ data });
+
 	const error = new Error("Conditions_not_acceptable");
 
 	error.status = 412;

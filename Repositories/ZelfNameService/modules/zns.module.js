@@ -57,8 +57,10 @@ const _calculateZelfNamePrice = (nameLength) => {
  * @param {*} authUser
  */
 const searchZelfName = async (params, authUser) => {
+	const query = params.zelfName ? { key: "zelfName", value: params.zelfName } : { key: params.key, value: params.value };
+
 	try {
-		const searchResults = await ArweaveModule.search(params.zelfName, {});
+		const searchResults = await ArweaveModule.search(params.zelfName, query);
 
 		if (searchResults?.available) throw new Error("404:not_found_in_arweave");
 
@@ -70,9 +72,9 @@ const searchZelfName = async (params, authUser) => {
 			zelfNames.push(zelfNameObject);
 		}
 
-		return { arweave: zelfNames, ipfs: await _searchInIPFS(params, authUser, true) };
+		return { arweave: zelfNames, ipfs: await _searchInIPFS(query, authUser, true) };
 	} catch (exception) {
-		return await _searchInIPFS(params, authUser);
+		return await _searchInIPFS(query, authUser);
 	}
 };
 
@@ -82,15 +84,9 @@ const searchZelfName = async (params, authUser) => {
  * @param {Object} authUser
  * @author Miguel Trevino
  */
-const _searchInIPFS = async (params, authUser, foundInArweave) => {
+const _searchInIPFS = async (query, authUser, foundInArweave) => {
 	try {
-		const ipfsRecords = await IPFSModule.get(
-			{
-				key: "zelfName",
-				value: params.zelfName,
-			},
-			authUser
-		);
+		const ipfsRecords = await IPFSModule.get(query, authUser);
 
 		const zelfNamesInIPFS = [];
 
@@ -106,11 +102,13 @@ const _searchInIPFS = async (params, authUser, foundInArweave) => {
 
 		return foundInArweave
 			? []
-			: {
-					price: _calculateZelfNamePrice(params.zelfName.split(".zelf")[0].length),
-					zelfName: params.zelfName,
+			: query.key === "zelfName"
+			? {
+					price: _calculateZelfNamePrice(query.value.split(".zelf")[0].length),
+					zelfName: query.value,
 					available: true,
-			  };
+			  }
+			: null;
 	}
 };
 
@@ -208,7 +206,7 @@ const leaseZelfName = async (params, authUser) => {
 
 	const wordsArray = mnemonic.split(" ");
 
-	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:wallet_cannot_be_generated_phase_error");
+	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
 
 	const eth = createEthWallet(mnemonic);
 	const btc = createBTCWallet(mnemonic);

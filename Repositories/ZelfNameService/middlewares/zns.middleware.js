@@ -36,6 +36,16 @@ const schemas = {
  * @param {*} next
  */
 const getValidation = async (ctx, next) => {
+	const { zelfName, key, value } = ctx.request.query;
+
+	if (!zelfName && (!key || !value)) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: "missing zelfName or search by key|value" };
+
+		return;
+	}
+
 	await next();
 };
 

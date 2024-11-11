@@ -176,13 +176,19 @@ const _uploadZelfProof = async (zelfProofQRCode) => {
 };
 
 const search = async (zelfName, extraConditions = {}) => {
-	if (!zelfName) return null;
+	if (!zelfName && (!extraConditions.key || !extraConditions.value)) return null;
+
+	console.log({ search: zelfName, extraConditions });
+
+	const tagsToSearch = zelfName
+		? `[{ name: "zelfName", values: "${zelfName}" }]`
+		: `[{ name: "${extraConditions.key}", values: "${extraConditions.value}" }]`;
 
 	const query = {
 		query: `
     {
  		transactions(
-			tags: [{ name: "zelfName", values: "${zelfName}" }],
+			tags: ${tagsToSearch},
 			owners: ["vzrsUNMg17WFPmh73xZguPbn_cZzqnef3btvmn6-YDk"]
 		) {
 			edges {
@@ -205,6 +211,8 @@ const search = async (zelfName, extraConditions = {}) => {
 	}
   `,
 	};
+
+	console.log({ query });
 
 	const result = await axios.post("https://arweave.net/graphql", query, {
 		headers: { "Content-Type": "application/json" },
