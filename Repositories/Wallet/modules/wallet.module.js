@@ -317,14 +317,18 @@ const importWallet = async (params, authUser) => {
 
 	const eth = createEthWallet(mnemonic);
 
+	const btc = createBTCWallet(mnemonic);
+
 	const solana = await createSolanaWallet(mnemonic);
 
 	const wallet = new Model({}); // we are not saving it.
 
 	const dataToEncrypt = {
-		cleartext_data: {
+		publicData: {
 			ethAddress: eth.address,
+			btcAddress: btc.address,
 			solanaAddress: solana.address,
+			evm: evmCompatibleTickers,
 			_id: `${wallet._id}`,
 			zelfName: params.zelfName,
 		},
@@ -351,9 +355,9 @@ const importWallet = async (params, authUser) => {
 const _saveImportedWallet = async (wallet, params, dataToEncrypt, password, authUser) => {
 	const { zelfName } = params;
 
-	const encryptedWallet = await encrypt(dataToEncrypt);
+	const zelfProof = await encrypt(dataToEncrypt);
 
-	if (!encryptedWallet) {
+	if (!zelfProof) {
 		const error = new Error("Wallet_could_not_be_encrypted");
 
 		error.status = 409;
@@ -363,15 +367,15 @@ const _saveImportedWallet = async (wallet, params, dataToEncrypt, password, auth
 
 	let zelfNameService;
 
-	wallet.publicData = dataToEncrypt.cleartext_data;
+	wallet.publicData = dataToEncrypt.publicData;
 
-	// wallet.zkProof = await OfflineProofModule.createProof(encryptedWallet);
+	wallet.bitcoinAddress = wallet.publicData.btcAddress;
 
-	wallet.ethAddress = dataToEncrypt.cleartext_data.ethAddress;
+	wallet.ethAddress = wallet.publicData.ethAddress;
 
-	wallet.solanaAddress = dataToEncrypt.cleartext_data.solanaAddress;
+	wallet.solanaAddress = wallet.publicData.solanaAddress;
 
-	wallet.zelfProof = await sessionModule.walletEncrypt(encryptedWallet, wallet.ethAddress, password);
+	wallet.zelfProof = zelfProof;
 
 	if (wallet.image.includes("Request failed with")) {
 		wallet.image = null;
@@ -389,10 +393,8 @@ const _saveImportedWallet = async (wallet, params, dataToEncrypt, password, auth
 					zelfName,
 					pinIt: true,
 					metadata: {
-						zelfName,
-						ethAddress: wallet.ethAddress,
-						solanaAddress: wallet.solanaAddress,
-						hasPassword: `${wallet.hasPassword}`,
+						...wallet.publicData,
+						zelfProof,
 					},
 				},
 				authUser

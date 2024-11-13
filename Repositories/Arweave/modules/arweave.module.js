@@ -60,6 +60,10 @@ const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 			name: "zelfProof",
 			value: zelfNameObject.zelfProof,
 		},
+		{
+			name: "hasPassword",
+			value: zelfNameObject.hasPassword,
+		},
 	];
 
 	const publicKeys = Object.keys(zelfNameObject.publicData);
