@@ -6,6 +6,7 @@ const config = require("../../../Core/config");
 const axios = require("axios");
 const arweaveUrl = `https://arweave.net`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
+const graphql = `https://arweave-search.goldsky.com/graphql`;
 
 const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 	/**
@@ -218,7 +219,7 @@ const search = async (zelfName, extraConditions = {}) => {
 
 	console.log({ query });
 
-	const result = await axios.post("https://arweave.net/graphql", query, {
+	const result = await axios.post(graphql, query, {
 		headers: { "Content-Type": "application/json" },
 	});
 

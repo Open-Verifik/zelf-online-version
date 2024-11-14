@@ -10,7 +10,7 @@ const sessionModule = require("../../Session/modules/session.module");
 const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
-const { zelfProof } = require("../../../Core/config");
+const moment = require("moment");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -222,6 +222,7 @@ const leaseZelfName = async (params, authUser) => {
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
 			zelfName,
+			leaseExpiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
 		},
 		metadata: {
 			mnemonic,
