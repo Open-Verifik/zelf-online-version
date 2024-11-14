@@ -202,17 +202,20 @@ const leaseZelfName = async (params, authUser) => {
 
 	await _findDuplicatedZelfName(zelfName, authUser);
 
-	const mnemonic = params.type === "import" ? params.mnemonic : generateMnemonic(params.wordsCount);
+	const { face, password, mnemonic } = await _decryptParams(params, authUser);
 
-	const wordsArray = mnemonic.split(" ");
+	const _mnemonic = params.type === "import" ? mnemonic : generateMnemonic(params.wordsCount);
+
+	console.log({ mnemonic, _mnemonic });
+
+	const wordsArray = _mnemonic.split(" ");
 
 	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
 
-	const eth = createEthWallet(mnemonic);
-	const btc = createBTCWallet(mnemonic);
-	const solana = await createSolanaWallet(mnemonic);
-	const { face, password } = await _decryptParams(params, authUser);
-	const zkProof = await OfflineProofModule.createProof(mnemonic);
+	const eth = createEthWallet(_mnemonic);
+	const btc = createBTCWallet(_mnemonic);
+	const solana = await createSolanaWallet(_mnemonic);
+	const zkProof = await OfflineProofModule.createProof(_mnemonic);
 	const zelfNameObject = {};
 
 	const dataToEncrypt = {
@@ -225,7 +228,7 @@ const leaseZelfName = async (params, authUser) => {
 			leaseExpiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
 		},
 		metadata: {
-			mnemonic,
+			mnemonic: _mnemonic,
 			zkProof,
 		},
 		faceBase64: face,
@@ -275,16 +278,16 @@ const _decryptParams = async (data, authUser) => {
 	if (data.removePGP) {
 		return {
 			password: data.password,
-			mnemonic: data.phrase,
+			mnemonic: data.mnemonic,
 			face: data.faceBase64,
 		};
 	}
 
-	const password = data.password ? await sessionModule.sessionDecrypt(data.password, authUser) : undefined;
+	const password = await sessionModule.sessionDecrypt(data.password || null, authUser);
 
-	const mnemonic = data.phrase ? await sessionModule.sessionDecrypt(data.phrase, authUser) : undefined;
+	const mnemonic = await sessionModule.sessionDecrypt(data.mnemonic || null, authUser);
 
-	const face = data.faceBase64 ? await sessionModule.sessionDecrypt(data.faceBase64, authUser) : undefined;
+	const face = await sessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
 
 	return { password, mnemonic, face };
 };

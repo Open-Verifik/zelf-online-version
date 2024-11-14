@@ -134,6 +134,8 @@ const _getPrivateKey = async (authUser) => {
 };
 
 const sessionDecrypt = async (content, authUser) => {
+	if (!content) return null;
+
 	try {
 		const privateKey = await _getPrivateKey(authUser);
 

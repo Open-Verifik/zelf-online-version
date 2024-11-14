@@ -32,5 +32,6 @@ module.exports = (server) => {
 	//X
 	//Y
 	//Z
+	require("../Repositories/ZelfNameService/routes/zns.routes")(server);
 };
 // end
