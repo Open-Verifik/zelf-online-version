@@ -382,17 +382,25 @@ const _previewWithIPFS = async (params, authUser) => {
  * @param {Object} authUser
  */
 const decryptZelfName = async (params, authUser) => {
-	const zelfNameObject = await searchZelfName(
+	const searchResults = await searchZelfName(
 		{
 			zelfName: params.zelfName,
 		},
 		authUser
 	);
 
+	if (!searchResults.arweave?.length && !searchResults.ipfs?.length) {
+		const error = new Error(`zelfName_not_found`);
+		error.status = 404;
+		throw error;
+	}
+
+	const zelfNameObject = searchResults.arweave?.length ? searchResults.arweave[0] : searchResults.ipfs[0];
+
 	const { face, password } = await _decryptParams(params, authUser);
 
 	const decryptedZelfProof = await decrypt({
-		zelfProof: zelfNameObject[0].zelfProof,
+		zelfProof: zelfNameObject.zelfProof,
 		faceBase64: face,
 		password,
 		addServerPassword: Boolean(params.addServerPassword),
@@ -405,7 +413,8 @@ const decryptZelfName = async (params, authUser) => {
 	}
 
 	return {
-		...zelfNameObject[0],
+		zelfName: zelfNameObject.publicData.zelfName,
+		image: zelfNameObject.zelfProofQRCode,
 		metadata: decryptedZelfProof.metadata,
 		publicData: decryptedZelfProof.publicData,
 	};
