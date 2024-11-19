@@ -123,8 +123,6 @@ const _uploadZelfProof = async (zelfProofQRCode) => {
 	 */
 	const address = await arweave.wallets.jwkToAddress(jwk);
 
-	console.log("Arweave Wallet Address:", address);
-
 	/**
 	 * Use the arweave key to create an authenticated turbo client
 	 */
@@ -140,7 +138,6 @@ const _uploadZelfProof = async (zelfProofQRCode) => {
 
 	// Check if balance is sufficient; assume we need at least 10 USD worth of winc
 	const requiredWinc = await turboAuthClient.getWincForFiat({ amount: USD(10) });
-	console.log("Required Winc:", requiredWinc);
 
 	// Convert base64 string to a buffer
 	const base64Data = zelfProofQRCode.replace(/^data:image\/\w+;base64,/, ""); //
@@ -175,15 +172,11 @@ const _uploadZelfProof = async (zelfProofQRCode) => {
 	// Clean up the temporary file after upload
 	fs.unlinkSync(tempFilePath);
 
-	console.log(JSON.stringify(uploadResult, null, 2));
-
 	return { uploadResult, address };
 };
 
 const search = async (zelfName, extraConditions = {}) => {
 	if (!zelfName && (!extraConditions.key || !extraConditions.value)) return null;
-
-	console.log({ search: zelfName, extraConditions });
 
 	const tagsToSearch = zelfName
 		? `[{ name: "zelfName", values: "${zelfName}" }]`
@@ -216,8 +209,6 @@ const search = async (zelfName, extraConditions = {}) => {
 	}
   `,
 	};
-
-	console.log({ query });
 
 	const result = await axios.post(graphql, query, {
 		headers: { "Content-Type": "application/json" },

@@ -19,7 +19,7 @@ const leaseZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.log({ error });
+		console.error({ error });
 
 		ctx.status = error.status || 500;
 
@@ -33,7 +33,7 @@ const previewZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.log({ error });
+		console.error({ error });
 
 		ctx.status = error.status || 500;
 
@@ -47,7 +47,7 @@ const decryptZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.log({ error });
+		console.error({ error });
 
 		ctx.status = error.status || 500;
 

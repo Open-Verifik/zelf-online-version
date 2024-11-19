@@ -74,6 +74,8 @@ const searchZelfName = async (params, authUser) => {
 
 		return { arweave: zelfNames, ipfs: await _searchInIPFS(query, authUser, true) };
 	} catch (exception) {
+		console.error({ exception });
+
 		return await _searchInIPFS(query, authUser);
 	}
 };
@@ -98,8 +100,6 @@ const _searchInIPFS = async (query, authUser, foundInArweave) => {
 
 		return foundInArweave ? zelfNamesInIPFS : { ipfs: zelfNamesInIPFS };
 	} catch (exception) {
-		console.error({ error__searchInIPFS: exception });
-
 		return foundInArweave
 			? []
 			: query.key === "zelfName"
@@ -206,8 +206,6 @@ const leaseZelfName = async (params, authUser) => {
 
 	const _mnemonic = params.type === "import" ? mnemonic : generateMnemonic(params.wordsCount);
 
-	console.log({ mnemonic, _mnemonic });
-
 	const wordsArray = _mnemonic.split(" ");
 
 	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
@@ -311,36 +309,17 @@ const _findDuplicatedZelfName = async (zelfName, authUser) => {
  */
 const previewZelfName = async (params, authUser) => {
 	try {
-		const searchResults = await ArweaveModule.search(params.zelfName, {});
+		const zelfNameObject = await _findZelfName(params.zelfName, authUser);
 
-		if (!searchResults.length) throw new Error("404");
+		if (zelfNameObject.ipfs_pin_hash) {
+			zelfNameObject.url = `${arweaveUrl}/${zelfNameObject.publicData.arweaveId}`;
 
-		const zelfNames = [];
-
-		for (let index = 0; index < searchResults.length; index++) {
-			const transactionRecord = searchResults[index];
-
-			const zelfName = {
-				id: transactionRecord.node?.id,
-				// tags: transactionRecord.node?.tags,
-				url: `${arweaveUrl}/${transactionRecord.node?.id}`,
-				explorerUrl: `${explorerUrl}/${transactionRecord.node?.id}`,
-			};
-			// Find the "zelfProof" tag and get its value
-			const zelfProofTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfProof");
-			zelfName.zelfProof = zelfProofTag ? zelfProofTag.value : null;
-
-			// Pass the zelfProof to the preview function
-			if (zelfName.zelfProof) {
-				zelfName.preview = await preview({ zelfProof: zelfName.zelfProof });
-			}
-
-			zelfName.zelfProofQRCode = await _arweaveIDToBase64(zelfName.id);
-
-			zelfNames.push(zelfName);
+			zelfNameObject.explorerUrl = `${explorerUrl}/${zelfNameObject.publicData.arweaveId}`;
 		}
 
-		return zelfNames;
+		zelfNameObject.source = zelfNameObject.ipfs_pin_hash ? "ipfs" : "arweave";
+
+		return [zelfNameObject];
 	} catch (exception) {
 		return await _previewWithIPFS(params, authUser);
 	}
@@ -354,11 +333,11 @@ const previewZelfName = async (params, authUser) => {
  */
 const _previewWithIPFS = async (params, authUser) => {
 	try {
-		const searchResult = await _searchInIPFS(params, authUser, false);
+		const searchResult = await _searchInIPFS(params, { ...authUser, pro: true }, false);
 
-		if (searchResult.available) throw new Error("404");
+		if (searchResult?.available) throw new Error("404");
 
-		for (let index = 0; index < searchResult.ipfs.length; index++) {
+		for (let index = 0; index < searchResult?.ipfs.length; index++) {
 			const ipfsRecord = searchResult.ipfs[index];
 
 			ipfsRecord.preview = await preview({ zelfProof: ipfsRecord.zelfProof });
@@ -366,8 +345,6 @@ const _previewWithIPFS = async (params, authUser) => {
 
 		return searchResult;
 	} catch (exception) {
-		console.log({ exception });
-
 		const error = new Error("zelfName_not_found");
 
 		error.status = 404;
@@ -376,15 +353,10 @@ const _previewWithIPFS = async (params, authUser) => {
 	}
 };
 
-/**
- * decrypt zelfName
- * @param {Object} params
- * @param {Object} authUser
- */
-const decryptZelfName = async (params, authUser) => {
+const _findZelfName = async (zelfName, authUser) => {
 	const searchResults = await searchZelfName(
 		{
-			zelfName: params.zelfName,
+			zelfName,
 		},
 		authUser
 	);
@@ -395,7 +367,16 @@ const decryptZelfName = async (params, authUser) => {
 		throw error;
 	}
 
-	const zelfNameObject = searchResults.arweave?.length ? searchResults.arweave[0] : searchResults.ipfs[0];
+	return searchResults.arweave?.length ? searchResults.arweave[0] : searchResults.ipfs[0];
+};
+
+/**
+ * decrypt zelfName
+ * @param {Object} params
+ * @param {Object} authUser
+ */
+const decryptZelfName = async (params, authUser) => {
+	const zelfNameObject = await _findZelfName(params.zelfName, authUser);
 
 	const { face, password } = await _decryptParams(params, authUser);
 

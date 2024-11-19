@@ -3,15 +3,13 @@ const IPFS = require("../../../Core/ipfs");
 const config = require("../../../Core/config");
 
 const get = async (data) => {
-	const { cid, name, key, value, exipres } = data;
+	const { cid, zelfName, key, value, exipres } = data;
 
 	if (cid) return await IPFS.retrieve(cid, expires);
 
-	if (name) return await IPFS.filter("name", name);
+	if (zelfName) return await IPFS.filter("name", zelfName);
 
 	if (key && value) return await IPFS.filter(key, value);
-
-	console.log({ data });
 
 	const error = new Error("Conditions_not_acceptable");
 
