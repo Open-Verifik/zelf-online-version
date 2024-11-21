@@ -15,7 +15,7 @@ const SessionSchema = new Schema({
 		unique: true,
 	},
 	status: requiredEnumField(String, ["active", "used"], "active"),
-	type: requiredEnumField(String, ["createWallet", "decryptWallet", "importWallet"], "createWallet"),
+	type: requiredEnumField(String, ["createWallet", "decryptWallet", "importWallet", "general"], "createWallet"),
 	activatedAt: {
 		type: Date,
 		expires: "1m",
