@@ -245,7 +245,7 @@ const leaseZelfName = async (params, authUser) => {
 	zelfNameObject.ethAddress = eth.address;
 	zelfNameObject.btcAddress = btc.address;
 	zelfNameObject.solanaAddress = solana.address;
-	zelfNameObject.hasPassword = `${Boolean(password)}`;
+	zelfNameObject.hasPassword = Boolean(password);
 	zelfNameObject.metadata = params.previewZelfProof ? dataToEncrypt.metadata : undefined;
 
 	if (!params.skipZNS) {
@@ -261,7 +261,7 @@ const leaseZelfName = async (params, authUser) => {
 					...zelfNameObject.publicData,
 					arweaveId: zelfNameObject.leaseTransaction.id,
 					zelfProof: zelfNameObject.zelfProof,
-					hasPassword: zelfNameObject.hasPassword,
+					hasPassword: `${zelfNameObject.hasPassword}`,
 				},
 				pinIt: true,
 			},
