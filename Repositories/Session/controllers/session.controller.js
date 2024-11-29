@@ -47,7 +47,7 @@ const show = async (request, response) => {
  */
 const create = async (ctx) => {
 	try {
-		const data = await Module.insert(ctx.request.body);
+		const data = await Module.insert(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
