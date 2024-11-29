@@ -26,6 +26,7 @@ module.exports = (server) => {
 	//S
 	require("../Repositories/Solana/routes/solana-scrapping.route")(server);
 	//T
+	require("../Repositories/tron/routes/tron-scrapping.route")(server);
 	//U
 	//V
 	//W
