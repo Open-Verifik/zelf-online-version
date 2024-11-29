@@ -27,7 +27,7 @@ const getAddress = async (params) => {
 			address: result.account,
 			balance: result.lamports / 1_000_000_000,
 			type: result.type,
-			fiatTotal: 0,
+			fiatBalance: 0,
 			account: {
 				asset: "SOL",
 				fiatValue: "0",
@@ -38,7 +38,7 @@ const getAddress = async (params) => {
 
 		_response.tokenHoldings = await getTokens({ id: params.id });
 
-		if (_response.tokenHoldings.balance) _response.fiatTotal += _response.tokenHoldings.balance;
+		if (_response.tokenHoldings.balance) _response.fiatBalance += _response.tokenHoldings.balance;
 
 		return _response;
 	} catch (error) {
@@ -86,6 +86,7 @@ const getTokens = async (params) => {
 	const tokenHoldings = {
 		total: data.data.tokens.length,
 		balance: 0,
+		fiatBalance: 0,
 		tokens: [],
 	};
 
@@ -93,10 +94,10 @@ const getTokens = async (params) => {
 		for (let index = 0; index < data.data.tokens.length; index++) {
 			const token = data.data.tokens[index];
 
-			tokenHoldings.balance += token.value;
+			tokenHoldings.fiatBalance += token.value;
 
 			tokenHoldings.tokens.push({
-				balance: token.value,
+				fiatBalance: token.value,
 				name: token.tokenName,
 				amount: token.balance,
 				price: token.priceUsdt,
