@@ -27,15 +27,18 @@ const getAddress = async (params) => {
 			address: result.account,
 			balance: result.lamports / 1_000_000_000,
 			type: result.type,
-			tokenHoldings: null,
+			fiatTotal: 0,
 			account: {
 				asset: "SOL",
 				fiatValue: "0",
 				price: "0",
 			},
+			tokenHoldings: null,
 		};
 
 		_response.tokenHoldings = await getTokens({ id: params.id });
+
+		if (_response.tokenHoldings.balance) _response.fiatTotal += _response.tokenHoldings.balance;
 
 		return _response;
 	} catch (error) {
