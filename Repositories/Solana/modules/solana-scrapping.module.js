@@ -78,13 +78,33 @@ const getTokens = async (params) => {
 	const tokenHoldings = {
 		total: data.data.tokens.length,
 		balance: 0,
-		tokens: data.data.tokens,
+		tokens: [],
 	};
 
-	for (let index = 0; index < tokenHoldings.tokens.length; index++) {
-		const token = tokenHoldings.tokens[index];
+	try {
+		for (let index = 0; index < data.data.tokens.length; index++) {
+			const token = data.data.tokens[index];
 
-		tokenHoldings.balance += token.value;
+			tokenHoldings.balance += token.value;
+
+			tokenHoldings.tokens.push({
+				balance: token.value,
+				name: token.tokenName,
+				amount: token.balance,
+				price: token.priceUsdt,
+				symbol: token.tokensymbol,
+				image: token.tokenIcon,
+				address: token.address,
+				tokenAddress: token.tokenAddress,
+				type: token.type,
+				reputation: token.reputation,
+				quantity: token.amount,
+				decimals: token.decimals,
+				owner: token.owner,
+			});
+		}
+	} catch (exception) {
+		console.error({ exception });
 	}
 
 	return tokenHoldings;
