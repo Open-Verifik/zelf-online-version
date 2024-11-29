@@ -30,7 +30,9 @@ const get = async (params, authUser = {}) => {
  * @param {*} params
  * @param {*} authUser
  */
-const insert = async (params) => {
+const insert = async (params, authUser) => {
+	if (authUser) await deleteSession(authUser);
+
 	const session = new Model({
 		identifier: params.identifier,
 		type: params.type || "createWallet",

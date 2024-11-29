@@ -1,9 +1,9 @@
 const Module = require("../modules/solana-scrapping.module");
 const HttpHandler = require("../../../Core/http-handler");
 
-const balance = async (ctx) => {
+const getAddress = async (ctx) => {
 	try {
-		const data = await Module.getBalance(ctx.request.params);
+		const data = await Module.getAddress(ctx.request.params);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -20,7 +20,7 @@ const getToken = async (ctx) => {
 	const query = ctx.request.query;
 
 	try {
-		const data = await Module.getToken(params, query);
+		const data = await Module.getTokens(params, query);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -34,10 +34,7 @@ const getToken = async (ctx) => {
 
 const transactionsList = async (ctx) => {
 	try {
-		const data = await Module.getTransactionsList(
-			ctx.request.params,
-			ctx.request.query
-		);
+		const data = await Module.getTransactionsList(ctx.request.params, ctx.request.query);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -63,7 +60,7 @@ const transactionStatus = async (ctx) => {
 	}
 };
 module.exports = {
-	balance,
+	getAddress,
 	getToken,
 	transactionStatus,
 	transactionsList,
