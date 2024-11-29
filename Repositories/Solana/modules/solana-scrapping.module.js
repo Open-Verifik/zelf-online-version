@@ -28,6 +28,11 @@ const getAddress = async (params) => {
 			balance: result.lamports / 1_000_000_000,
 			type: result.type,
 			tokenHoldings: null,
+			account: {
+				asset: "SOL",
+				fiatValue: "0",
+				price: "0",
+			},
 		};
 
 		_response.tokenHoldings = await getTokens({ id: params.id });
