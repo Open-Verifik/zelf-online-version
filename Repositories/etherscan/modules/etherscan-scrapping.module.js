@@ -43,14 +43,14 @@ const getAddress = async (params) => {
 		try {
 			account = {
 				asset: "ETH",
-				fiatValue: accounts[0].replace("Eth Value", "").replace("(", "").replace(",", "").replace("$", "").trim(),
+				fiatBalance: accounts[0].replace("Eth Value", "").replace("(", "").replace(",", "").replace("$", "").trim(),
 				price: accounts[1].replace("$", "").replace("/ETH)", "").replace(",", "").trim(),
 			};
 		} catch (error) {
 			//si no tiene nada
 			account = {
 				asset: "ETH",
-				fiatValue: "0.00",
+				fiatBalance: "0.00",
 				price: "0.00",
 			};
 		}
@@ -109,6 +109,7 @@ const getAddress = async (params) => {
 			if (name && tokenImage) {
 				const token = {
 					tokenType: currentTokenType,
+					fiatBalance: Number(_price * _amount),
 					name: name,
 					symbol: symbol,
 					amount: _amount,
@@ -179,10 +180,21 @@ const getAddress = async (params) => {
 			console.error({ error });
 		}
 
+		tokenHoldings.tokens.unshift({
+			tokenType: "ERC-20",
+			fiatBalance: Number(account.fiatBalance),
+			symbol: "ETH",
+			name: "Ethereum",
+			price: account.price,
+			image: "../../../assets/images/ETH.png",
+			amount: balance,
+		});
+
 		const response = {
 			address,
 			fullName,
 			balance,
+			fiatBalance: Number(account.fiatBalance),
 			account,
 			tokenHoldings,
 			transactions,

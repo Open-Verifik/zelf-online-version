@@ -46,6 +46,14 @@ const getValidation = async (ctx, next) => {
 		return;
 	}
 
+	if (!zelfName.includes(".zelf")) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: "missing extension .zelf" };
+
+		return;
+	}
+
 	await next();
 };
 
