@@ -1,9 +1,9 @@
 const config = require("../../../Core/config");
-const Controller = require("../controllers/mina-scrapping.controller");
+const Controller = require("../controllers/bitcoin-scrapping.controller");
 
-const Middleware = require("../middlewares/mina-scrapping.middleware");
+const Middleware = require("../middlewares/bitcoin-scrapping.middleware");
 
-const base = "/mina";
+const base = "/bitcoin";
 
 module.exports = (server) => {
 	const PATH = config.basePath(base);
@@ -20,11 +20,9 @@ module.exports = (server) => {
 		Controller.transactionsList
 	);
 
-	// server.get(`${PATH}/transaction/:id`, Controller.transactionStatus);
-
 	server.get(
-		`${PATH}/token/:id`,
+		`${PATH}/transaction/:id`,
 		Middleware.validateToken,
-		Controller.getToken
+		Controller.getTransactionDetail
 	);
 };

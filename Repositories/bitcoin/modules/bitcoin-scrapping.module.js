@@ -9,26 +9,23 @@ const { generateRandomUserAgent } = require("../../../Core/helpers");
 const getBalance = async (params) => {
 	try {
 		const { data } = await instance.get(
-			`https://minascan.io/mainnet/api/api/core/accounts/${params.id}/balance`,
+			`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`,
 			{
 				headers: {
 					"user-agent": generateRandomUserAgent(),
-					"Upgrade-Insecure-Requests": "1",
 				},
 			}
 		);
 
-		console.log(data);
-
 		return {
 			address: params.id,
-			balance: data.balance,
+			balance: data.confirmed,
 			fiatBalance: null, //data.balanceUsd,
 			currency: "usd",
 			account: {
-				asset: "MINA",
+				asset: "BTC",
 				fiatValue: "0",
-				price: data.balanceUsd,
+				price: data.confirmed,
 			},
 			tokenHoldings: {
 				total: null,
@@ -47,38 +44,37 @@ const getBalance = async (params) => {
  * @returns
  */
 const getTransactionsList = async (params, query) => {
+	console.log(query.show);
 	const { data } = await instance.get(
-		`https://minascan.io/mainnet/api/api/core/accounts/${params.id}/activity?page=${query.page}&limit=${query.show}&sortBy=age&orderBy=DESC&direction=all`,
+		`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/transactions?limit=${query.show}&offset=0`,
 		{
 			headers: {
 				"user-agent": generateRandomUserAgent(),
-				"Upgrade-Insecure-Requests": "1",
 			},
 		}
 	);
-	return data.data;
+	return { transactions: data };
 };
 
 /**
  * get transaction status
  * @param {Object} params
  */
-const getToken = async (params, query) => {
+const getTransactionDetail = async (params, query) => {
 	const { data } = await instance.get(
-		`https://minascan.io/mainnet/api/api/token/${params.id}/info`,
+		`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`,
 		{
 			headers: {
 				"user-agent": generateRandomUserAgent(),
-				"Upgrade-Insecure-Requests": "1",
 			},
 		}
 	);
 
-	return data;
+	return { transactionDetail: data };
 };
 
 module.exports = {
 	getBalance,
 	getTransactionsList,
-	getToken,
+	getTransactionDetail,
 };
