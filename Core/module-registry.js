@@ -1,5 +1,3 @@
-const modules = {
-
-};
+const modules = {};
 
 module.exports = modules;
