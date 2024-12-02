@@ -1,7 +1,7 @@
 const config = require("../../../Core/config");
-const Controller = require("../controllers/solana-scrapping.controller");
+const Controller = require("../controllers/tron-scrapping.controller");
 
-const Middleware = require("../middlewares/solana-scrapping.middleware");
+const Middleware = require("../middlewares/tron-scrapping.middleware");
 
 const base = "/tron";
 
@@ -9,7 +9,7 @@ module.exports = (server) => {
 	const PATH = config.basePath(base);
 
 	server.get(
-		`${PATH}/balance/:id`,
+		`${PATH}/address/:id`,
 		//Middleware.validateAddress,
 		Controller.balance
 	);

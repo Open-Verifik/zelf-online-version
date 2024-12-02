@@ -1,4 +1,4 @@
-const Module = require("../modules/solana-scrapping.module");
+const Module = require("../modules/bitcoin-scrapping.module");
 const HttpHandler = require("../../../Core/http-handler");
 
 const balance = async (ctx) => {
@@ -14,13 +14,13 @@ const balance = async (ctx) => {
 		ctx.body = { error: error.message };
 	}
 };
-const getToken = async (ctx) => {
+const getTransactionDetail = async (ctx) => {
 	const params = ctx.request.params;
 
 	const query = ctx.request.query;
 
 	try {
-		const data = await Module.getToken(params, query);
+		const data = await Module.getTransactionDetail(params, query);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -64,7 +64,7 @@ const transactionStatus = async (ctx) => {
 };
 module.exports = {
 	balance,
-	getToken,
+	getTransactionDetail,
 	transactionStatus,
 	transactionsList,
 };

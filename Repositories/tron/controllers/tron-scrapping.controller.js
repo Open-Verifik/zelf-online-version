@@ -1,4 +1,4 @@
-const Module = require("../modules/solana-scrapping.module");
+const Module = require("../modules/tron-scrapping.module");
 const HttpHandler = require("../../../Core/http-handler");
 
 const balance = async (ctx) => {

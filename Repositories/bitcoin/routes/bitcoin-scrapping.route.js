@@ -1,15 +1,15 @@
 const config = require("../../../Core/config");
-const Controller = require("../controllers/solana-scrapping.controller");
+const Controller = require("../controllers/bitcoin-scrapping.controller");
 
-const Middleware = require("../middlewares/solana-scrapping.middleware");
+const Middleware = require("../middlewares/bitcoin-scrapping.middleware");
 
-const base = "/solana";
+const base = "/bitcoin";
 
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
 	server.get(
-		`${PATH}/balance/:id`,
+		`${PATH}/address/:id`,
 		//Middleware.validateAddress,
 		Controller.balance
 	);
@@ -21,8 +21,8 @@ module.exports = (server) => {
 	);
 
 	server.get(
-		`${PATH}/token/:id`,
+		`${PATH}/transaction/:id`,
 		Middleware.validateToken,
-		Controller.getToken
+		Controller.getTransactionDetail
 	);
 };

@@ -3,6 +3,8 @@ module.exports = (server) => {
 	require("../Repositories/api-mina/routes/mina-scrapping.route")(server);
 	//B
 	require("../Repositories/binance/routes/binance.route")(server);
+	require("../Repositories/bitcoin/routes/bitcoin-scrapping.route")(server);
+
 	//C
 	//D
 	//E
