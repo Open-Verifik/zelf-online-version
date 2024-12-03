@@ -31,7 +31,14 @@ const get = async (params, authUser = {}) => {
  * @param {*} authUser
  */
 const insert = async (params, authUser) => {
-	if (authUser) await deleteSession(authUser);
+	if (authUser)
+		await deleteSession(
+			authUser || params.type === "general"
+				? {
+						identifier: params.identifier,
+				  }
+				: null
+		);
 
 	const session = new Model({
 		identifier: params.identifier,
@@ -39,7 +46,17 @@ const insert = async (params, authUser) => {
 		status: "active",
 	});
 
-	await session.save();
+	try {
+		await session.save();
+	} catch (exception) {
+		if (params.type !== "general") {
+			const error = new Error("zelfName_is_taken");
+
+			error.status = 409;
+
+			throw error;
+		}
+	}
 
 	return {
 		token: jwt.sign(
