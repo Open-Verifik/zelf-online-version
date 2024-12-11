@@ -28,7 +28,7 @@ app.use((ctx, next) => {
 });
 
 const server = app.listen(config.port, () => {
-	console.log(`Server running on port ${config.port}`);
+	console.info(`Server running on port ${config.port}`);
 	const mongooseConnection = DatabaseModule.initMongoDB();
 
 	mongooseConnection.on("error", (err) => {
@@ -119,7 +119,7 @@ process.once("SIGUSR2", () => {
 			console.info("Exiting...");
 			setTimeout(() => {
 				process.kill(process.pid, "SIGUSR2");
-				console.log("exited..");
+				console.info("exited..");
 			}, 1000); // 1-second delay to ensure cleanup completes
 		});
 });

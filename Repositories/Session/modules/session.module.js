@@ -23,6 +23,10 @@ const get = async (params, authUser = {}) => {
 		queryParams.where_identifier = authUser.identifier;
 	}
 
+	if (authUser.type) {
+		queryParams.where_type = authUser.type;
+	}
+
 	return await MongoORM.buildQuery(queryParams, Model, null, populates);
 };
 
@@ -33,11 +37,10 @@ const get = async (params, authUser = {}) => {
 const insert = async (params, authUser) => {
 	if (authUser)
 		await deleteSession(
-			authUser || params.type === "general"
-				? {
-						identifier: params.identifier,
-				  }
-				: null
+			authUser || {
+				identifier: params.identifier,
+				type: params.type || "createWallet",
+			}
 		);
 
 	const session = new Model({
