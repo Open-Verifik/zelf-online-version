@@ -181,7 +181,7 @@ const getAddress = async (params) => {
 		}
 
 		tokenHoldings.tokens.unshift({
-			tokenType: "ERC-20",
+			tokenType: "ETH",
 			fiatBalance: Number(account.fiatBalance),
 			symbol: "ETH",
 			name: "Ethereum",
