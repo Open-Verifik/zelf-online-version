@@ -1,9 +1,9 @@
 const config = require("../../../Core/config");
-const Controller = require("../controllers/mina-scrapping.controller");
+const Controller = require("../controllers/tron-scrapping.controller");
 
-const Middleware = require("../middlewares/mina-scrapping.middleware");
+const Middleware = require("../middlewares/tron-scrapping.middleware");
 
-const base = "/mina";
+const base = "/tron";
 
 module.exports = (server) => {
 	const PATH = config.basePath(base);
@@ -19,8 +19,6 @@ module.exports = (server) => {
 		Middleware.validateAddressTransactions,
 		Controller.transactionsList
 	);
-
-	// server.get(`${PATH}/transaction/:id`, Controller.transactionStatus);
 
 	server.get(
 		`${PATH}/token/:id`,
