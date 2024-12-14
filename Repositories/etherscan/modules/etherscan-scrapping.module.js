@@ -12,7 +12,7 @@ const baseUrls = {
  */
 
 const getAddress = async (params) => {
-	const baseUrl = baseUrls[params.env || "production"];
+	const baseUrl = baseUrls[params.env || "development"];
 
 	try {
 		const address = params.address;
@@ -186,7 +186,7 @@ const getAddress = async (params) => {
 			symbol: "ETH",
 			name: "Ethereum",
 			price: account.price,
-			image: "../../../assets/images/ETH.png",
+			image: "",
 			amount: balance,
 		});
 
