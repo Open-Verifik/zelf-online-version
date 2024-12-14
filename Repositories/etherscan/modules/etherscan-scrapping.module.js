@@ -12,7 +12,7 @@ const baseUrls = {
  */
 
 const getAddress = async (params) => {
-	const baseUrl = baseUrls[params.env || "development"];
+	const baseUrl = baseUrls[params.env || "production"];
 
 	try {
 		const address = params.address;
