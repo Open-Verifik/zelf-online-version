@@ -112,7 +112,7 @@ const getAddress = async (params) => {
 					fiatBalance: Number(_price * _amount),
 					name: name,
 					symbol: symbol,
-					amount: _amount,
+					amount: _amount.replace(/,/g, ""),
 					price: _price,
 					type: tokenType,
 					address: tokenLink,
