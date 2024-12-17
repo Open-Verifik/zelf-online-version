@@ -363,7 +363,9 @@ const _findZelfName = async (zelfName, authUser) => {
 
 	if (!searchResults.arweave?.length && !searchResults.ipfs?.length) {
 		const error = new Error(`zelfName_not_found`);
+
 		error.status = 404;
+
 		throw error;
 	}
 
@@ -381,7 +383,7 @@ const decryptZelfName = async (params, authUser) => {
 	const { face, password } = await _decryptParams(params, authUser);
 
 	const decryptedZelfProof = await decrypt({
-		zelfProof: zelfNameObject.zelfProof,
+		zelfProof: zelfNameObject.zelfProof || params.zelfProof,
 		faceBase64: face,
 		password,
 		addServerPassword: Boolean(params.addServerPassword),
