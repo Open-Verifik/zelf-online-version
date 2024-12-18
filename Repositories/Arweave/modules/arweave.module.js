@@ -6,8 +6,10 @@ const config = require("../../../Core/config");
 const axios = require("axios");
 const arweaveUrl = `https://arweave.net`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
-const graphql = `https://arweave-search.goldsky.com/graphql`;
+const graphql = "https://arweave.net/graphql"; //`https://arweave-search.goldsky.com/graphql`;
 const moment = require("moment");
+const holdOwner = config.arwave.hold.owner;
+const owner = config.arwave.owner;
 
 const zelfNameHold = async (zelfProofQRCode, zelfNameObject) => {
 	/**
@@ -209,7 +211,7 @@ const _zelfNameHold = async (zelfProofQRCode) => {
 	return { uploadResult, address };
 };
 
-const search = async (zelfName, extraConditions = {}) => {
+const search = async (environment = "hold", zelfName, extraConditions = {}) => {
 	if (!zelfName && (!extraConditions.key || !extraConditions.value)) return null;
 
 	const tagsToSearch = zelfName
@@ -221,7 +223,7 @@ const search = async (zelfName, extraConditions = {}) => {
     {
  		transactions(
 			tags: ${tagsToSearch},
-			owners: ["vzrsUNMg17WFPmh73xZguPbn_cZzqnef3btvmn6-YDk"]
+			owners: ["${environment === "hold" ? holdOwner : owner}"]
 		) {
 			edges {
 				node {

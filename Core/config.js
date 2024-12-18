@@ -97,6 +97,7 @@ const configuration = {
 	},
 	arwave: {
 		key: process.env.ARWAVE_KEY,
+		owner: process.env.ARWEAVE_OWNER,
 		n: process.env.ARWAVE_N,
 		e: process.env.ARWAVE_E,
 		d: process.env.ARWAVE_D,
@@ -106,6 +107,7 @@ const configuration = {
 		dq: process.env.ARWAVE_DQ,
 		qi: process.env.ARWAVE_QI,
 		hold: {
+			owner: process.env._ARWEAVE_OWNER,
 			n: process.env._ARWAVE_N,
 			e: process.env._ARWAVE_E,
 			d: process.env._ARWAVE_D,

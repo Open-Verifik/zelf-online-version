@@ -80,7 +80,7 @@ const searchZelfName = async (params, authUser) => {
 	const query = params.zelfName ? { key: "zelfName", value: params.zelfName } : { key: params.key, value: params.value };
 
 	try {
-		const searchResults = await ArweaveModule.search(params.zelfName, query);
+		const searchResults = await ArweaveModule.search(params.environment, params.zelfName, query);
 
 		if (searchResults?.available) throw new Error("404:not_found_in_arweave");
 
@@ -92,11 +92,11 @@ const searchZelfName = async (params, authUser) => {
 			zelfNames.push(zelfNameObject);
 		}
 
-		return { arweave: zelfNames, ipfs: await _searchInIPFS(query, authUser, true) };
+		return { arweave: zelfNames, ipfs: await _searchInIPFS(params.environment, query, authUser, true) };
 	} catch (exception) {
-		console.error({ exception });
+		console.error({ exception: exception.response?.data?.errors });
 
-		return await _searchInIPFS(query, authUser);
+		return await _searchInIPFS(params.environment, query, authUser);
 	}
 };
 
@@ -106,7 +106,7 @@ const searchZelfName = async (params, authUser) => {
  * @param {Object} authUser
  * @author Miguel Trevino
  */
-const _searchInIPFS = async (query, authUser, foundInArweave) => {
+const _searchInIPFS = async (environment = "hold", query, authUser, foundInArweave) => {
 	try {
 		const ipfsRecords = await IPFSModule.get(query, authUser);
 
@@ -115,7 +115,12 @@ const _searchInIPFS = async (query, authUser, foundInArweave) => {
 		for (let index = 0; index < ipfsRecords.length; index++) {
 			const ipfsRecord = ipfsRecords[index];
 
-			zelfNamesInIPFS.push(await _formatIPFSSearchResult(ipfsRecord, foundInArweave));
+			if (
+				(environment === "hold" && ipfsRecord.metadata.keyvalues.type === "hold") ||
+				(environment === "mainnet" && (!ipfsRecord.metadata.keyvalues.type || ipfsRecord.metadata.keyvalues.type === "mainnet"))
+			) {
+				zelfNamesInIPFS.push(await _formatIPFSSearchResult(ipfsRecord, foundInArweave));
+			}
 		}
 
 		return foundInArweave ? zelfNamesInIPFS : { ipfs: zelfNamesInIPFS };
@@ -378,7 +383,7 @@ const previewZelfName = async (params, authUser) => {
  */
 const _previewWithIPFS = async (params, authUser) => {
 	try {
-		const searchResult = await _searchInIPFS(params, { ...authUser, pro: true }, false);
+		const searchResult = await _searchInIPFS(params.environment, params, { ...authUser, pro: true }, false);
 
 		if (searchResult?.available) throw new Error("404");
 
