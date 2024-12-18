@@ -11,6 +11,7 @@ const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/e
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
+const { createCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -30,24 +31,43 @@ const evmCompatibleTickers = [
 	"AURORA", // Aurora (NEAR EVM)
 ].join(","); // Create a single string of tickers;
 
-const _calculateZelfNamePrice = (nameLength) => {
-	const basePrice = 24;
+const zelfNamePricing = {
+	1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
+	2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
+	3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
+	4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
+	"5-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
+	16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
+	17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
+	18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
+	19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
+	20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
+	21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
+	22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
+	23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
+	24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
+	25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
+	26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
+	27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
+};
 
-	const priceMultipliers = {
-		1: 3,
-		2: 2,
-		3: 1.5,
-		4: 1.25,
-	};
+/**
+ * Get Zelf Name price based on name length and duration
+ * @param {number} length - The length of the Zelf name
+ * @param {string} duration - Duration ("1", "2", "3", "4", "5", "lifetime")
+ * @returns {number} - Price of the Zelf name
+ */
+const _calculateZelfNamePrice = (length, duration = 1) => {
+	if (![1, 2, 3, 4, 5, "lifetime"].includes(duration)) {
+		throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
+	}
 
-	if (nameLength >= 1 && nameLength <= 4) {
-		return basePrice * priceMultipliers[nameLength];
-	} else if (nameLength >= 5 && nameLength <= 15) {
-		return basePrice;
-	} else if (nameLength >= 15 && nameLength <= 20) {
-		return basePrice * 0.75;
+	if (length >= 5 && length <= 15) {
+		return zelfNamePricing["5-15"][duration];
+	} else if (zelfNamePricing[length]) {
+		return zelfNamePricing[length][duration];
 	} else {
-		return basePrice * 0.5;
+		throw new Error("Invalid name length. Length must be between 1 and 27.");
 	}
 };
 
@@ -104,7 +124,7 @@ const _searchInIPFS = async (query, authUser, foundInArweave) => {
 			? []
 			: query.key === "zelfName"
 			? {
-					price: _calculateZelfNamePrice(query.value.split(".zelf")[0].length),
+					price: _calculateZelfNamePrice(query.value.split(".zelf")[0].length, 1),
 					zelfName: query.value,
 					available: true,
 			  }
@@ -198,7 +218,7 @@ const _arweaveIDToBase64 = async (id) => {
  * @param {Object} authUser
  */
 const leaseZelfName = async (params, authUser) => {
-	const { zelfName } = params;
+	const { zelfName, duration } = params;
 
 	await _findDuplicatedZelfName(zelfName, authUser);
 
@@ -219,7 +239,7 @@ const leaseZelfName = async (params, authUser) => {
 	const dataToEncrypt = {
 		publicData: {
 			ethAddress: eth.address,
-			evm: evmCompatibleTickers,
+			// evm: evmCompatibleTickers,
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
 			zelfName,
@@ -240,12 +260,32 @@ const leaseZelfName = async (params, authUser) => {
 	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
 
 	zelfNameObject.zelfName = zelfName;
+	zelfNameObject.price = _calculateZelfNamePrice(zelfName.length - 5, duration);
 	zelfNameObject.publicData = dataToEncrypt.publicData;
 	zelfNameObject.ethAddress = eth.address;
 	zelfNameObject.btcAddress = btc.address;
 	zelfNameObject.solanaAddress = solana.address;
 	zelfNameObject.hasPassword = `${Boolean(password)}`;
 	zelfNameObject.metadata = params.previewZelfProof ? dataToEncrypt.metadata : undefined;
+
+	zelfNameObject.coinbaseCharge = await createCoinbaseCharge({
+		name: `${zelfNameObject.zelfName}`,
+		description: `Purchase of the Zelf Name > ${zelfNameObject.zelfName} for $${zelfNameObject.price}`,
+		pricing_type: "fixed_price",
+		local_price: {
+			amount: `${zelfNameObject.price}`,
+			currency: "USD",
+		},
+		metadata: {
+			// Custom metadata (optional)
+			zelfName: zelfNameObject.zelfName,
+			ethAddress: eth.address,
+			btcAddress: btc.address,
+			solanaAddress: solana.address,
+		},
+		redirect_url: "https://name.zelf.world/#/coinbase-success",
+		cancel_url: "https://name.zelf.world/#/coinbase-cancel",
+	});
 
 	if (!params.skipZNS) {
 		zelfNameObject.image = await encryptQR(dataToEncrypt);
@@ -258,11 +298,15 @@ const leaseZelfName = async (params, authUser) => {
 				name: zelfNameObject.zelfName,
 				metadata: {
 					...zelfNameObject.publicData,
-					arweaveId: zelfNameObject.holdTransaction.id,
+					// arweaveId: zelfNameObject.holdTransaction.id,
 					zelfProof: zelfNameObject.zelfProof,
 					hasPassword: zelfNameObject.hasPassword,
-					type: "hold",
 					expiresAt: moment().add(12, "hour").format("YYYY-MM-DD"),
+					type: "hold",
+					// coinbase_id: zelfNameObject.coinbaseCharge.id,
+					coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
+					// coinbase_expires_at: zelfNameObject.coinbaseCharge.expires_at,
+					// coinbase_created_at: zelfNameObject.coinbaseCharge.created_at,
 				},
 				pinIt: true,
 			},
