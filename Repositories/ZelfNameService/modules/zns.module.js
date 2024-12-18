@@ -12,6 +12,7 @@ const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
 const { createCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
+const config = require("../../../Core/config");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -58,17 +59,19 @@ const zelfNamePricing = {
  * @returns {number} - Price of the Zelf name
  */
 const _calculateZelfNamePrice = (length, duration = 1) => {
-	if (![1, 2, 3, 4, 5, "lifetime"].includes(duration)) {
-		throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
-	}
+	if (![1, 2, 3, 4, 5, "lifetime"].includes(duration)) throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
+
+	let price = 24;
 
 	if (length >= 5 && length <= 15) {
-		return zelfNamePricing["5-15"][duration];
+		price = zelfNamePricing["5-15"][duration];
 	} else if (zelfNamePricing[length]) {
-		return zelfNamePricing[length][duration];
+		price = zelfNamePricing[length][duration];
 	} else {
 		throw new Error("Invalid name length. Length must be between 1 and 27.");
 	}
+
+	return config.env === "development" ? price / 24 : price;
 };
 
 /**
