@@ -2,8 +2,10 @@ module.exports = (server) => {
 	//A
 	require("../Repositories/api-mina/routes/mina-scrapping.route")(server);
 	//B
+	require("../Repositories/bnb/routes/bnb-scrapping.route")(server);
 	require("../Repositories/binance/routes/binance.route")(server);
 	//C
+	require("../Repositories/cardano/routes/cardano-scrapping.route")(server);
 	//D
 	//E
 	require("../Repositories/etherscan/routes/etherscan.route")(server);
@@ -21,6 +23,7 @@ module.exports = (server) => {
 	//N
 	//O
 	//P
+	require("../Repositories/purchase-zelf/routes/purchase.route")(server);
 	//Q
 	//R
 	//S
@@ -31,6 +34,7 @@ module.exports = (server) => {
 	//W
 	require("../Repositories/Wallet/routes/wallet.route")(server);
 	//X
+	require("../Repositories/XRP/routes/xrp-scrapping.route")(server);
 	//Y
 	//Z
 	require("../Repositories/ZelfNameService/routes/zns.routes")(server);
