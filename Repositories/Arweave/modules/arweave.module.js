@@ -7,30 +7,44 @@ const axios = require("axios");
 const arweaveUrl = `https://arweave.net`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 const graphql = `https://arweave-search.goldsky.com/graphql`;
+const moment = require("moment");
 
-const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
+const zelfNameHold = async (zelfProofQRCode, zelfNameObject) => {
 	/**
 	 * Generate a key from the arweave wallet.
 	 */
-	const arweave = new Arweave({});
+
+	// const jwk = {
+	// 	kty: "RSA",
+	// 	n: config.arwave.n,
+	// 	e: config.arwave.e,
+	// 	d: config.arwave.d,
+	// 	p: config.arwave.p,
+	// 	q: config.arwave.q,
+	// 	dp: config.arwave.dp,
+	// 	dq: config.arwave.dq,
+	// 	qi: config.arwave.qi,
+	// 	kid: "2011-04-29",
+	// };
 
 	const jwk = {
 		kty: "RSA",
-		n: config.arwave.n,
-		e: config.arwave.e,
-		d: config.arwave.d,
-		p: config.arwave.p,
-		q: config.arwave.q,
-		dp: config.arwave.dp,
-		dq: config.arwave.dq,
-		qi: config.arwave.qi,
+		n: config.arwave.hold.n,
+		e: config.arwave.hold.e,
+		d: config.arwave.hold.d,
+		p: config.arwave.hold.p,
+		q: config.arwave.hold.q,
+		dp: config.arwave.hold.dp,
+		dq: config.arwave.hold.dq,
+		qi: config.arwave.hold.qi,
 		kid: "2011-04-29",
 	};
 
 	/**
 	 * Get the address associated with the generated wallet.
 	 */
-	const address = await arweave.wallets.jwkToAddress(jwk);
+	// const arweave = new Arweave({});
+	// const address = await arweave.wallets.jwkToAddress(jwk);
 
 	/**
 	 * Use the arweave key to create an authenticated turbo client
@@ -47,7 +61,7 @@ const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 
 	const fileSize = buffer.length;
 
-	const tempFilePath = path.join(__dirname, "tempFile.png");
+	const tempFilePath = path.join(__dirname, `${zelfNameObject.zelfName}.png`);
 
 	// Write buffer to a temporary file
 	fs.writeFileSync(tempFilePath, buffer);
@@ -64,6 +78,10 @@ const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 		{
 			name: "hasPassword",
 			value: zelfNameObject.hasPassword,
+		},
+		{
+			name: "expiresAt",
+			value: moment().add(12, "hour").format("YYYY-MM-DD"),
 		},
 	];
 
@@ -99,7 +117,7 @@ const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 	};
 };
 
-const _uploadZelfProof = async (zelfProofQRCode) => {
+const _zelfNameHold = async (zelfProofQRCode) => {
 	/**
 	 * Generate a key from the arweave wallet.
 	 */
@@ -227,6 +245,6 @@ const search = async (zelfName, extraConditions = {}) => {
 };
 
 module.exports = {
-	uploadZelfProof,
+	zelfNameHold,
 	search,
 };

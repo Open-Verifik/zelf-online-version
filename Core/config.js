@@ -105,6 +105,19 @@ const configuration = {
 		dp: process.env.ARWAVE_DP,
 		dq: process.env.ARWAVE_DQ,
 		qi: process.env.ARWAVE_QI,
+		hold: {
+			n: process.env._ARWAVE_N,
+			e: process.env._ARWAVE_E,
+			d: process.env._ARWAVE_D,
+			p: process.env._ARWAVE_P,
+			q: process.env._ARWAVE_Q,
+			dp: process.env._ARWAVE_DP,
+			dq: process.env._ARWAVE_DQ,
+			qi: process.env._ARWAVE_QI,
+		},
+	},
+	coinbase: {
+		key: process.env.COINBASE_API_KEY,
 	},
 };
 

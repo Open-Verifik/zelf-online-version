@@ -35,13 +35,11 @@ const get = async (params, authUser = {}) => {
  * @param {*} authUser
  */
 const insert = async (params, authUser) => {
-	if (authUser)
-		await deleteSession(
-			authUser || {
-				identifier: params.identifier,
-				type: params.type || "createWallet",
-			}
-		);
+	await deleteSession(
+		authUser || {
+			identifier: params.identifier,
+		}
+	);
 
 	const session = new Model({
 		identifier: params.identifier,
@@ -52,6 +50,7 @@ const insert = async (params, authUser) => {
 	try {
 		await session.save();
 	} catch (exception) {
+		console.error({ exception });
 		if (params.type !== "general") {
 			const error = new Error("zelfName_is_taken");
 
@@ -240,11 +239,7 @@ const walletDecrypt = async (content, identifier, password) => {
  * @author Miguel Trevino
  */
 const deleteSession = async (authUser) => {
-	const session = await get({ findOne: true }, authUser);
-
-	if (!session) return;
-
-	return await Model.findByIdAndDelete(session._id);
+	return await Model.deleteMany({ identifier: authUser.identifier });
 };
 
 module.exports = {

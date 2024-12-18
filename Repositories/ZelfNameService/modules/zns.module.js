@@ -223,7 +223,6 @@ const leaseZelfName = async (params, authUser) => {
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
 			zelfName,
-			leaseExpiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
 		},
 		metadata: {
 			mnemonic: _mnemonic,
@@ -251,7 +250,7 @@ const leaseZelfName = async (params, authUser) => {
 	if (!params.skipZNS) {
 		zelfNameObject.image = await encryptQR(dataToEncrypt);
 
-		zelfNameObject.leaseTransaction = await ArweaveModule.uploadZelfProof(zelfNameObject.image, zelfNameObject);
+		zelfNameObject.holdTransaction = await ArweaveModule.zelfNameHold(zelfNameObject.image, zelfNameObject);
 
 		zelfNameObject.ipfs = await IPFSModule.insert(
 			{
@@ -259,9 +258,11 @@ const leaseZelfName = async (params, authUser) => {
 				name: zelfNameObject.zelfName,
 				metadata: {
 					...zelfNameObject.publicData,
-					arweaveId: zelfNameObject.leaseTransaction.id,
+					arweaveId: zelfNameObject.holdTransaction.id,
 					zelfProof: zelfNameObject.zelfProof,
 					hasPassword: zelfNameObject.hasPassword,
+					type: "hold",
+					expiresAt: moment().add(12, "hour").format("YYYY-MM-DD"),
 				},
 				pinIt: true,
 			},
