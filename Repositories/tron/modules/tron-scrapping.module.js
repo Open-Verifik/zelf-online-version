@@ -8,14 +8,11 @@ const { generateRandomUserAgent } = require("../../../Core/helpers");
 
 const getBalance = async (params) => {
 	try {
-		const { data } = await instance.get(
-			`https://apilist.tronscanapi.com/api/accountv2?address=${params.id}`,
-			{
-				headers: {
-					"user-agent": generateRandomUserAgent(),
-				},
-			}
-		);
+		const { data } = await instance.get(`https://apilist.tronscanapi.com/api/accountv2?address=${params.id}`, {
+			headers: {
+				"user-agent": generateRandomUserAgent(),
+			},
+		});
 
 		const token = await instance.get(
 			`https://apilist.tronscanapi.com/api/account/tokens?address=${params.id}&start=0&limit=20&token=&hidden=0&show=0&sortType=0&sortBy=0`,
@@ -27,13 +24,14 @@ const getBalance = async (params) => {
 		);
 
 		return {
+			data,
 			address: params.id,
 			balance: data.balance,
-			fiatBalance: null, //data.balanceUsd,
+			fiatBalance: 0, //data.balanceUsd,
 			currency: "usd",
 			account: {
 				asset: "TRX",
-				fiatValue: "0",
+				fiatValue: 0,
 				price: data.balanceUsd,
 			},
 			tokenHoldings: {

@@ -8,17 +8,12 @@ const { generateRandomUserAgent } = require("../../../Core/helpers");
 
 const getBalance = async (params) => {
 	try {
-		const { data } = await instance.get(
-			`https://minascan.io/mainnet/api/api/core/accounts/${params.id}/balance`,
-			{
-				headers: {
-					"user-agent": generateRandomUserAgent(),
-					"Upgrade-Insecure-Requests": "1",
-				},
-			}
-		);
-
-		console.log(data);
+		const { data } = await instance.get(`https://minascan.io/mainnet/api/api/core/accounts/${params.id}/balance`, {
+			headers: {
+				"user-agent": generateRandomUserAgent(),
+				"Upgrade-Insecure-Requests": "1",
+			},
+		});
 
 		return {
 			address: params.id,
@@ -37,7 +32,7 @@ const getBalance = async (params) => {
 			},
 		};
 	} catch (error) {
-		console.error({ error });
+		console.error({ error: error.response.data });
 	}
 };
 
@@ -64,15 +59,12 @@ const getTransactionsList = async (params, query) => {
  * @param {Object} params
  */
 const getToken = async (params, query) => {
-	const { data } = await instance.get(
-		`https://minascan.io/mainnet/api/api/token/${params.id}/info`,
-		{
-			headers: {
-				"user-agent": generateRandomUserAgent(),
-				"Upgrade-Insecure-Requests": "1",
-			},
-		}
-	);
+	const { data } = await instance.get(`https://minascan.io/mainnet/api/api/token/${params.id}/info`, {
+		headers: {
+			"user-agent": generateRandomUserAgent(),
+			"Upgrade-Insecure-Requests": "1",
+		},
+	});
 
 	return data;
 };
