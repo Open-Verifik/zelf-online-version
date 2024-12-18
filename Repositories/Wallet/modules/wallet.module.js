@@ -10,7 +10,6 @@ const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
 const populates = [];
-const ArwaveModule = require("../../Arweave/modules/arweave.module");
 
 /**
  * @param {*} params

@@ -70,7 +70,7 @@ const buildQuery = (params, mongooseDocument, _id, allowedPopulates) => {
 
 	const fields = filters.select;
 
-	if (config.debug.mongo) console.log(filters.wheres);
+	if (config.debug.mongo) console.info(filters.wheres);
 
 	if (params[_id]) {
 		query = mongooseDocument.findById(params[_id], fields, filters);

@@ -23,6 +23,10 @@ const get = async (params, authUser = {}) => {
 		queryParams.where_identifier = authUser.identifier;
 	}
 
+	if (authUser.type) {
+		queryParams.where_type = authUser.type;
+	}
+
 	return await MongoORM.buildQuery(queryParams, Model, null, populates);
 };
 
@@ -31,7 +35,13 @@ const get = async (params, authUser = {}) => {
  * @param {*} authUser
  */
 const insert = async (params, authUser) => {
-	if (authUser) await deleteSession(authUser);
+	if (authUser)
+		await deleteSession(
+			authUser || {
+				identifier: params.identifier,
+				type: params.type || "createWallet",
+			}
+		);
 
 	const session = new Model({
 		identifier: params.identifier,
@@ -39,7 +49,17 @@ const insert = async (params, authUser) => {
 		status: "active",
 	});
 
-	await session.save();
+	try {
+		await session.save();
+	} catch (exception) {
+		if (params.type !== "general") {
+			const error = new Error("zelfName_is_taken");
+
+			error.status = 409;
+
+			throw error;
+		}
+	}
 
 	return {
 		token: jwt.sign(

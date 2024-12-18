@@ -21,7 +21,7 @@ server.get("/async-endpoint", async (req, res) => {
 		const data = await someAsyncFunction();
 		res.send(data, null);
 	} catch (error) {
-		console.log({ error });
+		console.error({ error });
 
 		if (!res.headersSent) {
 			res.send(500, { error: error.message });
