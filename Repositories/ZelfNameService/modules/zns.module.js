@@ -11,7 +11,7 @@ const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/e
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
-const { createCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
+const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const config = require("../../../Core/config");
 
 const evmCompatibleTickers = [
@@ -85,7 +85,13 @@ const searchZelfName = async (params, authUser) => {
 	try {
 		const searchResults = await ArweaveModule.search(params.environment, params.zelfName, query);
 
-		if (searchResults?.available) throw new Error("404:not_found_in_arweave");
+		if (searchResults?.available) {
+			const error = new Error("not_found_in_arweave");
+
+			error.status = 404;
+
+			throw error;
+		}
 
 		const zelfNames = [];
 
@@ -97,7 +103,7 @@ const searchZelfName = async (params, authUser) => {
 
 		return { arweave: zelfNames, ipfs: await _searchInIPFS(params.environment, query, authUser, true) };
 	} catch (exception) {
-		console.error({ exception: exception.response?.data?.errors });
+		console.error({ exception: exception });
 
 		return await _searchInIPFS(params.environment, query, authUser);
 	}
@@ -298,23 +304,22 @@ const leaseZelfName = async (params, authUser) => {
 	if (!params.skipZNS) {
 		zelfNameObject.image = await encryptQR(dataToEncrypt);
 
-		zelfNameObject.holdTransaction = await ArweaveModule.zelfNameHold(zelfNameObject.image, zelfNameObject);
+		// zelfNameObject.holdTransaction = await ArweaveModule.zelfNameHold(zelfNameObject.image, zelfNameObject);
 
 		zelfNameObject.ipfs = await IPFSModule.insert(
 			{
 				base64: zelfNameObject.image,
 				name: zelfNameObject.zelfName,
 				metadata: {
-					...zelfNameObject.publicData,
-					// arweaveId: zelfNameObject.holdTransaction.id,
+					// ...zelfNameObject.publicData,
+					zelfName,
 					zelfProof: zelfNameObject.zelfProof,
 					hasPassword: zelfNameObject.hasPassword,
 					expiresAt: moment().add(12, "hour").format("YYYY-MM-DD"),
 					type: "hold",
-					// coinbase_id: zelfNameObject.coinbaseCharge.id,
+					coinbase_id: zelfNameObject.coinbaseCharge.id,
 					coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
-					// coinbase_expires_at: zelfNameObject.coinbaseCharge.expires_at,
-					// coinbase_created_at: zelfNameObject.coinbaseCharge.created_at,
+					coinbase_expires_at: zelfNameObject.coinbaseCharge.expires_at,
 				},
 				pinIt: true,
 			},
@@ -323,6 +328,73 @@ const leaseZelfName = async (params, authUser) => {
 	}
 
 	return { ...zelfNameObject, hasPassword: Boolean(password) };
+};
+
+/**
+ * lease confirmation
+ * @param {Object} data
+ * @param {Object} authUser
+ * @author Miguel Trevino
+ */
+const leaseConfirmation = async (data, authUser) => {
+	const { network, coin, zelfName } = data;
+
+	const zelfNameObject = await previewZelfName({ zelfName }, authUser);
+
+	if (!zelfNameObject) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	let payment = false;
+
+	switch (network) {
+		case "coinbase":
+			// payment = await _confirmCoinbaseCharge(zelfNameObject);
+
+			break;
+
+		default:
+			break;
+	}
+
+	// mover el registro a la wallet de nosotros ( no la temporal ) > ipfs clonar sin la propiedad de type = 'hold'
+	if (payment?.confirmed) {
+		// unpin previous one so we can only keep the good copy after it's been purchased
+		const unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
+	}
+
+	return {
+		zelfNameObject,
+		zelfName,
+		payment,
+	};
+};
+
+const _confirmCoinbaseCharge = async (zelfNameObject) => {
+	const chargeID = zelfNameObject.publicData?.coinbase_id || zelfNameObject.publicData?.coinbase_hosted_url.split("/pay/")[1];
+
+	const charge = await getCoinbaseCharge(chargeID);
+
+	if (!charge) return false;
+
+	const timeline = charge.timeline;
+
+	let confirmed = false;
+
+	for (let index = 0; index < timeline.length; index++) {
+		const _timeline = timeline[index];
+
+		if (_timeline.status === "COMPLETED") {
+			confirmed = true;
+		}
+	}
+
+	return {
+		...charge,
+		confirmed,
+	};
 };
 
 const _decryptParams = async (data, authUser) => {
@@ -372,6 +444,8 @@ const previewZelfName = async (params, authUser) => {
 
 		zelfNameObject.source = zelfNameObject.ipfs_pin_hash ? "ipfs" : "arweave";
 
+		zelfNameObject.preview = await preview({ zelfProof: zelfNameObject.zelfProof });
+
 		return [zelfNameObject];
 	} catch (exception) {
 		return await _previewWithIPFS(params, authUser);
@@ -390,11 +464,7 @@ const _previewWithIPFS = async (params, authUser) => {
 
 		if (searchResult?.available) throw new Error("404");
 
-		for (let index = 0; index < searchResult?.ipfs.length; index++) {
-			const ipfsRecord = searchResult.ipfs[index];
-
-			ipfsRecord.preview = await preview({ zelfProof: ipfsRecord.zelfProof });
-		}
+		searchResult[0].preview = await preview({ zelfProof: searchResult[0].zelfProof });
 
 		return searchResult;
 	} catch (exception) {
@@ -459,6 +529,7 @@ const decryptZelfName = async (params, authUser) => {
 module.exports = {
 	searchZelfName,
 	leaseZelfName,
+	leaseConfirmation,
 	previewZelfName,
 	decryptZelfName,
 };

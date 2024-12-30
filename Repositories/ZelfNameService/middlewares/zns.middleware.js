@@ -5,6 +5,11 @@ const schemas = {
 		type: stringEnum(["create", "import"]).required(),
 		// years: number().required(),
 	},
+	leaseConfirmation: {
+		zelfName: string().required(),
+		coin: string().required(),
+		network: string().required(),
+	},
 	create: {
 		zelfName: string().required(),
 		faceBase64: string().required(),
@@ -88,6 +93,40 @@ const leaseValidation = async (ctx, next) => {
 	await next();
 };
 
+const leaseConfirmationValidation = async (ctx, next) => {
+	// Step 1: Extract necessary data from the request
+	const { zelfName, purchaseDetails } = ctx.request.body;
+
+	const validation = validate(schemas.leaseConfirmation, ctx.request.body);
+
+	// Step 2: Validate the Zelf name service purchase details
+	if (validation.error) {
+		ctx.status = 400;
+
+		ctx.body = { validationError: validation.error.message };
+
+		return;
+	}
+
+	// validation logic
+	const isValidPurchase = validatePurchaseDetails(zelfName, purchaseDetails);
+
+	// Step 3: Return a response indicating success or failure
+	if (!isValidPurchase) {
+		ctx.status = 400;
+
+		ctx.body = { validationError: "Invalid lease confirmation details" };
+	}
+
+	await next();
+};
+
+// Example validation function (replace with actual logic)
+function validatePurchaseDetails(zelfName, purchaseDetails) {
+	// Implement actual validation logic here
+	return true; // Placeholder
+}
+
 const previewValidation = async (ctx, next) => {
 	const validation = validate(schemas.preview, ctx.request.body);
 
@@ -128,6 +167,7 @@ const decryptValidation = async (ctx, next) => {
 module.exports = {
 	getValidation,
 	leaseValidation,
+	leaseConfirmationValidation,
 	previewValidation,
 	deleteValidation,
 	decryptValidation,

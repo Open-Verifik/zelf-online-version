@@ -12,8 +12,4 @@ module.exports = (server) => {
 	server.get(PATH, Middleware.getValidation, Controller.get);
 
 	server.get(`${PATH}/:cid`, Middleware.showValidation, Controller.show);
-
-	server.post(`${PATH}`, Middleware.createValidation, Controller.create);
-
-	server.del(`${PATH}/:id`, Middleware.deleteValidation, Controller.destroy);
 };

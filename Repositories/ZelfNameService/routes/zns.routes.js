@@ -13,6 +13,8 @@ module.exports = (server) => {
 
 	server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseZelfName);
 
+	server.post(`${PATH}/lease-confirmation`, Middleware.leaseConfirmationValidation, Controller.leaseConfirmation);
+
 	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewZelfName);
 
 	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptZelfName);

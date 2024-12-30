@@ -21,6 +21,23 @@ const createCoinbaseCharge = async (chargeData) => {
 	}
 };
 
+const getCoinbaseCharge = async (chargeID) => {
+	try {
+		const response = await axios.get(`https://api.commerce.coinbase.com/charges/${chargeID}`, {
+			headers: {
+				"Content-Type": "application/json",
+				"X-CC-Api-Key": config.coinbase.key,
+			},
+		});
+
+		return response.data?.data;
+	} catch (error) {
+		console.log({ error });
+		throw new Error(error.message);
+	}
+};
+
 module.exports = {
 	createCoinbaseCharge,
+	getCoinbaseCharge,
 };
