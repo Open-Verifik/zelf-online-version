@@ -5,8 +5,6 @@ const config = require("../../../Core/config");
 const get = async (data) => {
 	const { cid, zelfName, key, value, exipres } = data;
 
-	console.log({ key, value, zelfName });
-
 	if (cid) return await IPFS.retrieve(cid, expires);
 
 	if (zelfName) return await IPFS.filter("name", zelfName);
@@ -46,8 +44,6 @@ const insert = async (data, authUser) => {
 
 const unPinFiles = async (CIDs = []) => {
 	const unpinnedFiles = await IPFS.unPinFiles(CIDs);
-
-	console.log({ unpinnedFiles });
 
 	return unpinnedFiles;
 };
