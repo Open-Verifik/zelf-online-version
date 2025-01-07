@@ -135,8 +135,8 @@ const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, au
 			ipfsRecords.push(
 				...(await IPFSModule.get(
 					{
-						key: query.key,
-						value: `${query.value}.hold`,
+						key: query.key || "zelfName",
+						value: `${query.value || query.zelfName}.hold`,
 					},
 					authUser
 				))
@@ -149,17 +149,23 @@ const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, au
 		default:
 			try {
 				ipfsRecords.push(...(await IPFSModule.get(query, authUser)));
-			} catch (exception) {}
+			} catch (exception) {
+				console.error({ mainNetIPFSError: exception });
+			}
 
-			ipfsRecords.push(
-				...(await IPFSModule.get(
-					{
-						key: query.key,
-						value: `${query.value}.hold`,
-					},
-					authUser
-				))
-			);
+			try {
+				ipfsRecords.push(
+					...(await IPFSModule.get(
+						{
+							key: query.key || "zelfName",
+							value: `${query.value || query.zelfName}.hold`,
+						},
+						authUser
+					))
+				);
+			} catch (exception) {
+				console.error({ holdIPFSError: exception });
+			}
 
 			break;
 	}
@@ -179,13 +185,15 @@ const _searchInIPFS = async (environment = "hold", query, authUser, foundInArwea
 
 		await _retriveFromIPFSByEnvironment(ipfsRecords, environment, query, authUser);
 
+		const value = query.value || query.zelfName;
+
 		if (!ipfsRecords.length) {
 			return foundInArweave
 				? []
-				: query.key === "zelfName"
+				: value
 				? {
-						price: _calculateZelfNamePrice(query.value.split(".zelf")[0].length, 1),
-						zelfName: query.value,
+						price: _calculateZelfNamePrice(value.split(".zelf")[0].length, 1),
+						zelfName: value,
 						available: true,
 				  }
 				: null;
@@ -212,7 +220,7 @@ const _searchInIPFS = async (environment = "hold", query, authUser, foundInArwea
 
 		return foundInArweave ? zelfNamesInIPFS : { ipfs: zelfNamesInIPFS };
 	} catch (exception) {
-		console.error({ exception });
+		console.error({ _searchInIPFS_exception: exception });
 
 		return foundInArweave
 			? []
@@ -419,8 +427,16 @@ const leaseZelfName = async (params, authUser) => {
  */
 const leaseConfirmation = async (data, authUser) => {
 	const { network, coin, zelfName } = data;
+	let unpinResult;
+	let inMainnet = false;
 
 	const zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
+
+	for (let index = 0; index < zelfNameRecords.length; index++) {
+		const record = zelfNameRecords[index];
+
+		inMainnet = Boolean(record.publicData?.type === "mainnet");
+	}
 
 	if (!zelfNameRecords.length) {
 		const error = new Error("zelfName_not_found");
@@ -428,14 +444,13 @@ const leaseConfirmation = async (data, authUser) => {
 		throw error;
 	}
 
-	if (zelfNameRecords.length === 2) {
+	if (zelfNameRecords.length === 2 || inMainnet) {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
 		throw error;
 	}
 
 	const zelfNameObject = zelfNameRecords[0];
-
 	let payment = false;
 
 	switch (network) {
@@ -450,9 +465,9 @@ const leaseConfirmation = async (data, authUser) => {
 
 	// mover el registro a la wallet de nosotros ( no la temporal ) > ipfs clonar sin la propiedad de type = 'hold'
 	if (payment?.confirmed) {
-		// unpin previous one so we can only keep the good copy after it's been purchased
+		unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
+
 		const { masterIPFSRecord, masterArweaveRecord } = await _cloneZelfNameToProduction(zelfNameObject, payment);
-		// const unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
 
 		return {
 			ipfs: [masterIPFSRecord],
@@ -464,6 +479,7 @@ const leaseConfirmation = async (data, authUser) => {
 		zelfNameObject,
 		zelfName,
 		payment,
+		hold: unpinResult,
 	};
 };
 
@@ -508,27 +524,37 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
  */
 const _cloneZelfNameToProduction = async (zelfNameObject, payment) => {
 	// first clone it to ipfs, then to arweave
-	const masterIPFSRecord = await IPFSModule.insert(
-		{
-			base64: zelfNameObject.zelfProofQRCode,
-			name: zelfNameObject.zelfName,
-			metadata: {
-				hasPassword: `${Boolean(zelfNameObject.preview?.passwordLayer === "Password")}`,
-				zelfName: zelfNameObject.publicData.zelfName,
-				zelfProof: zelfNameObject.publicData.zelfProof,
-				...zelfNameObject.preview?.publicData,
-				expiresAt: moment()
-					.add(zelfNameObject.publicData.duration || 1, "year")
-					.format("YYYY-MM-DD HH:mm:ss"),
-				type: "mainnet",
-			},
-			pinIt: true,
+	const payload = {
+		base64: zelfNameObject.zelfProofQRCode,
+		name: zelfNameObject.preview?.publicData.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", ""),
+		metadata: {
+			hasPassword: `${Boolean(zelfNameObject.preview?.passwordLayer === "Password")}`,
+			zelfProof: zelfNameObject.publicData.zelfProof,
+			...zelfNameObject.preview?.publicData,
+			expiresAt: moment()
+				.add(zelfNameObject.publicData.duration || 1, "year")
+				.format("YYYY-MM-DD HH:mm:ss"),
+			type: "mainnet",
 		},
-		{ pro: true }
-	);
+		pinIt: true,
+	};
+
+	const masterIPFSRecord = await IPFSModule.insert(payload, { pro: true });
+
+	const masterArweaveRecord = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
+		hasPassword: payload.metadata.hasPassword,
+		zelfProof: payload.metadata.zelfProof,
+		publicData: {
+			...zelfNameObject.preview?.publicData,
+			type: "mainnet",
+			expiresAt: moment()
+				.add(zelfNameObject.publicData.duration || 1, "year")
+				.format("YYYY-MM-DD HH:mm:ss"),
+		},
+	});
 
 	return {
-		masterArweaveRecord: null,
+		masterArweaveRecord,
 		masterIPFSRecord,
 	};
 };
@@ -612,12 +638,14 @@ const _previewWithIPFS = async (params, authUser) => {
 	try {
 		const searchResult = await _searchInIPFS(params.environment, params, { ...authUser, pro: true }, false);
 
-		if (searchResult?.available) throw new Error("404");
+		if (!searchResult || searchResult?.available) throw new Error("404:not_found");
 
 		searchResult[0].preview = await preview({ zelfProof: searchResult[0].zelfProof });
 
 		return searchResult;
 	} catch (exception) {
+		console.error({ exception });
+
 		const error = new Error("zelfName_not_found");
 
 		error.status = 404;

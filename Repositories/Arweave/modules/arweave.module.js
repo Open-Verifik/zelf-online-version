@@ -11,7 +11,8 @@ const moment = require("moment");
 const holdOwner = config.arwave.hold.owner;
 const owner = config.arwave.owner;
 
-const zelfNameHold = async (zelfProofQRCode, zelfNameObject) => {
+const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
+	const { zelfProof, hasPassword, publicData } = zelfNameObject;
 	/**
 	 * Generate a key from the arweave wallet.
 	 */
@@ -75,42 +76,47 @@ const zelfNameHold = async (zelfProofQRCode, zelfNameObject) => {
 		},
 		{
 			name: "zelfProof",
-			value: zelfNameObject.zelfProof,
+			value: zelfProof,
 		},
 		{
 			name: "hasPassword",
-			value: zelfNameObject.hasPassword,
+			value: hasPassword,
 		},
 		{
 			name: "expiresAt",
 			value: moment().add(12, "hour").format("YYYY-MM-DD"),
 		},
-		{
-			name: "coinbase_id",
-			value: zelfNameObject.coinbaseCharge?.id,
-		},
-		{
-			name: "coinbase_hosted_url",
-			value: zelfNameObject.coinbaseCharge?.hosted_url,
-		},
-		{
-			name: "coinbase_expires_at",
-			value: zelfNameObject.coinbaseCharge?.expires_at,
-		},
-		{
-			name: "coinbase_created_at",
-			value: zelfNameObject.coinbaseCharge?.created_at,
-		},
 	];
 
-	const publicKeys = Object.keys(zelfNameObject.publicData);
+	if (zelfNameObject.coinbaseCharge) {
+		tags.push(
+			{
+				name: "coinbase_id",
+				value: zelfNameObject.coinbaseCharge.id,
+			},
+			{
+				name: "coinbase_hosted_url",
+				value: zelfNameObject.coinbaseCharge.hosted_url,
+			},
+			{
+				name: "coinbase_expires_at",
+				value: zelfNameObject.coinbaseCharge.expires_at,
+			},
+			{
+				name: "coinbase_created_at",
+				value: zelfNameObject.coinbaseCharge.created_at,
+			}
+		);
+	}
+
+	const publicKeys = Object.keys(publicData);
 
 	for (let index = 0; index < publicKeys.length; index++) {
 		const publicKey = publicKeys[index];
 
 		tags.push({
 			name: publicKey,
-			value: zelfNameObject.publicData[publicKey],
+			value: publicData[publicKey],
 		});
 	}
 
@@ -263,6 +269,6 @@ const search = async (environment = "hold", zelfName, extraConditions = {}) => {
 };
 
 module.exports = {
-	zelfNameHold,
+	zelfNameRegistration,
 	search,
 };

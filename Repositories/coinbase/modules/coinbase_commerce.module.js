@@ -32,7 +32,8 @@ const getCoinbaseCharge = async (chargeID) => {
 
 		return response.data?.data;
 	} catch (error) {
-		console.log({ error });
+		console.error({ error });
+
 		throw new Error(error.message);
 	}
 };
