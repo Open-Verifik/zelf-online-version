@@ -96,6 +96,9 @@ const leaseValidation = async (ctx, next) => {
     Client IP: ${clientIp}
     User Agent: ${userAgent}`);
 
+	const forwardedFor = ctx.request.header["x-forwarded-for"] || "No X-Forwarded-For header";
+	console.log(`X-Forwarded-For: ${forwardedFor}`);
+
 	console.log({ body: { zelfName, type }, user: ctx.state.user });
 
 	await next();
