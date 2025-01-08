@@ -85,7 +85,7 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	console.log({ body: ctx.request.body });
+	console.log({ body: { zelfName, type }, user: ctx.state.user });
 
 	await next();
 };
