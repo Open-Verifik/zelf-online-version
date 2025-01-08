@@ -55,6 +55,8 @@ const insert = async (params, authUser) => {
 		if (params.type !== "general") {
 			const error = new Error("zelfName_is_taken");
 
+			console.log({ identifier: params.identifier, type: params.type || "createWallet" });
+
 			error.status = 409;
 
 			throw error;
