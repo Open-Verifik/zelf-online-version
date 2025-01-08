@@ -85,6 +85,8 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
+	console.log({ body: ctx.request.body });
+
 	await next();
 };
 
