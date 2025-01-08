@@ -85,6 +85,17 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
+	const origin = ctx.request.header.origin || "No Origin Header";
+	const referer = ctx.request.header.referer || "No Referer Header";
+	const clientIp = ctx.request.ip;
+	const userAgent = ctx.request.header["user-agent"] || "No User Agent";
+
+	console.log(`Request Details: 
+    Origin: ${origin}
+    Referer: ${referer}
+    Client IP: ${clientIp}
+    User Agent: ${userAgent}`);
+
 	console.log({ body: { zelfName, type }, user: ctx.state.user });
 
 	await next();
