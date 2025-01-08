@@ -5,6 +5,11 @@ const schemas = {
 		type: stringEnum(["create", "import"]).required(),
 		// years: number().required(),
 	},
+	leaseOffline: {
+		zelfName: string().required(),
+		zelfProof: string().required(),
+		zelfProofQRCode: string().required(),
+	},
 	leaseConfirmation: {
 		zelfName: string().required(),
 		coin: string().required(),
@@ -93,6 +98,25 @@ const leaseValidation = async (ctx, next) => {
 	await next();
 };
 
+/**
+ * lease offline validation
+ * @param {Object} ctx
+ * @param {Object} next
+ */
+const leaseOfflineValidation = async (ctx, next) => {
+	const valid = validate(schemas.leaseOffline, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	await next();
+};
+
 const leaseConfirmationValidation = async (ctx, next) => {
 	// Step 1: Extract necessary data from the request
 	const { zelfName, purchaseDetails } = ctx.request.body;
@@ -171,4 +195,6 @@ module.exports = {
 	previewValidation,
 	deleteValidation,
 	decryptValidation,
+	//offline
+	leaseOfflineValidation,
 };

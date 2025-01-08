@@ -113,7 +113,7 @@ const _removeExpiredRecords = async (records) => {
 	const now = moment();
 
 	// testing adding few days, so it's expired
-	// now.add(3, "day");
+	now.add(3, "day");
 
 	for (let index = records.length - 1; index >= 0; index--) {
 		const record = records[index];
@@ -322,7 +322,7 @@ const _arweaveIDToBase64 = async (id) => {
 const leaseZelfName = async (params, authUser) => {
 	const { zelfName, duration } = params;
 
-	await _findDuplicatedZelfName(zelfName, authUser);
+	await _findDuplicatedZelfName(zelfName, "both", authUser);
 
 	const { face, password, mnemonic } = await _decryptParams(params, authUser);
 
@@ -451,6 +451,7 @@ const leaseConfirmation = async (data, authUser) => {
 	}
 
 	const zelfNameObject = zelfNameRecords[0];
+
 	let payment = false;
 
 	switch (network) {
@@ -512,7 +513,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed,
+		confirmed: true,
 	};
 };
 
@@ -577,16 +578,18 @@ const _decryptParams = async (data, authUser) => {
 	return { password, mnemonic, face };
 };
 
-const _findDuplicatedZelfName = async (zelfName, authUser) => {
+const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser, returnResults = false) => {
 	const searchResult = await searchZelfName(
 		{
 			zelfName,
-			environment: "both",
+			environment,
 		},
 		authUser
 	);
 
 	if (searchResult.available) return null;
+
+	if (returnResults) return searchResult;
 
 	const error = new Error("zelfName_is_taken");
 
@@ -711,10 +714,125 @@ const decryptZelfName = async (params, authUser) => {
 	};
 };
 
+const leaseOffline = async (params, authUser) => {
+	const { zelfName, duration, zelfProof, zelfProofQRCode } = params;
+
+	let mainnetRecord = null;
+	let holdRecord = null;
+	let zelfNameRecords = [];
+
+	try {
+		zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
+	} catch (exception) {}
+
+	if (zelfNameRecords.length === 2) {
+		const error = new Error("zelfName_purchased_already");
+		error.status = 409;
+		throw error;
+	}
+
+	for (let index = 0; index < zelfNameRecords.length; index++) {
+		const ipfsRecord = zelfNameRecords[index];
+
+		if (ipfsRecord.publicData.type === "hold") holdRecord = ipfsRecord;
+
+		if (ipfsRecord.publicData.type === "mainnet") mainnetRecord = ipfsRecord;
+	}
+
+	let _preview = holdRecord?.preview || mainnetRecord?.preview;
+
+	const zelfNameObject = {
+		zelfName: `${zelfName}.hold`,
+		zelfProof,
+		image: zelfProofQRCode,
+		price: _calculateZelfNamePrice(zelfName.length - 5, duration),
+	};
+
+	if (!_preview) {
+		_preview = await preview({ zelfProof: zelfNameObject.zelfProof });
+	}
+
+	const coinbasePayload = {
+		name: `${zelfNameObject.zelfName}`,
+		description: `Purchase of the Zelf Name > ${zelfNameObject.zelfName} for $${zelfNameObject.price}`,
+		pricing_type: "fixed_price",
+		local_price: {
+			amount: `${zelfNameObject.price}`,
+			currency: "USD",
+		},
+		metadata: {
+			zelfName: zelfNameObject.zelfName,
+			ethAddress: _preview.publicData.ethAddress,
+			btcAddress: _preview.publicData.btcAddress,
+			solanaAddress: _preview.publicData.solanaAddress,
+		},
+		redirect_url: "https://name.zelf.world/#/coinbase-success",
+		cancel_url: "https://name.zelf.world/#/coinbase-cancel",
+	};
+
+	return {
+		preview: _preview,
+		coinbasePayload,
+	};
+
+	// unpin previous holdRecord
+	// if (holdRecord) {
+	// 	unpinResult = await IPFSModule.unPinFiles([holdRecord.ipfs_pin_hash]);
+	// }
+
+	// 3. create the .hold if it was not found
+	zelfNameObject.coinbaseCharge = await createCoinbaseCharge({
+		name: `${zelfNameObject.zelfName}`,
+		description: `Purchase of the Zelf Name > ${zelfNameObject.zelfName} for $${zelfNameObject.price}`,
+		pricing_type: "fixed_price",
+		local_price: {
+			amount: `${zelfNameObject.price}`,
+			currency: "USD",
+		},
+		metadata: {
+			// Custom metadata (optional)
+			zelfName: zelfNameObject.zelfName,
+			ethAddress: eth.address,
+			btcAddress: btc.address,
+			solanaAddress: solana.address,
+		},
+		redirect_url: "https://name.zelf.world/#/coinbase-success",
+		cancel_url: "https://name.zelf.world/#/coinbase-cancel",
+	});
+
+	zelfNameObject.ipfs = await IPFSModule.insert(
+		{
+			base64: zelfNameObject.image,
+			name: zelfNameObject.zelfName,
+			metadata: {
+				zelfProof: zelfNameObject.zelfProof,
+				zelfName: zelfNameObject.zelfName,
+				duration: duration || 1,
+				price: zelfNameObject.price,
+				expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
+				type: "hold",
+				coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
+				coinbase_expires_at: zelfNameObject.coinbaseCharge.expires_at,
+			},
+			pinIt: true,
+		},
+		{ ...authUser, pro: true }
+	);
+	// 3.2 delete the expired records from ipfs
+
+	return {
+		// searchResult,
+		holdRecord,
+		mainnetRecord,
+	};
+};
+
 module.exports = {
 	searchZelfName,
 	leaseZelfName,
 	leaseConfirmation,
 	previewZelfName,
 	decryptZelfName,
+	//Offline
+	leaseOffline,
 };

@@ -69,10 +69,27 @@ const decryptZelfName = async (ctx) => {
 	}
 };
 
+const leaseOfflineZelfName = async (ctx) => {
+	// lease offline zelf name
+	try {
+		const data = await Module.leaseOffline(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	searchZelfName,
 	leaseZelfName,
 	leaseConfirmation,
 	previewZelfName,
 	decryptZelfName,
+	//offline
+	leaseOfflineZelfName,
 };
