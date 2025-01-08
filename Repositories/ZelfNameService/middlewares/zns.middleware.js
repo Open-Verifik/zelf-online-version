@@ -57,6 +57,16 @@ const getValidation = async (ctx, next) => {
 const leaseValidation = async (ctx, next) => {
 	const valid = validate(schemas.lease, ctx.request.body);
 
+	const { clientId } = ctx.state.user;
+
+	if (!clientId) {
+		ctx.status = 403;
+
+		ctx.body = { validationError: "Access forbidden" };
+
+		return;
+	}
+
 	if (valid.error) {
 		ctx.status = 409;
 
@@ -108,6 +118,16 @@ const leaseValidation = async (ctx, next) => {
 const previewValidation = async (ctx, next) => {
 	const validation = validate(schemas.preview, ctx.request.body);
 
+	const { clientId } = ctx.state.user;
+
+	if (!clientId) {
+		ctx.status = 403;
+
+		ctx.body = { validationError: "Access forbidden" };
+
+		return;
+	}
+
 	if (validation.error) {
 		ctx.status = 409;
 
@@ -130,6 +150,16 @@ const deleteValidation = async (ctx, next) => {
  */
 const decryptValidation = async (ctx, next) => {
 	const validation = validate(schemas.decrypt, ctx.request.body);
+
+	const { clientId } = ctx.state.user;
+
+	if (!clientId) {
+		ctx.status = 403;
+
+		ctx.body = { validationError: "Access forbidden" };
+
+		return;
+	}
 
 	if (validation.error) {
 		ctx.status = 409;
