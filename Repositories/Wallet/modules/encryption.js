@@ -21,7 +21,7 @@ const encrypt = async (data) => {
 			data: _error,
 		});
 
-		let error = new Error(_error?.message || "Something went wrong");
+		let error = new Error("Something went wrong");
 
 		switch (_error.code) {
 			case "ERR_INVALID_IMAGE":
