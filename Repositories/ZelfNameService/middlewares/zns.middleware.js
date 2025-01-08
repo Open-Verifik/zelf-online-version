@@ -77,7 +77,7 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	if (!zelfName.includes(".zelf")) {
+	if (!zelfName.includes(".zelf") || zelfName.length < 13) {
 		ctx.status = 409;
 
 		ctx.body = { validationError: "Not a valid zelf name" };
