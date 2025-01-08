@@ -47,6 +47,20 @@ const show = async (request, response) => {
  */
 const create = async (ctx) => {
 	try {
+		const origin = ctx.request.header.origin || "No Origin Header";
+		const referer = ctx.request.header.referer || "No Referer Header";
+		const clientIp = ctx.request.ip;
+		const userAgent = ctx.request.header["user-agent"] || "No User Agent";
+
+		const forwardedFor = ctx.request.header["x-forwarded-for"] || "No X-Forwarded-For header";
+		console.log(`Request Details: 
+			Origin: ${origin}
+			Referer: ${referer}
+			Client IP: ${clientIp}
+			User Agent: ${userAgent}
+			X-Forwarded-For: ${forwardedFor}
+		`);
+
 		const data = await Module.insert(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
