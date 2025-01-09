@@ -11,6 +11,8 @@ module.exports = (server) => {
 
 	server.get(`${PATH}/search`, Middleware.getValidation, Controller.searchZelfName);
 
+	server.post(`${PATH}/search`, Middleware.getValidation, Controller.searchZelfName);
+
 	server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseZelfName);
 
 	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewZelfName);

@@ -2,22 +2,26 @@ const { string, validate, boolean, number, stringEnum } = require("../../../Core
 const captchaService = require("../../../Core/captcha");
 
 const schemas = {
+	search: {
+		zelfName: string(),
+		key: string(),
+		value: string(),
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]), // TODO required()
+		captchaToken: string(), // TODO required()
+	},
 	lease: {
+		zelfName: string().required(),
+		faceBase64: string().required(),
 		type: stringEnum(["create", "import"]).required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]), // TODO required()
 		captchaToken: string(), // TODO required()
-		// years: number().required(),
 	},
 	create: {
-		zelfName: string().required(),
-		faceBase64: string().required(),
 		password: string(),
 		addServerPassword: boolean(),
 		wordsCount: number().required(),
 	},
 	import: {
-		zelfName: string().required(),
-		faceBase64: string().required(),
 		password: string(),
 		mnemonic: string().required(),
 	},
@@ -26,9 +30,13 @@ const schemas = {
 		password: string(),
 		zelfName: string().required(),
 		addServerPassword: boolean(),
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]), // TODO required()
+		captchaToken: string(), // TODO required()
 	},
 	preview: {
 		zelfName: string().required(),
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]), // TODO required()
+		captchaToken: string(), // TODO required()
 	},
 };
 
@@ -39,12 +47,36 @@ const schemas = {
  * @param {*} next
  */
 const getValidation = async (ctx, next) => {
-	const { zelfName, key, value } = ctx.request.query;
+	const payload = Object.assign(ctx.request.query, ctx.request.body);
+
+	const valid = validate(schemas.search, payload);
+
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	const { zelfName, key, value, captchaToken, os } = payload;
 
 	if (!zelfName && (!key || !value)) {
 		ctx.status = 409;
 
 		ctx.body = { validationError: "missing zelfName or search by key|value" };
+
+		return;
+	}
+
+	const _zelfName = zelfName || value;
+
+	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, _zelfName.split(".zelf")[0]) : 1;
+
+	if (captchaScore < 0.7) {
+		ctx.status = 409;
+
+		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
 
 		return;
 	}
@@ -58,8 +90,6 @@ const getValidation = async (ctx, next) => {
  * @param {*} next
  */
 const leaseValidation = async (ctx, next) => {
-	const valid = validate(schemas.lease, ctx.request.body);
-
 	const { clientId } = ctx.state.user;
 
 	if (!clientId) {
@@ -69,6 +99,8 @@ const leaseValidation = async (ctx, next) => {
 
 		return;
 	}
+
+	const valid = validate(schemas.lease, ctx.request.body);
 
 	if (valid.error) {
 		ctx.status = 409;
@@ -84,17 +116,19 @@ const leaseValidation = async (ctx, next) => {
 
 	if (typeValid.error) {
 		ctx.status = 409;
-
 		ctx.body = { validationError: typeValid.error.message };
-
 		return;
 	}
 
-	if (!zelfName.includes(".zelf") || zelfName.length < 13) {
+	if (!zelfName.includes(".zelf")) {
 		ctx.status = 409;
-
 		ctx.body = { validationError: "Not a valid zelf name" };
+		return;
+	}
 
+	if (zelfName.length < 13) {
+		ctx.status = 409;
+		ctx.body = { validationError: "ZelfName should be 8 characters or more." };
 		return;
 	}
 
@@ -103,7 +137,7 @@ const leaseValidation = async (ctx, next) => {
 	if (captchaScore < 0.7) {
 		ctx.status = 409;
 
-		ctx.body = { captchaScore, validationError: "captcha_not_acceptable" };
+		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
 
 		return;
 	}
@@ -128,6 +162,18 @@ const previewValidation = async (ctx, next) => {
 		ctx.status = 409;
 
 		ctx.body = { validationError: validation.error.message };
+
+		return;
+	}
+
+	const { captchaToken, os, zelfName } = ctx.request.body;
+
+	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]) : 1;
+
+	if (captchaScore < 0.7) {
+		ctx.status = 409;
+
+		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
 
 		return;
 	}
@@ -161,6 +207,18 @@ const decryptValidation = async (ctx, next) => {
 		ctx.status = 409;
 
 		ctx.body = { validationError: validation.error.message };
+
+		return;
+	}
+
+	const { captchaToken, os, zelfName } = ctx.request.body;
+
+	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]) : 1;
+
+	if (captchaScore < 0.7) {
+		ctx.status = 409;
+
+		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
 
 		return;
 	}
