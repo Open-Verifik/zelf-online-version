@@ -106,6 +106,11 @@ const configuration = {
 		dq: process.env.ARWAVE_DQ,
 		qi: process.env.ARWAVE_QI,
 	},
+	google: {
+		captchaProjectID: process.env.CAPTCHA_PROJECT_ID,
+		webSiteKey: process.env.CAPTCHA_WEB_SITE_KEY,
+		androidSiteKey: process.env.CAPTCHA_ANDROID_SITE_KEY,
+	},
 };
 
 module.exports = configuration;

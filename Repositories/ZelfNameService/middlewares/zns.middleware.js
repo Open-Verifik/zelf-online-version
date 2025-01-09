@@ -1,8 +1,11 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
+const captchaService = require("../../../Core/captcha");
 
 const schemas = {
 	lease: {
 		type: stringEnum(["create", "import"]).required(),
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]), // TODO required()
+		captchaToken: string(), // TODO required()
 		// years: number().required(),
 	},
 	create: {
@@ -75,7 +78,7 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	const { type, zelfName } = ctx.request.body;
+	const { type, zelfName, captchaToken, os } = ctx.request.body;
 
 	const typeValid = validate(schemas[type], ctx.request.body);
 
@@ -95,22 +98,15 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	const origin = ctx.request.header.origin || "No Origin Header";
-	const referer = ctx.request.header.referer || "No Referer Header";
-	const clientIp = ctx.request.ip;
-	const userAgent = ctx.request.header["user-agent"] || "No User Agent";
+	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]) : 1;
 
-	console.log(`Request Details: 
-    Origin: ${origin}
-    Referer: ${referer}
-    Client IP: ${clientIp}
-    User Agent: ${userAgent}`);
+	if (captchaScore < 0.7) {
+		ctx.status = 409;
 
-	const forwardedFor = ctx.request.header["x-forwarded-for"] || "No X-Forwarded-For header";
+		ctx.body = { captchaScore, validationError: "captcha_not_acceptable" };
 
-	console.log(`X-Forwarded-For: ${forwardedFor}`);
-
-	console.log({ body: { zelfName, type }, user: ctx.state.user });
+		return;
+	}
 
 	await next();
 };
