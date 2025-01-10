@@ -6,8 +6,8 @@ const schemas = {
 		zelfName: string(),
 		key: string(),
 		value: string(),
-		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]), // TODO required()
-		captchaToken: string(), // TODO required()
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]),
+		captchaToken: string(),
 	},
 	leaseOffline: {
 		zelfName: string().required(),
@@ -23,8 +23,8 @@ const schemas = {
 		zelfName: string().required(),
 		faceBase64: string().required(),
 		type: stringEnum(["create", "import"]).required(),
-		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]), // TODO required()
-		captchaToken: string(), // TODO required()
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
+		captchaToken: string().required(),
 	},
 	create: {
 		password: string(),
@@ -40,13 +40,13 @@ const schemas = {
 		password: string(),
 		zelfName: string().required(),
 		addServerPassword: boolean(),
-		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]), // TODO required()
-		captchaToken: string(), // TODO required()
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
+		captchaToken: string().required(),
 	},
 	preview: {
 		zelfName: string().required(),
-		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]), // TODO required()
-		captchaToken: string(), // TODO required()
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
+		captchaToken: string().required(),
 	},
 };
 
@@ -100,16 +100,6 @@ const getValidation = async (ctx, next) => {
  * @param {*} next
  */
 const leaseValidation = async (ctx, next) => {
-	const { clientId } = ctx.state.user;
-
-	if (!clientId) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "Access forbidden" };
-
-		return;
-	}
-
 	const valid = validate(schemas.lease, ctx.request.body);
 
 	const { clientId } = ctx.state.user;
@@ -221,16 +211,6 @@ function validatePurchaseDetails(zelfName, purchaseDetails) {
 const previewValidation = async (ctx, next) => {
 	const validation = validate(schemas.preview, ctx.request.body);
 
-	const { clientId } = ctx.state.user;
-
-	if (!clientId) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "Access forbidden" };
-
-		return;
-	}
-
 	if (validation.error) {
 		ctx.status = 409;
 
@@ -265,16 +245,6 @@ const deleteValidation = async (ctx, next) => {
  */
 const decryptValidation = async (ctx, next) => {
 	const validation = validate(schemas.decrypt, ctx.request.body);
-
-	const { clientId } = ctx.state.user;
-
-	if (!clientId) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "Access forbidden" };
-
-		return;
-	}
 
 	if (validation.error) {
 		ctx.status = 409;
