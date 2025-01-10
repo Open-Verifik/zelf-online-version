@@ -4,6 +4,7 @@ const config = require("./config");
 const PROJECT_ID = config.google.captchaProjectID;
 const WEB_SITE_KEY = config.google.webSiteKey;
 const ANDROID_SITE_KEY = config.google.androidSiteKey;
+const IOS_SITE_KEY = config.google.iOSSiteKey;
 /**
  * Create an assessment to analyze the risk of a UI action.
  *
@@ -16,6 +17,7 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 	const OSMapping = {
 		DESKTOP: WEB_SITE_KEY,
 		ANDROID: ANDROID_SITE_KEY,
+		IOS: IOS_SITE_KEY,
 	};
 
 	const client = new RecaptchaEnterpriseServiceClient();
@@ -41,7 +43,7 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 			tokenProperties: response.tokenProperties,
 		});
 
-		return null;
+		return Boolean(config.env === "development" ? 1 : 0);
 	}
 
 	// Check if the expected action was executed.
@@ -56,12 +58,12 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 			console.log(reason);
 		});
 
-		return response.riskAnalysis.score || 0;
+		return Boolean(config.env === "development" ? 1 : response.riskAnalysis.score || 0);
 	}
 
 	console.log("The action attribute in your reCAPTCHA tag does not match the action you are expecting to score");
 
-	return 0;
+	return Boolean(config.env === "development" ? 1 : 0);
 };
 
 module.exports = {

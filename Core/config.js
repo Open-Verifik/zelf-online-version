@@ -110,6 +110,7 @@ const configuration = {
 		captchaProjectID: process.env.CAPTCHA_PROJECT_ID,
 		webSiteKey: process.env.CAPTCHA_WEB_SITE_KEY,
 		androidSiteKey: process.env.CAPTCHA_ANDROID_SITE_KEY,
+		iOSSiteKey: process.env.CAPTCHA_IOS_SITE_KEY,
 	},
 };
 
