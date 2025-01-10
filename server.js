@@ -7,9 +7,8 @@ const cors = require("@koa/cors");
 const DatabaseModule = require("./Core/database");
 const { serverLog } = require("./Core/loggin");
 const mongoose = require("mongoose"); // Add this line
-
 const app = new Koa();
-
+app.proxy = true; // Trust the proxy's X-Forwarded-For header
 app.use(bodyParser());
 
 // Enable CORS

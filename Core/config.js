@@ -121,6 +121,11 @@ const configuration = {
 	coinbase: {
 		key: process.env.COINBASE_API_KEY,
 	},
+	google: {
+		captchaProjectID: process.env.CAPTCHA_PROJECT_ID,
+		webSiteKey: process.env.CAPTCHA_WEB_SITE_KEY,
+		androidSiteKey: process.env.CAPTCHA_ANDROID_SITE_KEY,
+	},
 };
 
 module.exports = configuration;
