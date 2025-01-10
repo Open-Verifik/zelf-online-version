@@ -56,12 +56,12 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 			console.log(reason);
 		});
 
-		return response.riskAnalysis.score;
+		return response.riskAnalysis.score || 0;
 	}
 
 	console.log("The action attribute in your reCAPTCHA tag does not match the action you are expecting to score");
 
-	return null;
+	return 0;
 };
 
 module.exports = {
