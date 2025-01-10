@@ -122,7 +122,7 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]) : 1;
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
 
 	if (captchaScore < 0.7) {
 		ctx.status = 409;
@@ -148,7 +148,7 @@ const previewValidation = async (ctx, next) => {
 
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
-	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]) : 1;
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
 
 	if (captchaScore < 0.7) {
 		ctx.status = 409;
@@ -183,7 +183,7 @@ const decryptValidation = async (ctx, next) => {
 
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
-	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]) : 1;
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
 
 	if (captchaScore < 0.7) {
 		ctx.status = 409;
