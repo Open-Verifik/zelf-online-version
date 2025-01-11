@@ -73,7 +73,7 @@ const getValidation = async (ctx, next) => {
 
 	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, _zelfName.split(".zelf")[0]) : 1;
 
-	if (captchaScore < 0.7) {
+	if (captchaScore < 0.79) {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
@@ -124,7 +124,7 @@ const leaseValidation = async (ctx, next) => {
 
 	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
 
-	if (captchaScore < 0.7) {
+	if (captchaScore < 0.79) {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
@@ -150,7 +150,7 @@ const previewValidation = async (ctx, next) => {
 
 	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
 
-	if (captchaScore < 0.7) {
+	if (captchaScore < 0.79) {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
@@ -185,7 +185,7 @@ const decryptValidation = async (ctx, next) => {
 
 	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
 
-	if (captchaScore < 0.7) {
+	if (captchaScore < 0.79) {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
