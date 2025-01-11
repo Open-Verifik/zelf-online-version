@@ -156,6 +156,7 @@ const previewValidation = async (ctx, next) => {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+
 		console.log({ captchaFailed: true, zelfName });
 
 		return;
