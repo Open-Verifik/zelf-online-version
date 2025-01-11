@@ -21,11 +21,12 @@ const encrypt = async (data) => {
 			data: _error,
 		});
 
-		let error = new Error("Something went wrong");
+		let error = new Error(_error.message);
 
 		switch (_error.code) {
 			case "ERR_INVALID_IMAGE":
 				error.status = 400;
+				error.message = "Invalid ZelfProof payload";
 
 				break;
 
@@ -91,11 +92,29 @@ const decrypt = async (data) => {
 
 		return encryptedResponse?.data;
 	} catch (exception) {
-		console.error({ exception: exception.response?.data });
+		const _error = exception.response?.data;
 
-		return {
-			error: exception.response?.data,
-		};
+		console.error({
+			data: _error,
+		});
+
+		let error = new Error(_error.message);
+
+		switch (_error.code) {
+			case "ERR_INVALID_IMAGE":
+				error.status = 400;
+
+				break;
+			case "ERR_PASSWORD_REQUIRED":
+				error.status = 409;
+
+				error.message = "Password required";
+
+			default:
+				break;
+		}
+
+		throw error;
 	}
 };
 
