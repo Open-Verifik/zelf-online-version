@@ -43,7 +43,7 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 			tokenProperties: response.tokenProperties,
 		});
 
-		return Boolean(config.env === "development" ? 1 : 0);
+		return config.env === "development" ? 1 : 0;
 	}
 
 	// Check if the expected action was executed.
