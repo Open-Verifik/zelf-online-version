@@ -52,7 +52,7 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 		// Get the risk score and the reason(s).
 		// For more information on interpreting the assessment, see:
 		// https://cloud.google.com/recaptcha-enterprise/docs/interpret-assessment
-		console.log(`The reCAPTCHA score is: ${response.riskAnalysis.score}`);
+		// console.log(`The reCAPTCHA score is: ${response.riskAnalysis.score}`);
 
 		response.riskAnalysis.reasons.forEach((reason) => {
 			console.log(reason);
@@ -61,9 +61,7 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 		return Boolean(config.env === "development" ? 1 : response.riskAnalysis.score || 0);
 	}
 
-	console.log("The action attribute in your reCAPTCHA tag does not match the action you are expecting to score");
-
-	return Boolean(config.env === "development" ? 1 : 0);
+	return 0;
 };
 
 module.exports = {

@@ -77,6 +77,7 @@ const getValidation = async (ctx, next) => {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+
 		console.log({ captchaFailed: true, zelfName });
 
 		return;
@@ -126,15 +127,34 @@ const leaseValidation = async (ctx, next) => {
 	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
 
 	if (captchaScore < 0.79) {
+		_consoleLogSuspicious(ctx, captchaScore, zelfName);
+
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
-		console.log({ captchaFailed: true, zelfName });
 
 		return;
 	}
 
 	await next();
+};
+
+const _consoleLogSuspicious = (ctx, captchaScore, zelfName) => {
+	const origin = ctx.request.header.origin || null;
+	const referer = ctx.request.header.referer || null;
+	const clientIp = ctx.request.ip;
+	const userAgent = ctx.request.header["user-agent"] || null;
+
+	const forwardedFor = ctx.request.header["x-forwarded-for"] || "No X-Forwarded-For header";
+	console.log(`Request Details: 
+			CaptchaScore: ${captchaScore}
+			ZelfName: ${zelfName}
+			Origin: ${origin}
+			Referer: ${referer}
+			Client IP: ${clientIp}
+			User Agent: ${userAgent}
+			X-Forwarded-For: ${forwardedFor}
+		`);
 };
 
 const previewValidation = async (ctx, next) => {
