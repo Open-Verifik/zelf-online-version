@@ -83,10 +83,12 @@ const getValidation = async (ctx, next) => {
 
 	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, _zelfName.split(".zelf")[0]) : 1;
 
-	if (captchaScore < 0.7) {
+	if (captchaScore < 0.79) {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+
+		console.log({ captchaFailed: true, zelfName });
 
 		return;
 	}
@@ -144,7 +146,9 @@ const leaseValidation = async (ctx, next) => {
 
 	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
 
-	if (captchaScore < 0.7) {
+	if (captchaScore < 0.79) {
+		_consoleLogSuspicious(ctx, captchaScore, zelfName);
+
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
@@ -208,6 +212,24 @@ function validatePurchaseDetails(zelfName, purchaseDetails) {
 	return true; // Placeholder
 }
 
+const _consoleLogSuspicious = (ctx, captchaScore, zelfName) => {
+	const origin = ctx.request.header.origin || null;
+	const referer = ctx.request.header.referer || null;
+	const clientIp = ctx.request.ip;
+	const userAgent = ctx.request.header["user-agent"] || null;
+
+	const forwardedFor = ctx.request.header["x-forwarded-for"] || "No X-Forwarded-For header";
+	console.log(`Request Details: 
+			CaptchaScore: ${captchaScore}
+			ZelfName: ${zelfName}
+			Origin: ${origin}
+			Referer: ${referer}
+			Client IP: ${clientIp}
+			User Agent: ${userAgent}
+			X-Forwarded-For: ${forwardedFor}
+		`);
+};
+
 const previewValidation = async (ctx, next) => {
 	const validation = validate(schemas.preview, ctx.request.body);
 
@@ -223,10 +245,12 @@ const previewValidation = async (ctx, next) => {
 
 	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
 
-	if (captchaScore < 0.7) {
+	if (captchaScore < 0.79) {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+
+		console.log({ captchaFailed: true, zelfName });
 
 		return;
 	}
@@ -258,10 +282,11 @@ const decryptValidation = async (ctx, next) => {
 
 	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
 
-	if (captchaScore < 0.7) {
+	if (captchaScore < 0.79) {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+		console.log({ captchaFailed: true, zelfName });
 
 		return;
 	}

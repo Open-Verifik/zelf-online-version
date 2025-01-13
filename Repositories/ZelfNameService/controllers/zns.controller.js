@@ -15,7 +15,7 @@ const searchZelfName = async (ctx) => {
 
 const leaseZelfName = async (ctx) => {
 	try {
-		const data = await Module.leaseZelfName(ctx.request.body, ctx.state.user);
+		const data = await Module.leaseZelfName({ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() }, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -43,7 +43,13 @@ const leaseConfirmation = async (ctx) => {
 
 const previewZelfName = async (ctx) => {
 	try {
-		const data = await Module.previewZelfName(ctx.request.body, ctx.state.user);
+		const data = await Module.previewZelfName(
+			{
+				...ctx.request.body,
+				zelfName: `${ctx.request.body.zelfName}`.toLowerCase(),
+			},
+			ctx.state.user
+		);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -57,7 +63,13 @@ const previewZelfName = async (ctx) => {
 
 const decryptZelfName = async (ctx) => {
 	try {
-		const data = await Module.decryptZelfName(ctx.request.body, ctx.state.user);
+		const data = await Module.decryptZelfName(
+			{
+				...ctx.request.body,
+				zelfName: `${ctx.request.body.zelfName}`.toLowerCase(),
+			},
+			ctx.state.user
+		);
 
 		ctx.body = { data };
 	} catch (error) {
