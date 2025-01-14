@@ -97,6 +97,7 @@ const configuration = {
 	},
 	arwave: {
 		key: process.env.ARWAVE_KEY,
+		owner: process.env.ARWEAVE_OWNER,
 		n: process.env.ARWAVE_N,
 		e: process.env.ARWAVE_E,
 		d: process.env.ARWAVE_D,
@@ -105,6 +106,26 @@ const configuration = {
 		dp: process.env.ARWAVE_DP,
 		dq: process.env.ARWAVE_DQ,
 		qi: process.env.ARWAVE_QI,
+		hold: {
+			owner: process.env._ARWEAVE_OWNER,
+			n: process.env._ARWAVE_N,
+			e: process.env._ARWAVE_E,
+			d: process.env._ARWAVE_D,
+			p: process.env._ARWAVE_P,
+			q: process.env._ARWAVE_Q,
+			dp: process.env._ARWAVE_DP,
+			dq: process.env._ARWAVE_DQ,
+			qi: process.env._ARWAVE_QI,
+		},
+	},
+	coinbase: {
+		key: process.env.COINBASE_API_KEY,
+	},
+	google: {
+		captchaProjectID: process.env.CAPTCHA_PROJECT_ID,
+		webSiteKey: process.env.CAPTCHA_WEB_SITE_KEY,
+		androidSiteKey: process.env.CAPTCHA_ANDROID_SITE_KEY,
+		iOSSiteKey: process.env.CAPTCHA_IOS_SITE_KEY,
 	},
 };
 

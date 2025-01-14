@@ -23,6 +23,10 @@ const get = async (params, authUser = {}) => {
 		queryParams.where_identifier = authUser.identifier;
 	}
 
+	if (authUser.type) {
+		queryParams.where_type = authUser.type;
+	}
+
 	return await MongoORM.buildQuery(queryParams, Model, null, populates);
 };
 
@@ -31,14 +35,11 @@ const get = async (params, authUser = {}) => {
  * @param {*} authUser
  */
 const insert = async (params, authUser) => {
-	if (authUser)
-		await deleteSession(
-			authUser || params.type === "general"
-				? {
-						identifier: params.identifier,
-				  }
-				: null
-		);
+	await deleteSession(
+		authUser || {
+			identifier: params.identifier,
+		}
+	);
 
 	const session = new Model({
 		identifier: params.identifier,
@@ -49,8 +50,11 @@ const insert = async (params, authUser) => {
 	try {
 		await session.save();
 	} catch (exception) {
+		console.error({ exception });
 		if (params.type !== "general") {
 			const error = new Error("zelfName_is_taken");
+
+			console.log({ identifier: params.identifier, type: params.type || "createWallet", authUser });
 
 			error.status = 409;
 
@@ -237,11 +241,7 @@ const walletDecrypt = async (content, identifier, password) => {
  * @author Miguel Trevino
  */
 const deleteSession = async (authUser) => {
-	const session = await get({ findOne: true }, authUser);
-
-	if (!session) return;
-
-	return await Model.findByIdAndDelete(session._id);
+	return await Model.deleteMany({ identifier: authUser.identifier });
 };
 
 module.exports = {

@@ -6,31 +6,48 @@ const config = require("../../../Core/config");
 const axios = require("axios");
 const arweaveUrl = `https://arweave.net`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
-const graphql = `https://arweave-search.goldsky.com/graphql`;
+const graphql = "https://arweave.net/graphql"; //`https://arweave-search.goldsky.com/graphql`;
+const moment = require("moment");
+const holdOwner = config.arwave.hold.owner;
+const owner = config.arwave.owner;
 
-const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
+const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
+	const { zelfProof, hasPassword, publicData } = zelfNameObject;
 	/**
 	 * Generate a key from the arweave wallet.
 	 */
-	const arweave = new Arweave({});
+
+	// const jwk = {
+	// 	kty: "RSA",
+	// 	n: config.arwave.n,
+	// 	e: config.arwave.e,
+	// 	d: config.arwave.d,
+	// 	p: config.arwave.p,
+	// 	q: config.arwave.q,
+	// 	dp: config.arwave.dp,
+	// 	dq: config.arwave.dq,
+	// 	qi: config.arwave.qi,
+	// 	kid: "2011-04-29",
+	// };
 
 	const jwk = {
 		kty: "RSA",
-		n: config.arwave.n,
-		e: config.arwave.e,
-		d: config.arwave.d,
-		p: config.arwave.p,
-		q: config.arwave.q,
-		dp: config.arwave.dp,
-		dq: config.arwave.dq,
-		qi: config.arwave.qi,
+		n: config.arwave.hold.n,
+		e: config.arwave.hold.e,
+		d: config.arwave.hold.d,
+		p: config.arwave.hold.p,
+		q: config.arwave.hold.q,
+		dp: config.arwave.hold.dp,
+		dq: config.arwave.hold.dq,
+		qi: config.arwave.hold.qi,
 		kid: "2011-04-29",
 	};
 
 	/**
 	 * Get the address associated with the generated wallet.
 	 */
-	const address = await arweave.wallets.jwkToAddress(jwk);
+	// const arweave = new Arweave({});
+	// const address = await arweave.wallets.jwkToAddress(jwk);
 
 	/**
 	 * Use the arweave key to create an authenticated turbo client
@@ -47,7 +64,7 @@ const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 
 	const fileSize = buffer.length;
 
-	const tempFilePath = path.join(__dirname, "tempFile.png");
+	const tempFilePath = path.join(__dirname, `${zelfNameObject.zelfName}.png`);
 
 	// Write buffer to a temporary file
 	fs.writeFileSync(tempFilePath, buffer);
@@ -59,22 +76,47 @@ const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 		},
 		{
 			name: "zelfProof",
-			value: zelfNameObject.zelfProof,
+			value: zelfProof,
 		},
 		{
 			name: "hasPassword",
-			value: zelfNameObject.hasPassword,
+			value: hasPassword,
+		},
+		{
+			name: "expiresAt",
+			value: moment().add(12, "hour").format("YYYY-MM-DD"),
 		},
 	];
 
-	const publicKeys = Object.keys(zelfNameObject.publicData);
+	if (zelfNameObject.coinbaseCharge) {
+		tags.push(
+			{
+				name: "coinbase_id",
+				value: zelfNameObject.coinbaseCharge.id,
+			},
+			{
+				name: "coinbase_hosted_url",
+				value: zelfNameObject.coinbaseCharge.hosted_url,
+			},
+			{
+				name: "coinbase_expires_at",
+				value: zelfNameObject.coinbaseCharge.expires_at,
+			},
+			{
+				name: "coinbase_created_at",
+				value: zelfNameObject.coinbaseCharge.created_at,
+			}
+		);
+	}
+
+	const publicKeys = Object.keys(publicData);
 
 	for (let index = 0; index < publicKeys.length; index++) {
 		const publicKey = publicKeys[index];
 
 		tags.push({
 			name: publicKey,
-			value: zelfNameObject.publicData[publicKey],
+			value: publicData[publicKey],
 		});
 	}
 
@@ -99,7 +141,7 @@ const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 	};
 };
 
-const _uploadZelfProof = async (zelfProofQRCode) => {
+const _zelfNameHold = async (zelfProofQRCode) => {
 	/**
 	 * Generate a key from the arweave wallet.
 	 */
@@ -175,7 +217,7 @@ const _uploadZelfProof = async (zelfProofQRCode) => {
 	return { uploadResult, address };
 };
 
-const search = async (zelfName, extraConditions = {}) => {
+const search = async (environment = "hold", zelfName, extraConditions = {}) => {
 	if (!zelfName && (!extraConditions.key || !extraConditions.value)) return null;
 
 	const tagsToSearch = zelfName
@@ -187,7 +229,7 @@ const search = async (zelfName, extraConditions = {}) => {
     {
  		transactions(
 			tags: ${tagsToSearch},
-			owners: ["vzrsUNMg17WFPmh73xZguPbn_cZzqnef3btvmn6-YDk"]
+			owners: ["${environment === "hold" ? holdOwner : owner}"]
 		) {
 			edges {
 				node {
@@ -227,6 +269,6 @@ const search = async (zelfName, extraConditions = {}) => {
 };
 
 module.exports = {
-	uploadZelfProof,
+	zelfNameRegistration,
 	search,
 };

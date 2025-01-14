@@ -63,7 +63,9 @@ const retrieve = async (cid, expires = 1800) => {
 		return { url, pinnedFiles };
 	} catch (exception) {
 		const error = new Error(exception.message || "file_not_found");
+
 		error.status = exception.status || 404;
+
 		throw error; // Rethrow to ensure higher-level code catches this.
 	}
 };
@@ -132,9 +134,14 @@ const filter = async (property = "name", value) => {
 	return files;
 };
 
+const unPinFiles = async (CIDs = []) => {
+	return await web3Instance.unpin(CIDs);
+};
+
 module.exports = {
 	upload,
 	retrieve,
 	pinFile,
 	filter,
+	unPinFiles,
 };

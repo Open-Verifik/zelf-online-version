@@ -42,13 +42,15 @@ const insert = async (data, authUser) => {
 	return await IPFS.upload(base64, name, null, metadata);
 };
 
-const destroy = async () => {
-	return null;
+const unPinFiles = async (CIDs = []) => {
+	const unpinnedFiles = await IPFS.unPinFiles(CIDs);
+
+	return unpinnedFiles;
 };
 
 module.exports = {
 	get,
 	show,
 	insert,
-	destroy,
+	unPinFiles,
 };

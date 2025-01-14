@@ -140,7 +140,7 @@ const getAddress = async (params) => {
 					fiatBalance: Number(_price * _amount),
 					name: name,
 					symbol: symbol,
-					amount: _amount,
+					amount: _amount.replace(/,/g, ""),
 					price: _price,
 					type: tokenType,
 					address: tokenLink,
@@ -228,12 +228,12 @@ const getAddress = async (params) => {
 		}
 
 		tokenHoldings.tokens.unshift({
-			tokenType: "ERC-20",
+			tokenType: "ETH",
 			fiatBalance: Number(account.fiatBalance),
 			symbol: "ETH",
 			name: "Ethereum",
 			price: account.price,
-			image: "../../../assets/images/ETH.png",
+			image: "",
 			amount: balance,
 		});
 
@@ -366,7 +366,7 @@ const getGasTracker = async (params) => {
 
 		return response;
 	} catch (error) {
-		console.log({ error: error });
+		console.error({ error: error });
 	}
 };
 

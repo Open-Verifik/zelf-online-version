@@ -71,6 +71,16 @@ const showValidation = async (ctx, next) => {
 const createValidation = async (ctx, next) => {
 	const valid = validate(schemas.createWallet, ctx.request.body);
 
+	const { clientId } = ctx.state.user;
+
+	if (!clientId) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: "Access forbidden. contact us for a valid API Key" };
+
+		return;
+	}
+
 	if (valid.error) {
 		ctx.status = 409;
 
@@ -136,6 +146,16 @@ const decryptWalletValidation = async (ctx, next) => {
 		return;
 	}
 
+	const { clientId } = ctx.state.user;
+
+	if (!clientId) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: "Access forbidden. contact us for a valid API Key" };
+
+		return;
+	}
+
 	await next();
 };
 
@@ -150,6 +170,16 @@ const zkProofValidation = async (ctx, next) => {
 		return;
 	}
 
+	const { clientId } = ctx.state.user;
+
+	if (!clientId) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: "Access forbidden. contact us for a valid API Key" };
+
+		return;
+	}
+
 	await next();
 };
 
@@ -160,6 +190,16 @@ const seeWalletValidation = async (ctx, next) => {
 		ctx.status = 409;
 
 		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	const { clientId } = ctx.state.user;
+
+	if (!clientId) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: "Access forbidden. contact us for a valid API Key" };
 
 		return;
 	}
@@ -194,6 +234,16 @@ const importValidation = async (ctx, next) => {
 		return;
 	}
 
+	const { clientId } = ctx.state.user;
+
+	if (!clientId) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: "Access forbidden. contact us for a valid API Key" };
+
+		return;
+	}
+
 	const invalidZelfName = _isZelfNameInvalid(ctx.request.body);
 
 	if (invalidZelfName) {
@@ -218,6 +268,16 @@ const searchOpenWalletsValidation = async (ctx, next) => {
 		return;
 	}
 
+	const { clientId } = ctx.state.user;
+
+	if (!clientId) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: "Access forbidden. contact us for a valid API Key" };
+
+		return;
+	}
+
 	await next();
 };
 
@@ -228,6 +288,16 @@ const ipfsValidation = async (ctx, next) => {
 		ctx.status = 409;
 
 		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	const { clientId } = ctx.state.user;
+
+	if (!clientId) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: "Access forbidden. contact us for a valid API Key" };
 
 		return;
 	}

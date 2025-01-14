@@ -47,6 +47,28 @@ const show = async (request, response) => {
  */
 const create = async (ctx) => {
 	try {
+		const origin = ctx.request.header.origin || null;
+		const referer = ctx.request.header.referer || null;
+		const clientIp = ctx.request.ip;
+		const userAgent = ctx.request.header["user-agent"] || null;
+
+		const forwardedFor = ctx.request.header["x-forwarded-for"] || "No X-Forwarded-For header";
+		console.log(`Request Details: 
+			Origin: ${origin}
+			Referer: ${referer}
+			Client IP: ${clientIp}
+			User Agent: ${userAgent}
+			X-Forwarded-For: ${forwardedFor}
+		`);
+
+		if (!origin || !clientIp) {
+			ctx.status = 403;
+
+			ctx.body = { error: "rejected" };
+
+			return;
+		}
+
 		const data = await Module.insert(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
