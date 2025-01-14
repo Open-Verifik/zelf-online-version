@@ -3,6 +3,8 @@ const Joi = require("joi").extend(JoiDate);
 
 const recordShow = ["10", "25", "50", "100"];
 
+const crypto = ["ETH", "SOL"];
+
 const zelfNameDuration = ["1", "2", "3", "4", "5", "lifetime"];
 
 const _customErrors = (errors) => {
@@ -81,6 +83,11 @@ const boolean = () => Joi.boolean().error(_customErrors);
 const zelfNameDuration_ = () =>
 	Joi.string()
 		.valid(...zelfNameDuration)
+		.error(_customErrors);
+
+const crypto_ = () =>
+	Joi.string()
+		.valid(...crypto)
 		.error(_customErrors);
 
 const province = () =>
@@ -179,4 +186,5 @@ module.exports = {
 	showRecords,
 	jsonObjectWithMinKeys,
 	zelfNameDuration_,
+	crypto_,
 };

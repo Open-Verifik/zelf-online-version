@@ -9,8 +9,14 @@ module.exports = (server) => {
 	const PATH = config.basePath(base);
 
 	server.get(
-		`${PATH}/purchase`,
-		Middleware.validateParamas,
+		`${PATH}/purchase/:id`,
+		///Middleware.validateParamas,
 		Controller.checkout
+	);
+
+	server.get(
+		`${PATH}/getTickerPrice`,
+
+		Controller.tickerPrice
 	);
 };

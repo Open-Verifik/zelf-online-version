@@ -2,8 +2,9 @@ const config = require("../../../Core/config");
 const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-//const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
+const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
 const MongoORM = require("../../../Core/mongo-orm");
+const mongoose = require("mongoose");
 const {
 	getTransactionStatus,
 	getAddress,
@@ -13,7 +14,6 @@ const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 
 const modelPurchase = require("../models/purchase.model");
 
-const priceBase = 24; //Dolares Americanos ;
 const addressZelf = [
 	{
 		id: "ETH",
@@ -56,20 +56,24 @@ const addressZelf = [
  * @param {*} params
  */
 const getCheckout = async (params) => {
-	const crypto = params.crypto;
-	const duration = params.duration;
-	const zelfName = params.zelfName;
+	const purchase = await modelPurchase.findById(params.id);
 
-	const existingRecordZelfName = await searchZelfName(zelfName, crypto);
+	if (!purchase) return { message: "expired_payments" };
+
+	const crypto = purchase.crypto;
+	const duration = purchase.duration;
+	const zelfName = purchase.zelfName;
+
+	const existingRecordZelfName = await searchZelfName_(zelfName, crypto);
 
 	if (!existingRecordZelfName)
 		throw new Error("404:This_zelfName_is not_yet_linked");
 
 	const addressCliente = existingRecordZelfName;
 
-	const cryptoValue = await calculateCryptoValue(crypto);
+	const cryptoValue = await calculateCryptoValue(crypto, zelfName, duration);
 
-	let status = await checkout(
+	let reult = await checkout(
 		crypto,
 		addressCliente,
 		cryptoValue.cryptoValue,
@@ -78,7 +82,14 @@ const getCheckout = async (params) => {
 		duration
 	);
 
-	return status;
+	reult.wordsCount = cryptoValue.wordsCount.toString();
+	reult.USD = cryptoValue.USD.toString();
+
+	updatedRecord = await modelPurchase.findByIdAndUpdate(params.id, reult, {
+		new: true,
+	});
+
+	return reult;
 };
 
 ///funcion para checar transacciones global
@@ -124,12 +135,12 @@ const checkout = async (
 	console.log({ ultimaDirreccion, valorDetransaccion });
 
 	let transactionStatus = false;
-	let transactionDescription = "transaction_not_detected";
+	let transactionDescription = "pending"; //"transaction_not_detected";
 
-	if (addressCliente) {
+	if (addressCliente === ultimaDirreccion) {
 		if (valorDetransaccion === valorApagar) {
 			transactionStatus = true;
-			transactionDescription = "full_payment";
+			transactionDescription = "successful";
 		} else if (valorApagar < valorDetransaccion) {
 			transactionStatus = false;
 			transactionDescription = "partial_payment";
@@ -138,7 +149,7 @@ const checkout = async (
 			transactionDescription = "overpayment";
 		}
 	} else {
-		valorDetransaccion = null;
+		valorDetransaccion = "0";
 	}
 
 	return {
@@ -224,7 +235,7 @@ getLastInTransactionHash = async (transactions) => {
  *
  * @param {string} crypto
  */
-const searchZelfName = async (zelfName, crypto) => {
+const searchZelfName_ = async (zelfName) => {
 	try {
 		const { data } = await instance.get(
 			`https://api.zelf.world/api/zelf-name-service/search?zelfName=${zelfName}.zelf`,
@@ -236,32 +247,25 @@ const searchZelfName = async (zelfName, crypto) => {
 			}
 		);
 
-		let addressCliente;
+		const ethAddress = data.data.ipfs[0].publicData.ethAddress;
+		const solanaAddress = data.data.ipfs[0].publicData.solanaAddress;
+		const minaAddress = data.data.ipfs[0].publicData?.minaAddress;
 
-		switch (crypto) {
-			case "ETH":
-				addressCliente = data.data.ipfs[0].publicData.ethAddress;
-				break;
-			case "SOL":
-				addressCliente = data.data.ipfs[0].publicData.solanaAddress;
-				break;
-			case "MINA":
-				addressCliente = data.data.ipfs[0].publicData.minaAddress;
-				break;
+		const address = {
+			ethAddress,
+			solanaAddress,
+			minaAddress,
+		};
 
-			default:
-		}
-
-		return addressCliente;
+		return address;
 	} catch (error) {
 		console.log(error);
 		return null;
 	}
 };
-const calculatePriceZelfName = async (zelfName, crypto, duration) => {
-	const data = [
-		{
-			Length: "1 Year",
+const calculatePriceZelfName = async (zelfName, duration) => {
+	const data = {
+		1: {
 			1: 240,
 			2: 120,
 			3: 72,
@@ -280,8 +284,7 @@ const calculatePriceZelfName = async (zelfName, crypto, duration) => {
 			26: 13,
 			27: 12,
 		},
-		{
-			Length: "2 Years",
+		2: {
 			1: 432,
 			2: 216,
 			3: 130,
@@ -300,8 +303,7 @@ const calculatePriceZelfName = async (zelfName, crypto, duration) => {
 			26: 23,
 			27: 22,
 		},
-		{
-			Length: "3 Years",
+		3: {
 			1: 612,
 			2: 306,
 			3: 184,
@@ -320,8 +322,7 @@ const calculatePriceZelfName = async (zelfName, crypto, duration) => {
 			26: 33,
 			27: 31,
 		},
-		{
-			Length: "4 Years",
+		4: {
 			1: 768,
 			2: 384,
 			3: 230,
@@ -340,8 +341,7 @@ const calculatePriceZelfName = async (zelfName, crypto, duration) => {
 			26: 42,
 			27: 38,
 		},
-		{
-			Length: "5 Years",
+		5: {
 			1: 900,
 			2: 450,
 			3: 270,
@@ -360,8 +360,7 @@ const calculatePriceZelfName = async (zelfName, crypto, duration) => {
 			26: 49,
 			27: 45,
 		},
-		{
-			Length: "Lifetime",
+		lifetime: {
 			1: 3600,
 			2: 1800,
 			3: 1080,
@@ -380,40 +379,41 @@ const calculatePriceZelfName = async (zelfName, crypto, duration) => {
 			26: 195,
 			27: 180,
 		},
-	];
+	};
 
-	function getValue(length, year) {
-		// Busca el objeto que coincide con el Length
-		const lengthData = data.find((item) => item.Length === length);
+	const getValue = (duration, length) => {
+		const durationData = data[duration];
 
-		if (!lengthData) {
-			throw new Error(`No se encontró el Length "${length}".`);
+		if (!durationData) {
+			throw new Error(`No se encontró la duración "${duration}".`);
 		}
 
-		// Busca el valor basado en el año
-		const key = Object.keys(lengthData).find((k) => {
+		const key = Object.keys(durationData).find((k) => {
 			if (k.includes("-")) {
-				// Manejo de rangos (por ejemplo, "5-15")
 				const [start, end] = k.split("-").map(Number);
-				return year >= start && year <= end;
+				return length >= start && length <= end;
 			}
-			return Number(k) === year; // Comparación directa para claves numéricas
+			return Number(k) === length;
 		});
 
 		if (!key) {
 			throw new Error(
-				`No se encontró un valor para el año "${year}" en el Length "${length}".`
+				`No se encontró un valor para la longitud "${length}" en la duración "${duration}".`
 			);
 		}
 
-		return lengthData[key];
-	}
+		return durationData[key];
+	};
 
-	// Ejemplo de uso:
 	try {
-		console.log(getValue("1 Year", 15)); // 240
+		const zelfLength = zelfName.length;
+
+		const price = getValue(duration, zelfLength);
+
+		return { price, zelfLength };
 	} catch (error) {
 		console.error(error.message);
+		return null;
 	}
 };
 
@@ -421,7 +421,7 @@ const calculatePriceZelfName = async (zelfName, crypto, duration) => {
 /**
  * @param {string} crypto
  */
-const calculateCryptoValue = async (crypto) => {
+const calculateCryptoValue = async (crypto, zelfName, duration) => {
 	try {
 		const { price } = await getTickerPrice({ symbol: `${crypto}USDT` });
 
@@ -431,18 +431,122 @@ const calculateCryptoValue = async (crypto) => {
 			);
 		}
 
-		const cryptoValue = priceBase / price;
+		const priceBase = await calculatePriceZelfName(zelfName, duration);
+
+		const cryptoValue = priceBase.price / price;
 
 		return {
 			crypto,
-			cryptoValue: cryptoValue.toFixed(8),
+			amountToSend: cryptoValue.toFixed(8),
 			ratePriceInUSDT: parseFloat(price).toFixed(5),
+			wordsCount: priceBase.zelfLength.toString(),
+			USD: priceBase.price.toString(),
+			duration,
+			zelfName,
 		};
 	} catch (error) {
 		console.error("Error al obtener el valor de la criptomoneda:");
 		throw error;
 	}
 };
+
+const transactionGenerate = async (crypto, zelfName, duration) => {
+	const existingRecordZelfName = await searchZelfName_(zelfName);
+
+	if (!existingRecordZelfName) return { message: "no_encont" };
+
+	const existingRecord = await MongoORM.buildQuery(
+		{
+			where_zelfName: zelfName,
+			findOne: true,
+		},
+		modelPurchase,
+		null,
+		[]
+	);
+
+	if (existingRecord) {
+		let updatedRecord;
+		let result;
+		if (
+			existingRecord.crypto !== crypto ||
+			existingRecord.duration !== duration
+		) {
+			result = await calculateCryptoValue(crypto, zelfName, duration);
+			updatedRecord = await modelPurchase.findByIdAndUpdate(
+				existingRecord._id,
+				{
+					zelfName: result.zelfName,
+					duration: result.duration,
+					crypto: result.crypto,
+					amountToSend: result.amountToSend,
+					ratePriceInUSDT: result.ratePriceInUSDT,
+					wordsCount: result.wordsCount,
+					USD: result.USD,
+					isValido: isValido,
+				},
+				{ new: true }
+			);
+		}
+		result = await calculateCryptoValue(crypto, zelfName, duration);
+		updatedRecord = await modelPurchase.findByIdAndUpdate(
+			existingRecord._id,
+			{
+				zelfName: result.zelfName,
+				duration: result.duration,
+				crypto: result.crypto,
+				wordsCount: result.wordsCount,
+				USD: result.USD,
+				isValido: isValido,
+			},
+			{ new: true }
+		);
+		delete updatedRecord._doc.amountDetected;
+		delete updatedRecord._doc.purchaseCreatedAt;
+		delete updatedRecord._doc.updatedAt;
+		delete updatedRecord._doc.createdAt;
+		delete updatedRecord._doc.__v;
+		delete updatedRecord._doc.amountDetected;
+		return updatedRecord;
+	}
+
+	result = await calculateCryptoValue(crypto, zelfName, duration);
+
+	result.isValido = isValido;
+
+	const transaction = new modelPurchase(result);
+
+	const response = await transaction.save();
+
+	delete response._doc.amountDetected;
+	delete response._doc.purchaseCreatedAt;
+	delete response._doc.updatedAt;
+	delete response._doc.createdAt;
+	delete response._doc.__v;
+	delete response._doc.amountDetected;
+	return response;
+};
+
+const zelfVerify = async (zelfName) => {
+	//return await searchZelfName({ zelfName: zelfName });
+
+	const { data } = await instance.get(
+		`https://api.zelf.world/api/zelf-name-service/search?zelfName=${zelfName}.zelf`,
+		{
+			headers: {
+				authorization:
+					"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uIjoiNjc2MTlkOGMwYzI2NDVkY2VhYzcxYzE5IiwiaWRlbnRpZmllciI6IjM2ODUxNTc0NiIsImlhdCI6MTczNDQ1MDU3Mn0.FBInrZVafALVEuNTDq7tdHS1d8gBYuGXsR_Ve9csqHc",
+			},
+		}
+	);
+
+	if (!data.data.available) return true;
+
+	return false;
+};
+
 module.exports = {
 	getCheckout,
+	calculateCryptoValue,
+	transactionGenerate,
 };

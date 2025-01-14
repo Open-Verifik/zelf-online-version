@@ -2,11 +2,12 @@ const {
 	string,
 	validate,
 	zelfNameDuration_,
+	crypto_,
 } = require("../../../Core/JoiUtils");
 
 const schemas = {
 	validateParamas: {
-		crypto: string().required(),
+		crypto: crypto_().required(),
 		zelfName: string().required(),
 		duration: zelfNameDuration_().required(),
 	},

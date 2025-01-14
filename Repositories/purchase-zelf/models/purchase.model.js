@@ -8,39 +8,53 @@ const { addBasicPlugins } = require("../../../Core/mongoose-utils");
 
 //####################################################//
 
-const purchaseSchema = new Schema({
-	crypto: {
-		type: String,
-		required: true,
-		minlength: 2,
+const purchaseSchema = new Schema(
+	{
+		zelfName: { type: String },
+		duration: { type: String },
+		crypto: {
+			type: String,
+			required: true,
+			minlength: 2,
+		},
+		cryptoValue: { type: String },
+		ratePriceInUSDT: { type: String },
+		wordsCount: { type: String },
+		USD: { type: String },
+		amountToSend: {
+			type: String,
+		},
+		amountDetected: {
+			type: String,
+		},
+		address: {
+			type: String,
+		},
+		isValido: {
+			type: String,
+		},
+		purchaseCreatedAt: {
+			type: Date,
+			default: Date.now, // Campo con nombre diferente para evitar conflicto
+		},
 	},
-	amountToSend: {
-		type: String,
-		required: true,
-		minlength: 2,
-	},
-	amountDetected: {
-		type: String,
-		required: true,
-		minlength: 4,
-	},
-	ratePriceInTUSD: {
-		type: String,
-		required: true,
-	},
-	address: {
-		type: String,
-		required: true,
-	},
+	{
+		timestamps: false, // Deshabilitar los timestamps automáticos
+	}
+);
+
+// Pre-save hook
+purchaseSchema.pre("save", async function (next) {
+	next();
 });
 
-purchaseSchema.pre("save", async (next) => {
-	const _this = this;
+// Post-save hook
+purchaseSchema.post("save", async function (doc, next) {
+	next();
 });
 
-purchaseSchema.post("save", async (next) => {
-	const _this = this;
-});
+// Crear un índice TTL para que el documento se elimine automáticamente después de 2 minutos
+purchaseSchema.index({ purchaseCreatedAt: 1 }, { expireAfterSeconds: 7200 }); // 120 segundos = 2 minutos
 
 /**
  * #model methods
