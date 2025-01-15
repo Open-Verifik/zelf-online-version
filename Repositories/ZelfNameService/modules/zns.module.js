@@ -82,6 +82,8 @@ const _calculateZelfNamePrice = (length, duration = 1) => {
 const searchZelfName = async (params, authUser) => {
 	const query = params.zelfName ? { key: "zelfName", value: params.zelfName } : { key: params.key, value: params.value };
 
+	if (params.duration) query.duration = params.duration;
+
 	try {
 		const searchResults = await ArweaveModule.search(params.environment, params.zelfName, query);
 
@@ -124,6 +126,9 @@ const _removeExpiredRecords = async (records) => {
 
 		if (isExpired) {
 			records.splice(index, 1);
+
+			record.ipfs_pin_hash ? await IPFSModule.unPinFiles([record.ipfs_pin_hash]) : "do nothing";
+
 			continue;
 		}
 	}
@@ -170,7 +175,7 @@ const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, au
 			break;
 	}
 
-	_removeExpiredRecords(ipfsRecords);
+	await _removeExpiredRecords(ipfsRecords);
 };
 
 /**
@@ -192,7 +197,7 @@ const _searchInIPFS = async (environment = "hold", query, authUser, foundInArwea
 				? []
 				: value
 				? {
-						price: _calculateZelfNamePrice(value.split(".zelf")[0].length, 1),
+						price: _calculateZelfNamePrice(value.split(".zelf")[0].length, query.duration),
 						zelfName: value,
 						available: true,
 				  }
@@ -226,7 +231,7 @@ const _searchInIPFS = async (environment = "hold", query, authUser, foundInArwea
 			? []
 			: query.key === "zelfName"
 			? {
-					price: _calculateZelfNamePrice(query.value.split(".zelf")[0].length, 1),
+					price: _calculateZelfNamePrice(query.value.split(".zelf")[0].length, query.duration),
 					zelfName: query.value,
 					available: true,
 			  }
@@ -734,6 +739,8 @@ const leaseOffline = async (params, authUser) => {
 		if (ipfsRecord.publicData.type === "mainnet") mainnetRecord = ipfsRecord;
 	}
 
+	const _zelfProof = holdRecord?.publicData?.zelfProof || mainnetRecord?.publicData?.zelfProof;
+
 	if (zelfNameRecords.length === 2 || mainnetRecord) {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
@@ -753,6 +760,12 @@ const leaseOffline = async (params, authUser) => {
 
 	if (!zelfName.includes(_preview.publicData.zelfName)) {
 		const error = new Error("zelfName_does_not_match_in_zelfProof");
+		error.status = 409;
+		throw error;
+	}
+
+	if (_zelfProof && zelfProof !== _zelfProof) {
+		const error = new Error("zelfProof_does_not_match_in_hold");
 		error.status = 409;
 		throw error;
 	}
