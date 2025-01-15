@@ -67,9 +67,21 @@ const decryptZelfName = async (ctx) => {
 	}
 };
 
+const revenueCatWebhook = async (ctx) => {
+	try {
+		ctx.body = { data: ctx.request.body };
+	} catch (error) {
+		console.error(error);
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	searchZelfName,
 	leaseZelfName,
 	previewZelfName,
 	decryptZelfName,
+	revenueCatWebhook,
 };

@@ -19,5 +19,7 @@ module.exports = (server) => {
 
 	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptZelfName);
 
+	server.post(`${PATH}/revenue-cat`, Middleware.revenueCatWebhookValidation, Controller.revenueCatWebhook);
+
 	// server.del(`${PATH}/:id`, Middleware.deleteValidation, Controller.destroy);
 };

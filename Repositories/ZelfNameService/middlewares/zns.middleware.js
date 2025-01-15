@@ -38,6 +38,16 @@ const schemas = {
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string().required(),
 	},
+	revenueCatWebhook: {
+		product_id: string().required(),
+		period_type: string().required(),
+		currency: string().required(),
+		price: number().required(),
+		id: string().required(),
+		app_id: string().required(),
+		transaction_id: string().required(),
+		environment: string().required(),
+	},
 };
 
 /**
@@ -221,10 +231,31 @@ const decryptValidation = async (ctx, next) => {
 	await next();
 };
 
+const revenueCatWebhookValidation = async (ctx, next) => {
+	const { event } = ctx.request.body;
+
+	if (!event) {
+		ctx.status = 409;
+		ctx.body = { validationError: "Missing event payload" };
+		return;
+	}
+
+	const valid = validate(schemas.revenueCatWebhook, ctx.request.body?.event);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	getValidation,
 	leaseValidation,
 	previewValidation,
 	deleteValidation,
 	decryptValidation,
+	revenueCatWebhookValidation,
 };
