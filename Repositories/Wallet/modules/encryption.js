@@ -21,7 +21,7 @@ const encrypt = async (data) => {
 			data: _error,
 		});
 
-		let error = new Error(_error.message);
+		let error = new Error(_error.code);
 
 		switch (_error.code) {
 			case "ERR_INVALID_IMAGE":
@@ -98,7 +98,7 @@ const decrypt = async (data) => {
 			data: _error,
 		});
 
-		let error = new Error(_error.message);
+		let error = new Error(_error.code);
 
 		switch (_error.code) {
 			case "ERR_INVALID_IMAGE":
