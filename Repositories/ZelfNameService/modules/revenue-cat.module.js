@@ -13,7 +13,7 @@ const webhookHandler = async (payload) => {
 			}
 
 			if (event.environment === "PRODUCTION" && config.env === "production") {
-				return await _handleProductionWebhook(event);
+				return await _handleSandboxWebhook(event);
 			}
 			break;
 
