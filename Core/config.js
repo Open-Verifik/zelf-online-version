@@ -127,6 +127,9 @@ const configuration = {
 		androidSiteKey: process.env.CAPTCHA_ANDROID_SITE_KEY,
 		iOSSiteKey: process.env.CAPTCHA_IOS_SITE_KEY,
 	},
+	revenueCat: {
+		allowedEmail: process.env.REVENUECAT_ALLOWED_EMAIL,
+	},
 };
 
 module.exports = configuration;

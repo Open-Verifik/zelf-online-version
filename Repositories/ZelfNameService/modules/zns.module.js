@@ -441,7 +441,7 @@ const leaseConfirmation = async (data, authUser) => {
 	for (let index = 0; index < zelfNameRecords.length; index++) {
 		const record = zelfNameRecords[index];
 
-		inMainnet = Boolean(record.publicData?.type === "mainnet");
+		inMainnet = Boolean(record.publicData?.type === "mainnet" || !record.publicData?.zelfName.includes(".hold"));
 	}
 
 	if (!zelfNameRecords.length) {
@@ -474,7 +474,7 @@ const leaseConfirmation = async (data, authUser) => {
 	if (payment?.confirmed) {
 		unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
 
-		const { masterIPFSRecord, masterArweaveRecord } = await _cloneZelfNameToProduction(zelfNameObject, payment);
+		const { masterIPFSRecord, masterArweaveRecord } = await _cloneZelfNameToProduction(zelfNameObject);
 
 		return {
 			ipfs: [masterIPFSRecord],
@@ -526,10 +526,9 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 /**
  * clone zelf name to production
  * @param {Object} zelfNameObject
- * @param {Object} payment
  * @author Miguel Trevino
  */
-const _cloneZelfNameToProduction = async (zelfNameObject, payment) => {
+const _cloneZelfNameToProduction = async (zelfNameObject) => {
 	// first clone it to ipfs, then to arweave
 	const payload = {
 		base64: zelfNameObject.zelfProofQRCode,
@@ -827,4 +826,5 @@ module.exports = {
 	decryptZelfName,
 	//Offline
 	leaseOffline,
+	saveInProduction: _cloneZelfNameToProduction,
 };

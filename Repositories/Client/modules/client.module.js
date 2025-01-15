@@ -70,11 +70,16 @@ const auth = async (data, authUser) => {
 
 	if (!isKeyValid) throw new Error("403");
 
+	let tokenDuration = 1;
+
+	if (email.includes(config.revenueCat.allowedEmail)) tokenDuration = 700;
+
 	return {
 		token: jwt.sign(
 			{
 				clientId: client._id,
-				exp: moment().add(1, "day").unix(),
+				email,
+				exp: moment().add(tokenDuration, "day").unix(),
 			},
 			config.JWT_SECRET
 		),

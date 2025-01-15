@@ -1,5 +1,6 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
 const captchaService = require("../../../Core/captcha");
+const config = require("../../../Core/config");
 
 const schemas = {
 	search: {
@@ -118,9 +119,7 @@ const leaseValidation = async (ctx, next) => {
 
 	if (!clientId) {
 		ctx.status = 403;
-
 		ctx.body = { validationError: "Access forbidden" };
-
 		return;
 	}
 
@@ -306,6 +305,14 @@ const decryptValidation = async (ctx, next) => {
 
 const revenueCatWebhookValidation = async (ctx, next) => {
 	const { event } = ctx.request.body;
+
+	const { clientId, email } = ctx.state.user;
+
+	if (!clientId || email !== config.revenueCat.allowedEmail) {
+		ctx.status = 403;
+		ctx.body = { validationError: "Access forbidden" };
+		return;
+	}
 
 	if (!event) {
 		ctx.status = 409;

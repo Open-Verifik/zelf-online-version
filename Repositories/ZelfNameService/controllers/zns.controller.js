@@ -1,4 +1,5 @@
 const Module = require("../modules/zns.module");
+const RevenueCatModule = require("../modules/revenue-cat.module");
 
 const searchZelfName = async (ctx) => {
 	try {
@@ -93,7 +94,8 @@ const leaseOfflineZelfName = async (ctx) => {
 
 const revenueCatWebhook = async (ctx) => {
 	try {
-		ctx.body = { data: ctx.request.body };
+		const data = await RevenueCatModule.webhookHandler(ctx.request.body);
+		ctx.body = { data };
 	} catch (error) {
 		console.error(error);
 		ctx.status = error.status || 500;
