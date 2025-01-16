@@ -9,11 +9,11 @@ const webhookHandler = async (payload) => {
 	switch (event.type) {
 		case "NON_RENEWING_PURCHASE":
 			if (event.environment === "SANDBOX" && config.env === "development") {
-				return await _handleSandboxWebhook(event);
+				return await _handleWebhook(event);
 			}
 
 			if (event.environment === "PRODUCTION" && config.env === "production") {
-				return await _handleSandboxWebhook(event);
+				return await _handleWebhook(event);
 			}
 			break;
 
@@ -26,7 +26,7 @@ const webhookHandler = async (payload) => {
 	throw error;
 };
 
-const _handleSandboxWebhook = async (event) => {
+const _handleWebhook = async (event) => {
 	const attributes = {};
 	let inMainnet = false;
 	const attributeKeys = Object.keys(event.subscriber_attributes);
@@ -58,10 +58,10 @@ const _handleSandboxWebhook = async (event) => {
 	}
 
 	const zelfNameObject = zelfNameRecords[0];
-
+	const matchDuration = Boolean(zelfNameObject.publicData.duration == attributes.duration);
 	const preview = zelfNameObject.preview;
 
-	if (preview.publicData.ethAddress !== attributes.ethAddress) {
+	if (preview.publicData.ethAddress !== attributes.ethAddress || !matchDuration) {
 		const error = new Error("zelfProof_does_not_match");
 		error.status = 409;
 		throw error;
