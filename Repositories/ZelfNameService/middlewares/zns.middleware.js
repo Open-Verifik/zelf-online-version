@@ -1,6 +1,7 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
 const captchaService = require("../../../Core/captcha");
 const config = require("../../../Core/config");
+const ZNSTokenModule = require("../modules/zns-token.module");
 
 const schemas = {
 	search: {
@@ -165,7 +166,14 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	await next();
+	await ZNSTokenModule.giveTokensAfterPurchase();
+
+	ctx.status = 409;
+
+	ctx.body = { captchaScore, validationError: "stoppp not acceptable" };
+
+	return;
+	// await next();
 };
 
 /**

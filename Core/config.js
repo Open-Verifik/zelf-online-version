@@ -130,6 +130,9 @@ const configuration = {
 	revenueCat: {
 		allowedEmail: process.env.REVENUECAT_ALLOWED_EMAIL,
 	},
+	solana: {
+		sender: process.env.SENDER_KEY,
+	},
 };
 
 module.exports = configuration;
