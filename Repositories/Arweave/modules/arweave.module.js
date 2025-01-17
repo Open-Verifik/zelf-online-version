@@ -4,9 +4,9 @@ const fs = require("fs");
 const path = require("path");
 const config = require("../../../Core/config");
 const axios = require("axios");
-const arweaveUrl = `https://arweave.net`;
+const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
-const graphql = `https://arweave-search.goldsky.com/graphql`;
+const graphql = `${arweaveUrl}/graphql`;
 
 const uploadZelfProof = async (zelfProofQRCode, zelfNameObject) => {
 	/**
