@@ -1,6 +1,7 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
 const captchaService = require("../../../Core/captcha");
 const config = require("../../../Core/config");
+const { createUnderName } = require("../modules/undernames.module");
 const ZNSTokenModule = require("../modules/zns-token.module");
 
 const schemas = {
@@ -166,7 +167,8 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	await ZNSTokenModule.giveTokensAfterPurchase();
+	await createUnderName({ parentName: config.arwave.parentName, underName: zelfName });
+	// await ZNSTokenModule.giveTokensAfterPurchase();
 
 	ctx.status = 409;
 
