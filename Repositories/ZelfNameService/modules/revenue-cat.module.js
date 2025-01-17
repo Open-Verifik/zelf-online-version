@@ -8,13 +8,13 @@ const webhookHandler = async (payload) => {
 
 	switch (event.type) {
 		case "NON_RENEWING_PURCHASE":
-			if (event.environment === "SANDBOX" && config.env === "development") {
-				return await _handleWebhook(event);
-			}
+			// if (event.environment === "SANDBOX" && config.env === "development") {
+			await _handleWebhook(event);
+			// }
 
-			if (event.environment === "PRODUCTION" && config.env === "production") {
-				return await _handleWebhook(event);
-			}
+			// if (event.environment === "PRODUCTION" && config.env === "production") {
+			// return await _handleWebhook(event);
+			// }
 			break;
 
 		default:
