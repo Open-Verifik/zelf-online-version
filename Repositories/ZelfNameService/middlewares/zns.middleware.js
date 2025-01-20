@@ -167,15 +167,10 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	await createUnderName({ parentName: config.arwave.parentName, underName: zelfName });
+	// await createUnderName({ parentName: config.arwave.parentName, underName: zelfName });
 	// await ZNSTokenModule.giveTokensAfterPurchase();
 
-	ctx.status = 409;
-
-	ctx.body = { captchaScore, validationError: "stoppp not acceptable" };
-
-	return;
-	// await next();
+	await next();
 };
 
 /**

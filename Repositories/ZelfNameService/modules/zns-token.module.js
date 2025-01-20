@@ -2,6 +2,7 @@ const solanaWeb3 = require("@solana/web3.js");
 const splToken = require("@solana/spl-token");
 const Solana = require("../../Wallet/modules/solana");
 const config = require("../../../Core/config");
+const ReferralRewardModel = require("../models/referral-rewards.model");
 
 // Connect to Solana devnet or mainnet
 // const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("mainnet-beta"), "confirmed");
@@ -240,6 +241,43 @@ const sendWithRetry = async (transaction, signers, retries = 3) => {
 	}
 };
 
+const addPurchase = async (zelfNameObject) => {
+	if (!zelfNameObject) return null;
+
+	try {
+		const referralReward = new ReferralRewardModel({
+			zelfName: zelfNameObject.zelfName,
+			ethAddress: zelfNameObject.ethAddress,
+			referralZelfName: zelfNameObject.referralZelfName,
+			zelfNamePrice: zelfNameObject.zelfNamePrice,
+			status: "pending",
+			attempts: 0,
+			payload: {},
+			ipfsHash: zelfNameObject.ipfsHash,
+			arweaveId: zelfNameObject.arweaveId,
+		});
+
+		await referralReward.save();
+
+		return referralReward;
+	} catch (error) {
+		console.error("Error adding purchase:", error);
+		throw error; // Re-throw for higher-level error handling if needed
+	}
+};
+
+const releaseReward = async (zelfNameObject) => {
+	try {
+		// Release reward to the referrer
+		// const reward = await ReferralReward.create(zelfNameObject);
+	} catch (error) {
+		console.error("Error releasing reward:", error);
+		throw error; // Re-throw for higher-level error handling if needed
+	}
+};
+
 module.exports = {
+	addPurchase,
+	releaseReward,
 	giveTokensAfterPurchase,
 };

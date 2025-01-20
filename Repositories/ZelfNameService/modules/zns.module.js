@@ -13,6 +13,7 @@ const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
 const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const config = require("../../../Core/config");
+const { addPurchase } = require("./zns-token.module");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -325,9 +326,11 @@ const _arweaveIDToBase64 = async (id) => {
  * @param {Object} authUser
  */
 const leaseZelfName = async (params, authUser) => {
-	const { zelfName, duration } = params;
+	const { zelfName, duration, referralZelfName } = params;
 
 	await _findDuplicatedZelfName(zelfName, "both", authUser);
+
+	await _validateReferral(referralZelfName, authUser);
 
 	const { face, password, mnemonic } = await _decryptParams(params, authUser);
 
@@ -393,33 +396,31 @@ const leaseZelfName = async (params, authUser) => {
 		cancel_url: "https://name.zelf.world/#/coinbase-cancel",
 	});
 
-	if (!params.skipZNS) {
-		zelfNameObject.image = await encryptQR(dataToEncrypt);
+	zelfNameObject.image = await encryptQR(dataToEncrypt);
 
-		// zelfNameObject.holdTransaction = await ArweaveModule.zelfNameHold(zelfNameObject.image, zelfNameObject);
+	// zelfNameObject.holdTransaction = await ArweaveModule.zelfNameHold(zelfNameObject.image, zelfNameObject);
 
-		const holdName = `${zelfName}.hold`;
+	const holdName = `${zelfName}.hold`;
 
-		zelfNameObject.ipfs = await IPFSModule.insert(
-			{
-				base64: zelfNameObject.image,
-				name: holdName,
-				metadata: {
-					// ...zelfNameObject.publicData,
-					zelfProof: zelfNameObject.zelfProof,
-					zelfName: holdName,
-					duration: duration || 1,
-					price: zelfNameObject.price,
-					expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
-					type: "hold",
-					coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
-					coinbase_expires_at: zelfNameObject.coinbaseCharge.expires_at,
-				},
-				pinIt: true,
+	zelfNameObject.ipfs = await IPFSModule.insert(
+		{
+			base64: zelfNameObject.image,
+			name: holdName,
+			metadata: {
+				// ...zelfNameObject.publicData,
+				zelfProof: zelfNameObject.zelfProof,
+				zelfName: holdName,
+				duration: duration || 1,
+				price: zelfNameObject.price,
+				expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
+				type: "hold",
+				coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
+				referralZelfName: referralZelfName || "migueltrevino.zelf",
 			},
-			{ ...authUser, pro: true }
-		);
-	}
+			pinIt: true,
+		},
+		{ ...authUser, pro: true }
+	);
 
 	return { ...zelfNameObject, hasPassword: Boolean(password) };
 };
@@ -476,7 +477,20 @@ const leaseConfirmation = async (data, authUser) => {
 
 		const { masterIPFSRecord, masterArweaveRecord } = await _cloneZelfNameToProduction(zelfNameObject);
 
+		const referralReward = zelfNameObject.publicData.referralZelfName
+			? await addPurchase({
+					ethAddress: masterIPFSRecord.metadata.ethAddress,
+					zelfName,
+					zelfNamePrice: zelfNameObject.publicData.price,
+					referralZelfName: zelfNameObject.publicData.referralZelfName,
+					ipfsHash: masterIPFSRecord.IpfsHash,
+					arweaveId: masterArweaveRecord.id,
+			  })
+			: "no_referral";
+
 		return {
+			referralReward,
+			zelfNameObject,
 			ipfs: [masterIPFSRecord],
 			arweave: [masterArweaveRecord],
 		};
@@ -597,6 +611,28 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
 	if (returnResults) return searchResult;
 
 	const error = new Error("zelfName_is_taken");
+
+	error.status = 409;
+
+	throw error;
+};
+
+const _validateReferral = async (referralZelfName, authUser) => {
+	if (!referralZelfName) return;
+
+	const searchResult = await searchZelfName(
+		{
+			zelfName: referralZelfName,
+			environment: "mainnet",
+		},
+		authUser
+	);
+
+	let notFound = Boolean(searchResult.available);
+
+	if (!notFound) return searchResult;
+
+	const error = new Error("zelfName_referring_you_not_found");
 
 	error.status = 409;
 
