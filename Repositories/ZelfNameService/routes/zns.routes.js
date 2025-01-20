@@ -20,4 +20,6 @@ module.exports = (server) => {
 	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptZelfName);
 
 	// server.del(`${PATH}/:id`, Middleware.deleteValidation, Controller.destroy);
+
+	server.post(`${PATH}/referral-rewards`, Middleware.referralRewardsValidation, Controller.referralRewards);
 };

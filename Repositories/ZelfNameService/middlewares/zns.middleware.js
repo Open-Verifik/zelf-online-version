@@ -221,10 +221,25 @@ const decryptValidation = async (ctx, next) => {
 	await next();
 };
 
+const referralRewardsValidation = async (ctx, next) => {
+	const { superAdminId } = ctx.state.user;
+
+	if (!superAdminId) {
+		ctx.status = 403;
+
+		ctx.body = { error: "Unauthorized" };
+
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	getValidation,
 	leaseValidation,
 	previewValidation,
 	deleteValidation,
 	decryptValidation,
+	referralRewardsValidation,
 };

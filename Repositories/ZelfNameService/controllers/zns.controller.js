@@ -67,9 +67,24 @@ const decryptZelfName = async (ctx) => {
 	}
 };
 
+const referralRewards = async (ctx) => {
+	try {
+		// const data = await Module.referralRewards(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data: null };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	searchZelfName,
 	leaseZelfName,
 	previewZelfName,
 	decryptZelfName,
+	referralRewards,
 };
