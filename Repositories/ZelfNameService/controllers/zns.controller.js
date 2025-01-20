@@ -95,9 +95,21 @@ const leaseOfflineZelfName = async (ctx) => {
 const revenueCatWebhook = async (ctx) => {
 	try {
 		const data = await RevenueCatModule.webhookHandler(ctx.request.body);
+
 		ctx.body = { data };
 	} catch (error) {
 		console.error(error);
+	}
+};
+
+const referralRewards = async (ctx) => {
+	try {
+		// const data = await Module.referralRewards(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data: null };
+	} catch (error) {
+		console.error({ error });
+
 		ctx.status = error.status || 500;
 
 		ctx.body = { error: error.message };
@@ -112,4 +124,5 @@ module.exports = {
 	decryptZelfName,
 	leaseOfflineZelfName,
 	revenueCatWebhook,
+	referralRewards,
 };

@@ -335,6 +335,19 @@ const revenueCatWebhookValidation = async (ctx, next) => {
 	if (valid.error) {
 		ctx.status = 409;
 		ctx.body = { validationError: valid.error.message };
+	}
+
+	await next();
+};
+
+const referralRewardsValidation = async (ctx, next) => {
+	const { superAdminId } = ctx.state.user;
+
+	if (!superAdminId) {
+		ctx.status = 403;
+
+		ctx.body = { error: "Unauthorized" };
+
 		return;
 	}
 
@@ -351,4 +364,5 @@ module.exports = {
 	//offline
 	leaseOfflineValidation,
 	revenueCatWebhookValidation,
+	referralRewardsValidation,
 };
