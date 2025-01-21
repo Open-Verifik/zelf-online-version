@@ -59,7 +59,7 @@ const zelfNamePricing = {
  * @param {string} duration - Duration ("1", "2", "3", "4", "5", "lifetime")
  * @returns {number} - Price of the Zelf name
  */
-const _calculateZelfNamePrice = (length, duration = 1) => {
+const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	if (![1, 2, 3, 4, 5, "lifetime"].includes(duration)) throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
 
 	let price = 24;
@@ -72,7 +72,16 @@ const _calculateZelfNamePrice = (length, duration = 1) => {
 		throw new Error("Invalid name length. Length must be between 1 and 27.");
 	}
 
-	return config.env === "development" ? price / 24 : price;
+	// Apply 10% discount if referralZelfName is provided
+	if (referralZelfName) {
+		price = price - price * 0.1; // Subtract 10% from the price
+	}
+
+	// Adjust price for development environment
+	price = config.env === "development" ? price / 24 : price;
+
+	// Round up to 2 decimal places
+	return Math.ceil(price * 100) / 100;
 };
 
 /**
@@ -369,7 +378,7 @@ const leaseZelfName = async (params, authUser) => {
 	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
 
 	zelfNameObject.zelfName = zelfName;
-	zelfNameObject.price = _calculateZelfNamePrice(zelfName.length - 5, duration);
+	zelfNameObject.price = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
 	zelfNameObject.publicData = dataToEncrypt.publicData;
 	zelfNameObject.ethAddress = eth.address;
 	zelfNameObject.btcAddress = btc.address;
@@ -382,7 +391,7 @@ const leaseZelfName = async (params, authUser) => {
 		description: `Purchase of the Zelf Name > ${zelfNameObject.zelfName} for $${zelfNameObject.price}`,
 		pricing_type: "fixed_price",
 		local_price: {
-			amount: `${zelfNameObject.price}`,
+			amount: zelfNameObject.price,
 			currency: "USD",
 		},
 		metadata: {
