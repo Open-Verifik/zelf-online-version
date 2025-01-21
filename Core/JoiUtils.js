@@ -3,9 +3,9 @@ const Joi = require("joi").extend(JoiDate);
 
 const recordShow = ["10", "25", "50", "100"];
 
-const crypto = ["ETH", "SOL"];
+const crypto = ["ETH", "SOL", "BTC", "CB"];
 
-const zelfNameDuration = ["1", "2", "3", "4", "5", "lifetime"];
+const zelfNameDuration = ["1"]; //, "2", "3", "4", "5", "lifetime"
 
 const _customErrors = (errors) => {
 	errors.forEach((err) => {

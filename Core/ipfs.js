@@ -1,7 +1,8 @@
 const { PinataSDK } = require("pinata");
 const { Blob } = require("buffer");
 require("dotenv").config();
-
+const FormData = require("form-data");
+const axios = require("axios");
 const pinata = new PinataSDK({
 	pinataJwt: process.env.PINATA_JWT,
 	pinataGateway: process.env.PINATA_GATEWAY_URL,
@@ -14,7 +15,12 @@ const web3Instance = new pinataWeb3.PinataSDK({
 	pinataGateway: process.env.PINATA_GATEWAY_URL,
 });
 
-const upload = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
+const upload = async (
+	base64Image,
+	filename = "image.png",
+	mimeType = "image/png",
+	metadata = {}
+) => {
 	try {
 		// // Remove base64 header if present (data:image/png;base64,...)
 		// const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
@@ -78,15 +84,77 @@ const retrieve = async (cid, expires = 1800) => {
  * @param {Object} metadata
  * @returns ipfs file
  */
-const pinFile = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
+// const pinFile = async (
+// 	base64Image,
+// 	filename = "image.png",
+// 	mimeType = "image/png",
+// 	metadata = {}
+// ) => {
+// 	try {
+// 		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+// 		console.log(metadata);
+// 		// Upload the file to Pinata
+// 		const uploadResponse = await web3Instance.upload
+// 			.base64(base64Data)
+// 			.addMetadata({
+// 				name: filename,
+// 				keyValues: metadata,
+// 			});
+
+// 		return {
+// 			url: `https://${process.env.PINATA_GATEWAY_URL}/ipfs/${uploadResponse.IpfsHash}`,
+// 			...uploadResponse,
+// 			pinned: true,
+// 			web3: true,
+// 			name: filename,
+// 			metadata,
+// 		};
+// 	} catch (error) {
+// 		console.error(error);
+// 	}
+
+// 	return null;
+// };
+const pinFile = async (
+	base64Image,
+	filename = "image.png",
+	mimeType = "image/png",
+	metadata = {}
+) => {
+	const PINATA_API_KEY = process.env.PINATA_API_KEY;
+	const PINATA_SECRET_API_KEY = process.env.PINATA_API_SECRET;
+
 	try {
 		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
 
-		// Upload the file to Pinata
-		const uploadResponse = await web3Instance.upload.base64(base64Data).addMetadata({
-			name: filename,
-			keyValues: metadata,
-		});
+		const formData = new FormData();
+
+		const buffer = Buffer.from(base64Data, "base64");
+		formData.append("file", buffer, filename);
+
+		if (metadata) {
+			formData.append(
+				"pinataMetadata",
+				JSON.stringify({
+					name: filename,
+					keyvalues: metadata,
+				})
+			);
+		}
+
+		const response = await axios.post(
+			"https://api.pinata.cloud/pinning/pinFileToIPFS",
+			formData,
+			{
+				headers: {
+					...formData.getHeaders(),
+					pinata_api_key: PINATA_API_KEY,
+					pinata_secret_api_key: PINATA_SECRET_API_KEY,
+				},
+			}
+		);
+
+		const uploadResponse = response.data;
 
 		return {
 			url: `https://${process.env.PINATA_GATEWAY_URL}/ipfs/${uploadResponse.IpfsHash}`,
@@ -98,11 +166,9 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 		};
 	} catch (error) {
 		console.error(error);
+		return null;
 	}
-
-	return null;
 };
-
 const filter = async (property = "name", value) => {
 	let files;
 

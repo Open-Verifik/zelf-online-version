@@ -5,6 +5,7 @@ const Schema = mongoose.Schema;
 const { ObjectId, String } = mongoose.Schema.Types;
 
 const { addBasicPlugins } = require("../../../Core/mongoose-utils");
+const { boolean } = require("joi");
 
 //####################################################//
 
@@ -27,12 +28,12 @@ const purchaseSchema = new Schema(
 		amountDetected: {
 			type: String,
 		},
-		address: {
-			type: String,
-		},
-		isValido: {
-			type: String,
-		},
+		paymentAddress: String,
+		address: {},
+		transactionStatus: String,
+		transactionDescription: String,
+		remainingTime: String,
+		lastSavedTime: String,
 		purchaseCreatedAt: {
 			type: Date,
 			default: Date.now, // Campo con nombre diferente para evitar conflicto

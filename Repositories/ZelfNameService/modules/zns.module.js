@@ -7,11 +7,21 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const sessionModule = require("../../Session/modules/session.module");
-const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
+const {
+	encrypt,
+	decrypt,
+	preview,
+	encryptQR,
+} = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
-const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
+const {
+	createCoinbaseCharge,
+	getCoinbaseCharge,
+} = require("../../coinbase/modules/coinbase_commerce.module");
+
+const { checkoutPay } = require("../../purchase-zelf/modules/purchase.module");
 const config = require("../../../Core/config");
 
 const evmCompatibleTickers = [
@@ -59,7 +69,10 @@ const zelfNamePricing = {
  * @returns {number} - Price of the Zelf name
  */
 const _calculateZelfNamePrice = (length, duration = 1) => {
-	if (![1, 2, 3, 4, 5, "lifetime"].includes(duration)) throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
+	if (![1, 2, 3, 4, 5, "lifetime"].includes(duration))
+		throw new Error(
+			"Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'."
+		);
 
 	let price = 24;
 
@@ -80,10 +93,16 @@ const _calculateZelfNamePrice = (length, duration = 1) => {
  * @param {*} authUser
  */
 const searchZelfName = async (params, authUser) => {
-	const query = params.zelfName ? { key: "zelfName", value: params.zelfName } : { key: params.key, value: params.value };
+	const query = params.zelfName
+		? { key: "zelfName", value: params.zelfName }
+		: { key: params.key, value: params.value };
 
 	try {
-		const searchResults = await ArweaveModule.search(params.environment, params.zelfName, query);
+		const searchResults = await ArweaveModule.search(
+			params.environment,
+			params.zelfName,
+			query
+		);
 
 		if (searchResults?.available) {
 			const error = new Error("not_found_in_arweave");
@@ -96,12 +115,17 @@ const searchZelfName = async (params, authUser) => {
 		const zelfNames = [];
 
 		for (let index = 0; index < searchResults.length; index++) {
-			const zelfNameObject = await _formatArweaveSearchResult(searchResults[index]);
+			const zelfNameObject = await _formatArweaveSearchResult(
+				searchResults[index]
+			);
 
 			zelfNames.push(zelfNameObject);
 		}
 
-		return { arweave: zelfNames, ipfs: await _searchInIPFS(params.environment, query, authUser, true) };
+		return {
+			arweave: zelfNames,
+			ipfs: await _searchInIPFS(params.environment, query, authUser, true),
+		};
 	} catch (exception) {
 		console.error({ exception: exception });
 
@@ -129,7 +153,12 @@ const _removeExpiredRecords = async (records) => {
 	}
 };
 
-const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, authUser) => {
+const _retriveFromIPFSByEnvironment = async (
+	ipfsRecords,
+	environment,
+	query,
+	authUser
+) => {
 	switch (environment) {
 		case "hold":
 			ipfsRecords.push(
@@ -179,11 +208,21 @@ const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, au
  * @param {Object} authUser
  * @author Miguel Trevino
  */
-const _searchInIPFS = async (environment = "hold", query, authUser, foundInArweave) => {
+const _searchInIPFS = async (
+	environment = "hold",
+	query,
+	authUser,
+	foundInArweave
+) => {
 	try {
 		let ipfsRecords = [];
 
-		await _retriveFromIPFSByEnvironment(ipfsRecords, environment, query, authUser);
+		await _retriveFromIPFSByEnvironment(
+			ipfsRecords,
+			environment,
+			query,
+			authUser
+		);
 
 		const value = query.value || query.zelfName;
 
@@ -205,16 +244,23 @@ const _searchInIPFS = async (environment = "hold", query, authUser, foundInArwea
 			const ipfsRecord = ipfsRecords[index];
 
 			if (environment === "both") {
-				zelfNamesInIPFS.push(await _formatIPFSSearchResult(ipfsRecord, foundInArweave));
+				zelfNamesInIPFS.push(
+					await _formatIPFSSearchResult(ipfsRecord, foundInArweave)
+				);
 
 				continue;
 			}
 
 			if (
-				(environment === "hold" && ipfsRecord.metadata.keyvalues.type === "hold") ||
-				(environment === "mainnet" && (!ipfsRecord.metadata.keyvalues.type || ipfsRecord.metadata.keyvalues.type === "mainnet"))
+				(environment === "hold" &&
+					ipfsRecord.metadata.keyvalues.type === "hold") ||
+				(environment === "mainnet" &&
+					(!ipfsRecord.metadata.keyvalues.type ||
+						ipfsRecord.metadata.keyvalues.type === "mainnet"))
 			) {
-				zelfNamesInIPFS.push(await _formatIPFSSearchResult(ipfsRecord, foundInArweave));
+				zelfNamesInIPFS.push(
+					await _formatIPFSSearchResult(ipfsRecord, foundInArweave)
+				);
 			}
 		}
 
@@ -226,7 +272,10 @@ const _searchInIPFS = async (environment = "hold", query, authUser, foundInArwea
 			? []
 			: query.key === "zelfName"
 			? {
-					price: _calculateZelfNamePrice(query.value.split(".zelf")[0].length, 1),
+					price: _calculateZelfNamePrice(
+						query.value.split(".zelf")[0].length,
+						1
+					),
 					zelfName: query.value,
 					available: true,
 			  }
@@ -248,9 +297,13 @@ const _formatArweaveSearchResult = async (transactionRecord) => {
 		zelfNameObject.publicData[tag.name] = tag.value;
 	}
 
-	const zelfProofTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfProof");
+	const zelfProofTag = transactionRecord.node?.tags.find(
+		(tag) => tag.name === "zelfProof"
+	);
 
-	const zelfNameTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfName");
+	const zelfNameTag = transactionRecord.node?.tags.find(
+		(tag) => tag.name === "zelfName"
+	);
 
 	zelfNameObject.zelfProof = zelfProofTag ? zelfProofTag.value : null;
 
@@ -284,10 +337,14 @@ const _formatIPFSSearchResult = async (ipfsRecord, foundInArweave) => {
 
 const _IPFSToBase64 = async (url) => {
 	try {
-		const encryptedResponse = await axios.get(url, { responseType: "arraybuffer" });
+		const encryptedResponse = await axios.get(url, {
+			responseType: "arraybuffer",
+		});
 
 		if (encryptedResponse?.data) {
-			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
+			const base64Image = Buffer.from(encryptedResponse.data).toString(
+				"base64"
+			);
 
 			return `data:image/png;base64,${base64Image}`;
 		}
@@ -300,10 +357,14 @@ const _IPFSToBase64 = async (url) => {
 
 const _arweaveIDToBase64 = async (id) => {
 	try {
-		const encryptedResponse = await axios.get(`https://arweave.net/${id}`, { responseType: "arraybuffer" });
+		const encryptedResponse = await axios.get(`https://arweave.net/${id}`, {
+			responseType: "arraybuffer",
+		});
 
 		if (encryptedResponse?.data) {
-			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
+			const base64Image = Buffer.from(encryptedResponse.data).toString(
+				"base64"
+			);
 
 			return `data:image/png;base64,${base64Image}`;
 		}
@@ -326,11 +387,13 @@ const leaseZelfName = async (params, authUser) => {
 
 	const { face, password, mnemonic } = await _decryptParams(params, authUser);
 
-	const _mnemonic = params.type === "import" ? mnemonic : generateMnemonic(params.wordsCount);
+	const _mnemonic =
+		params.type === "import" ? mnemonic : generateMnemonic(params.wordsCount);
 
 	const wordsArray = _mnemonic.split(" ");
 
-	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
+	if (wordsArray.length !== 12 && wordsArray.length !== 24)
+		throw new Error("409:mnemonic_invalid");
 
 	const eth = createEthWallet(_mnemonic);
 	const btc = createBTCWallet(_mnemonic);
@@ -358,7 +421,8 @@ const leaseZelfName = async (params, authUser) => {
 
 	zelfNameObject.zelfProof = await encrypt(dataToEncrypt);
 
-	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
+	if (!zelfNameObject.zelfProof)
+		throw new Error("409:Wallet_could_not_be_encrypted");
 
 	zelfNameObject.zelfName = zelfName;
 	zelfNameObject.price = _calculateZelfNamePrice(zelfName.length - 5, duration);
@@ -367,7 +431,9 @@ const leaseZelfName = async (params, authUser) => {
 	zelfNameObject.btcAddress = btc.address;
 	zelfNameObject.solanaAddress = solana.address;
 	zelfNameObject.hasPassword = `${Boolean(password)}`;
-	zelfNameObject.metadata = params.previewZelfProof ? dataToEncrypt.metadata : undefined;
+	zelfNameObject.metadata = params.previewZelfProof
+		? dataToEncrypt.metadata
+		: undefined;
 
 	zelfNameObject.coinbaseCharge = await createCoinbaseCharge({
 		name: `${zelfNameObject.zelfName}`,
@@ -425,13 +491,16 @@ const leaseZelfName = async (params, authUser) => {
  * @param {Object} authUser
  * @author Miguel Trevino
  */
-const leaseConfirmation = async (data, authUser) => {
+const leaseConfirmation = async (data, authUser, datos) => {
 	const { network, coin, zelfName } = data;
 
 	let unpinResult;
 	let inMainnet = false;
 
-	const zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
+	const zelfNameRecords = await previewZelfName(
+		{ zelfName, environment: "both" },
+		authUser
+	);
 
 	for (let index = 0; index < zelfNameRecords.length; index++) {
 		const record = zelfNameRecords[index];
@@ -460,6 +529,20 @@ const leaseConfirmation = async (data, authUser) => {
 			payment = await _confirmCoinbaseCharge(zelfNameObject);
 
 			break;
+		case "ETH":
+			//payment = await network_scanning(zelfNameObject);
+
+			payment = await network_scanning(datos);
+
+			break;
+		// case "SOL":
+		// 	payment = await network_scanning(zelfNameObject);
+
+		// 	break;
+		// case "BTC":
+		// 	payment = await network_scanning(zelfNameObject);
+
+		// 	break;
 
 		default:
 			break;
@@ -469,7 +552,8 @@ const leaseConfirmation = async (data, authUser) => {
 	if (payment?.confirmed) {
 		unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
 
-		const { masterIPFSRecord, masterArweaveRecord } = await _cloneZelfNameToProduction(zelfNameObject, payment);
+		const { masterIPFSRecord, masterArweaveRecord } =
+			await _cloneZelfNameToProduction(zelfNameObject, payment);
 
 		return {
 			ipfs: [masterIPFSRecord],
@@ -485,8 +569,20 @@ const leaseConfirmation = async (data, authUser) => {
 	};
 };
 
+const network_scanning = async (datos) => {
+	let confirmed = false;
+
+	//checkoutPay();
+	console.log(datos);
+	return {
+		confirmed: confirmed,
+	};
+};
+
 const _confirmCoinbaseCharge = async (zelfNameObject) => {
-	const chargeID = zelfNameObject.publicData?.coinbase_id || zelfNameObject.publicData?.coinbase_hosted_url.split("/pay/")[1];
+	const chargeID =
+		zelfNameObject.publicData?.coinbase_id ||
+		zelfNameObject.publicData?.coinbase_hosted_url.split("/pay/")[1];
 
 	if (!chargeID) {
 		const error = new Error("coinbase_charge_id_not_found");
@@ -514,7 +610,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed: true,
+		confirmed: false,
 	};
 };
 
@@ -528,9 +624,13 @@ const _cloneZelfNameToProduction = async (zelfNameObject, payment) => {
 	// first clone it to ipfs, then to arweave
 	const payload = {
 		base64: zelfNameObject.zelfProofQRCode,
-		name: zelfNameObject.preview?.publicData.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", ""),
+		name:
+			zelfNameObject.preview?.publicData.zelfName ||
+			zelfNameObject.publicData.zelfName.replace(".hold", ""),
 		metadata: {
-			hasPassword: `${Boolean(zelfNameObject.preview?.passwordLayer === "Password")}`,
+			hasPassword: `${Boolean(
+				zelfNameObject.preview?.passwordLayer === "Password"
+			)}`,
 			zelfProof: zelfNameObject.publicData.zelfProof,
 			...zelfNameObject.preview?.publicData,
 			expiresAt: moment()
@@ -543,17 +643,20 @@ const _cloneZelfNameToProduction = async (zelfNameObject, payment) => {
 
 	const masterIPFSRecord = await IPFSModule.insert(payload, { pro: true });
 
-	const masterArweaveRecord = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
-		hasPassword: payload.metadata.hasPassword,
-		zelfProof: payload.metadata.zelfProof,
-		publicData: {
-			...zelfNameObject.preview?.publicData,
-			type: "mainnet",
-			expiresAt: moment()
-				.add(zelfNameObject.publicData.duration || 1, "year")
-				.format("YYYY-MM-DD HH:mm:ss"),
-		},
-	});
+	const masterArweaveRecord = await ArweaveModule.zelfNameRegistration(
+		zelfNameObject.zelfProofQRCode,
+		{
+			hasPassword: payload.metadata.hasPassword,
+			zelfProof: payload.metadata.zelfProof,
+			publicData: {
+				...zelfNameObject.preview?.publicData,
+				type: "mainnet",
+				expiresAt: moment()
+					.add(zelfNameObject.publicData.duration || 1, "year")
+					.format("YYYY-MM-DD HH:mm:ss"),
+			},
+		}
+	);
 
 	return {
 		masterArweaveRecord,
@@ -570,16 +673,30 @@ const _decryptParams = async (data, authUser) => {
 		};
 	}
 
-	const password = await sessionModule.sessionDecrypt(data.password || null, authUser);
+	const password = await sessionModule.sessionDecrypt(
+		data.password || null,
+		authUser
+	);
 
-	const mnemonic = await sessionModule.sessionDecrypt(data.mnemonic || null, authUser);
+	const mnemonic = await sessionModule.sessionDecrypt(
+		data.mnemonic || null,
+		authUser
+	);
 
-	const face = await sessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
+	const face = await sessionModule.sessionDecrypt(
+		data.faceBase64 || null,
+		authUser
+	);
 
 	return { password, mnemonic, face };
 };
 
-const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser, returnResults = false) => {
+const _findDuplicatedZelfName = async (
+	zelfName,
+	environment = "both",
+	authUser,
+	returnResults = false
+) => {
 	const searchResult = await searchZelfName(
 		{
 			zelfName,
@@ -606,7 +723,11 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
  */
 const previewZelfName = async (params, authUser) => {
 	try {
-		let zelfNameObjects = await _findZelfName(params.zelfName, params.environment, authUser);
+		let zelfNameObjects = await _findZelfName(
+			params.zelfName,
+			params.environment,
+			authUser
+		);
 
 		if (!Array.isArray(zelfNameObjects)) {
 			zelfNameObjects = [zelfNameObjects];
@@ -623,7 +744,9 @@ const previewZelfName = async (params, authUser) => {
 
 			zelfNameObject.source = zelfNameObject.ipfs_pin_hash ? "ipfs" : "arweave";
 
-			zelfNameObject.preview = await preview({ zelfProof: zelfNameObject.zelfProof });
+			zelfNameObject.preview = await preview({
+				zelfProof: zelfNameObject.zelfProof,
+			});
 		}
 
 		return zelfNameObjects;
@@ -640,11 +763,19 @@ const previewZelfName = async (params, authUser) => {
  */
 const _previewWithIPFS = async (params, authUser) => {
 	try {
-		const searchResult = await _searchInIPFS(params.environment, params, { ...authUser, pro: true }, false);
+		const searchResult = await _searchInIPFS(
+			params.environment,
+			params,
+			{ ...authUser, pro: true },
+			false
+		);
 
-		if (!searchResult || searchResult?.available) throw new Error("404:not_found");
+		if (!searchResult || searchResult?.available)
+			throw new Error("404:not_found");
 
-		searchResult[0].preview = await preview({ zelfProof: searchResult[0].zelfProof });
+		searchResult[0].preview = await preview({
+			zelfProof: searchResult[0].zelfProof,
+		});
 
 		return searchResult;
 	} catch (exception) {
@@ -690,7 +821,11 @@ const _findZelfName = async (zelfName, environment = "hold", authUser) => {
  * @param {Object} authUser
  */
 const decryptZelfName = async (params, authUser) => {
-	const zelfNameObject = await _findZelfName(params.zelfName, params.environment, authUser);
+	const zelfNameObject = await _findZelfName(
+		params.zelfName,
+		params.environment,
+		authUser
+	);
 
 	const { face, password } = await _decryptParams(params, authUser);
 
@@ -723,7 +858,10 @@ const leaseOffline = async (params, authUser) => {
 	let zelfNameRecords = [];
 
 	try {
-		zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
+		zelfNameRecords = await previewZelfName(
+			{ zelfName, environment: "both" },
+			authUser
+		);
 	} catch (exception) {}
 
 	for (let index = 0; index < zelfNameRecords.length; index++) {
@@ -749,7 +887,8 @@ const leaseOffline = async (params, authUser) => {
 		price: _calculateZelfNamePrice(zelfName.length - 5, duration),
 	};
 
-	if (!_preview) _preview = await preview({ zelfProof: zelfNameObject.zelfProof });
+	if (!_preview)
+		_preview = await preview({ zelfProof: zelfNameObject.zelfProof });
 
 	if (!zelfName.includes(_preview.publicData.zelfName)) {
 		const error = new Error("zelfName_does_not_match_in_zelfProof");

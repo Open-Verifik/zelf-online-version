@@ -2,7 +2,13 @@ const config = require("../../../Core/config");
 const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
+const {
+	leaseConfirmation,
+} = require("../../ZelfNameService/modules/zns.module");
+const {
+	searchZelfName,
+	previewZelfName,
+} = require("../../ZelfNameService/modules/zns.module");
 const MongoORM = require("../../../Core/mongo-orm");
 const mongoose = require("mongoose");
 const {
@@ -25,12 +31,12 @@ const addressZelf = [
 		address: "6gDQQQMRveayDFSz5bA2wyjNZr9Jue9hS1S4kkmLDqBt",
 	},
 	{
-		id: "BNB",
-		address: "0xD3b0d838cCCEAe7ebF1781D11D1bB741DB7Fe1A7",
-	},
-	{
 		id: "BTC",
 		address: "bc1p6lsrl8amjuwrwxcwaa9ncuuzljuc3zv4jg55xdruuq5nxxwnvj4qd23dxl",
+	},
+	{
+		id: "BNB",
+		address: "0xD3b0d838cCCEAe7ebF1781D11D1bB741DB7Fe1A7",
 	},
 	{
 		id: "MINA",
@@ -58,40 +64,103 @@ const addressZelf = [
 const getCheckout = async (params) => {
 	const purchase = await modelPurchase.findById(params.id);
 
-	if (!purchase) return { message: "expired_payments" };
+	if (!purchase) {
+		const error = new Error("expired_payments");
+		error.status = 409;
+		throw error;
+	}
 
 	const crypto = purchase.crypto;
 	const duration = purchase.duration;
 	const zelfName = purchase.zelfName;
+	const paymentAddress = purchase.paymentAddress;
+	const ratePriceInUSDT = purchase.ratePriceInUSDT;
+	const amountToSend = purchase.amountToSend;
+	const remainingTime = purchase.remainingTime;
+	const lastSavedTime = purchase.lastSavedTime;
+	const _id = purchase._id;
+	const USD = purchase.USD;
+	const wordsCount = purchase.wordsCount;
+	const amountDetected = purchase.amountDetected;
+	return {
+		crypto,
+		duration,
+		zelfName,
+		paymentAddress,
+		ratePriceInUSDT,
+		amountToSend,
+		remainingTime,
+		lastSavedTime,
+		USD,
+		wordsCount,
+		_id,
+		amountDetected,
+	};
+};
+const pay = async (params) => {
+	const purchase = await modelPurchase.findById(params.id);
 
-	const existingRecordZelfName = await searchZelfName_(zelfName, crypto);
+	if (!purchase) {
+		const error = new Error("expired_payments");
+		error.status = 409;
+		throw error;
+	}
 
-	if (!existingRecordZelfName)
-		throw new Error("404:This_zelfName_is not_yet_linked");
+	const address = purchase.address;
+	const crypto = purchase.crypto;
+	const duration = purchase.duration;
+	const zelfName = purchase.zelfName;
+	const paymentAddress = purchase.paymentAddress;
+	const ratePriceInUSDT = purchase.ratePriceInUSDT;
+	const amountToSend = purchase.amountToSend;
+	const remainingTime = purchase.remainingTime;
+	const lastSavedTime = purchase.lastSavedTime;
+	const _id = purchase._id;
+	const USD = purchase.USD;
+	const wordsCount = purchase.wordsCount;
 
-	const addressCliente = existingRecordZelfName;
+	switch (crypto) {
+		case "ETH":
+			addressCliente = address.ethAddress;
+			break;
+		case "SOL":
+			addressCliente = address.solanaAddress;
+			break;
+		case "BTC":
+			addressCliente = address.btcAddress;
+			break;
+	}
 
-	const cryptoValue = await calculateCryptoValue(crypto, zelfName, duration);
-
-	let reult = await checkout(
+	console.log({ addressCliente });
+	const resposne = await checkoutPay(
 		crypto,
 		addressCliente,
-		cryptoValue.cryptoValue,
-		cryptoValue.ratePriceInUSDT,
+		amountToSend,
+		ratePriceInUSDT,
 		zelfName,
-		duration
+		duration,
+		paymentAddress,
+		_id
 	);
 
-	reult.wordsCount = cryptoValue.wordsCount.toString();
-	reult.USD = cryptoValue.USD.toString();
-
-	updatedRecord = await modelPurchase.findByIdAndUpdate(params.id, reult, {
-		new: true,
-	});
-
-	return reult;
+	// const cryptoValue = await calculateCryptoValue(crypto, zelfName, duration);
+	// let reult = await checkout(
+	// 	crypto,
+	// 	addressCliente,
+	// 	cryptoValue.cryptoValue,
+	// 	ratePriceInUSDT,
+	// 	zelfName,
+	// 	duration
+	// );
+	// //reult.wordsCount = cryptoValue.wordsCount.toString();
+	// reult._id = params.id;
+	// ///reult.amountToSend = amountToSend;
+	// //reult.USD = cryptoValue.USD.toString();
+	// updatedRecord = await modelPurchase.findByIdAndUpdate(params.id, reult, {
+	// 	new: true,
+	// });
+	return resposne;
 };
-
 ///funcion para checar transacciones global
 /**
  * @param {string} crypto
@@ -106,42 +175,45 @@ const getCheckout = async (params) => {
  *
  * @param {string} duration
  */
-const checkout = async (
+const checkoutPay = async (
 	crypto,
 	addressCliente,
-	valorApagar,
+	amountToSend,
 	ratePriceInUSDT,
 	zelfName,
-	duration
+	duration,
+	paymentAddress,
+	_id
 ) => {
-	const { address } = addressZelf.find((method) => method.id === crypto);
-
 	switch (crypto) {
 		case "ETH":
-			transaction = await checkoutETH(address);
+			transaction = await checkoutETH(paymentAddress);
 			break;
 		case "SOL":
-			transaction = await checkoutSOLANA(address);
+			transaction = await checkoutSOLANA(paymentAddress);
 			break;
-		case "MINA":
-			transaction = await checkoutBICOIN(address);
+		case "BTC":
+			transaction = await checkoutBICOIN(paymentAddress);
 			break;
 	}
 
-	const ultimaDirreccion = transaction.from;
+	const lastTransaction = transaction.from;
 
-	let valorDetransaccion = transaction.value;
+	//let amountDetected = transaction.value;
 
-	console.log({ ultimaDirreccion, valorDetransaccion });
+	amountDetected = "0.00723563";
 
 	let transactionStatus = false;
+
 	let transactionDescription = "pending"; //"transaction_not_detected";
 
-	if (addressCliente === ultimaDirreccion) {
-		if (valorDetransaccion === valorApagar) {
+	console.log(zelfName);
+
+	if (addressCliente) {
+		if (amountDetected === amountToSend) {
 			transactionStatus = true;
 			transactionDescription = "successful";
-		} else if (valorApagar < valorDetransaccion) {
+		} else if (amountToSend < amountDetected) {
 			transactionStatus = false;
 			transactionDescription = "partial_payment";
 		} else {
@@ -149,19 +221,30 @@ const checkout = async (
 			transactionDescription = "overpayment";
 		}
 	} else {
-		valorDetransaccion = "0";
+		amountDetected = "0";
 	}
 
+	// updatedRecord = await modelPurchase.findByIdAndUpdate(
+	// 	_id,
+	// 	{
+	// 		transactionDescription: transactionDescription,
+	// 		transactionStatus: transactionStatus,
+	// 		amountDetected: amountDetected, //valorDetransaccion,
+	// 	},
+	// 	{
+	// 		new: true,
+	// 	}
+	// );
+
+	// // if (updatedRecord.transactionStatus)
+	// // 	await leaseConfirmation({ crypto: crypto, coin: "", zelfName: zelfName });
+
+	// return cleanResponse(updatedRecord);
+
 	return {
-		currency: crypto,
-		transactionStatus,
-		transactionDescription,
-		amountToSend: valorApagar,
-		amountDetected: valorDetransaccion,
-		ratePriceInUSDT: ratePriceInUSDT,
-		paymentAddress: address,
-		zelfName,
-		duration,
+		transactionDescription: transactionDescription,
+		transactionStatus: transactionStatus,
+		amountDetected: amountDetected, //valorDetransaccion,
 	};
 };
 
@@ -236,34 +319,39 @@ getLastInTransactionHash = async (transactions) => {
  * @param {string} crypto
  */
 const searchZelfName_ = async (zelfName) => {
+	let status = "";
+	let address = {};
+
 	try {
-		const { data } = await instance.get(
-			`https://api.zelf.world/api/zelf-name-service/search?zelfName=${zelfName}.zelf`,
-			{
-				headers: {
-					authorization:
-						"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uIjoiNjc2MTlkOGMwYzI2NDVkY2VhYzcxYzE5IiwiaWRlbnRpZmllciI6IjM2ODUxNTc0NiIsImlhdCI6MTczNDQ1MDU3Mn0.FBInrZVafALVEuNTDq7tdHS1d8gBYuGXsR_Ve9csqHc",
-				},
-			}
-		);
+		let data = await searchZelfName({
+			zelfName: zelfName,
+			environment: "both",
+		});
 
-		const ethAddress = data.data.ipfs[0].publicData.ethAddress;
-		const solanaAddress = data.data.ipfs[0].publicData.solanaAddress;
-		const minaAddress = data.data.ipfs[0].publicData?.minaAddress;
+		if (data?.available === true) {
+			status = "available";
+		} else if (data?.ipfs?.[0]?.publicData?.type === "hold") {
+			status = "hold";
 
-		const address = {
-			ethAddress,
-			solanaAddress,
-			minaAddress,
-		};
+			const previewData = await previewZelfName({
+				zelfName: zelfName,
+			});
+			console.log(previewData[0].publicData.coinbase_expires_at);
+			console.log(previewData[0].publicData.coinbase_hosted_url);
+			address = previewData[0].preview?.publicData || {};
+		} else if (data?.ipfs?.[0]?.publicData?.type === "mainnet") {
+			status = "mainnet";
+		}
 
-		return address;
+		return { status, address };
 	} catch (error) {
-		console.log(error);
+		console.error("Error in searchZelfName_:", error);
 		return null;
 	}
 };
+
 const calculatePriceZelfName = async (zelfName, duration) => {
+	zelfName = zelfName.split(".zelf")[0];
 	const data = {
 		1: {
 			1: 240,
@@ -381,40 +469,25 @@ const calculatePriceZelfName = async (zelfName, duration) => {
 		},
 	};
 
-	const getValue = (duration, length) => {
-		const durationData = data[duration];
+	if (!data[duration]) throw new Error(`Duración inválida: "${duration}".`);
 
-		if (!durationData) {
-			throw new Error(`No se encontró la duración "${duration}".`);
+	const zelfLength = zelfName.length;
+	const durationData = data[duration];
+	const key = Object.keys(durationData).find((k) => {
+		if (k.includes("-")) {
+			const [start, end] = k.split("-").map(Number);
+			return zelfLength >= start && zelfLength <= end;
 		}
+		return Number(k) === zelfLength;
+	});
 
-		const key = Object.keys(durationData).find((k) => {
-			if (k.includes("-")) {
-				const [start, end] = k.split("-").map(Number);
-				return length >= start && length <= end;
-			}
-			return Number(k) === length;
-		});
-
-		if (!key) {
-			throw new Error(
-				`No se encontró un valor para la longitud "${length}" en la duración "${duration}".`
-			);
-		}
-
-		return durationData[key];
-	};
-
-	try {
-		const zelfLength = zelfName.length;
-
-		const price = getValue(duration, zelfLength);
-
-		return { price, zelfLength };
-	} catch (error) {
-		console.error(error.message);
-		return null;
+	if (!key) {
+		throw new Error(
+			`Longitud no válida: "${zelfLength}" para la duración "${duration}".`
+		);
 	}
+
+	return { price: durationData[key], zelfLength };
 };
 
 ///funcion para carcular el valor en crypto segun la moneda /USDT
@@ -449,104 +522,134 @@ const calculateCryptoValue = async (crypto, zelfName, duration) => {
 		throw error;
 	}
 };
+const clock_sync = async (params) => {
+	const purchase = await modelPurchase.findById(params.id);
+	if (!purchase) {
+		const error = new Error("clock_synchronization_failure");
+		error.status = 409;
+		throw error;
+	}
+	// purchase.remainingTime = "240";
+	// purchase.lastSavedTime = Date.now().toString();
+
+	updatedRecord = await modelPurchase.findByIdAndUpdate(
+		params.id,
+		{
+			remainingTime: "360",
+			lastSavedTime: Date.now().toString(),
+		},
+		{
+			new: true,
+		}
+	);
+
+	return {
+		remainingTime: updatedRecord.remainingTime,
+		lastSavedTime: updatedRecord.lastSavedTime,
+	};
+};
 
 const transactionGenerate = async (crypto, zelfName, duration) => {
-	const existingRecordZelfName = await searchZelfName_(zelfName);
+	if (crypto !== "CB") {
+		const existingRecord = await MongoORM.buildQuery(
+			{
+				where_zelfName: zelfName,
+				findOne: true,
+			},
+			modelPurchase
+		);
 
-	if (!existingRecordZelfName) return { message: "no_encont" };
+		let validar;
 
-	const existingRecord = await MongoORM.buildQuery(
-		{
-			where_zelfName: zelfName,
-			findOne: true,
-		},
-		modelPurchase,
-		null,
-		[]
-	);
+		if (!existingRecord) {
+			validar = await searchZelfName_(zelfName);
 
-	if (existingRecord) {
-		let updatedRecord;
-		let result;
-		if (
-			existingRecord.crypto !== crypto ||
-			existingRecord.duration !== duration
-		) {
-			result = await calculateCryptoValue(crypto, zelfName, duration);
-			updatedRecord = await modelPurchase.findByIdAndUpdate(
+			if (validar.status === "available") {
+				const error = new Error("zelf_name_no_lease");
+				error.status = 409;
+				throw error;
+			}
+
+			if (validar.status === "mainnet") {
+				const error = new Error("zelfName_purchased_already");
+				error.status = 409;
+				throw error;
+			}
+		}
+
+		const address = existingRecord ? existingRecord.address : validar.address;
+
+		const result = await calculateCryptoValue(crypto, zelfName, duration);
+
+		const paymentAddress = addressZelf
+			.find((method) => method.id === crypto)
+			.address.toString();
+
+		const recordData = {
+			zelfName: result.zelfName,
+			duration: result.duration,
+			crypto: result.crypto,
+			wordsCount: result.wordsCount,
+			USD: result.USD,
+			address,
+			paymentAddress: paymentAddress,
+		};
+
+		if (existingRecord) {
+			if (
+				existingRecord.crypto !== crypto ||
+				existingRecord.duration !== duration
+			) {
+				recordData.amountToSend = result.amountToSend;
+				recordData.ratePriceInUSDT = result.ratePriceInUSDT;
+			}
+
+			const updatedRecord = await modelPurchase.findByIdAndUpdate(
 				existingRecord._id,
-				{
-					zelfName: result.zelfName,
-					duration: result.duration,
-					crypto: result.crypto,
-					amountToSend: result.amountToSend,
-					ratePriceInUSDT: result.ratePriceInUSDT,
-					wordsCount: result.wordsCount,
-					USD: result.USD,
-					isValido: isValido,
-				},
+				recordData,
 				{ new: true }
 			);
+
+			return cleanResponse(updatedRecord);
 		}
-		result = await calculateCryptoValue(crypto, zelfName, duration);
-		updatedRecord = await modelPurchase.findByIdAndUpdate(
-			existingRecord._id,
-			{
-				zelfName: result.zelfName,
-				duration: result.duration,
-				crypto: result.crypto,
-				wordsCount: result.wordsCount,
-				USD: result.USD,
-				isValido: isValido,
-			},
-			{ new: true }
-		);
-		delete updatedRecord._doc.amountDetected;
-		delete updatedRecord._doc.purchaseCreatedAt;
-		delete updatedRecord._doc.updatedAt;
-		delete updatedRecord._doc.createdAt;
-		delete updatedRecord._doc.__v;
-		delete updatedRecord._doc.amountDetected;
-		return updatedRecord;
+
+		const newRecord = new modelPurchase({
+			...recordData,
+			amountToSend: result.amountToSend,
+			ratePriceInUSDT: result.ratePriceInUSDT,
+		});
+
+		const savedRecord = await newRecord.save();
+		return cleanResponse(savedRecord);
 	}
-
-	result = await calculateCryptoValue(crypto, zelfName, duration);
-
-	result.isValido = isValido;
-
-	const transaction = new modelPurchase(result);
-
-	const response = await transaction.save();
-
-	delete response._doc.amountDetected;
-	delete response._doc.purchaseCreatedAt;
-	delete response._doc.updatedAt;
-	delete response._doc.createdAt;
-	delete response._doc.__v;
-	delete response._doc.amountDetected;
-	return response;
 };
 
-const zelfVerify = async (zelfName) => {
-	//return await searchZelfName({ zelfName: zelfName });
-
-	const { data } = await instance.get(
-		`https://api.zelf.world/api/zelf-name-service/search?zelfName=${zelfName}.zelf`,
-		{
-			headers: {
-				authorization:
-					"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uIjoiNjc2MTlkOGMwYzI2NDVkY2VhYzcxYzE5IiwiaWRlbnRpZmllciI6IjM2ODUxNTc0NiIsImlhdCI6MTczNDQ1MDU3Mn0.FBInrZVafALVEuNTDq7tdHS1d8gBYuGXsR_Ve9csqHc",
-			},
-		}
-	);
-
-	if (!data.data.available) return true;
-
-	return false;
+const getLease_confirmation_pay = (params) => {
+	//leaseConfirmation({network:, coin, zelfName });
 };
 
+const cleanResponse = (record) => {
+	const { _doc } = record;
+	const fieldsToRemove = [
+		//"amountDetected",
+		"purchaseCreatedAt",
+		"updatedAt",
+		"createdAt",
+		"__v",
+		"address",
+		"lastSavedTime",
+		"remainingTime",
+	];
+
+	fieldsToRemove.forEach((field) => delete _doc[field]);
+
+	return _doc;
+};
 module.exports = {
 	getCheckout,
+	checkoutPay,
 	calculateCryptoValue,
 	transactionGenerate,
+	clock_sync,
+	pay,
 };
