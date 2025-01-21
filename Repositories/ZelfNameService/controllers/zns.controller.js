@@ -1,4 +1,5 @@
 const Module = require("../modules/zns.module");
+const ZNSTokenModule = require("../modules/zns-token.module");
 const RevenueCatModule = require("../modules/revenue-cat.module");
 
 const searchZelfName = async (ctx) => {
@@ -104,9 +105,9 @@ const revenueCatWebhook = async (ctx) => {
 
 const referralRewards = async (ctx) => {
 	try {
-		// const data = await Module.referralRewards(ctx.request.body, ctx.state.user);
+		const data = await ZNSTokenModule.releaseReward(ctx.state.user);
 
-		ctx.body = { data: null };
+		ctx.body = { data };
 	} catch (error) {
 		console.error({ error });
 

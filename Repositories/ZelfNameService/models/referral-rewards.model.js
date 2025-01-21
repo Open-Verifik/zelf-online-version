@@ -11,8 +11,10 @@ const { requiredEnumField, requiredField, refField, defaultField, addBasicPlugin
 const ReferralRewardSchema = new Schema({
 	zelfName: requiredField(String),
 	ethAddress: requiredField(String),
+	solanaAddress: requiredField(String),
 	referralZelfName: requiredField(String),
 	status: requiredEnumField(String, ["pending", "completed", "failed"], "pending"),
+	referralSolanaAddress: requiredField(String),
 	attempts: requiredField(Number),
 	ipfsHash: requiredField(String),
 	arweaveId: requiredField(String),

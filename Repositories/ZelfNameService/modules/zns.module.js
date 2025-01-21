@@ -330,7 +330,7 @@ const leaseZelfName = async (params, authUser) => {
 
 	await _findDuplicatedZelfName(zelfName, "both", authUser);
 
-	await _validateReferral(referralZelfName, authUser);
+	const referralZelfNameObject = await _validateReferral(referralZelfName, authUser);
 
 	const { face, password, mnemonic } = await _decryptParams(params, authUser);
 
@@ -407,7 +407,6 @@ const leaseZelfName = async (params, authUser) => {
 			base64: zelfNameObject.image,
 			name: holdName,
 			metadata: {
-				// ...zelfNameObject.publicData,
 				zelfProof: zelfNameObject.zelfProof,
 				zelfName: holdName,
 				duration: duration || 1,
@@ -416,6 +415,8 @@ const leaseZelfName = async (params, authUser) => {
 				type: "hold",
 				coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
 				referralZelfName: referralZelfName || "migueltrevino.zelf",
+				referralSolanaAddress:
+					referralZelfNameObject?.publicData?.solanaAddress || referralZelfNameObject?.metadata?.solanaAddress || "no_referral",
 			},
 			pinIt: true,
 		},
@@ -480,9 +481,11 @@ const leaseConfirmation = async (data, authUser) => {
 		const referralReward = zelfNameObject.publicData.referralZelfName
 			? await addPurchase({
 					ethAddress: masterIPFSRecord.metadata.ethAddress,
+					solanaAddress: masterIPFSRecord.metadata.solanaAddress,
 					zelfName,
 					zelfNamePrice: zelfNameObject.publicData.price,
 					referralZelfName: zelfNameObject.publicData.referralZelfName,
+					referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
 					ipfsHash: masterIPFSRecord.IpfsHash,
 					arweaveId: masterArweaveRecord.id,
 			  })
@@ -630,7 +633,7 @@ const _validateReferral = async (referralZelfName, authUser) => {
 
 	let notFound = Boolean(searchResult.available);
 
-	if (!notFound) return searchResult;
+	if (!notFound) return searchResult.arweave?.length ? searchResult.arweave[0] : searchResult.ipfs[0];
 
 	const error = new Error("zelfName_referring_you_not_found");
 

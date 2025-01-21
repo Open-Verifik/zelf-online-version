@@ -1,8 +1,8 @@
 const solanaWeb3 = require("@solana/web3.js");
 const splToken = require("@solana/spl-token");
-const Solana = require("../../Wallet/modules/solana");
 const config = require("../../../Core/config");
 const ReferralRewardModel = require("../models/referral-rewards.model");
+const MongoORM = require("../../../Core/mongo-orm");
 
 // Connect to Solana devnet or mainnet
 // const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("mainnet-beta"), "confirmed");
@@ -14,9 +14,6 @@ let connection;
 
 // Token mint address (ZNS token address)
 const tokenMintAddress = new solanaWeb3.PublicKey("GfF6PSkH8bKLkws5RMFdzgASwcVbgCfhhKfp8zeoFBkx"); // Replace with actual token mint address
-
-// Receiver's public key
-const receiverPublicKey = new solanaWeb3.PublicKey("Gxc6245Pwod5pfGWrFoQ1YYTezUCuXeF1jWqfjMKphLt"); // Replace with actual receiver address
 
 const _giveTokensAfterPurchase = async (zelfNameObject) => {
 	try {
@@ -147,10 +144,15 @@ const __giveTokensAfterPurchase = async (zelfNameObject) => {
 	}
 };
 
-const giveTokensAfterPurchase = async (zelfNameObject) => {
+const giveTokensAfterPurchase = async (reward) => {
 	try {
 		const senderKey = Uint8Array.from(JSON.parse(config.solana.sender));
 		const senderWallet = solanaWeb3.Keypair.fromSecretKey(senderKey);
+
+		// Compute Budget Program Instruction (to increase gas fees)
+		const computeBudgetInstruction = solanaWeb3.ComputeBudgetProgram.setComputeUnitPrice({
+			microLamports: 100000, // Adjust this value to set a higher priority fee
+		});
 
 		// Get or create the sender's associated token account
 		const senderTokenAccount = await splToken.getOrCreateAssociatedTokenAccount(
@@ -161,13 +163,18 @@ const giveTokensAfterPurchase = async (zelfNameObject) => {
 		);
 
 		const tokenBalance = await connection.getTokenAccountBalance(senderTokenAccount.address);
+
 		console.log("Sender Token Account Balance:", tokenBalance.value.uiAmount);
 
 		// Ensure sender has enough tokens to send
-		const amountToSend = 1 * 10 ** 8; // 1 ZNS token (assuming 8 decimals)
+		const amountToSend = reward.zelfNamePriceSum * 0.25 * 10 ** 8; // 1 ZNS token (assuming 8 decimals)
+
 		if (tokenBalance.value.amount < amountToSend) {
 			throw new Error("Insufficient balance in sender's token account.");
 		}
+
+		// Receiver's public key
+		const receiverPublicKey = new solanaWeb3.PublicKey(reward.referralSolanaAddress);
 
 		// Get the receiver's associated token account address
 		const associatedTokenAddress = await splToken.getAssociatedTokenAddress(tokenMintAddress, receiverPublicKey);
@@ -186,7 +193,7 @@ const giveTokensAfterPurchase = async (zelfNameObject) => {
 				tokenMintAddress // Token mint address
 			);
 
-			const createTransaction = new solanaWeb3.Transaction().add(createReceiverAccountInstruction);
+			const createTransaction = new solanaWeb3.Transaction().add(computeBudgetInstruction, createReceiverAccountInstruction);
 
 			// Use sendWithRetry for reliable account creation
 			const createSignature = await sendWithRetry(createTransaction, [senderWallet], 3);
@@ -209,14 +216,17 @@ const giveTokensAfterPurchase = async (zelfNameObject) => {
 			8 // Decimals of the token
 		);
 
-		const transferTransaction = new solanaWeb3.Transaction().add(transferInstruction);
+		const transferTransaction = new solanaWeb3.Transaction().add(computeBudgetInstruction, transferInstruction);
 
 		// Use sendWithRetry for reliable token transfer
 		const transferSignature = await sendWithRetry(transferTransaction, [senderWallet]);
 
 		console.log("Transaction successful, signature:", transferSignature, { transferTransaction });
+
+		return transferSignature;
 	} catch (error) {
 		console.error("Error sending token:", { error });
+		throw error;
 	}
 };
 
@@ -248,7 +258,9 @@ const addPurchase = async (zelfNameObject) => {
 		const referralReward = new ReferralRewardModel({
 			zelfName: zelfNameObject.zelfName,
 			ethAddress: zelfNameObject.ethAddress,
+			solanaAddress: zelfNameObject.solanaAddress,
 			referralZelfName: zelfNameObject.referralZelfName,
+			referralSolanaAddress: zelfNameObject.referralSolanaAddress,
 			zelfNamePrice: zelfNameObject.zelfNamePrice,
 			status: "pending",
 			attempts: 0,
@@ -266,12 +278,59 @@ const addPurchase = async (zelfNameObject) => {
 	}
 };
 
-const releaseReward = async (zelfNameObject) => {
+const releaseReward = async (authUser) => {
+	let referralRewards = null;
+	let firstGroup = null;
+
 	try {
-		// Release reward to the referrer
-		// const reward = await ReferralReward.create(zelfNameObject);
+		referralRewards = await MongoORM.groupAggregate(ReferralRewardModel, {
+			wheres: { status: "pending" }, // Match condition
+			groupBy: "referralZelfName", // Group by field
+			sum: "zelfNamePrice", // Field to sum
+			includeFields: ["referralZelfName", "referralSolanaAddress", "status"],
+		});
+
+		// Ensure there is at least one group to process
+		if (!referralRewards || referralRewards.length === 0) {
+			return { nothingToProcess: true };
+		}
+
+		firstGroup = referralRewards[0];
+
+		await giveTokensAfterPurchase(firstGroup);
+
+		// Update all records in this group with a single updateMany
+		await ReferralRewardModel.updateMany(
+			{
+				referralZelfName: firstGroup._id, // Match the grouped field
+				status: "pending", // Ensure only pending rewards are updated
+			},
+			{
+				$set: {
+					status: "completed",
+					completedAt: new Date(),
+				},
+				$inc: { attempts: 1 }, // Increment the attempts counter
+			}
+		);
+
+		return firstGroup;
 	} catch (error) {
 		console.error("Error releasing reward:", error);
+
+		if (referralRewards.length) {
+			await ReferralRewardModel.updateMany(
+				{
+					referralZelfName: firstGroup._id, // Match the grouped field
+					status: "pending", // Ensure only pending rewards are updated
+				},
+				{
+					$set: {},
+					$inc: { attempts: 1 }, // Increment the attempts counter
+				}
+			);
+		}
+
 		throw error; // Re-throw for higher-level error handling if needed
 	}
 };
