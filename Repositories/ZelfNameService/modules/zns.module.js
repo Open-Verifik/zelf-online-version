@@ -14,6 +14,7 @@ const moment = require("moment");
 const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const config = require("../../../Core/config");
 const { addPurchase } = require("./zns-token.module");
+const jwt = require("jsonwebtoken");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -60,7 +61,8 @@ const zelfNamePricing = {
  * @returns {number} - Price of the Zelf name
  */
 const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
-	if (![1, 2, 3, 4, 5, "lifetime"].includes(duration)) throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
+	if (!["1", "2", "3", "4", "5", "lifetime"].includes(`${duration}`))
+		throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
 
 	let price = 24;
 
@@ -432,7 +434,17 @@ const leaseZelfName = async (params, authUser) => {
 		{ ...authUser, pro: true }
 	);
 
-	return { ...zelfNameObject, hasPassword: Boolean(password) };
+	return {
+		...zelfNameObject,
+		hasPassword: Boolean(password),
+		durationToken: jwt.sign(
+			{
+				zelfName,
+				exp: moment().add(12, "hour").unix(),
+			},
+			config.JWT_SECRET
+		),
+	};
 };
 
 /**
@@ -866,6 +878,46 @@ const leaseOffline = async (params, authUser) => {
 	return zelfNameObject;
 };
 
+const update = async (params, authUser) => {
+	const { duration } = params;
+	const { zelfName } = authUser;
+
+	const zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
+
+	if (!zelfNameRecords.length) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const holdRecord = zelfNameRecords.find((record) => record.publicData.type === "hold");
+
+	if (!holdRecord) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const { ipfs_pin_hash, publicData } = holdRecord;
+
+	const updatedRecord = await IPFSModule.update(
+		ipfs_pin_hash,
+		{
+			base64: holdRecord.zelfProofQRCode,
+			name: holdRecord.zelfName,
+			metadata: {
+				...publicData,
+				price: _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration),
+				duration,
+			},
+			pinIt: true,
+		},
+		{ ...authUser, pro: true }
+	);
+
+	return updatedRecord;
+};
+
 module.exports = {
 	searchZelfName,
 	leaseZelfName,
@@ -875,4 +927,6 @@ module.exports = {
 	//Offline
 	leaseOffline,
 	saveInProduction: _cloneZelfNameToProduction,
+	//update,
+	update,
 };

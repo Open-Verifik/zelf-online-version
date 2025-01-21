@@ -28,4 +28,6 @@ module.exports = (server) => {
 	// server.del(`${PATH}/:id`, Middleware.deleteValidation, Controller.destroy);
 
 	server.post(`${PATH}/referral-rewards`, Middleware.referralRewardsValidation, Controller.referralRewards);
+
+	server.put(`${PATH}/:zelfName`, Middleware.updateValidation, Controller.update);
 };

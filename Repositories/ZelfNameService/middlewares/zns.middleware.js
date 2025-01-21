@@ -61,6 +61,9 @@ const schemas = {
 		transaction_id: string().required(),
 		environment: string().required(),
 	},
+	update: {
+		duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
+	},
 };
 
 /**
@@ -349,6 +352,26 @@ const referralRewardsValidation = async (ctx, next) => {
 	await next();
 };
 
+const updateValidation = async (ctx, next) => {
+	const { zelfName } = ctx.state.user;
+
+	if (!zelfName) {
+		ctx.status = 403;
+		ctx.body = { validationError: "Access forbidden" };
+		return;
+	}
+
+	const valid = validate(schemas.update, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	getValidation,
 	leaseValidation,
@@ -360,4 +383,6 @@ module.exports = {
 	leaseOfflineValidation,
 	revenueCatWebhookValidation,
 	referralRewardsValidation,
+	//update
+	updateValidation,
 };

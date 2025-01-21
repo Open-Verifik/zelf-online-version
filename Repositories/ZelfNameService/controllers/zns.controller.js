@@ -117,6 +117,20 @@ const referralRewards = async (ctx) => {
 	}
 };
 
+const update = async (ctx) => {
+	try {
+		const data = await Module.update(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	searchZelfName,
 	leaseZelfName,
@@ -126,4 +140,5 @@ module.exports = {
 	leaseOfflineZelfName,
 	revenueCatWebhook,
 	referralRewards,
+	update,
 };
