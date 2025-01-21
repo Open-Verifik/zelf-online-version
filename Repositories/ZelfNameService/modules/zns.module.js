@@ -892,6 +892,13 @@ const update = async (params, authUser) => {
 
 	const holdRecord = zelfNameRecords.find((record) => record.publicData.type === "hold");
 
+	// check if holdDuration is == same as the duration passed on params
+	if (holdRecord.publicData.duration === duration) {
+		const error = new Error("hold_duration_is_the_same");
+		error.status = 409;
+		throw error;
+	}
+
 	if (!holdRecord) {
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
