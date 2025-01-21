@@ -1,4 +1,5 @@
 const Module = require("../modules/zns.module");
+const ZNSTokenModule = require("../modules/zns-token.module");
 const RevenueCatModule = require("../modules/revenue-cat.module");
 
 const searchZelfName = async (ctx) => {
@@ -95,9 +96,35 @@ const leaseOfflineZelfName = async (ctx) => {
 const revenueCatWebhook = async (ctx) => {
 	try {
 		const data = await RevenueCatModule.webhookHandler(ctx.request.body);
+
 		ctx.body = { data };
 	} catch (error) {
 		console.error(error);
+	}
+};
+
+const referralRewards = async (ctx) => {
+	try {
+		const data = await ZNSTokenModule.releaseReward(ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
+const update = async (ctx) => {
+	try {
+		const data = await Module.update(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
 		ctx.status = error.status || 500;
 
 		ctx.body = { error: error.message };
@@ -112,4 +139,6 @@ module.exports = {
 	decryptZelfName,
 	leaseOfflineZelfName,
 	revenueCatWebhook,
+	referralRewards,
+	update,
 };

@@ -4,12 +4,12 @@ const fs = require("fs");
 const path = require("path");
 const config = require("../../../Core/config");
 const axios = require("axios");
-const arweaveUrl = `https://arweave.net`;
+const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
-const graphql = "https://arweave.net/graphql"; //`https://arweave-search.goldsky.com/graphql`;
 const moment = require("moment");
 const holdOwner = config.arwave.hold.owner;
 const owner = config.arwave.owner;
+const graphql = `${arweaveUrl}/graphql`;
 
 const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 	const { zelfProof, hasPassword, publicData } = zelfNameObject;
