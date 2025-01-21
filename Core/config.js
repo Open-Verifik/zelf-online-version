@@ -117,6 +117,7 @@ const configuration = {
 			dq: process.env._ARWAVE_DQ,
 			qi: process.env._ARWAVE_QI,
 		},
+		parentName: process.env.ARWEAVE_PARENT_NAME,
 	},
 	coinbase: {
 		key: process.env.COINBASE_API_KEY,
@@ -126,6 +127,12 @@ const configuration = {
 		webSiteKey: process.env.CAPTCHA_WEB_SITE_KEY,
 		androidSiteKey: process.env.CAPTCHA_ANDROID_SITE_KEY,
 		iOSSiteKey: process.env.CAPTCHA_IOS_SITE_KEY,
+	},
+	revenueCat: {
+		allowedEmail: process.env.REVENUECAT_ALLOWED_EMAIL,
+	},
+	solana: {
+		sender: process.env.SENDER_KEY,
 	},
 };
 

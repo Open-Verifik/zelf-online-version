@@ -74,7 +74,7 @@ const auth = async (data, authUser) => {
 		token: jwt.sign(
 			{
 				superAdminId: superAdmin._id,
-				exp: moment().add(3, "hour").unix(),
+				exp: moment().add(365, "day").unix(),
 			},
 			config.JWT_SECRET
 		),

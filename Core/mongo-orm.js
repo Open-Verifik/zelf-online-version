@@ -8,58 +8,47 @@ const config = require("./config");
 
 const groupAggregate = (Model, params) => {
 	const pipeline = [];
-	const { wheres, _ } = parseFilters(params, {});
+	const { wheres } = params;
 
-	if (wheres) {
+	// Add the $match stage if wheres exists
+	if (wheres && Object.keys(wheres).length > 0) {
 		pipeline.push({
 			$match: wheres,
 		});
 	}
 
-	const queryGroup = {};
+	const queryGroup = {
+		$group: {
+			_id: params.groupBy ? `$${params.groupBy}` : null, // Group by the specified field
+		},
+	};
 
-	if (params.groupBy) {
-		const isString = typeof params.groupBy === "string";
-		queryGroup["$group"] = {
-			_id: isString ? `$${params.groupBy}` : params.groupBy,
-		};
-	}
-
-	if (params.fields) {
-		if (!Array.isArray(params.fields)) {
-			params.fields = [params.fields];
-		}
-
-		params.fields.forEach(
-			(field) =>
-				(queryGroup["$group"][field] = {
-					$first: `$${field}`,
-				})
-		);
-	}
-
-	if (params.count) {
-		queryGroup["$group"].count = {
-			$sum: 1,
-		};
-	}
-
+	// Add sum aggregation if specified
 	if (params.sum) {
-		queryGroup["$group"][`${params.sum}Sum`] = {
+		queryGroup.$group[`${params.sum}Sum`] = {
 			$sum: `$${params.sum}`,
 		};
 	}
 
+	// Include remaining fields
+	if (params.includeFields && Array.isArray(params.includeFields)) {
+		params.includeFields.forEach((field) => {
+			queryGroup.$group[field] = { $first: `$${field}` };
+		});
+	}
+
 	pipeline.push(queryGroup);
 
+	// Add sorting if specified
 	if (params.sortField) {
 		pipeline.push({
 			$sort: {
-				[params.sortField]: +params.sortOrder || 1,
+				[params.sortField]: params.sortOrder === -1 ? -1 : 1,
 			},
 		});
 	}
 
+	// Return the aggregated results
 	return Model.aggregate(pipeline);
 };
 
@@ -71,6 +60,10 @@ const buildQuery = (params, mongooseDocument, _id, allowedPopulates) => {
 	const fields = filters.select;
 
 	if (config.debug.mongo) console.info(filters.wheres);
+
+	if (params.groupBy) {
+		query = groupAggregate(mongooseDocument, params);
+	}
 
 	if (params[_id]) {
 		query = mongooseDocument.findById(params[_id], fields, filters);

@@ -23,6 +23,8 @@ const {
 
 const { checkoutPay } = require("../../purchase-zelf/modules/purchase.module");
 const config = require("../../../Core/config");
+const { addPurchase } = require("./zns-token.module");
+const jwt = require("jsonwebtoken");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -68,8 +70,8 @@ const zelfNamePricing = {
  * @param {string} duration - Duration ("1", "2", "3", "4", "5", "lifetime")
  * @returns {number} - Price of the Zelf name
  */
-const _calculateZelfNamePrice = (length, duration = 1) => {
-	if (![1, 2, 3, 4, 5, "lifetime"].includes(duration))
+const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
+	if (!["1", "2", "3", "4", "5", "lifetime"].includes(`${duration}`))
 		throw new Error(
 			"Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'."
 		);
@@ -84,7 +86,16 @@ const _calculateZelfNamePrice = (length, duration = 1) => {
 		throw new Error("Invalid name length. Length must be between 1 and 27.");
 	}
 
-	return config.env === "development" ? price / 24 : price;
+	// Apply 10% discount if referralZelfName is provided
+	if (referralZelfName) {
+		price = price - price * 0.1; // Subtract 10% from the price
+	}
+
+	// Adjust price for development environment
+	price = config.env === "development" ? price / 24 : price;
+
+	// Round up to 2 decimal places
+	return Math.ceil(price * 100) / 100;
 };
 
 /**
@@ -96,6 +107,8 @@ const searchZelfName = async (params, authUser) => {
 	const query = params.zelfName
 		? { key: "zelfName", value: params.zelfName }
 		: { key: params.key, value: params.value };
+
+	if (params.duration) query.duration = params.duration;
 
 	try {
 		const searchResults = await ArweaveModule.search(
@@ -148,6 +161,11 @@ const _removeExpiredRecords = async (records) => {
 
 		if (isExpired) {
 			records.splice(index, 1);
+
+			record.ipfs_pin_hash
+				? await IPFSModule.unPinFiles([record.ipfs_pin_hash])
+				: "do nothing";
+
 			continue;
 		}
 	}
@@ -199,7 +217,7 @@ const _retriveFromIPFSByEnvironment = async (
 			break;
 	}
 
-	_removeExpiredRecords(ipfsRecords);
+	await _removeExpiredRecords(ipfsRecords);
 };
 
 /**
@@ -231,7 +249,10 @@ const _searchInIPFS = async (
 				? []
 				: value
 				? {
-						price: _calculateZelfNamePrice(value.split(".zelf")[0].length, 1),
+						price: _calculateZelfNamePrice(
+							value.split(".zelf")[0].length,
+							query.duration
+						),
 						zelfName: value,
 						available: true,
 				  }
@@ -274,7 +295,7 @@ const _searchInIPFS = async (
 			? {
 					price: _calculateZelfNamePrice(
 						query.value.split(".zelf")[0].length,
-						1
+						query.duration
 					),
 					zelfName: query.value,
 					available: true,
@@ -381,9 +402,14 @@ const _arweaveIDToBase64 = async (id) => {
  * @param {Object} authUser
  */
 const leaseZelfName = async (params, authUser) => {
-	const { zelfName, duration } = params;
+	const { zelfName, duration, referralZelfName } = params;
 
 	await _findDuplicatedZelfName(zelfName, "both", authUser);
+
+	const referralZelfNameObject = await _validateReferral(
+		referralZelfName,
+		authUser
+	);
 
 	const { face, password, mnemonic } = await _decryptParams(params, authUser);
 
@@ -425,7 +451,11 @@ const leaseZelfName = async (params, authUser) => {
 		throw new Error("409:Wallet_could_not_be_encrypted");
 
 	zelfNameObject.zelfName = zelfName;
-	zelfNameObject.price = _calculateZelfNamePrice(zelfName.length - 5, duration);
+	zelfNameObject.price = _calculateZelfNamePrice(
+		zelfName.length - 5,
+		duration,
+		referralZelfName
+	);
 	zelfNameObject.publicData = dataToEncrypt.publicData;
 	zelfNameObject.ethAddress = eth.address;
 	zelfNameObject.btcAddress = btc.address;
@@ -440,7 +470,7 @@ const leaseZelfName = async (params, authUser) => {
 		description: `Purchase of the Zelf Name > ${zelfNameObject.zelfName} for $${zelfNameObject.price}`,
 		pricing_type: "fixed_price",
 		local_price: {
-			amount: `${zelfNameObject.price}`,
+			amount: zelfNameObject.price,
 			currency: "USD",
 		},
 		metadata: {
@@ -454,35 +484,46 @@ const leaseZelfName = async (params, authUser) => {
 		cancel_url: "https://name.zelf.world/#/coinbase-cancel",
 	});
 
-	if (!params.skipZNS) {
-		zelfNameObject.image = await encryptQR(dataToEncrypt);
+	zelfNameObject.image = await encryptQR(dataToEncrypt);
 
-		// zelfNameObject.holdTransaction = await ArweaveModule.zelfNameHold(zelfNameObject.image, zelfNameObject);
+	// zelfNameObject.holdTransaction = await ArweaveModule.zelfNameHold(zelfNameObject.image, zelfNameObject);
 
-		const holdName = `${zelfName}.hold`;
+	const holdName = `${zelfName}.hold`;
 
-		zelfNameObject.ipfs = await IPFSModule.insert(
-			{
-				base64: zelfNameObject.image,
-				name: holdName,
-				metadata: {
-					// ...zelfNameObject.publicData,
-					zelfProof: zelfNameObject.zelfProof,
-					zelfName: holdName,
-					duration: duration || 1,
-					price: zelfNameObject.price,
-					expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
-					type: "hold",
-					coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
-					coinbase_expires_at: zelfNameObject.coinbaseCharge.expires_at,
-				},
-				pinIt: true,
+	zelfNameObject.ipfs = await IPFSModule.insert(
+		{
+			base64: zelfNameObject.image,
+			name: holdName,
+			metadata: {
+				zelfProof: zelfNameObject.zelfProof,
+				zelfName: holdName,
+				duration: duration || 1,
+				price: zelfNameObject.price,
+				expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
+				type: "hold",
+				coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
+				referralZelfName: referralZelfName || "migueltrevino.zelf",
+				referralSolanaAddress:
+					referralZelfNameObject?.publicData?.solanaAddress ||
+					referralZelfNameObject?.metadata?.solanaAddress ||
+					"no_referral",
 			},
-			{ ...authUser, pro: true }
-		);
-	}
+			pinIt: true,
+		},
+		{ ...authUser, pro: true }
+	);
 
-	return { ...zelfNameObject, hasPassword: Boolean(password) };
+	return {
+		...zelfNameObject,
+		hasPassword: Boolean(password),
+		durationToken: jwt.sign(
+			{
+				zelfName,
+				exp: moment().add(12, "hour").unix(),
+			},
+			config.JWT_SECRET
+		),
+	};
 };
 
 /**
@@ -505,7 +546,10 @@ const leaseConfirmation = async (data, authUser, datos) => {
 	for (let index = 0; index < zelfNameRecords.length; index++) {
 		const record = zelfNameRecords[index];
 
-		inMainnet = Boolean(record.publicData?.type === "mainnet");
+		inMainnet = Boolean(
+			record.publicData?.type === "mainnet" ||
+				!record.publicData?.zelfName.includes(".hold")
+		);
 	}
 
 	if (!zelfNameRecords.length) {
@@ -553,9 +597,25 @@ const leaseConfirmation = async (data, authUser, datos) => {
 		unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
 
 		const { masterIPFSRecord, masterArweaveRecord } =
-			await _cloneZelfNameToProduction(zelfNameObject, payment);
+			await _cloneZelfNameToProduction(zelfNameObject);
+
+		const referralReward = zelfNameObject.publicData.referralZelfName
+			? await addPurchase({
+					ethAddress: masterIPFSRecord.metadata.ethAddress,
+					solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+					zelfName,
+					zelfNamePrice: zelfNameObject.publicData.price,
+					referralZelfName: zelfNameObject.publicData.referralZelfName,
+					referralSolanaAddress:
+						zelfNameObject.publicData.referralSolanaAddress,
+					ipfsHash: masterIPFSRecord.IpfsHash,
+					arweaveId: masterArweaveRecord.id,
+			  })
+			: "no_referral";
 
 		return {
+			referralReward,
+			zelfNameObject,
 			ipfs: [masterIPFSRecord],
 			arweave: [masterArweaveRecord],
 		};
@@ -617,10 +677,9 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 /**
  * clone zelf name to production
  * @param {Object} zelfNameObject
- * @param {Object} payment
  * @author Miguel Trevino
  */
-const _cloneZelfNameToProduction = async (zelfNameObject, payment) => {
+const _cloneZelfNameToProduction = async (zelfNameObject) => {
 	// first clone it to ipfs, then to arweave
 	const payload = {
 		base64: zelfNameObject.zelfProofQRCode,
@@ -710,6 +769,31 @@ const _findDuplicatedZelfName = async (
 	if (returnResults) return searchResult;
 
 	const error = new Error("zelfName_is_taken");
+
+	error.status = 409;
+
+	throw error;
+};
+
+const _validateReferral = async (referralZelfName, authUser) => {
+	if (!referralZelfName) return;
+
+	const searchResult = await searchZelfName(
+		{
+			zelfName: referralZelfName,
+			environment: "mainnet",
+		},
+		authUser
+	);
+
+	let notFound = Boolean(searchResult.available);
+
+	if (!notFound)
+		return searchResult.arweave?.length
+			? searchResult.arweave[0]
+			: searchResult.ipfs[0];
+
+	const error = new Error("zelfName_referring_you_not_found");
 
 	error.status = 409;
 
@@ -872,6 +956,9 @@ const leaseOffline = async (params, authUser) => {
 		if (ipfsRecord.publicData.type === "mainnet") mainnetRecord = ipfsRecord;
 	}
 
+	const _zelfProof =
+		holdRecord?.publicData?.zelfProof || mainnetRecord?.publicData?.zelfProof;
+
 	if (zelfNameRecords.length === 2 || mainnetRecord) {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
@@ -892,6 +979,12 @@ const leaseOffline = async (params, authUser) => {
 
 	if (!zelfName.includes(_preview.publicData.zelfName)) {
 		const error = new Error("zelfName_does_not_match_in_zelfProof");
+		error.status = 409;
+		throw error;
+	}
+
+	if (_zelfProof && zelfProof !== _zelfProof) {
+		const error = new Error("zelfProof_does_not_match_in_hold");
 		error.status = 409;
 		throw error;
 	}
@@ -945,6 +1038,61 @@ const leaseOffline = async (params, authUser) => {
 	return zelfNameObject;
 };
 
+const update = async (params, authUser) => {
+	const { duration } = params;
+	const { zelfName } = authUser;
+
+	const zelfNameRecords = await previewZelfName(
+		{ zelfName, environment: "both" },
+		authUser
+	);
+
+	if (!zelfNameRecords.length) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const holdRecord = zelfNameRecords.find(
+		(record) => record.publicData.type === "hold"
+	);
+
+	// check if holdDuration is == same as the duration passed on params
+	if (holdRecord.publicData.duration === duration) {
+		const error = new Error("hold_duration_is_the_same");
+		error.status = 409;
+		throw error;
+	}
+
+	if (!holdRecord) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const { ipfs_pin_hash, publicData } = holdRecord;
+
+	const updatedRecord = await IPFSModule.update(
+		ipfs_pin_hash,
+		{
+			base64: holdRecord.zelfProofQRCode,
+			name: holdRecord.zelfName,
+			metadata: {
+				...publicData,
+				price: _calculateZelfNamePrice(
+					holdRecord.zelfName.split(".zelf")[0].length,
+					duration
+				),
+				duration,
+			},
+			pinIt: true,
+		},
+		{ ...authUser, pro: true }
+	);
+
+	return updatedRecord;
+};
+
 module.exports = {
 	searchZelfName,
 	leaseZelfName,
@@ -953,4 +1101,7 @@ module.exports = {
 	decryptZelfName,
 	//Offline
 	leaseOffline,
+	saveInProduction: _cloneZelfNameToProduction,
+	//update,
+	update,
 };

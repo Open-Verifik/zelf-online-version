@@ -162,6 +162,18 @@ const authValidation = async (ctx, next) => {
 	await next();
 };
 
+const revenueCatWebhookValidation = async (ctx) => {
+	const valid = validate(schemas.revenueCatWebhook, ctx.request.body?.event);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	getValidation,
 	showValidation,

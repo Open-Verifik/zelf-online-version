@@ -4,12 +4,12 @@ const fs = require("fs");
 const path = require("path");
 const config = require("../../../Core/config");
 const axios = require("axios");
-const arweaveUrl = `https://arweave.net`;
+const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
-const graphql = "https://arweave.net/graphql"; //`https://arweave-search.goldsky.com/graphql`;
 const moment = require("moment");
 const holdOwner = config.arwave.hold.owner;
 const owner = config.arwave.owner;
+const graphql = `${arweaveUrl}/graphql`;
 
 const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 	const { zelfProof, hasPassword, publicData } = zelfNameObject;
@@ -17,29 +17,16 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 	 * Generate a key from the arweave wallet.
 	 */
 
-	// const jwk = {
-	// 	kty: "RSA",
-	// 	n: config.arwave.n,
-	// 	e: config.arwave.e,
-	// 	d: config.arwave.d,
-	// 	p: config.arwave.p,
-	// 	q: config.arwave.q,
-	// 	dp: config.arwave.dp,
-	// 	dq: config.arwave.dq,
-	// 	qi: config.arwave.qi,
-	// 	kid: "2011-04-29",
-	// };
-
 	const jwk = {
 		kty: "RSA",
-		n: config.arwave.hold.n,
-		e: config.arwave.hold.e,
-		d: config.arwave.hold.d,
-		p: config.arwave.hold.p,
-		q: config.arwave.hold.q,
-		dp: config.arwave.hold.dp,
-		dq: config.arwave.hold.dq,
-		qi: config.arwave.hold.qi,
+		n: config.arwave.n,
+		e: config.arwave.e,
+		d: config.arwave.d,
+		p: config.arwave.p,
+		q: config.arwave.q,
+		dp: config.arwave.dp,
+		dq: config.arwave.dq,
+		qi: config.arwave.qi,
 		kid: "2011-04-29",
 	};
 
