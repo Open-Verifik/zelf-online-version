@@ -908,6 +908,27 @@ const update = async (params, authUser) => {
 
 	const { ipfs_pin_hash, publicData } = holdRecord;
 
+	holdRecord.price = _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration);
+
+	holdRecord.coinbaseCharge = await createCoinbaseCharge({
+		name: `${holdRecord.zelfName}`,
+		description: `Purchase of the Zelf Name > ${holdRecord.zelfName} for $${holdRecord.price}`,
+		pricing_type: "fixed_price",
+		local_price: {
+			amount: holdRecord.price,
+			currency: "USD",
+		},
+		metadata: {
+			duration,
+			zelfName: holdRecord.zelfName,
+			ethAddress: holdRecord.preview?.ethAddress,
+			btcAddress: holdRecord.preview?.btcAddress,
+			solanaAddress: holdRecord.preview?.solanaAddress,
+		},
+		redirect_url: "https://purchase.zelf.world/#/coinbase-success",
+		cancel_url: "https://purchase.zelf.world/#/coinbase-cancel",
+	});
+
 	const updatedRecord = await IPFSModule.update(
 		ipfs_pin_hash,
 		{
@@ -915,8 +936,9 @@ const update = async (params, authUser) => {
 			name: holdRecord.zelfName,
 			metadata: {
 				...publicData,
-				price: _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration),
+				price: holdRecord.price,
 				duration,
+				coinbase_hosted_url: holdRecord.coinbaseCharge.hosted_url,
 			},
 			pinIt: true,
 		},
