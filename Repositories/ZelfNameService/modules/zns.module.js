@@ -1,6 +1,6 @@
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const axios = require("axios");
-const arweaveUrl = `https://arweave.net`;
+const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
 const { createEthWallet } = require("../../Wallet/modules/eth");
@@ -49,7 +49,8 @@ const zelfNamePricing = {
 	2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
 	3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
 	4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
-	"5-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
+	5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
+	"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
 	16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
 	17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
 	18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
@@ -78,8 +79,8 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 
 	let price = 24;
 
-	if (length >= 5 && length <= 15) {
-		price = zelfNamePricing["5-15"][duration];
+	if (length >= 6 && length <= 15) {
+		price = zelfNamePricing["6-15"][duration];
 	} else if (zelfNamePricing[length]) {
 		price = zelfNamePricing[length][duration];
 	} else {
@@ -378,7 +379,7 @@ const _IPFSToBase64 = async (url) => {
 
 const _arweaveIDToBase64 = async (id) => {
 	try {
-		const encryptedResponse = await axios.get(`https://arweave.net/${id}`, {
+		const encryptedResponse = await axios.get(`${arweaveUrl}/${id}`, {
 			responseType: "arraybuffer",
 		});
 
@@ -1072,6 +1073,30 @@ const update = async (params, authUser) => {
 
 	const { ipfs_pin_hash, publicData } = holdRecord;
 
+	holdRecord.price = _calculateZelfNamePrice(
+		holdRecord.zelfName.split(".zelf")[0].length,
+		duration
+	);
+
+	holdRecord.coinbaseCharge = await createCoinbaseCharge({
+		name: `${holdRecord.zelfName}`,
+		description: `Purchase of the Zelf Name > ${holdRecord.zelfName} for $${holdRecord.price}`,
+		pricing_type: "fixed_price",
+		local_price: {
+			amount: holdRecord.price,
+			currency: "USD",
+		},
+		metadata: {
+			duration,
+			zelfName: holdRecord.zelfName,
+			ethAddress: holdRecord.preview?.ethAddress,
+			btcAddress: holdRecord.preview?.btcAddress,
+			solanaAddress: holdRecord.preview?.solanaAddress,
+		},
+		redirect_url: "https://purchase.zelf.world/#/coinbase-success",
+		cancel_url: "https://purchase.zelf.world/#/coinbase-cancel",
+	});
+
 	const updatedRecord = await IPFSModule.update(
 		ipfs_pin_hash,
 		{
@@ -1079,11 +1104,9 @@ const update = async (params, authUser) => {
 			name: holdRecord.zelfName,
 			metadata: {
 				...publicData,
-				price: _calculateZelfNamePrice(
-					holdRecord.zelfName.split(".zelf")[0].length,
-					duration
-				),
+				price: holdRecord.price,
 				duration,
+				coinbase_hosted_url: holdRecord.coinbaseCharge.hosted_url,
 			},
 			pinIt: true,
 		},
