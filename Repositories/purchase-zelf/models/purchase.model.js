@@ -15,8 +15,6 @@ const purchaseSchema = new Schema(
 		duration: { type: String },
 		crypto: {
 			type: String,
-			required: true,
-			minlength: 2,
 		},
 		cryptoValue: { type: String },
 		ratePriceInUSDT: { type: String },
@@ -32,6 +30,7 @@ const purchaseSchema = new Schema(
 		address: {},
 		transactionStatus: String,
 		transactionDescription: String,
+		coinbase_hosted_url: String,
 		remainingTime: String,
 		lastSavedTime: String,
 		purchaseCreatedAt: {

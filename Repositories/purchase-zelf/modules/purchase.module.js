@@ -69,7 +69,8 @@ const getCheckout = async (params) => {
 		error.status = 409;
 		throw error;
 	}
-
+	let origin_address;
+	const address = purchase.address;
 	const crypto = purchase.crypto;
 	const duration = purchase.duration;
 	const zelfName = purchase.zelfName;
@@ -82,6 +83,18 @@ const getCheckout = async (params) => {
 	const USD = purchase.USD;
 	const wordsCount = purchase.wordsCount;
 	const amountDetected = purchase.amountDetected;
+
+	switch (crypto) {
+		case "ETH":
+			origin_address = address.ethAddress;
+			break;
+		case "SOL":
+			origin_address = address.solanaAddress;
+			break;
+		case "BTC":
+			origin_address = address.btcAddress;
+			break;
+	}
 	return {
 		crypto,
 		duration,
@@ -95,6 +108,7 @@ const getCheckout = async (params) => {
 		wordsCount,
 		_id,
 		amountDetected,
+		origin_address,
 	};
 };
 const pay = async (params) => {
@@ -105,7 +119,7 @@ const pay = async (params) => {
 		error.status = 409;
 		throw error;
 	}
-
+	let origin_address;
 	const address = purchase.address;
 	const crypto = purchase.crypto;
 	const duration = purchase.duration;
@@ -121,20 +135,19 @@ const pay = async (params) => {
 
 	switch (crypto) {
 		case "ETH":
-			addressCliente = address.ethAddress;
+			origin_address = address.ethAddress;
 			break;
 		case "SOL":
-			addressCliente = address.solanaAddress;
+			origin_address = address.solanaAddress;
 			break;
 		case "BTC":
-			addressCliente = address.btcAddress;
+			origin_address = address.btcAddress;
 			break;
 	}
 
-	console.log({ addressCliente });
 	const resposne = await checkoutPay(
 		crypto,
-		addressCliente,
+		origin_address,
 		amountToSend,
 		ratePriceInUSDT,
 		zelfName,
@@ -143,10 +156,12 @@ const pay = async (params) => {
 		_id
 	);
 
+	console.log(resposne);
+
 	// const cryptoValue = await calculateCryptoValue(crypto, zelfName, duration);
 	// let reult = await checkout(
 	// 	crypto,
-	// 	addressCliente,
+	// 	origin_address,
 	// 	cryptoValue.cryptoValue,
 	// 	ratePriceInUSDT,
 	// 	zelfName,
@@ -165,7 +180,7 @@ const pay = async (params) => {
 /**
  * @param {string} crypto
  *
- * @param {string} addressCliente
+ * @param {string} origin_address
  *
  * @param {string} valorApagar
  *
@@ -177,7 +192,7 @@ const pay = async (params) => {
  */
 const checkoutPay = async (
 	crypto,
-	addressCliente,
+	origin_address,
 	amountToSend,
 	ratePriceInUSDT,
 	zelfName,
@@ -197,11 +212,11 @@ const checkoutPay = async (
 			break;
 	}
 
-	const lastTransaction = transaction.from;
+	const addresslastTransaction = transaction.from;
 
-	//let amountDetected = transaction.value;
+	//let amountDetected = addresslastTransaction.value;
 
-	amountDetected = "0.00723563";
+	amountDetected = "0.17143769";
 
 	let transactionStatus = false;
 
@@ -209,11 +224,12 @@ const checkoutPay = async (
 
 	console.log(zelfName);
 
-	if (addressCliente) {
+	if (origin_address) {
+		// ===addresslastTransaction
 		if (amountDetected === amountToSend) {
 			transactionStatus = true;
 			transactionDescription = "successful";
-		} else if (amountToSend < amountDetected) {
+		} else if (amountDetected < amountToSend) {
 			transactionStatus = false;
 			transactionDescription = "partial_payment";
 		} else {
@@ -321,31 +337,33 @@ getLastInTransactionHash = async (transactions) => {
 const searchZelfName_ = async (zelfName) => {
 	let status = "";
 	let address = {};
+	let coinbase_hosted_url, coinbase_expires_at, price, duration;
 
 	try {
-		let data = await searchZelfName({
+		const previewData = await previewZelfName({
 			zelfName: zelfName,
-			environment: "both",
 		});
+		status = previewData[0].publicData.type;
 
-		if (data?.available === true) {
-			status = "available";
-		} else if (data?.ipfs?.[0]?.publicData?.type === "hold") {
-			status = "hold";
+		coinbase_expires_at = previewData[0].publicData.expiresAt;
 
-			const previewData = await previewZelfName({
-				zelfName: zelfName,
-			});
-			console.log(previewData[0].publicData.coinbase_expires_at);
-			console.log(previewData[0].publicData.coinbase_hosted_url);
-			address = previewData[0].preview?.publicData || {};
-		} else if (data?.ipfs?.[0]?.publicData?.type === "mainnet") {
-			status = "mainnet";
-		}
+		coinbase_hosted_url = previewData[0].publicData.coinbase_hosted_url;
 
-		return { status, address };
+		price = previewData[0].publicData.price;
+
+		duration = previewData[0].publicData.duration;
+
+		address = previewData[0].preview.publicData;
+
+		return {
+			status,
+			address,
+			coinbase_expires_at,
+			coinbase_hosted_url,
+			price,
+			duration,
+		};
 	} catch (error) {
-		console.error("Error in searchZelfName_:", error);
 		return null;
 	}
 };
@@ -495,6 +513,8 @@ const calculatePriceZelfName = async (zelfName, duration) => {
  * @param {string} crypto
  */
 const calculateCryptoValue = async (crypto, zelfName, duration) => {
+	//if (crypto == "CB") return null;
+
 	try {
 		const { price } = await getTickerPrice({ symbol: `${crypto}USDT` });
 
@@ -518,8 +538,8 @@ const calculateCryptoValue = async (crypto, zelfName, duration) => {
 			zelfName,
 		};
 	} catch (error) {
-		console.error("Error al obtener el valor de la criptomoneda:");
-		throw error;
+		// console.error("Error al obtener el valor de la criptomoneda:");
+		// throw error;
 	}
 };
 const clock_sync = async (params) => {
@@ -548,78 +568,145 @@ const clock_sync = async (params) => {
 		lastSavedTime: updatedRecord.lastSavedTime,
 	};
 };
+const select_method = async (crypto, zelfName, duration, id) => {
+	const purchase = await modelPurchase.findById(id);
 
-const transactionGenerate = async (crypto, zelfName, duration) => {
-	if (crypto !== "CB") {
-		const existingRecord = await MongoORM.buildQuery(
-			{
-				where_zelfName: zelfName,
-				findOne: true,
-			},
-			modelPurchase
-		);
+	if (!purchase) {
+		const error = new Error("id_null");
+		error.status = 409;
+		throw error;
+	}
+	if (purchase.crypto !== crypto) {
+		const cryptoValue = await calculateCryptoValue(crypto, zelfName, duration);
 
-		let validar;
-
-		if (!existingRecord) {
-			validar = await searchZelfName_(zelfName);
-
-			if (validar.status === "available") {
-				const error = new Error("zelf_name_no_lease");
-				error.status = 409;
-				throw error;
-			}
-
-			if (validar.status === "mainnet") {
-				const error = new Error("zelfName_purchased_already");
-				error.status = 409;
-				throw error;
-			}
-		}
-
-		const address = existingRecord ? existingRecord.address : validar.address;
-
-		const result = await calculateCryptoValue(crypto, zelfName, duration);
-
-		const paymentAddress = addressZelf
-			.find((method) => method.id === crypto)
-			.address.toString();
-
-		const recordData = {
-			zelfName: result.zelfName,
-			duration: result.duration,
-			crypto: result.crypto,
-			wordsCount: result.wordsCount,
-			USD: result.USD,
-			address,
-			paymentAddress: paymentAddress,
-		};
-
-		if (existingRecord) {
-			if (
-				existingRecord.crypto !== crypto ||
-				existingRecord.duration !== duration
-			) {
-				recordData.amountToSend = result.amountToSend;
-				recordData.ratePriceInUSDT = result.ratePriceInUSDT;
-			}
-
+		if (!cryptoValue) {
 			const updatedRecord = await modelPurchase.findByIdAndUpdate(
-				existingRecord._id,
-				recordData,
+				purchase._id,
+				{ crypto: crypto },
 				{ new: true }
 			);
 
 			return cleanResponse(updatedRecord);
 		}
 
-		const newRecord = new modelPurchase({
-			...recordData,
-			amountToSend: result.amountToSend,
-			ratePriceInUSDT: result.ratePriceInUSDT,
+		const paymentAddress = addressZelf
+			.find((method) => method.id === crypto)
+
+			?.address.toString();
+		const recordData = {
+			crypto,
+			amountToSend: cryptoValue.amountToSend,
+			ratePriceInUSDT: cryptoValue.ratePriceInUSDT,
+			paymentAddress: paymentAddress,
+		};
+
+		const updatedRecord = await modelPurchase.findByIdAndUpdate(
+			purchase._id,
+			recordData,
+			{ new: true }
+		);
+
+		return cleanResponse(updatedRecord);
+	}
+
+	if (purchase.duration !== duration) {
+		const previewData = await previewZelfName({
+			zelfName: zelfName,
 		});
 
+		const duration = previewData[0].publicData.duration;
+		const cryptoValue = await calculateCryptoValue(crypto, zelfName, duration);
+
+		recordData = {
+			zelfName: zelfName,
+			duration: duration,
+			crypto: crypto,
+			amountToSend: cryptoValue.amountToSend,
+			wordsCount: cryptoValue.wordsCount,
+			USD: cryptoValue.USD,
+			//address: previewData[0].preview.publicData,
+			//paymentAddress: "paymentAddress",
+			coinbase_hosted_url: previewData[0].publicData.coinbase_hosted_url,
+		};
+
+		const updatedRecord = await modelPurchase.findByIdAndUpdate(
+			purchase._id,
+			recordData,
+			{ new: true }
+		);
+
+		return cleanResponse(updatedRecord);
+	}
+
+	return cleanResponse(purchase);
+};
+
+const transactionGenerate = async (crypto = "ETH", zelfName) => {
+	const existingRecord = await MongoORM.buildQuery(
+		{
+			where_zelfName: zelfName,
+			findOne: true,
+		},
+		modelPurchase
+	);
+
+	if (existingRecord) {
+		return cleanResponse(existingRecord);
+	}
+
+	const previewData = await previewZelfName({
+		zelfName: zelfName,
+	});
+
+	if (previewData[0].publicData.type === "mainnet") {
+		const error = new Error("zelfName_purchased_already");
+		error.status = 409;
+		throw error;
+	}
+
+	console.log(previewData[0].publicData.price);
+	const duration = previewData[0].publicData.duration;
+	console.log(previewData[0].publicData.expiresAt);
+	console.log(previewData[0].publicData.referralSolanaAddress);
+	console.log(previewData[0].publicData.referralZelfName);
+	console.log(previewData[0].publicData.coinbase_hosted_url);
+	let address = previewData[0].preview.publicData;
+	// console.log(previewData[0].preview.publicData);
+
+	// address = existingRecord ? existingRecord.address : validar.address;
+	// let duration_ = existingRecord ? existingRecord.duration : validar.duration;
+	// const coinbase_hosted_url = existingRecord
+	// 	? existingRecord.coinbase_hosted_url
+	// 	: validar.coinbase_hosted_url;
+
+	result = await calculateCryptoValue(crypto, zelfName, duration);
+	// if (!result) {
+	// 	result = { wordsCount: "", USD: "" };
+
+	// }
+	const paymentAddress = addressZelf
+		.find((method) => method.id === crypto)
+		?.address.toString();
+
+	recordData = {
+		zelfName: zelfName,
+		duration: previewData[0].publicData.duration,
+		crypto: crypto,
+		amountToSend: result.amountToSend,
+		wordsCount: result.wordsCount,
+		USD: previewData[0].publicData.price,
+		address: previewData[0].preview.publicData,
+		paymentAddress: paymentAddress,
+		coinbase_hosted_url: previewData[0].publicData.coinbase_hosted_url,
+	};
+	const newRecord = new modelPurchase({
+		...recordData,
+		amountToSend: result.amountToSend,
+		ratePriceInUSDT: result.ratePriceInUSDT,
+	});
+	if (!existingRecord) {
 		const savedRecord = await newRecord.save();
+
 		return cleanResponse(savedRecord);
 	}
 };
@@ -650,6 +737,7 @@ module.exports = {
 	checkoutPay,
 	calculateCryptoValue,
 	transactionGenerate,
+	select_method,
 	clock_sync,
 	pay,
 };

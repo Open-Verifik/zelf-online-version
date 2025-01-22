@@ -9,9 +9,15 @@ module.exports = (server) => {
 	const PATH = config.basePath(base);
 
 	server.get(
-		`${PATH}/select-method`,
+		`${PATH}/setp`,
 
-		Controller.tickerPrice
+		Controller.setp
+	);
+
+	server.get(
+		`${PATH}/select-method/:id`,
+
+		Controller.select_method
 	);
 
 	server.get(
