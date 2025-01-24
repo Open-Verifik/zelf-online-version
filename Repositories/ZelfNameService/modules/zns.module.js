@@ -469,7 +469,7 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
-			zelfName: zelfNameObject.zelfName,
+			customerZelfName: zelfNameObject.zelfName,
 		},
 		metadata: {
 			mnemonic,
@@ -509,6 +509,7 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
 		zelfProof,
 		publicData: {
 			...dataToEncrypt.publicData,
+			zelfName: paymentName,
 			type: "mainnet",
 			expiresAt: moment()
 				.add(zelfNameObject.publicData.duration || 1, "year")
