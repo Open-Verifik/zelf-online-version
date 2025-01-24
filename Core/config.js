@@ -65,6 +65,9 @@ const configuration = {
 		port: process.env.PROXY_PORT || 4250,
 		basePath: process.env.PROXY_BASEPATH || "http://localhost",
 	},
+	zelfEncrypt: {
+		serverKey: process.env.ZELF_ENCRYPT_SERVER_KEY,
+	},
 	opencv: {
 		environment: process.env.OPENCV_ENV || "production",
 		defaultClient: process.env.OPENCV_DEFAULT_CLIENT || "613375a1eab2fe08527f81e2",

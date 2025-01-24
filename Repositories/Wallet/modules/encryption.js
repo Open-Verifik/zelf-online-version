@@ -11,7 +11,7 @@ const encrypt = async (data) => {
 			record_id: data._id,
 			require_live_face: data.require_live_face || true,
 			tolerance: data.tolerance || "REGULAR",
-			verifiers_auth_key: data.addServerPassword ? config.walletServer.authKey : undefined,
+			verifiers_auth_key: data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
 		});
 
 		return encryptedResponse?.data?.zelfProof;
@@ -19,9 +19,10 @@ const encrypt = async (data) => {
 		const _error = exception.response?.data;
 		console.error({
 			data: _error,
+			exception,
 		});
 
-		let error = new Error(_error.code);
+		let error = new Error(_error?.code);
 
 		switch (_error.code) {
 			case "ERR_INVALID_IMAGE":
@@ -51,7 +52,7 @@ const encryptQR = async (data) => {
 				require_live_face: data.require_live_face || true,
 				check_live_face_before_creation: data.check_live_face_before_creation || false,
 				tolerance: data.tolerance || "REGULAR",
-				verifiers_auth_key: data.addServerPassword ? config.walletServer.authKey : undefined,
+				verifiers_auth_key: data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
 				qr_format: "PNG",
 				os: data.os || "DESKTOP",
 			},
@@ -87,7 +88,7 @@ const decrypt = async (data) => {
 			os: data.os || "DESKTOP",
 			password: data.password || undefined,
 			senseprint_base_64: data.zelfProof,
-			verifiers_auth_key: data.addServerPassword ? config.walletServer.authKey : undefined,
+			verifiers_auth_key: data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
 		});
 
 		return encryptedResponse?.data;
@@ -96,6 +97,11 @@ const decrypt = async (data) => {
 
 		console.error({
 			data: _error,
+			face_base_64: data.faceBase64,
+			os: data.os || "DESKTOP",
+			password: data.password || undefined,
+			senseprint_base_64: data.zelfProof,
+			verifiers_auth_key: data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
 		});
 
 		let error = new Error(_error.code);

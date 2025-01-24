@@ -332,6 +332,21 @@ const _arweaveIDToBase64 = async (id) => {
 	}
 };
 
+const _createWalletsFromPhrase = async (params, authUser) => {
+	const { face, password, mnemonic } = await _decryptParams(params, authUser);
+
+	const _mnemonic = params.type === "import" ? mnemonic : generateMnemonic(params.wordsCount);
+	const wordsArray = _mnemonic.split(" ");
+	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
+
+	const eth = createEthWallet(_mnemonic);
+	const btc = createBTCWallet(_mnemonic);
+	const solana = await createSolanaWallet(_mnemonic);
+	const zkProof = await OfflineProofModule.createProof(_mnemonic);
+
+	return { eth, btc, solana, zkProof, mnemonic: _mnemonic, face, password };
+};
+
 /**
  * lease zelfName
  * @param {Object} params
@@ -339,23 +354,11 @@ const _arweaveIDToBase64 = async (id) => {
  */
 const leaseZelfName = async (params, authUser) => {
 	const { zelfName, duration, referralZelfName } = params;
-
 	await _findDuplicatedZelfName(zelfName, "both", authUser);
-
 	const referralZelfNameObject = await _validateReferral(referralZelfName, authUser);
 
-	const { face, password, mnemonic } = await _decryptParams(params, authUser);
+	const { eth, btc, solana, zkProof, mnemonic, face, password } = await _createWalletsFromPhrase(params, authUser);
 
-	const _mnemonic = params.type === "import" ? mnemonic : generateMnemonic(params.wordsCount);
-
-	const wordsArray = _mnemonic.split(" ");
-
-	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
-
-	const eth = createEthWallet(_mnemonic);
-	const btc = createBTCWallet(_mnemonic);
-	const solana = await createSolanaWallet(_mnemonic);
-	const zkProof = await OfflineProofModule.createProof(_mnemonic);
 	const zelfNameObject = {};
 
 	const dataToEncrypt = {
@@ -366,7 +369,7 @@ const leaseZelfName = async (params, authUser) => {
 			zelfName,
 		},
 		metadata: {
-			mnemonic: _mnemonic,
+			mnemonic,
 			zkProof,
 		},
 		faceBase64: face,
@@ -388,6 +391,27 @@ const leaseZelfName = async (params, authUser) => {
 	zelfNameObject.solanaAddress = solana.address;
 	zelfNameObject.hasPassword = `${Boolean(password)}`;
 	zelfNameObject.metadata = params.previewZelfProof ? dataToEncrypt.metadata : undefined;
+	zelfNameObject.duration = duration;
+	zelfNameObject.image = await encryptQR(dataToEncrypt);
+
+	await _createPaymentCharge(zelfNameObject, { referralZelfName, referralZelfNameObject }, authUser);
+
+	return {
+		...zelfNameObject,
+		hasPassword: Boolean(password),
+		durationToken: jwt.sign(
+			{
+				zelfName,
+				exp: moment().add(12, "hour").unix(),
+			},
+			config.JWT_SECRET
+		),
+	};
+};
+
+const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
+	const { referralZelfName, referralZelfNameObject } = referral;
+	const holdName = `${zelfNameObject.zelfName}.hold`;
 
 	zelfNameObject.coinbaseCharge = await createCoinbaseCharge({
 		name: `${zelfNameObject.zelfName}`,
@@ -398,21 +422,14 @@ const leaseZelfName = async (params, authUser) => {
 			currency: "USD",
 		},
 		metadata: {
-			// Custom metadata (optional)
 			zelfName: zelfNameObject.zelfName,
-			ethAddress: eth.address,
-			btcAddress: btc.address,
-			solanaAddress: solana.address,
+			ethAddress: zelfNameObject.ethAddress,
+			btcAddress: zelfNameObject.btcAddress,
+			solanaAddress: zelfNameObject.solanaAddress,
 		},
 		redirect_url: "https://name.zelf.world/#/coinbase-success",
 		cancel_url: "https://name.zelf.world/#/coinbase-cancel",
 	});
-
-	zelfNameObject.image = await encryptQR(dataToEncrypt);
-
-	// zelfNameObject.holdTransaction = await ArweaveModule.zelfNameHold(zelfNameObject.image, zelfNameObject);
-
-	const holdName = `${zelfName}.hold`;
 
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{
@@ -421,7 +438,7 @@ const leaseZelfName = async (params, authUser) => {
 			metadata: {
 				zelfProof: zelfNameObject.zelfProof,
 				zelfName: holdName,
-				duration: duration || 1,
+				duration: zelfNameObject.duration || 1,
 				price: zelfNameObject.price,
 				expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
 				type: "hold",
@@ -435,16 +452,73 @@ const leaseZelfName = async (params, authUser) => {
 		{ ...authUser, pro: true }
 	);
 
+	await _createReceivingWallets(zelfNameObject, authUser);
+};
+
+const _createReceivingWallets = async (zelfNameObject, authUser) => {
+	const mnemonic = generateMnemonic(12);
+	const jsonfile = require("../../../config/0012589021.json");
+	const eth = createEthWallet(mnemonic);
+	const btc = createBTCWallet(mnemonic);
+	const solana = await createSolanaWallet(mnemonic);
+
+	const zkProof = await OfflineProofModule.createProof(mnemonic);
+
+	const dataToEncrypt = {
+		publicData: {
+			ethAddress: eth.address,
+			solanaAddress: solana.address,
+			btcAddress: btc.address,
+			zelfName: zelfNameObject.zelfName,
+		},
+		metadata: {
+			mnemonic,
+			zkProof,
+		},
+		faceBase64: jsonfile.faceBase64,
+		password: jsonfile.password,
+		_id: `payment_${zelfNameObject.zelfName}.hold`,
+		tolerance: "REGULAR",
+		addServerPassword: true,
+	};
+
+	const zelfProof = await encrypt(dataToEncrypt);
+	const image = await encryptQR(dataToEncrypt);
+
+	// save it now in ipfs and arweave
+	const paymentName = `${zelfNameObject.zelfName}`.replace(".zelf", ".zelfpay");
+
+	const payload = {
+		base64: image,
+		name: paymentName,
+		metadata: {
+			hasPassword: "true",
+			zelfProof,
+			expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+			type: "mainnet",
+			addresses: JSON.stringify(dataToEncrypt.publicData),
+			zelfName: paymentName,
+		},
+		pinIt: true,
+	};
+
+	const ipfsRecord = await IPFSModule.insert(payload, { pro: true });
+
+	const arweaveRecord = await ArweaveModule.zelfNameRegistration(image, {
+		hasPassword: "true",
+		zelfProof,
+		publicData: {
+			...dataToEncrypt.publicData,
+			type: "mainnet",
+			expiresAt: moment()
+				.add(zelfNameObject.publicData.duration || 1, "year")
+				.format("YYYY-MM-DD HH:mm:ss"),
+		},
+	});
+
 	return {
-		...zelfNameObject,
-		hasPassword: Boolean(password),
-		durationToken: jwt.sign(
-			{
-				zelfName,
-				exp: moment().add(12, "hour").unix(),
-			},
-			config.JWT_SECRET
-		),
+		ipfsRecord,
+		arweaveRecord,
 	};
 };
 
@@ -724,6 +798,8 @@ const _previewWithIPFS = async (params, authUser) => {
 };
 
 const _findZelfName = async (zelfName, environment = "hold", authUser) => {
+	console.log({ zelfName, environment });
+
 	const searchResults = await searchZelfName(
 		{
 			zelfName,
