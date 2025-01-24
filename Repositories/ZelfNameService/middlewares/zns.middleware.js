@@ -120,14 +120,6 @@ const getValidation = async (ctx, next) => {
 const leaseValidation = async (ctx, next) => {
 	const valid = validate(schemas.lease, ctx.request.body);
 
-	const { clientId } = ctx.state.user;
-
-	if (!clientId) {
-		ctx.status = 403;
-		ctx.body = { validationError: "Access forbidden" };
-		return;
-	}
-
 	if (valid.error) {
 		ctx.status = 409;
 

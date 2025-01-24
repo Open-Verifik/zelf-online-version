@@ -204,7 +204,7 @@ const _zelfNameHold = async (zelfProofQRCode) => {
 	return { uploadResult, address };
 };
 
-const search = async (environment = "hold", zelfName, extraConditions = {}) => {
+const search = async (environment = "both", zelfName, extraConditions = {}) => {
 	if (!zelfName && (!extraConditions.key || !extraConditions.value)) return null;
 
 	const tagsToSearch = zelfName
