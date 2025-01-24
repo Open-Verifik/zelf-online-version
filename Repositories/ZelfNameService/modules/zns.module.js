@@ -533,7 +533,7 @@ const leaseZelfName = async (params, authUser) => {
  * @param {Object} authUser
  * @author Miguel Trevino
  */
-const leaseConfirmation = async (data, authUser, datos) => {
+const leaseConfirmation = async (data, authUser) => {
 	const { network, coin, zelfName } = data;
 
 	let unpinResult;
@@ -664,6 +664,8 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 	for (let index = 0; index < timeline.length; index++) {
 		const _timeline = timeline[index];
 
+		console.log(_timeline);
+
 		if (_timeline.status === "COMPLETED") {
 			confirmed = true;
 		}
@@ -671,7 +673,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed: false,
+		confirmed: true,
 	};
 };
 
@@ -1122,6 +1124,8 @@ module.exports = {
 	leaseConfirmation,
 	previewZelfName,
 	decryptZelfName,
+	_calculateZelfNamePrice,
+	_confirmCoinbaseCharge,
 	//Offline
 	leaseOffline,
 	saveInProduction: _cloneZelfNameToProduction,

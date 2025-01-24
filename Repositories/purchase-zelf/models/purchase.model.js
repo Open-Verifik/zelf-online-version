@@ -33,32 +33,22 @@ const purchaseSchema = new Schema(
 		coinbase_hosted_url: String,
 		remainingTime: String,
 		lastSavedTime: String,
-		purchaseCreatedAt: {
-			type: Date,
-			default: Date.now, // Campo con nombre diferente para evitar conflicto
-		},
 	},
 	{
-		timestamps: false, // Deshabilitar los timestamps automáticos
+		timestamps: false,
 	}
 );
 
-// Pre-save hook
 purchaseSchema.pre("save", async function (next) {
 	next();
 });
 
-// Post-save hook
 purchaseSchema.post("save", async function (doc, next) {
 	next();
 });
 
-// Crear un índice TTL para que el documento se elimine automáticamente después de 2 minutos
-purchaseSchema.index({ purchaseCreatedAt: 1 }, { expireAfterSeconds: 7200 }); // 120 segundos = 2 minutos
+purchaseSchema.index({ purchaseCreatedAt: 1 }, { expireAfterSeconds: 7200 });
 
-/**
- * #model methods
- */
 purchaseSchema.methods = {};
 
 addBasicPlugins(purchaseSchema);

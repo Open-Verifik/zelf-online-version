@@ -15,9 +15,15 @@ module.exports = (server) => {
 	);
 
 	server.get(
-		`${PATH}/select-method/:id`,
+		`${PATH}/select-method`,
 
 		Controller.select_method
+	);
+
+	server.get(
+		`${PATH}/select-method-coibase/:id`,
+		Middleware.validateParamas,
+		Controller.select_method_coibase
 	);
 
 	server.get(
@@ -26,8 +32,8 @@ module.exports = (server) => {
 		Controller.clock_sync
 	);
 	server.get(
-		`${PATH}/purchase/:id`,
-		///Middleware.validateParamas,
+		`${PATH}/purchase/:zelfName`,
+
 		Controller.checkout
 	);
 	server.get(

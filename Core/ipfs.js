@@ -7,6 +7,9 @@ const pinata = new PinataSDK({
 	pinataJwt: process.env.PINATA_JWT,
 	pinataGateway: process.env.PINATA_GATEWAY_URL,
 });
+const os = process.env.ENVOS;
+
+console.log({ os });
 
 const pinataWeb3 = require("pinata-web3");
 
@@ -84,38 +87,41 @@ const retrieve = async (cid, expires = 1800) => {
  * @param {Object} metadata
  * @returns ipfs file
  */
-// const pinFile = async (
-// 	base64Image,
-// 	filename = "image.png",
-// 	mimeType = "image/png",
-// 	metadata = {}
-// ) => {
-// 	try {
-// 		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
-// 		console.log(metadata);
-// 		// Upload the file to Pinata
-// 		const uploadResponse = await web3Instance.upload
-// 			.base64(base64Data)
-// 			.addMetadata({
-// 				name: filename,
-// 				keyValues: metadata,
-// 			});
-
-// 		return {
-// 			url: `https://${process.env.PINATA_GATEWAY_URL}/ipfs/${uploadResponse.IpfsHash}`,
-// 			...uploadResponse,
-// 			pinned: true,
-// 			web3: true,
-// 			name: filename,
-// 			metadata,
-// 		};
-// 	} catch (error) {
-// 		console.error(error);
-// 	}
-
-// 	return null;
-// };
 const pinFile = async (
+	base64Image,
+	filename = "image.png",
+	mimeType = "image/png",
+	metadata = {}
+) => {
+	if (os === "Win")
+		return await pinFileWindows(base64Image, filename, mimeType, metadata);
+
+	try {
+		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+
+		// Upload the file to Pinata
+		const uploadResponse = await web3Instance.upload
+			.base64(base64Data)
+			.addMetadata({
+				name: filename,
+				keyValues: metadata,
+			});
+
+		return {
+			url: `https://${process.env.PINATA_GATEWAY_URL}/ipfs/${uploadResponse.IpfsHash}`,
+			...uploadResponse,
+			pinned: true,
+			web3: true,
+			name: filename,
+			metadata,
+		};
+	} catch (error) {
+		console.error(error);
+	}
+
+	return null;
+};
+const pinFileWindows = async (
 	base64Image,
 	filename = "image.png",
 	mimeType = "image/png",
@@ -208,6 +214,7 @@ module.exports = {
 	upload,
 	retrieve,
 	pinFile,
+	pinFileWindows,
 	filter,
 	unPinFiles,
 };

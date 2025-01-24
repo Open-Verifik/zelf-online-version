@@ -10,6 +10,7 @@ const configuration = {
 	base_url: process.env.BASE_URL || "https://verifik.co",
 	documentationUrl: process.env.DOCUMENTATION_URL || "null",
 	sessionSecret: process.env.SESSION_SECRET,
+	so: process.env.ENVOS,
 	azureVision: {
 		key: process.env.AZURE_VISION_KEY || null,
 		url:
@@ -17,7 +18,9 @@ const configuration = {
 			"https://vision-verifik-ocr.cognitiveservices.azure.com/computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=read&language=en&gender-neutral-caption=False",
 		forms: {
 			key: process.env.AZURE_VISION_FORMS_KEY || "NOKEY",
-			endpoint: process.env.AZURE_VISION_FORMS_ENDPOINT || "https://verifik-forms.cognitiveservices.azure.com",
+			endpoint:
+				process.env.AZURE_VISION_FORMS_ENDPOINT ||
+				"https://verifik-forms.cognitiveservices.azure.com",
 		},
 	},
 	openai: {
@@ -67,7 +70,8 @@ const configuration = {
 	},
 	opencv: {
 		environment: process.env.OPENCV_ENV || "production",
-		defaultClient: process.env.OPENCV_DEFAULT_CLIENT || "613375a1eab2fe08527f81e2",
+		defaultClient:
+			process.env.OPENCV_DEFAULT_CLIENT || "613375a1eab2fe08527f81e2",
 		url: "https://us.opencv.fr",
 		apiKey: process.env.OPENCV_APIKEY || null,
 	},
@@ -134,6 +138,43 @@ const configuration = {
 	solana: {
 		sender: process.env.SENDER_KEY,
 	},
+	addressZelf: [
+		{
+			id: "ETH",
+			address: "0x1BC125bC681685f216935798453F70fb423eB392",
+			//address: "0x9eB697C8500e4abc9cF6C4E17F1Be8508010bd23",
+		},
+		{
+			id: "SOL",
+			address: "6gDQQQMRveayDFSz5bA2wyjNZr9Jue9hS1S4kkmLDqBt",
+		},
+		{
+			id: "BTC",
+			address: "bc1p6lsrl8amjuwrwxcwaa9ncuuzljuc3zv4jg55xdruuq5nxxwnvj4qd23dxl",
+		},
+		{
+			id: "BNB",
+			address: "0xD3b0d838cCCEAe7ebF1781D11D1bB741DB7Fe1A7",
+		},
+		{
+			id: "MINA",
+			address: "B62qoA5XwfEVnXbcrzphGH1TVuqxeJ5bhX7vTS3hcxpQFHnStG3MQk9",
+		},
+		{
+			id: "ADA",
+			address: "stake1u9m0ny47rdn9x43gcg0hjmg6xsnlz80hnz7kf6v6vplqtrcd9pnhj",
+		},
+
+		{
+			id: "TRX",
+			address: "TXPLNPmLC7XSazCEPVZMQkyx9YEdbvFXkU",
+		},
+		{
+			id: "XRP",
+			address: "rvpkkVqZyqPFz4uzT4YbbrBMLzuUUyTdm",
+		},
+		//...{}
+	],
 };
 
 module.exports = configuration;
