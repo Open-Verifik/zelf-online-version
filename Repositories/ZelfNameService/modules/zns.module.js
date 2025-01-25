@@ -13,8 +13,9 @@ const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
 const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const config = require("../../../Core/config");
-const { addPurchase } = require("./zns-token.module");
+const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const jwt = require("jsonwebtoken");
+const { createUnderName } = require("./undernames.module");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -569,31 +570,9 @@ const leaseConfirmation = async (data, authUser) => {
 			break;
 	}
 
-	// mover el registro a la wallet de nosotros ( no la temporal ) > ipfs clonar sin la propiedad de type = 'hold'
 	if (payment?.confirmed) {
-		unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
-
-		const { masterIPFSRecord, masterArweaveRecord } = await _cloneZelfNameToProduction(zelfNameObject);
-
-		const referralReward = zelfNameObject.publicData.referralZelfName
-			? await addPurchase({
-					ethAddress: masterIPFSRecord.metadata.ethAddress,
-					solanaAddress: masterIPFSRecord.metadata.solanaAddress,
-					zelfName,
-					zelfNamePrice: zelfNameObject.publicData.price,
-					referralZelfName: zelfNameObject.publicData.referralZelfName,
-					referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
-					ipfsHash: masterIPFSRecord.IpfsHash,
-					arweaveId: masterArweaveRecord.id,
-			  })
-			: "no_referral";
-
-		return {
-			referralReward,
-			zelfNameObject,
-			ipfs: [masterIPFSRecord],
-			arweave: [masterArweaveRecord],
-		};
+		//move this to another function
+		return await _confirmZelfNamePurchase(zelfNameObject);
 	}
 
 	return {
@@ -603,6 +582,53 @@ const leaseConfirmation = async (data, authUser) => {
 		hold: unpinResult,
 	};
 };
+
+/**
+ *
+ * @param {Object} zelfNameObject
+ * @returns {Object} - Returns the referral reward and the cloned Zelf Name records
+ */
+const _confirmZelfNamePurchase = async (zelfNameObject) => {
+	unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
+
+	const { masterIPFSRecord, masterArweaveRecord } = await _cloneZelfNameToProduction(zelfNameObject);
+
+	zelfNameObject.publicData.referralZelfName
+		? await addReferralReward({
+				ethAddress: masterIPFSRecord.metadata.ethAddress,
+				solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+				zelfName: zelfNameObject.publicData.zelfName,
+				zelfNamePrice: zelfNameObject.publicData.price,
+				referralZelfName: zelfNameObject.publicData.referralZelfName,
+				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
+				ipfsHash: masterIPFSRecord.IpfsHash,
+				arweaveId: masterArweaveRecord.id,
+		  })
+		: "no_referral";
+
+	await addPurchaseReward({
+		ethAddress: masterIPFSRecord.metadata.ethAddress,
+		solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+		zelfName: zelfNameObject.publicData.zelfName,
+		zelfNamePrice: zelfNameObject.publicData.price,
+		ipfsHash: masterIPFSRecord.IpfsHash,
+		arweaveId: masterArweaveRecord.id,
+	});
+
+	// now here we will create the undername
+	await createUnderName({
+		parentName: config.arwave.parentName,
+		undername: zelfNameObject.publicData.zelfName.split(".zelf")[0],
+	});
+
+	return {
+		zelfNameObject,
+		ipfs: [masterIPFSRecord],
+		arweave: [masterArweaveRecord],
+	};
+};
+
+// await createUnderName({ parentName: config.arwave.parentName, underName: zelfName });
 
 const _confirmCoinbaseCharge = async (zelfNameObject) => {
 	const chargeID = zelfNameObject.publicData?.coinbase_id || zelfNameObject.publicData?.coinbase_hosted_url.split("/pay/")[1];

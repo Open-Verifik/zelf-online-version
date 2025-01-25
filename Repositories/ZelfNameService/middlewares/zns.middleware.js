@@ -162,7 +162,6 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	// await createUnderName({ parentName: config.arwave.parentName, underName: zelfName });
 	// await ZNSTokenModule.giveTokensAfterPurchase();
 
 	await next();

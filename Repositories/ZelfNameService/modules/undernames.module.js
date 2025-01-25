@@ -5,12 +5,8 @@ const ario = ARIO.init();
 
 // create under name logic here
 const createUnderName = async (payload) => {
-	const { parentName, underName } = payload;
-	const processId = "Z9a5VqgeVkkJRWPT8UNl9ub_NPjzxPxLSXPQMCXB9po";
-
-	const record = await ario.getArNSRecord({ name: parentName });
-
-	console.log({ record });
+	const { parentName, undername } = payload;
+	const processId = config.arwave.processId;
 
 	const walletKey = {
 		kty: "RSA",
@@ -25,7 +21,7 @@ const createUnderName = async (payload) => {
 		kid: "2011-04-29",
 	};
 
-	if (!parentName || !underName) {
+	if (!parentName || !undername) {
 		return null;
 	}
 
@@ -37,20 +33,20 @@ const createUnderName = async (payload) => {
 
 	console.log({ ant });
 
-	const owner = await ant.getOwner();
+	// const owner = await ant.getOwner();
 
-	console.log({ owner });
+	// console.log({ owner });
 
-	const records = await ant.getRecords();
+	// const records = await ant.getRecords();
 
-	console.log({ records });
+	// console.log({ records });
 
 	try {
 		// Create the under name
 		const newUnderName = await ant.setRecord(
 			{
-				undername: "random",
-				transactionId: processId,
+				undername,
+				transactionId: "SGsts42Qi3dNiSAl6pSOwcNInPsLqZ1yExAuSQyrjos",
 				ttlSeconds: 3600,
 			},
 			// optional additional tags
@@ -59,7 +55,7 @@ const createUnderName = async (payload) => {
 
 		console.log({ newUnderName });
 	} catch (error) {
-		console.error({ error });
+		console.error({ newUnderNameError: error });
 	}
 };
 

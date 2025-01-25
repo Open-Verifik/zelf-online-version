@@ -121,6 +121,7 @@ const configuration = {
 			qi: process.env._ARWAVE_QI,
 		},
 		parentName: process.env.ARWEAVE_PARENT_NAME,
+		processId: process.env.ARWEAVE_PROCESS_ID,
 	},
 	coinbase: {
 		key: process.env.COINBASE_API_KEY,
