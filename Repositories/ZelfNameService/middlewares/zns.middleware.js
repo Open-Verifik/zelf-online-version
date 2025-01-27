@@ -97,6 +97,8 @@ const getValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
 
+	console.log({ captchaZelfName });
+
 	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, captchaZelfName) : 1;
 
 	if (captchaScore < 0.79) {

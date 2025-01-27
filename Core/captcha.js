@@ -59,7 +59,7 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 		// console.log(`The reCAPTCHA score is: ${response.riskAnalysis.score}`);
 
 		response.riskAnalysis.reasons.forEach((reason) => {
-			console.log(reason);
+			console.log(reason, { recaptchaAction });
 		});
 
 		return Boolean(config.env === "development" ? 1 : response.riskAnalysis.score || 0);
