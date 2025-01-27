@@ -97,8 +97,6 @@ const getValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
 
-	console.log({ captchaZelfName });
-
 	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, captchaZelfName) : 1;
 
 	if (captchaScore < 0.79) {
@@ -152,7 +150,9 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
+	const captchaZelfName = _getZelfNameForCaptcha(`lease${zelfName}`);
+
+	console.log({ captchaZelfName });
 
 	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
 
