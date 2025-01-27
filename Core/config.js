@@ -26,6 +26,9 @@ const configuration = {
 	openai: {
 		key: process.env.OPENAI_API_KEY,
 	},
+	signedData: {
+		key: process.env.SECRET_KEY_PRICI,
+	},
 	debug: {
 		mongo: Boolean(process.env.DEBUG_MONGO),
 		sendEmail: Boolean(process.env.DEBUG_SEND_EMAIL),

@@ -1,9 +1,11 @@
 const Module = require("../modules/purchase.module");
 const HttpHandler = require("../../../Core/http-handler");
 
-const checkout = async (ctx) => {
+const search_zelf_lease = async (ctx) => {
 	try {
-		const data = await Module.getCheckout(ctx.request.params);
+		const { zelfName } = ctx.request.body;
+
+		const data = await Module.search_zelf_lease(zelfName);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -16,61 +18,10 @@ const checkout = async (ctx) => {
 };
 
 const select_method = async (ctx) => {
-	const { crypto, zelfName, duration } = ctx.request.query;
-	const { id } = ctx.request.params;
-
-	console.log(crypto, zelfName, duration, id);
+	const { crypto, zelfName, duration } = ctx.request.body;
 
 	try {
-		const data = await Module.select_method(crypto, zelfName, duration, id);
-
-		ctx.body = { data };
-	} catch (error) {
-		console.error(error);
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
-	}
-};
-
-const select_method_coibase = async (ctx) => {
-	const { crypto, zelfName, duration } = ctx.request.query;
-	const { id } = ctx.request.params;
-
-	console.log(crypto, zelfName, duration, id);
-
-	try {
-		const data = await Module.select_method(crypto, zelfName, duration, id);
-
-		ctx.body = { data };
-	} catch (error) {
-		console.error(error);
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
-	}
-};
-
-const setp = async (ctx) => {
-	try {
-		const { crypto, zelfName, duration } = ctx.request.query;
-
-		const data = await Module.transactionGenerate(crypto, zelfName, duration);
-
-		ctx.body = { data };
-	} catch (error) {
-		console.error(error);
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
-	}
-};
-const clock_sync = async (ctx) => {
-	try {
-		const data = await Module.clock_sync(ctx.request.params);
+		const data = await Module.select_method(crypto, zelfName, duration);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -83,8 +34,16 @@ const clock_sync = async (ctx) => {
 };
 
 const pay = async (ctx) => {
+	const { zelfName } = ctx.request.params;
+	const { crypto, signedDataPrice, paymentAddress } = ctx.request.body;
+
 	try {
-		const data = await Module.pay(ctx.request.params);
+		const data = await Module.pay(
+			zelfName,
+			crypto,
+			signedDataPrice,
+			paymentAddress
+		);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -111,10 +70,7 @@ const lease_confirmation_pay = async (ctx) => {
 };
 
 module.exports = {
-	checkout,
-	select_method_coibase,
-	setp,
-	clock_sync,
+	search_zelf_lease,
 	select_method,
 	pay,
 	lease_confirmation_pay,

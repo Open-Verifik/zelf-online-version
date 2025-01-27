@@ -753,7 +753,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed: true,
+		confirmed: false,
 	};
 };
 

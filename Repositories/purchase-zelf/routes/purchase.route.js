@@ -3,46 +3,30 @@ const Controller = require("../controllers/purchase.controller");
 
 const Middleware = require("../middlewares/purchase.middleware");
 
-const base = "/checkout";
+const base = "/payment";
 
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.get(
-		`${PATH}/setp`,
+	server.post(
+		`${PATH}/search_zelf_lease`,
 
-		Controller.setp
+		Controller.search_zelf_lease
 	);
 
-	server.get(
+	server.post(
 		`${PATH}/select-method`,
 
 		Controller.select_method
 	);
 
-	server.get(
-		`${PATH}/select-method-coibase/:id`,
-		Middleware.validateParamas,
-		Controller.select_method_coibase
-	);
-
-	server.get(
-		`${PATH}/clock-sync/:id`,
-
-		Controller.clock_sync
-	);
-	server.get(
-		`${PATH}/purchase/:zelfName`,
-
-		Controller.checkout
-	);
-	server.get(
-		`${PATH}/pay/:id`,
+	server.post(
+		`${PATH}/pay/:zelfName`,
 
 		Controller.pay
 	);
 
-	server.get(
+	server.post(
 		`${PATH}/lease-confirmation-pay/:id`,
 
 		Controller.pay

@@ -9,8 +9,6 @@ const pinata = new PinataSDK({
 });
 const os = process.env.ENVOS;
 
-console.log({ os });
-
 const pinataWeb3 = require("pinata-web3");
 
 const web3Instance = new pinataWeb3.PinataSDK({
