@@ -10,6 +10,7 @@ const configuration = {
 	base_url: process.env.BASE_URL || "https://verifik.co",
 	documentationUrl: process.env.DOCUMENTATION_URL || "null",
 	sessionSecret: process.env.SESSION_SECRET,
+	so: process.env.ENVOS,
 	azureVision: {
 		key: process.env.AZURE_VISION_KEY || null,
 		url:
@@ -17,11 +18,16 @@ const configuration = {
 			"https://vision-verifik-ocr.cognitiveservices.azure.com/computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=read&language=en&gender-neutral-caption=False",
 		forms: {
 			key: process.env.AZURE_VISION_FORMS_KEY || "NOKEY",
-			endpoint: process.env.AZURE_VISION_FORMS_ENDPOINT || "https://verifik-forms.cognitiveservices.azure.com",
+			endpoint:
+				process.env.AZURE_VISION_FORMS_ENDPOINT ||
+				"https://verifik-forms.cognitiveservices.azure.com",
 		},
 	},
 	openai: {
 		key: process.env.OPENAI_API_KEY,
+	},
+	signedData: {
+		key: process.env.SECRET_KEY_PRICI,
 	},
 	debug: {
 		mongo: Boolean(process.env.DEBUG_MONGO),
@@ -65,9 +71,13 @@ const configuration = {
 		port: process.env.PROXY_PORT || 4250,
 		basePath: process.env.PROXY_BASEPATH || "http://localhost",
 	},
+	zelfEncrypt: {
+		serverKey: process.env.ZELF_ENCRYPT_SERVER_KEY,
+	},
 	opencv: {
 		environment: process.env.OPENCV_ENV || "production",
-		defaultClient: process.env.OPENCV_DEFAULT_CLIENT || "613375a1eab2fe08527f81e2",
+		defaultClient:
+			process.env.OPENCV_DEFAULT_CLIENT || "613375a1eab2fe08527f81e2",
 		url: "https://us.opencv.fr",
 		apiKey: process.env.OPENCV_APIKEY || null,
 	},
@@ -97,6 +107,7 @@ const configuration = {
 	},
 	arwave: {
 		key: process.env.ARWAVE_KEY,
+		owner: process.env.ARWEAVE_OWNER,
 		n: process.env.ARWAVE_N,
 		e: process.env.ARWAVE_E,
 		d: process.env.ARWAVE_D,
@@ -105,6 +116,21 @@ const configuration = {
 		dp: process.env.ARWAVE_DP,
 		dq: process.env.ARWAVE_DQ,
 		qi: process.env.ARWAVE_QI,
+		hold: {
+			owner: process.env._ARWEAVE_OWNER,
+			n: process.env._ARWAVE_N,
+			e: process.env._ARWAVE_E,
+			d: process.env._ARWAVE_D,
+			p: process.env._ARWAVE_P,
+			q: process.env._ARWAVE_Q,
+			dp: process.env._ARWAVE_DP,
+			dq: process.env._ARWAVE_DQ,
+			qi: process.env._ARWAVE_QI,
+		},
+		parentName: process.env.ARWEAVE_PARENT_NAME,
+	},
+	coinbase: {
+		key: process.env.COINBASE_API_KEY,
 	},
 	google: {
 		captchaProjectID: process.env.CAPTCHA_PROJECT_ID,
@@ -112,6 +138,49 @@ const configuration = {
 		androidSiteKey: process.env.CAPTCHA_ANDROID_SITE_KEY,
 		iOSSiteKey: process.env.CAPTCHA_IOS_SITE_KEY,
 	},
+	revenueCat: {
+		allowedEmail: process.env.REVENUECAT_ALLOWED_EMAIL,
+	},
+	solana: {
+		sender: process.env.SENDER_KEY,
+	},
+	addressZelf: [
+		{
+			id: "ETH",
+			address: "0x1BC125bC681685f216935798453F70fb423eB392",
+			//address: "0x9eB697C8500e4abc9cF6C4E17F1Be8508010bd23",
+		},
+		{
+			id: "SOL",
+			address: "6gDQQQMRveayDFSz5bA2wyjNZr9Jue9hS1S4kkmLDqBt",
+		},
+		{
+			id: "BTC",
+			address: "bc1p6lsrl8amjuwrwxcwaa9ncuuzljuc3zv4jg55xdruuq5nxxwnvj4qd23dxl",
+		},
+		{
+			id: "BNB",
+			address: "0xD3b0d838cCCEAe7ebF1781D11D1bB741DB7Fe1A7",
+		},
+		{
+			id: "MINA",
+			address: "B62qoA5XwfEVnXbcrzphGH1TVuqxeJ5bhX7vTS3hcxpQFHnStG3MQk9",
+		},
+		{
+			id: "ADA",
+			address: "stake1u9m0ny47rdn9x43gcg0hjmg6xsnlz80hnz7kf6v6vplqtrcd9pnhj",
+		},
+
+		{
+			id: "TRX",
+			address: "TXPLNPmLC7XSazCEPVZMQkyx9YEdbvFXkU",
+		},
+		{
+			id: "XRP",
+			address: "rvpkkVqZyqPFz4uzT4YbbrBMLzuUUyTdm",
+		},
+		//...{}
+	],
 };
 
 module.exports = configuration;

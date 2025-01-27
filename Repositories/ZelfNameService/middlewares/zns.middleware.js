@@ -1,5 +1,8 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
 const captchaService = require("../../../Core/captcha");
+const config = require("../../../Core/config");
+const { createUnderName } = require("../modules/undernames.module");
+const ZNSTokenModule = require("../modules/zns-token.module");
 
 const schemas = {
 	search: {
@@ -8,6 +11,16 @@ const schemas = {
 		value: string(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]),
 		captchaToken: string(),
+	},
+	leaseOffline: {
+		zelfName: string().required(),
+		zelfProof: string().required(),
+		zelfProofQRCode: string().required(),
+	},
+	leaseConfirmation: {
+		zelfName: string().required(),
+		coin: string().required(),
+		network: string().required(),
 	},
 	lease: {
 		zelfName: string().required(),
@@ -37,6 +50,19 @@ const schemas = {
 		zelfName: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string().required(),
+	},
+	revenueCatWebhook: {
+		product_id: string().required(),
+		period_type: string().required(),
+		currency: string().required(),
+		price: number().required(),
+		id: string().required(),
+		app_id: string().required(),
+		transaction_id: string().required(),
+		environment: string().required(),
+	},
+	update: {
+		duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
 	},
 };
 
@@ -136,8 +162,64 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
+	// await createUnderName({ parentName: config.arwave.parentName, underName: zelfName });
+	// await ZNSTokenModule.giveTokensAfterPurchase();
+
 	await next();
 };
+
+/**
+ * lease offline validation
+ * @param {Object} ctx
+ * @param {Object} next
+ */
+const leaseOfflineValidation = async (ctx, next) => {
+	const valid = validate(schemas.leaseOffline, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	await next();
+};
+
+const leaseConfirmationValidation = async (ctx, next) => {
+	// Step 1: Extract necessary data from the request
+	const { zelfName, purchaseDetails } = ctx.request.body;
+
+	const validation = validate(schemas.leaseConfirmation, ctx.request.body);
+
+	// Step 2: Validate the Zelf name service purchase details
+	if (validation.error) {
+		ctx.status = 400;
+
+		ctx.body = { validationError: validation.error.message };
+
+		return;
+	}
+
+	// validation logic
+	const isValidPurchase = validatePurchaseDetails(zelfName, purchaseDetails);
+
+	// Step 3: Return a response indicating success or failure
+	if (!isValidPurchase) {
+		ctx.status = 400;
+
+		ctx.body = { validationError: "Invalid lease confirmation details" };
+	}
+
+	await next();
+};
+
+// Example validation function (replace with actual logic)
+function validatePurchaseDetails(zelfName, purchaseDetails) {
+	// Implement actual validation logic here
+	return true; // Placeholder
+}
 
 const _consoleLogSuspicious = (ctx, captchaScore, zelfName) => {
 	const origin = ctx.request.header.origin || null;
@@ -221,6 +303,33 @@ const decryptValidation = async (ctx, next) => {
 	await next();
 };
 
+const revenueCatWebhookValidation = async (ctx, next) => {
+	const { event } = ctx.request.body;
+
+	const { clientId, email } = ctx.state.user;
+
+	if (!clientId || email !== config.revenueCat.allowedEmail) {
+		ctx.status = 403;
+		ctx.body = { validationError: "Access forbidden" };
+		return;
+	}
+
+	if (!event) {
+		ctx.status = 409;
+		ctx.body = { validationError: "Missing event payload" };
+		return;
+	}
+
+	const valid = validate(schemas.revenueCatWebhook, ctx.request.body?.event);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+	}
+
+	await next();
+};
+
 const referralRewardsValidation = async (ctx, next) => {
 	const { superAdminId } = ctx.state.user;
 
@@ -235,11 +344,37 @@ const referralRewardsValidation = async (ctx, next) => {
 	await next();
 };
 
+const updateValidation = async (ctx, next) => {
+	const { zelfName } = ctx.state.user;
+
+	if (!zelfName) {
+		ctx.status = 403;
+		ctx.body = { validationError: "Access forbidden" };
+		return;
+	}
+
+	const valid = validate(schemas.update, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	getValidation,
 	leaseValidation,
+	leaseConfirmationValidation,
 	previewValidation,
 	deleteValidation,
 	decryptValidation,
+	//offline
+	leaseOfflineValidation,
+	revenueCatWebhookValidation,
 	referralRewardsValidation,
+	//update
+	updateValidation,
 };
