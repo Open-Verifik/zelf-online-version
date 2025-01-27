@@ -13,7 +13,11 @@ const IOS_SITE_KEY = config.google.iOSSiteKey;
  * token: The generated token obtained from the client.
  * recaptchaAction: Action name corresponding to the token.
  */
-const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action-name") => {
+const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action-name", skipIt = true) => {
+	if (skipIt && config.env === "development") {
+		return 1;
+	}
+
 	const OSMapping = {
 		DESKTOP: WEB_SITE_KEY,
 		ANDROID: ANDROID_SITE_KEY,
