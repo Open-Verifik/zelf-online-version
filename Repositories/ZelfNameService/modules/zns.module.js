@@ -412,6 +412,7 @@ const leaseZelfName = async (params, authUser) => {
 
 const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 	const { referralZelfName, referralZelfNameObject } = referral;
+
 	const holdName = `${zelfNameObject.zelfName}.hold`;
 
 	zelfNameObject.coinbaseCharge = await createCoinbaseCharge({
@@ -825,8 +826,6 @@ const _previewWithIPFS = async (params, authUser) => {
 };
 
 const _findZelfName = async (zelfName, environment = "hold", authUser) => {
-	console.log({ zelfName, environment });
-
 	const searchResults = await searchZelfName(
 		{
 			zelfName,
