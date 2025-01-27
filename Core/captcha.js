@@ -45,6 +45,7 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 	if (!response.tokenProperties.valid) {
 		console.log(`The CreateAssessment call failed because the token was: ${response.tokenProperties.invalidReason}`, {
 			tokenProperties: response.tokenProperties,
+			recaptchaAction,
 		});
 
 		return config.env === "development" ? 1 : 0;
