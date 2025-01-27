@@ -150,9 +150,7 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	const captchaZelfName = _getZelfNameForCaptcha(`lease${zelfName}`);
-
-	console.log({ captchaZelfName });
+	const captchaZelfName = _getZelfNameForCaptcha(`${zelfName}`);
 
 	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
 
