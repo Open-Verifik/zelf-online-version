@@ -204,19 +204,21 @@ const _zelfNameHold = async (zelfProofQRCode) => {
 	return { uploadResult, address };
 };
 
-const search = async (environment = "both", zelfName, extraConditions = {}) => {
+const search = async (zelfName, extraConditions = {}) => {
 	if (!zelfName && (!extraConditions.key || !extraConditions.value)) return null;
 
 	const tagsToSearch = zelfName
 		? `[{ name: "zelfName", values: "${zelfName}" }]`
 		: `[{ name: "${extraConditions.key}", values: "${extraConditions.value}" }]`;
 
+	console.log({ tagsToSearch });
+
 	const query = {
 		query: `
     {
  		transactions(
 			tags: ${tagsToSearch},
-			owners: ["${environment === "hold" ? holdOwner : owner}"]
+			owners: ["${owner}"]
 		) {
 			edges {
 				node {

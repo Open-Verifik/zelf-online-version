@@ -99,7 +99,7 @@ const searchZelfName = async (params, authUser) => {
 	if (params.duration) query.duration = params.duration;
 
 	try {
-		const searchResults = await ArweaveModule.search(params.environment, params.zelfName, query);
+		const searchResults = await ArweaveModule.search(params.zelfName || params.key === "zelfName" ? params.value : null, query);
 
 		if (searchResults?.available) {
 			const error = new Error("not_found_in_arweave");
@@ -198,7 +198,7 @@ const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, au
  * @param {Object} authUser
  * @author Miguel Trevino
  */
-const _searchInIPFS = async (environment = "hold", query, authUser, foundInArweave) => {
+const _searchInIPFS = async (environment = "both", query, authUser, foundInArweave) => {
 	try {
 		let ipfsRecords = [];
 
@@ -825,7 +825,7 @@ const _previewWithIPFS = async (params, authUser) => {
 	}
 };
 
-const _findZelfName = async (zelfName, environment = "hold", authUser) => {
+const _findZelfName = async (zelfName, environment = "both", authUser) => {
 	const searchResults = await searchZelfName(
 		{
 			zelfName,
@@ -845,7 +845,7 @@ const _findZelfName = async (zelfName, environment = "hold", authUser) => {
 	const inArweave = Boolean(searchResults.arweave?.length);
 
 	if (environment === "both") {
-		return inArweave ? searchResults.arweave : searchResults.ipfs;
+		return inArweave ? searchResults.arweave : searchResults.ipfs || [];
 	}
 
 	return inArweave ? searchResults.arweave[0] : searchResults.ipfs[0];
@@ -857,7 +857,9 @@ const _findZelfName = async (zelfName, environment = "hold", authUser) => {
  * @param {Object} authUser
  */
 const decryptZelfName = async (params, authUser) => {
-	const zelfNameObject = await _findZelfName(params.zelfName, params.environment, authUser);
+	const zelfNameObjects = await _findZelfName(params.zelfName, "both", authUser);
+
+	const zelfNameObject = zelfNameObjects[0];
 
 	const { face, password } = await _decryptParams(params, authUser);
 
