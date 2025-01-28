@@ -211,8 +211,6 @@ const search = async (zelfName, extraConditions = {}) => {
 		? `[{ name: "zelfName", values: "${zelfName}" }]`
 		: `[{ name: "${extraConditions.key}", values: "${extraConditions.value}" }]`;
 
-	console.log({ tagsToSearch });
-
 	const query = {
 		query: `
     {

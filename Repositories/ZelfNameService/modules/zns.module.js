@@ -290,6 +290,17 @@ const _formatIPFSSearchResult = async (ipfsRecord, foundInArweave) => {
 		zelfName: ipfsRecord.metadata.name,
 	};
 
+	if (zelfNameObject.publicData.payment) {
+		const payment = JSON.parse(zelfNameObject.publicData.payment);
+
+		// assign the payment to the publicData
+		zelfNameObject.publicData.price = payment.price;
+		zelfNameObject.publicData.duration = payment.duration;
+		zelfNameObject.publicData.coinbase_hosted_url = payment.coinbase_hosted_url;
+		zelfNameObject.publicData.referralZelfName = payment.referralZelfName;
+		zelfNameObject.publicData.referralSolanaAddress = payment.referralSolanaAddress;
+	}
+
 	if (!foundInArweave) {
 		zelfNameObject.zelfProof = zelfNameObject.publicData.zelfProof;
 
@@ -440,14 +451,17 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 			metadata: {
 				zelfProof: zelfNameObject.zelfProof,
 				zelfName: holdName,
-				duration: zelfNameObject.duration || 1,
-				price: zelfNameObject.price,
+				hasPassword: zelfNameObject.hasPassword,
+				payment: JSON.stringify({
+					price: zelfNameObject.price,
+					duration: zelfNameObject.duration || 1,
+					coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
+					referralZelfName: referralZelfName || "migueltrevino.zelf",
+					referralSolanaAddress:
+						referralZelfNameObject?.publicData?.solanaAddress || referralZelfNameObject?.metadata?.solanaAddress || "no_referral",
+				}),
 				expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
 				type: "hold",
-				coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
-				referralZelfName: referralZelfName || "migueltrevino.zelf",
-				referralSolanaAddress:
-					referralZelfNameObject?.publicData?.solanaAddress || referralZelfNameObject?.metadata?.solanaAddress || "no_referral",
 			},
 			pinIt: true,
 		},
