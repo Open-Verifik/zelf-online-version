@@ -894,7 +894,11 @@ const decryptZelfName = async (params, authUser) => {
 		zelfName: zelfNameObject.publicData.zelfName,
 		image: zelfNameObject.zelfProofQRCode,
 		metadata: decryptedZelfProof.metadata,
-		publicData: decryptedZelfProof.publicData,
+		url: zelfNameObject.url,
+		publicData: {
+			...zelfNameObject.publicData,
+			...decryptedZelfProof.publicData,
+		},
 	};
 };
 
