@@ -1,22 +1,22 @@
 const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-const {
-	previewZelfName,
-	searchZelfName,
-} = require("../../ZelfNameService/modules/zns.module");
 
 const {
 	leaseConfirmation,
 	_confirmCoinbaseCharge,
 	_calculateZelfNamePrice,
+	previewZelfName,
+	searchZelfName,
 } = require("../../ZelfNameService/modules/zns.module");
+const {
+	getCoinbaseCharge,
+} = require("../../coinbase/modules/coinbase_commerce.module");
 const {
 	getTransactionStatus,
 	getAddress,
 } = require("../../etherscan/modules/etherscan-scrapping.module");
 
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
-const modelPurchase = require("../models/purchase.model");
 const jwt = require("jsonwebtoken");
 const secretKey = config.signedData.key;
 
@@ -122,12 +122,39 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 	});
 
 	const zelfNamesInIPFS = previewData[0].preview.publicData.zelfName;
-	//const priceInIPFS = previewData[0].publicData.price;
 	const durationInIPFS = parseFloat(previewData[0].publicData.duration);
 	const expiresAt = previewData[0].publicData.expiresAt;
 	const referralZelfName = previewData[0].publicData.referralZelfName;
 	const coinbase_hosted_url = previewData[0].publicData.coinbase_hosted_url;
 	const referralSolanaAddress = previewData[0].publicData.referralSolanaAddress;
+
+	const zelfNamePay = zelfName_.replace(".zelf", ".zelfpay");
+
+	const previewData2 = await searchZelfName({
+		zelfName: zelfNamePay,
+		environment: "both",
+	});
+
+	const paymentAddressInIPFS = JSON.parse(
+		previewData2.ipfs[0].publicData.addresses
+	);
+
+	let selectedAddress = null;
+
+	switch (crypto.toUpperCase()) {
+		case "BTC":
+			selectedAddress = paymentAddressInIPFS.btcAddress;
+			break;
+		case "ETH":
+			selectedAddress = paymentAddressInIPFS.ethAddress;
+			break;
+		case "SOL":
+			selectedAddress = paymentAddressInIPFS.solanaAddress;
+			break;
+		default:
+			console.log("Método de pago no reconocido");
+			break;
+	}
 
 	const { zelfName, duration, amountToSend } = verifyRecordData(
 		signedDataPrice,
@@ -136,14 +163,24 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 	console.log({ expiresAt });
 	console.log({ zelfNamesInIPFS, durationInIPFS });
 	console.log({ zelfName, duration, amountToSend });
+	console.log({ paymentAddress, selectedAddress });
 
-	if (zelfName !== zelfNamesInIPFS || duration !== durationInIPFS) {
+	if (
+		zelfName !== zelfNamesInIPFS ||
+		duration !== durationInIPFS ||
+		paymentAddress !== selectedAddress
+	) {
 		const error = new Error("Validation_failed");
 		error.status = 409;
 		throw error;
 	}
 
-	return await checkoutPayUniqueAddress(crypto, amountToSend, paymentAddress);
+	return await checkoutPayUniqueAddress(
+		crypto,
+		amountToSend,
+		paymentAddress,
+		zelfName
+	);
 };
 
 ///funcion para checar transacciones global
@@ -163,43 +200,114 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 const checkoutPayUniqueAddress = async (
 	crypto,
 	amountToSend,
-	paymentAddress
+	paymentAddress,
+	zelfName
 ) => {
-	const transaction = await {
+	const balance = await {
 		ETH: checkoutETH,
 		SOL: checkoutSOLANA,
 		BTC: checkoutBICOIN,
 	}[crypto]?.(paymentAddress);
 
-	console.log({ transaction });
+	let amountDetected = balance;
+	console.log({ balance });
 
-	const addressLastTransaction = transaction?.from || "";
-	let amountDetected = transaction?.value || "0.17143769";
 	let transactionStatus = false;
 	let transactionDescription = "pending";
+	let remainingAmount = 0;
 
-	console.log(addressLastTransaction);
+	if (amountDetected === 0) {
+		return {
+			transactionStatus: false,
+			transactionDescription: "pending",
+			amountDetected,
+		};
+	}
 
-	if (origin_address === addressLastTransaction) {
-		if (amountDetected === amountToSend) {
+	try {
+		if (amountDetected >= amountToSend) {
 			transactionStatus = true;
-			transactionDescription = "successful";
-		} else if (amountDetected < amountToSend) {
-			transactionDescription = "partial_payment";
+			transactionDescription =
+				amountDetected === amountToSend ? "successful" : "overPayment";
+			await leaseConfirmation(
+				{ network: crypto, coin: crypto, zelfName },
+				{},
+				amountToSend
+			);
 		} else {
-			transactionStatus = true;
-			transactionDescription = "overpayment";
+			transactionDescription = "partialPayment";
+			remainingAmount = amountToSend - amountDetected;
 		}
-	} else {
-		amountDetected = "0";
+	} catch (error) {
+		console.log(error);
+		transactionDescription = "confirmationError";
+		transactionStatus = false;
 	}
 
 	return {
 		transactionDescription,
 		transactionStatus,
 		amountDetected,
+		remainingAmount: parseFloat(parseFloat(remainingAmount).toFixed(7)),
 	};
 };
+
+// const checkoutPayUniqueAddress = async (   no borrar
+// 	crypto,
+// 	amountToSend,
+// 	paymentAddress,
+// 	zelfName
+// ) => {
+// 	paymentAddress = "0x1BC125bC681685f216935798453F70fb423eB392"; //prueba
+// 	const transaction = await {
+// 		ETH: checkoutETH,
+// 		SOL: checkoutSOLANA,
+// 		BTC: checkoutBICOIN,
+// 	}[crypto]?.(paymentAddress);
+
+// 	console.log({ transaction });
+
+// 	let transactionStatus = false;
+// 	let transactionDescription = "pending";
+
+// 	if (!transaction) {
+// 		return {
+// 			transactionStatus: false,
+// 			transactionDescription: "undetected_transaction",
+// 			amountDetected: 0,
+// 		};
+// 	}
+
+// 	console.log({ amountToSend });
+
+// 	let amountDetected = transaction?.value || 0;
+
+// 	if (amountDetected === amountToSend) {
+// 		transactionStatus = true;
+// 		transactionDescription = "successful";
+// 		await leaseConfirmation(
+// 			{ network: crypto, coin: crypto, zelfName: zelfName },
+// 			{},
+// 			amountToSend
+// 		);
+// 	} else if (amountDetected < amountToSend) {
+// 		transactionDescription = "partial_payment";
+// 	} else {
+// 		transactionStatus = true;
+// 		transactionDescription = "overpayment";
+// 		await leaseConfirmation(
+// 			{ network: crypto, coin: crypto, zelfName: zelfName },
+// 			{},
+// 			amountToSend
+// 		);
+// 	}
+
+// 	return {
+// 		transactionDescription,
+// 		transactionStatus,
+// 		amountDetected,
+// 	};
+// };
 
 const checkoutPayCoinbase = async (zelfName) => {
 	const previewData = await previewZelfName({
@@ -209,25 +317,60 @@ const checkoutPayCoinbase = async (zelfName) => {
 
 	const coinbase_hosted_url = previewData[0].publicData.coinbase_hosted_url;
 
-	const payment = await _confirmCoinbaseCharge({
+	const charge = await _confirmCoinbaseCharge({
 		publicData: { coinbase_hosted_url },
 	});
+	// //console.log(charge.timeline);
+	// let transactionDescription;
+	// let timeline_;
+	// const timeline = charge.timeline;
+	// for (let index = 0; index < timeline.length; index++) {
+	// 	const _timeline = timeline[index];
 
-	if (!payment.confirmed) {
-		return {
-			transactionDescription: "pending",
-			transactionStatus: false,
-		};
-	}
+	// 	console.log(_timeline);
 
-	await leaseConfirmation({
-		zelfName,
-		coin: "coinbase",
-		network: "coinbase",
-	});
+	// 	if (_timeline.status === "SIGNED" || _timeline.status === "NEW") {
+	// 		transactionDescription = "started";
+	// 		timeline_ = _timeline.time;
+	// 		confirmed = false;
+	// 	}
+
+	// 	if (_timeline.status === "PENDING") {
+	// 		transactionDescription = "pending";
+	// 		timeline_ = _timeline.time;
+	// 		confirmed = false;
+	// 	}
+
+	// 	if (_timeline.status === "COMPLETED") {
+	// 		timeline_ = _timeline.time;
+	// 		transactionDescription = "successful";
+	// 		confirmed = true;
+	// 	}
+	// }
+	// //getCoinbaseCharge
+	// //payment = { confirmed: true };
+
+	// // if (!payment.confirmed) {
+	// // 	return {
+	// // 		transactionDescription: "pending",
+	// // 		transactionStatus: false,
+	// // 	};
+	// // }
+
+	// // await leaseConfirmation({
+	// // 	zelfName,
+	// // 	coin: "coinbase",
+	// // 	network: "coinbase",
+	// // });
+	// // return {
+	// // 	transactionDescription: "successful",
+	// // 	transactionStatus: true,
+	// // };
+
 	return {
-		transactionDescription: "successful",
-		transactionStatus: true,
+		timeline_: "o",
+		transactionDescription: "p",
+		transactionStatus: false,
 	};
 };
 
@@ -235,46 +378,88 @@ const checkoutPayCoinbase = async (zelfName) => {
 /**
  * @param {string} address
  */
+
 const checkoutETH = async (address) => {
 	console.log({ address });
-	const { transactions } = await getAddress({
-		address,
-	});
-	console.log(transactions);
-	const UltimaTxhash = await getLastInTransactionHash(transactions);
+	try {
+		const balanceETH = await getAddress({
+			address,
+		});
 
-	const transaction = await getTransactionStatus({ id: UltimaTxhash });
+		const balance = parseFloat(parseFloat(balanceETH.balance).toFixed(7));
 
-	return {
-		status: transaction.status,
-		from: transaction.from,
-		to: transaction.to,
-		value: transaction.valueETH,
-	};
+		return balance;
+	} catch (error) {
+		console.log(error);
+	}
 };
+
+//////////////////////////////////////////////////////////////////
+// const checkoutETH = async (address) => {
+// 	try {
+// 		console.log({ address });
+// 		const { transactions } = await getAddress({
+// 			address,
+// 		});
+
+// 		const LastTxhash = await getLastInTransactionHash(transactions);
+
+// 		console.log({ LastTxhash });
+
+// 		const transaction = await getTransactionStatus({ id: LastTxhash });
+
+// 		const value = transaction.valueETH;
+
+// 		return {
+// 			status: transaction.status,
+// 			from: transaction.from,
+// 			to: transaction.to,
+// 			value: parseFloat(parseFloat(value).toFixed(7)),
+// 		};
+// 	} catch (error) {
+// 		console.log(error.status);
+// 		if (error.status === 404) {
+// 			return null;
+// 		}
+// 	}
+// };
 ///funcion para checar transacciones en SOLANA
 /**
  * @param {string} address
  */
+// const checkoutSOLANA = async (address) => {
+// 	const { transactions } = await solanaModule.getTransactionsList(
+// 		{ id: address },
+// 		{ show: "10" }
+// 	);
+
+// 	function lamportsToSol(lamports) {
+// 		const lamportsPerSol = 1000000000;
+// 		return lamports / lamportsPerSol;
+// 	}
+
+// 	return {
+// 		status: transactions[0].status,
+// 		from: transactions[0].signer[0],
+// 		to: address,
+// 		value: lamportsToSol(transactions[0].sol_value).toString(),
+// 	};
+// };
 const checkoutSOLANA = async (address) => {
-	const { transactions } = await solanaModule.getTransactionsList(
-		{ id: address },
-		{ show: "10" }
-	);
+	///
+	//address = "ob2htHLoCu2P6tX7RrNVtiG1mYTas8NGJEVLaFEUngk";
+	try {
+		const balanceSOLANA = await solanaModule.getAddress({ id: address });
 
-	function lamportsToSol(lamports) {
-		const lamportsPerSol = 1000000000;
-		return lamports / lamportsPerSol;
+		const balance = parseFloat(parseFloat(balanceSOLANA.balance).toFixed(7));
+
+		console.log({ balance });
+
+		return balance;
+	} catch (error) {
+		console.log(error);
 	}
-
-	return {
-		status: transactions[0].status,
-		from: transactions[0].signer[0],
-		to: address,
-		value: lamportsToSol(transactions[0].sol_value).toString(),
-	};
 };
-
 ///funcion para checar transacciones en BICOIN
 /**
  * @param {string} address
@@ -332,7 +517,7 @@ const calculateCryptoValue = async (crypto, zelfName, duration) => {
 
 		return {
 			crypto,
-			amountToSend: parseFloat(cryptoValue.toFixed(8)),
+			amountToSend: parseFloat(cryptoValue.toFixed(7)),
 			ratePriceInUSDT: parseFloat(parseFloat(price).toFixed(5)),
 			wordsCount,
 			USD: priceBase,
@@ -342,60 +527,6 @@ const calculateCryptoValue = async (crypto, zelfName, duration) => {
 	} catch (error) {
 		throw error;
 	}
-};
-
-const transactionGenerateCB = async (purchase) => {
-	const zelfName = purchase.zelfName;
-	if (purchase.duration !== duration) {
-		///const previewData = (await previewZelfName({ zelfName: zelfName })) || [];
-
-		const wordsCount = zelfName.split(".zelf")[0].length;
-
-		const priceBase = _calculateZelfNamePrice(wordsCount, duration);
-
-		const recordData = {
-			zelfName: zelfName,
-			duration: duration,
-			crypto: "CB",
-			wordsCount: wordsCount,
-			USD: priceBase || 0,
-			// coinbase_hosted_url:
-			// 	previewData[0]?.publicData?.coinbase_hosted_url || "",
-		};
-
-		const updatedRecord = await modelPurchase.findByIdAndUpdate(
-			purchase._id,
-			recordData,
-			{ new: true }
-		);
-		delete updatedRecord.amountToSend;
-
-		return {
-			...cleanResponse(updatedRecord),
-		};
-	}
-};
-
-const getLease_confirmation_pay = (params) => {
-	//leaseConfirmation({network:, coin, zelfName });
-};
-
-const cleanResponse = (record) => {
-	const { _doc } = record;
-	const fieldsToRemove = [
-		"purchaseCreatedAt",
-		"updatedAt",
-		"createdAt",
-		"__v",
-		"_id",
-		"address",
-		"lastSavedTime",
-		"remainingTime",
-	];
-
-	fieldsToRemove.forEach((field) => delete _doc[field]);
-
-	return _doc;
 };
 
 const signRecordData = (recordData, secretKey) => {

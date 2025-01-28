@@ -45,7 +45,7 @@ const getAddress = async (params) => {
 
 		const _response = {
 			address: result.account,
-			balance: result.lamports / 1_000_000_000,
+			balance: result.lamports / 1_000_000_000 || 0,
 			type: result.type,
 			fiatBalance: 0,
 			account: {

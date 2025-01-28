@@ -21,10 +21,14 @@ const {
 	getCoinbaseCharge,
 } = require("../../coinbase/modules/coinbase_commerce.module");
 
-const { checkoutPay } = require("../../purchase-zelf/modules/purchase.module");
 const config = require("../../../Core/config");
 const { addPurchase } = require("./zns-token.module");
 const jwt = require("jsonwebtoken");
+const {
+	getAddress,
+} = require("../../etherscan/modules/etherscan-scrapping.module");
+
+const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -77,7 +81,7 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 			"Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'."
 		);
 
-	let price = 24;
+	let price = 20;
 
 	if (length >= 6 && length <= 15) {
 		price = zelfNamePricing["6-15"][duration];
@@ -93,7 +97,7 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	}
 
 	// Adjust price for development environment
-	price = config.env === "development" ? price / 24 : price;
+	price = config.env === "development" ? price / 20 : price;
 
 	// Round up to 2 decimal places
 	return Math.ceil(price * 100) / 100;
@@ -613,7 +617,7 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
  * @param {Object} authUser
  * @author Miguel Trevino
  */
-const leaseConfirmation = async (data, authUser) => {
+const leaseConfirmation = async (data, authUser, value) => {
 	const { network, coin, zelfName } = data;
 
 	let unpinResult;
@@ -655,19 +659,17 @@ const leaseConfirmation = async (data, authUser) => {
 
 			break;
 		case "ETH":
-			//payment = await network_scanning(zelfNameObject);
-
-			payment = await network_scanning(datos);
+			payment = await confirmPayUniqueAddress(zelfName, network, value);
 
 			break;
-		// case "SOL":
-		// 	payment = await network_scanning(zelfNameObject);
+		case "SOL":
+			payment = await confirmPayUniqueAddress(zelfName, network, value);
 
-		// 	break;
-		// case "BTC":
-		// 	payment = await network_scanning(zelfNameObject);
+			break;
+		case "BTC":
+			payment = await confirmPayUniqueAddress(zelfName, network, value);
 
-		// 	break;
+			break;
 
 		default:
 			break;
@@ -710,16 +712,6 @@ const leaseConfirmation = async (data, authUser) => {
 	};
 };
 
-const network_scanning = async (datos) => {
-	let confirmed = false;
-
-	//checkoutPay();
-	console.log(datos);
-	return {
-		confirmed: confirmed,
-	};
-};
-
 const _confirmCoinbaseCharge = async (zelfNameObject) => {
 	const chargeID =
 		zelfNameObject.publicData?.coinbase_id ||
@@ -753,8 +745,89 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed: false,
+		confirmed,
 	};
+};
+const confirmPayUniqueAddress = async (zelfName, network, value) => {
+	if (!value)
+		return {
+			confirmed: false,
+		};
+
+	console.log(zelfName, network, value);
+
+	const zelfNamePay = zelfName.replace(".zelf", ".zelfpay");
+
+	const previewData2 = await searchZelfName({
+		zelfName: zelfNamePay,
+		environment: "both",
+	});
+
+	const paymentAddressInIPFS = JSON.parse(
+		previewData2.ipfs[0].publicData.addresses
+	);
+
+	let selectedAddress = null;
+
+	switch (network.toUpperCase()) {
+		case "BTC":
+			selectedAddress = paymentAddressInIPFS.btcAddress;
+			break;
+		case "ETH":
+			selectedAddress = paymentAddressInIPFS.ethAddress;
+			break;
+		case "SOL":
+			selectedAddress = paymentAddressInIPFS.solanaAddress;
+			break;
+		default:
+			console.log("Método de pago no reconocido");
+			break;
+	}
+
+	console.log({ selectedAddress, value, network });
+
+	///selectedAddress = "0x9eB697C8500e4abc9cF6C4E17F1Be8508010bd23"; //prueba
+	const confirmed = await {
+		ETH: checkoutETH,
+		SOL: checkoutSOLANA,
+		//BTC: checkoutBICOIN,
+	}[network]?.(selectedAddress, value);
+
+	return {
+		confirmed,
+	};
+};
+
+const checkoutETH = async (address, value) => {
+	try {
+		const balanceETH = await getAddress({
+			address,
+		});
+
+		const balance = parseFloat(parseFloat(balanceETH.balance).toFixed(7));
+
+		console.log({ balance });
+
+		if (balance >= value) return true;
+
+		return false;
+	} catch (error) {
+		console.log(error);
+	}
+};
+
+const checkoutSOLANA = async (address, value) => {
+	try {
+		const balanceSOLANA = await solanaModule.getAddress({ id: address });
+
+		const balance = parseFloat(parseFloat(balanceSOLANA.balance).toFixed(7));
+
+		if (balance >= value) return true;
+
+		return false;
+	} catch (error) {
+		console.log(error);
+	}
 };
 
 /**
