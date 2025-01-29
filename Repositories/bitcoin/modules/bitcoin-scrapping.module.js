@@ -19,7 +19,7 @@ const getBalance = async (params) => {
 			}
 		);
 
-		const calculatedPrice = await calcularPrecio("BTC", data.confirmed);
+		//const calculatedPrice = await calcularPrecio("BTC", data.confirmed);
 
 		const { transactions } = await getTransactionsList(
 			{ id: params.id },
@@ -34,8 +34,8 @@ const getBalance = async (params) => {
 				currency: "USD",
 				account: {
 					asset: "BTC",
-					fiatValue: calculatedPrice.fiatValue,
-					price: calculatedPrice.price,
+					fiatValue: "",
+					price: "",
 				},
 				tokenHoldings: {
 					total: 0,

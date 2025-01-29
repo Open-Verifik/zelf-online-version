@@ -12,11 +12,13 @@ const {
 	getCoinbaseCharge,
 } = require("../../coinbase/modules/coinbase_commerce.module");
 const {
-	getTransactionStatus,
 	getAddress,
 } = require("../../etherscan/modules/etherscan-scrapping.module");
 
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
+const {
+	getBalance,
+} = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const jwt = require("jsonwebtoken");
 const secretKey = config.signedData.key;
 
@@ -83,6 +85,7 @@ const search_zelf_lease = async (zelfName) => {
 	};
 };
 const select_method = async (crypto, zelfName, duration) => {
+	console.log(crypto, zelfName, duration);
 	if (crypto === "CB") {
 		zelfName = zelfName.split(".zelf")[0].length;
 		priceBase = _calculateZelfNamePrice(zelfName, duration);
@@ -152,7 +155,6 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 			selectedAddress = paymentAddressInIPFS.solanaAddress;
 			break;
 		default:
-			console.log("Método de pago no reconocido");
 			break;
 	}
 
@@ -160,10 +162,6 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 		signedDataPrice,
 		secretKey
 	);
-	console.log({ expiresAt });
-	console.log({ zelfNamesInIPFS, durationInIPFS });
-	console.log({ zelfName, duration, amountToSend });
-	console.log({ paymentAddress, selectedAddress });
 
 	if (
 		zelfName !== zelfNamesInIPFS ||
@@ -183,20 +181,8 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 	);
 };
 
-///funcion para checar transacciones global
-/**
- * @param {string} crypto
- *
- * @param {string} origin_address
- *
- * @param {string} valorApagar
- *
- * @param {string} ratePriceInUSDT
- *
- * @param {string} zelfName
- *
- * @param {string} duration
- */
+///funcion para checar pagos con unica dirección
+
 const checkoutPayUniqueAddress = async (
 	crypto,
 	amountToSend,
@@ -210,7 +196,6 @@ const checkoutPayUniqueAddress = async (
 	}[crypto]?.(paymentAddress);
 
 	let amountDetected = balance;
-	console.log({ balance });
 
 	let transactionStatus = false;
 	let transactionDescription = "pending";
@@ -252,62 +237,50 @@ const checkoutPayUniqueAddress = async (
 	};
 };
 
-// const checkoutPayUniqueAddress = async (   no borrar
-// 	crypto,
-// 	amountToSend,
-// 	paymentAddress,
-// 	zelfName
-// ) => {
-// 	paymentAddress = "0x1BC125bC681685f216935798453F70fb423eB392"; //prueba
-// 	const transaction = await {
-// 		ETH: checkoutETH,
-// 		SOL: checkoutSOLANA,
-// 		BTC: checkoutBICOIN,
-// 	}[crypto]?.(paymentAddress);
+///funcion para checar balance en ETH
+const checkoutETH = async (address) => {
+	try {
+		const balanceETH = await getAddress({
+			address,
+		});
 
-// 	console.log({ transaction });
+		const balance = parseFloat(parseFloat(balanceETH.balance).toFixed(7));
 
-// 	let transactionStatus = false;
-// 	let transactionDescription = "pending";
+		return balance;
+	} catch (error) {
+		console.log(error);
+	}
+};
+///funcion para checar balance en SOLANA
+const checkoutSOLANA = async (address) => {
+	try {
+		const balanceSOLANA = await solanaModule.getAddress({ id: address });
 
-// 	if (!transaction) {
-// 		return {
-// 			transactionStatus: false,
-// 			transactionDescription: "undetected_transaction",
-// 			amountDetected: 0,
-// 		};
-// 	}
+		const balance = parseFloat(parseFloat(balanceSOLANA.balance).toFixed(7));
 
-// 	console.log({ amountToSend });
+		console.log({ balance });
 
-// 	let amountDetected = transaction?.value || 0;
+		return balance;
+	} catch (error) {
+		console.log(error);
+	}
+};
+///funcion para checar balance en BICOIN
 
-// 	if (amountDetected === amountToSend) {
-// 		transactionStatus = true;
-// 		transactionDescription = "successful";
-// 		await leaseConfirmation(
-// 			{ network: crypto, coin: crypto, zelfName: zelfName },
-// 			{},
-// 			amountToSend
-// 		);
-// 	} else if (amountDetected < amountToSend) {
-// 		transactionDescription = "partial_payment";
-// 	} else {
-// 		transactionStatus = true;
-// 		transactionDescription = "overpayment";
-// 		await leaseConfirmation(
-// 			{ network: crypto, coin: crypto, zelfName: zelfName },
-// 			{},
-// 			amountToSend
-// 		);
-// 	}
+const checkoutBICOIN = async (address) => {
+	//address = "bc1qw8wrek2m7nlqldll66ajnwr9mh64syvkt67zlu";
+	try {
+		const balanceBICOIN = await getBalance({ id: address });
 
-// 	return {
-// 		transactionDescription,
-// 		transactionStatus,
-// 		amountDetected,
-// 	};
-// };
+		const balance = parseFloat(parseFloat(balanceBICOIN.balance).toFixed(7));
+
+		console.log({ balance });
+
+		return balance;
+	} catch (error) {
+		console.log(error);
+	}
+};
 
 const checkoutPayCoinbase = async (zelfName) => {
 	const previewData = await previewZelfName({
@@ -368,136 +341,13 @@ const checkoutPayCoinbase = async (zelfName) => {
 	// // };
 
 	return {
-		timeline_: "o",
-		transactionDescription: "p",
+		timeline_: "",
+		transactionDescription: "",
 		transactionStatus: false,
 	};
 };
 
-///funcion para checar transacciones en ETH
-/**
- * @param {string} address
- */
-
-const checkoutETH = async (address) => {
-	console.log({ address });
-	try {
-		const balanceETH = await getAddress({
-			address,
-		});
-
-		const balance = parseFloat(parseFloat(balanceETH.balance).toFixed(7));
-
-		return balance;
-	} catch (error) {
-		console.log(error);
-	}
-};
-
-//////////////////////////////////////////////////////////////////
-// const checkoutETH = async (address) => {
-// 	try {
-// 		console.log({ address });
-// 		const { transactions } = await getAddress({
-// 			address,
-// 		});
-
-// 		const LastTxhash = await getLastInTransactionHash(transactions);
-
-// 		console.log({ LastTxhash });
-
-// 		const transaction = await getTransactionStatus({ id: LastTxhash });
-
-// 		const value = transaction.valueETH;
-
-// 		return {
-// 			status: transaction.status,
-// 			from: transaction.from,
-// 			to: transaction.to,
-// 			value: parseFloat(parseFloat(value).toFixed(7)),
-// 		};
-// 	} catch (error) {
-// 		console.log(error.status);
-// 		if (error.status === 404) {
-// 			return null;
-// 		}
-// 	}
-// };
-///funcion para checar transacciones en SOLANA
-/**
- * @param {string} address
- */
-// const checkoutSOLANA = async (address) => {
-// 	const { transactions } = await solanaModule.getTransactionsList(
-// 		{ id: address },
-// 		{ show: "10" }
-// 	);
-
-// 	function lamportsToSol(lamports) {
-// 		const lamportsPerSol = 1000000000;
-// 		return lamports / lamportsPerSol;
-// 	}
-
-// 	return {
-// 		status: transactions[0].status,
-// 		from: transactions[0].signer[0],
-// 		to: address,
-// 		value: lamportsToSol(transactions[0].sol_value).toString(),
-// 	};
-// };
-const checkoutSOLANA = async (address) => {
-	///
-	//address = "ob2htHLoCu2P6tX7RrNVtiG1mYTas8NGJEVLaFEUngk";
-	try {
-		const balanceSOLANA = await solanaModule.getAddress({ id: address });
-
-		const balance = parseFloat(parseFloat(balanceSOLANA.balance).toFixed(7));
-
-		console.log({ balance });
-
-		return balance;
-	} catch (error) {
-		console.log(error);
-	}
-};
-///funcion para checar transacciones en BICOIN
-/**
- * @param {string} address
- */
-const checkoutBICOIN = async (address) => {
-	// const { transactions } = await solanaModule.getTransactionsList(
-	// 	{ id: address },
-	// 	{ show: "10" }
-	// );
-	// function lamportsToSol(lamports) {
-	// 	const lamportsPerSol = 1000000000;
-	// 	return lamports / lamportsPerSol;
-	// }
-	// return {
-	// 	status: transactions[0].status,
-	// 	from: transactions[0].signer[0],
-	// 	to: address,
-	// 	value: lamportsToSol(transactions[0].sol_value).toString(),
-	// };
-};
-
-getLastInTransactionHash = async (transactions) => {
-	const inTransactions = transactions.filter((txn) => txn.traffic === "IN");
-
-	if (inTransactions.length === 0) {
-		return null;
-	}
-
-	const latestInTransaction = inTransactions.reduce((latest, current) => {
-		return parseInt(current.block) > parseInt(latest.block) ? current : latest;
-	});
-
-	return latestInTransaction.hash;
-};
-
-/**
- * @param {string} crypto
- */
+//calcular precio en la difrente redes
 const calculateCryptoValue = async (crypto, zelfName, duration) => {
 	const originalZelfName = zelfName.split(".zelf")[0];
 	const wordsCount = originalZelfName.length;
@@ -528,7 +378,7 @@ const calculateCryptoValue = async (crypto, zelfName, duration) => {
 		throw error;
 	}
 };
-
+//firmar el precio fijo
 const signRecordData = (recordData, secretKey) => {
 	try {
 		const token = jwt.sign(recordData, secretKey);
@@ -537,6 +387,8 @@ const signRecordData = (recordData, secretKey) => {
 		return { success: false, error: error.message };
 	}
 };
+
+//ver el precio fijo
 const verifyRecordData = (token, secretKey) => {
 	try {
 		const decodedData = jwt.verify(token, secretKey);

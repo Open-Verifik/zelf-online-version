@@ -4,7 +4,7 @@ module.exports = (server) => {
 	//B
 	require("../Repositories/bnb/routes/bnb-scrapping.route")(server);
 	require("../Repositories/binance/routes/binance.route")(server);
-	require("../Repositories/bitcoin/modules/bitcoin-scrapping.module")(server);
+	require("../Repositories/bitcoin/routes/bitcoin-scrapping.route")(server);
 	//C
 	require("../Repositories/cardano/routes/cardano-scrapping.route")(server);
 	//D

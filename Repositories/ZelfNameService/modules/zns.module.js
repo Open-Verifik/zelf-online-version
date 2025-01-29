@@ -29,6 +29,9 @@ const {
 } = require("../../etherscan/modules/etherscan-scrapping.module");
 
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
+const {
+	getBalance,
+} = require("../../bitcoin/modules/bitcoin-scrapping.module");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -790,14 +793,14 @@ const confirmPayUniqueAddress = async (zelfName, network, value) => {
 	const confirmed = await {
 		ETH: checkoutETH,
 		SOL: checkoutSOLANA,
-		//BTC: checkoutBICOIN,
+		BTC: checkoutBTC,
 	}[network]?.(selectedAddress, value);
 
 	return {
 		confirmed,
 	};
 };
-
+//verificar balance  ETH
 const checkoutETH = async (address, value) => {
 	try {
 		const balanceETH = await getAddress({
@@ -815,7 +818,7 @@ const checkoutETH = async (address, value) => {
 		console.log(error);
 	}
 };
-
+//verificar balance  SOlANA
 const checkoutSOLANA = async (address, value) => {
 	try {
 		const balanceSOLANA = await solanaModule.getAddress({ id: address });
@@ -829,7 +832,24 @@ const checkoutSOLANA = async (address, value) => {
 		console.log(error);
 	}
 };
+//verificar balance  BTC
+const checkoutBTC = async (address, value) => {
+	try {
+		const balanceBTC = await getBalance({
+			address,
+		});
 
+		const balance = parseFloat(parseFloat(balanceBTC.balance).toFixed(7));
+
+		console.log({ balance });
+
+		if (balance >= value) return true;
+
+		return false;
+	} catch (error) {
+		console.log(error);
+	}
+};
 /**
  * clone zelf name to production
  * @param {Object} zelfNameObject
