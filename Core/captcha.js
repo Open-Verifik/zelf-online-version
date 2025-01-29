@@ -13,7 +13,11 @@ const IOS_SITE_KEY = config.google.iOSSiteKey;
  * token: The generated token obtained from the client.
  * recaptchaAction: Action name corresponding to the token.
  */
-const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action-name") => {
+const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action-name", skipIt = true) => {
+	if (skipIt && config.env === "development") {
+		return 1;
+	}
+
 	const OSMapping = {
 		DESKTOP: WEB_SITE_KEY,
 		ANDROID: ANDROID_SITE_KEY,
@@ -41,6 +45,7 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 	if (!response.tokenProperties.valid) {
 		console.log(`The CreateAssessment call failed because the token was: ${response.tokenProperties.invalidReason}`, {
 			tokenProperties: response.tokenProperties,
+			recaptchaAction,
 		});
 
 		return config.env === "development" ? 1 : 0;
@@ -55,7 +60,7 @@ const createAssessment = async (token, os = "DESKTOP", recaptchaAction = "action
 		// console.log(`The reCAPTCHA score is: ${response.riskAnalysis.score}`);
 
 		response.riskAnalysis.reasons.forEach((reason) => {
-			console.log(reason);
+			console.log(reason, { recaptchaAction });
 		});
 
 		return Boolean(config.env === "development" ? 1 : response.riskAnalysis.score || 0);

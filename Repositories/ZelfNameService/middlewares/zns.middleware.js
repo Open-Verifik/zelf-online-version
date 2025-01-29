@@ -1,8 +1,6 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
 const captchaService = require("../../../Core/captcha");
 const config = require("../../../Core/config");
-const { createUnderName } = require("../modules/undernames.module");
-const ZNSTokenModule = require("../modules/zns-token.module");
 
 const schemas = {
 	search: {
@@ -48,6 +46,11 @@ const schemas = {
 	},
 	preview: {
 		zelfName: string().required(),
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
+		captchaToken: string().required(),
+	},
+	previewZelfProof: {
+		zelfProof: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string().required(),
 	},
@@ -97,7 +100,9 @@ const getValidation = async (ctx, next) => {
 
 	const _zelfName = zelfName || value;
 
-	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, _zelfName.split(".zelf")[0]) : 1;
+	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
+
+	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, captchaZelfName) : 1;
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -128,7 +133,7 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	const { type, zelfName, captchaToken, os } = ctx.request.body;
+	const { type, zelfName, captchaToken, os, skipIt } = ctx.request.body;
 
 	const typeValid = validate(schemas[type], ctx.request.body);
 
@@ -150,7 +155,9 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
+	const captchaZelfName = _getZelfNameForCaptcha(`${zelfName}`);
+
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
 
 	if (captchaScore < 0.79) {
 		_consoleLogSuspicious(ctx, captchaScore, zelfName);
@@ -162,7 +169,6 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	// await createUnderName({ parentName: config.arwave.parentName, underName: zelfName });
 	// await ZNSTokenModule.giveTokensAfterPurchase();
 
 	await next();
@@ -239,6 +245,34 @@ const _consoleLogSuspicious = (ctx, captchaScore, zelfName) => {
 		`);
 };
 
+const previewZelfProofValidation = async (ctx, next) => {
+	const validation = validate(schemas.previewZelfProof, ctx.request.body);
+
+	if (validation.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: validation.error.message };
+
+		return;
+	}
+
+	const { captchaToken, os, zelfProof } = ctx.request.body;
+
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, "preview");
+
+	if (captchaScore < 0.79) {
+		ctx.status = 409;
+
+		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+
+		console.log({ captchaFailed: true, zelfName });
+
+		return;
+	}
+
+	await next();
+};
+
 const previewValidation = async (ctx, next) => {
 	const validation = validate(schemas.preview, ctx.request.body);
 
@@ -252,7 +286,9 @@ const previewValidation = async (ctx, next) => {
 
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
+	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
+
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -289,7 +325,9 @@ const decryptValidation = async (ctx, next) => {
 
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
+	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
+
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -364,11 +402,16 @@ const updateValidation = async (ctx, next) => {
 	await next();
 };
 
+const _getZelfNameForCaptcha = (zelfName) => {
+	return zelfName.split(".zelf")[0].replace(".", "_");
+};
+
 module.exports = {
 	getValidation,
 	leaseValidation,
 	leaseConfirmationValidation,
 	previewValidation,
+	previewZelfProofValidation,
 	deleteValidation,
 	decryptValidation,
 	//offline
