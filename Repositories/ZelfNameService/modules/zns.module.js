@@ -102,6 +102,8 @@ const searchZelfName = async (params, authUser) => {
 		const searchResults = await ArweaveModule.search(params.zelfName || params.key === "zelfName" ? params.value : null, query);
 
 		if (searchResults?.available) {
+			console.log({ query });
+
 			const error = new Error("not_found_in_arweave");
 
 			error.status = 404;
@@ -209,7 +211,7 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 		if (!ipfsRecords.length) {
 			return foundInArweave
 				? []
-				: value
+				: value && value.includes(".zelf")
 				? {
 						price: _calculateZelfNamePrice(value.split(".zelf")[0].length, query.duration),
 						zelfName: value,
@@ -787,7 +789,22 @@ const _validateReferral = async (referralZelfName, authUser) => {
  */
 const previewZelfName = async (params, authUser) => {
 	try {
-		let zelfNameObjects = await _findZelfName(params.zelfName, params.environment, authUser);
+		let zelfNameObjects = await _findZelfName(
+			{
+				zelfName: params.zelfName,
+				key: params.key,
+				value: params.value,
+			},
+			params.environment,
+			authUser
+		);
+
+		console.log({
+			zelfNameObjects,
+			zelfName: params.zelfName,
+			key: params.key,
+			value: params.value,
+		});
 
 		if (!Array.isArray(zelfNameObjects)) {
 			zelfNameObjects = [zelfNameObjects];
@@ -811,6 +828,40 @@ const previewZelfName = async (params, authUser) => {
 	} catch (exception) {
 		return await _previewWithIPFS(params, authUser);
 	}
+};
+
+/**
+ * preview Zelf name
+ * @param {String} zelfName
+ * @param {Object} authUser
+ */
+const previewZelfProof = async (zelfProof, authUser) => {
+	// try {
+	let zelfNameObject = await preview({ zelfProof });
+
+	return zelfNameObject;
+	// 	if (!Array.isArray(zelfNameObjects)) {
+	// 		zelfNameObjects = [zelfNameObjects];
+	// 	}
+
+	// 	for (let index = 0; index < zelfNameObjects.length; index++) {
+	// 		const zelfNameObject = zelfNameObjects[index];
+
+	// 		if (zelfNameObject.ipfs_pin_hash && zelfNameObject.publicData.arweaveId) {
+	// 			zelfNameObject.url = `${arweaveUrl}/${zelfNameObject.publicData.arweaveId}`;
+
+	// 			zelfNameObject.explorerUrl = `${explorerUrl}/${zelfNameObject.publicData.arweaveId}`;
+	// 		}
+
+	// 		zelfNameObject.source = zelfNameObject.ipfs_pin_hash ? "ipfs" : "arweave";
+
+	// 		zelfNameObject.preview = await preview({ zelfProof: zelfNameObject.zelfProof });
+	// 	}
+
+	// 	return zelfNameObjects;
+	// } catch (exception) {
+	// 	return await _previewWithIPFS(params, authUser);
+	// }
 };
 
 /**
@@ -839,10 +890,14 @@ const _previewWithIPFS = async (params, authUser) => {
 	}
 };
 
-const _findZelfName = async (zelfName, environment = "both", authUser) => {
+const _findZelfName = async (params, environment = "both", authUser) => {
+	const { zelfName, key, value } = params;
+
 	const searchResults = await searchZelfName(
 		{
 			zelfName,
+			key,
+			value,
 			environment,
 		},
 		authUser
@@ -850,9 +905,7 @@ const _findZelfName = async (zelfName, environment = "both", authUser) => {
 
 	if (!searchResults.arweave?.length && !searchResults.ipfs?.length) {
 		const error = new Error(`zelfName_not_found`);
-
 		error.status = 404;
-
 		throw error;
 	}
 
@@ -871,7 +924,7 @@ const _findZelfName = async (zelfName, environment = "both", authUser) => {
  * @param {Object} authUser
  */
 const decryptZelfName = async (params, authUser) => {
-	const zelfNameObjects = await _findZelfName(params.zelfName, "both", authUser);
+	const zelfNameObjects = await _findZelfName({ zelfName: params.zelfName }, "both", authUser);
 
 	const zelfNameObject = zelfNameObjects[0];
 
@@ -1075,6 +1128,7 @@ module.exports = {
 	leaseZelfName,
 	leaseConfirmation,
 	previewZelfName,
+	previewZelfProof,
 	decryptZelfName,
 	//Offline
 	leaseOffline,

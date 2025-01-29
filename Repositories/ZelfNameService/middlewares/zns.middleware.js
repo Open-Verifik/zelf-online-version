@@ -49,6 +49,11 @@ const schemas = {
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string().required(),
 	},
+	previewZelfProof: {
+		zelfProof: string().required(),
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
+		captchaToken: string().required(),
+	},
 	revenueCatWebhook: {
 		product_id: string().required(),
 		period_type: string().required(),
@@ -240,6 +245,34 @@ const _consoleLogSuspicious = (ctx, captchaScore, zelfName) => {
 		`);
 };
 
+const previewZelfProofValidation = async (ctx, next) => {
+	const validation = validate(schemas.previewZelfProof, ctx.request.body);
+
+	if (validation.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: validation.error.message };
+
+		return;
+	}
+
+	const { captchaToken, os, zelfProof } = ctx.request.body;
+
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, "preview");
+
+	if (captchaScore < 0.79) {
+		ctx.status = 409;
+
+		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+
+		console.log({ captchaFailed: true, zelfName });
+
+		return;
+	}
+
+	await next();
+};
+
 const previewValidation = async (ctx, next) => {
 	const validation = validate(schemas.preview, ctx.request.body);
 
@@ -378,6 +411,7 @@ module.exports = {
 	leaseValidation,
 	leaseConfirmationValidation,
 	previewValidation,
+	previewZelfProofValidation,
 	deleteValidation,
 	decryptValidation,
 	//offline

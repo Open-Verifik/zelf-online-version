@@ -21,6 +21,8 @@ module.exports = (server) => {
 
 	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewZelfName);
 
+	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof);
+
 	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptZelfName);
 
 	server.post(`${PATH}/revenue-cat`, Middleware.revenueCatWebhookValidation, Controller.revenueCatWebhook);

@@ -63,6 +63,20 @@ const previewZelfName = async (ctx) => {
 	}
 };
 
+const previewZelfProof = async (ctx) => {
+	try {
+		const data = await Module.previewZelfProof(ctx.request.body.zelfProof, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 const decryptZelfName = async (ctx) => {
 	try {
 		const data = await Module.decryptZelfName(
@@ -136,6 +150,7 @@ module.exports = {
 	leaseZelfName,
 	leaseConfirmation,
 	previewZelfName,
+	previewZelfProof,
 	decryptZelfName,
 	leaseOfflineZelfName,
 	revenueCatWebhook,
