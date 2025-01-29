@@ -175,7 +175,7 @@ const addPurchaseReward = async (zelfNameObject) => {
 	}
 };
 
-const releaseReward = async (authUser) => {
+const releaseReferralRewards = async (authUser) => {
 	let referralRewards = null;
 	let firstGroup = null;
 
@@ -232,9 +232,51 @@ const releaseReward = async (authUser) => {
 	}
 };
 
+const releasePurchaseRewards = async (authUser) => {
+	const purchaseReward = await MongoORM.buildQuery({ where_status: "pending", findOne: true }, PurchaseRewardModel, null);
+
+	try {
+		if (!purchaseReward) {
+			return { nothingToProcess: true };
+		}
+
+		// if attempts is 5 then mark it as failed
+		if (purchaseReward.attempts === 5) {
+			purchaseReward.status = "failed";
+
+			purchaseReward.completedAt = new Date();
+
+			await purchaseReward.save();
+
+			return purchaseReward;
+		}
+
+		await giveTokensAfterPurchase(firstGroup);
+
+		purchaseReward.status = "completed";
+		purchaseReward.completedAt = new Date();
+		purchaseReward.attempts += 1;
+
+		await purchaseReward.save();
+
+		return purchaseReward;
+	} catch (error) {
+		console.error("Error releasing reward:", error);
+
+		purchaseReward.status = "pending";
+
+		purchaseReward.attempts += 1;
+
+		await purchaseReward.save();
+
+		throw error; // Re-throw for higher-level error handling if needed
+	}
+};
+
 module.exports = {
 	addReferralReward,
 	addPurchaseReward,
-	releaseReward,
+	releaseReferralRewards,
+	releasePurchaseRewards,
 	giveTokensAfterPurchase,
 };

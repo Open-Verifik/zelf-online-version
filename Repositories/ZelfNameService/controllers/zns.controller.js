@@ -119,7 +119,21 @@ const revenueCatWebhook = async (ctx) => {
 
 const referralRewards = async (ctx) => {
 	try {
-		const data = await ZNSTokenModule.releaseReward(ctx.state.user);
+		const data = await ZNSTokenModule.releaseReferralRewards(ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
+const purchaseRewards = async (ctx) => {
+	try {
+		const data = await ZNSTokenModule.releasePurchaseRewards(ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -155,5 +169,6 @@ module.exports = {
 	leaseOfflineZelfName,
 	revenueCatWebhook,
 	referralRewards,
+	purchaseRewards,
 	update,
 };

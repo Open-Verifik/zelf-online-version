@@ -27,7 +27,7 @@ module.exports = (server) => {
 
 	server.post(`${PATH}/revenue-cat`, Middleware.revenueCatWebhookValidation, Controller.revenueCatWebhook);
 
-	// server.del(`${PATH}/:id`, Middleware.deleteValidation, Controller.destroy);
+	server.post(`${PATH}/purchase-rewards`, Middleware.referralRewardsValidation, Controller.purchaseRewards);
 
 	server.post(`${PATH}/referral-rewards`, Middleware.referralRewardsValidation, Controller.referralRewards);
 

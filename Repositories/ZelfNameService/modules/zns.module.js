@@ -614,7 +614,7 @@ const _confirmZelfNamePurchase = async (zelfNameObject) => {
 		? await addReferralReward({
 				ethAddress: masterIPFSRecord.metadata.ethAddress,
 				solanaAddress: masterIPFSRecord.metadata.solanaAddress,
-				zelfName: zelfNameObject.publicData.zelfName,
+				zelfName: masterIPFSRecord.metadata.zelfName,
 				zelfNamePrice: zelfNameObject.publicData.price,
 				referralZelfName: zelfNameObject.publicData.referralZelfName,
 				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
@@ -626,20 +626,19 @@ const _confirmZelfNamePurchase = async (zelfNameObject) => {
 	await addPurchaseReward({
 		ethAddress: masterIPFSRecord.metadata.ethAddress,
 		solanaAddress: masterIPFSRecord.metadata.solanaAddress,
-		zelfName: zelfNameObject.publicData.zelfName,
+		zelfName: masterIPFSRecord.metadata.zelfName,
 		zelfNamePrice: zelfNameObject.publicData.price,
 		ipfsHash: masterIPFSRecord.IpfsHash,
 		arweaveId: masterArweaveRecord.id,
 	});
 
 	// now here we will create the undername
-	await createUnderName({
-		parentName: config.arwave.parentName,
-		undername: zelfNameObject.publicData.zelfName.split(".zelf")[0],
-	});
+	// await createUnderName({
+	// 	parentName: config.arwave.parentName,
+	// 	undername: zelfNameObject.publicData.zelfName.split(".zelf")[0],
+	// });
 
 	return {
-		zelfNameObject,
 		ipfs: [masterIPFSRecord],
 		arweave: [masterArweaveRecord],
 	};
