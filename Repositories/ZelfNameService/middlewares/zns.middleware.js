@@ -325,18 +325,18 @@ const decryptValidation = async (ctx, next) => {
 
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
-	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
+	// const captchaZelfName = _getZelfNameForCaptcha(zelfName);
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName);
+	// const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
-	if (captchaScore < 0.79) {
-		ctx.status = 409;
+	// if (captchaScore < 0.79) {
+	// 	ctx.status = 409;
 
-		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
-		console.log({ captchaFailed: true, zelfName });
+	// 	ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+	// 	console.log({ captchaFailed: true, zelfName });
 
-		return;
-	}
+	// 	return;
+	// }
 
 	await next();
 };
