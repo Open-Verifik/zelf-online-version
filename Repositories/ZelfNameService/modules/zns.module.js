@@ -392,6 +392,7 @@ const leaseZelfName = async (params, authUser) => {
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
 			zelfName,
+			origin: "online",
 		},
 		metadata: {
 			mnemonic,
@@ -919,13 +920,6 @@ const previewZelfName = async (params, authUser) => {
 			authUser
 		);
 
-		console.log({
-			zelfNameObjects,
-			zelfName: params.zelfName,
-			key: params.key,
-			value: params.value,
-		});
-
 		if (!Array.isArray(zelfNameObjects)) {
 			zelfNameObjects = [zelfNameObjects];
 		}
@@ -958,32 +952,9 @@ const previewZelfName = async (params, authUser) => {
  * @param {Object} authUser
  */
 const previewZelfProof = async (zelfProof, authUser) => {
-	// try {
 	let zelfNameObject = await preview({ zelfProof });
 
 	return zelfNameObject;
-	// 	if (!Array.isArray(zelfNameObjects)) {
-	// 		zelfNameObjects = [zelfNameObjects];
-	// 	}
-
-	// 	for (let index = 0; index < zelfNameObjects.length; index++) {
-	// 		const zelfNameObject = zelfNameObjects[index];
-
-	// 		if (zelfNameObject.ipfs_pin_hash && zelfNameObject.publicData.arweaveId) {
-	// 			zelfNameObject.url = `${arweaveUrl}/${zelfNameObject.publicData.arweaveId}`;
-
-	// 			zelfNameObject.explorerUrl = `${explorerUrl}/${zelfNameObject.publicData.arweaveId}`;
-	// 		}
-
-	// 		zelfNameObject.source = zelfNameObject.ipfs_pin_hash ? "ipfs" : "arweave";
-
-	// 		zelfNameObject.preview = await preview({ zelfProof: zelfNameObject.zelfProof });
-	// 	}
-
-	// 	return zelfNameObjects;
-	// } catch (exception) {
-	// 	return await _previewWithIPFS(params, authUser);
-	// }
 };
 
 /**
@@ -998,8 +969,10 @@ const _previewWithIPFS = async (params, authUser) => {
 
 		if (!searchResult || searchResult?.available) throw new Error("404:not_found");
 
-		searchResult[0].preview = await preview({
-			zelfProof: searchResult[0].zelfProof,
+		const zelfNameObject = searchResult.arweave?.length ? searchResult.arweave[0] : searchResult.ipfs[0] || searchResult[0];
+
+		zelfNameObject.preview = await preview({
+			zelfProof: zelfNameObject.zelfProof,
 		});
 
 		return searchResult;
@@ -1131,6 +1104,7 @@ const leaseOffline = async (params, authUser) => {
 
 	if (holdRecord)
 		return {
+			existed: true,
 			...holdRecord,
 			zelfName,
 			preview: _preview,

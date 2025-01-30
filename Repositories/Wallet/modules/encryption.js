@@ -97,6 +97,7 @@ const decrypt = async (data) => {
 
 		console.error({
 			data: _error,
+			exception: exception.response,
 			os: data.os || "DESKTOP",
 			password: data.password || undefined,
 			senseprint_base_64: data.zelfProof,
