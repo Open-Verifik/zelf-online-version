@@ -7,16 +7,13 @@ const instance = getCleanInstance(30000);
  */
 const getTickerPrice = async (params) => {
 	try {
-		let url = `${config.binance.urlBinance}api/v3/ticker/price?symbol=${params.symbol}`;
-
-		if (params.symbol === undefined) {
-			url = `${config.binance.urlBinance}api/v3/ticker/price`;
-		}
+		let url = `https://api.exchange.coinbase.com/products/${params.symbol}-USD/ticker`;
 
 		const { data } = await instance.get(url);
 
-		return data;
+		return { price: data.price };
 	} catch (error) {
+		console.log(error);
 		throw new Error(`409:${error.response.data.msg}`);
 	}
 };

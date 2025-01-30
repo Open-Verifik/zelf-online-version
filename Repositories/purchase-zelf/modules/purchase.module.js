@@ -50,7 +50,7 @@ const search_zelf_lease = async (zelfName) => {
 	const wordsCount = cryptoValue.wordsCount;
 	const ratePriceInUSDT = cryptoValue.ratePriceInUSDT;
 
-	console.log(parseInt(duration));
+	console.log({ date_pinned });
 
 	const recordData = {
 		zelfName,
@@ -353,7 +353,7 @@ const calculateCryptoValue = async (crypto, zelfName, duration) => {
 	const wordsCount = originalZelfName.length;
 
 	try {
-		const { price } = await getTickerPrice({ symbol: `${crypto}USDT` });
+		const { price } = await getTickerPrice({ symbol: `${crypto}` });
 
 		if (!price) {
 			throw new Error(

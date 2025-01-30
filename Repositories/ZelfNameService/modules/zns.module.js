@@ -70,7 +70,7 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	if (!["1", "2", "3", "4", "5", "lifetime"].includes(`${duration}`))
 		throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
 
-	let price = 20;
+	let price = 24;
 
 	if (length >= 6 && length <= 15) {
 		price = zelfNamePricing["6-15"][duration];
@@ -86,7 +86,7 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	}
 
 	// Adjust price for development environment
-	price = config.env === "development" ? price / 20 : price;
+	price = config.env === "development" ? price / 60 : price;
 
 	// Round up to 2 decimal places
 	return Math.ceil(price * 100) / 100;
@@ -700,7 +700,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed,
+		confirmed: false,
 	};
 };
 const confirmPayUniqueAddress = async (zelfName, network, value) => {
