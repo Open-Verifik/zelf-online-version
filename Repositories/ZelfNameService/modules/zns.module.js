@@ -392,6 +392,7 @@ const leaseZelfName = async (params, authUser) => {
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
 			zelfName,
+			origin: "online",
 		},
 		metadata: {
 			mnemonic,
