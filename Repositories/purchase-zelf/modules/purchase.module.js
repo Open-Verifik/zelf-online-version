@@ -8,17 +8,11 @@ const {
 	previewZelfName,
 	searchZelfName,
 } = require("../../ZelfNameService/modules/zns.module");
-const {
-	getCoinbaseCharge,
-} = require("../../coinbase/modules/coinbase_commerce.module");
-const {
-	getAddress,
-} = require("../../etherscan/modules/etherscan-scrapping.module");
+const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
+const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
-const {
-	getBalance,
-} = require("../../bitcoin/modules/bitcoin-scrapping.module");
+const { getBalance } = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const jwt = require("jsonwebtoken");
 const secretKey = config.signedData.key;
 
@@ -49,8 +43,6 @@ const search_zelf_lease = async (zelfName) => {
 	const amountToSend = cryptoValue.amountToSend;
 	const wordsCount = cryptoValue.wordsCount;
 	const ratePriceInUSDT = cryptoValue.ratePriceInUSDT;
-
-	console.log({ date_pinned });
 
 	const recordData = {
 		zelfName,
@@ -138,9 +130,7 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 		environment: "both",
 	});
 
-	const paymentAddressInIPFS = JSON.parse(
-		previewData2.ipfs[0].publicData.addresses
-	);
+	const paymentAddressInIPFS = JSON.parse(previewData2.ipfs[0].publicData.addresses);
 
 	let selectedAddress = null;
 
@@ -158,37 +148,20 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 			break;
 	}
 
-	const { zelfName, duration, amountToSend } = verifyRecordData(
-		signedDataPrice,
-		secretKey
-	);
+	const { zelfName, duration, amountToSend } = verifyRecordData(signedDataPrice, secretKey);
 
-	if (
-		zelfName !== zelfNamesInIPFS ||
-		duration !== durationInIPFS ||
-		paymentAddress !== selectedAddress
-	) {
+	if (zelfName !== zelfNamesInIPFS || duration !== durationInIPFS || paymentAddress !== selectedAddress) {
 		const error = new Error("Validation_failed");
 		error.status = 409;
 		throw error;
 	}
 
-	return await checkoutPayUniqueAddress(
-		crypto,
-		amountToSend,
-		paymentAddress,
-		zelfName
-	);
+	return await checkoutPayUniqueAddress(crypto, amountToSend, paymentAddress, zelfName);
 };
 
 ///funcion para checar pagos con unica dirección
 
-const checkoutPayUniqueAddress = async (
-	crypto,
-	amountToSend,
-	paymentAddress,
-	zelfName
-) => {
+const checkoutPayUniqueAddress = async (crypto, amountToSend, paymentAddress, zelfName) => {
 	const balance = await {
 		ETH: checkoutETH,
 		SOL: checkoutSOLANA,
@@ -212,13 +185,8 @@ const checkoutPayUniqueAddress = async (
 	try {
 		if (amountDetected >= amountToSend) {
 			transactionStatus = true;
-			transactionDescription =
-				amountDetected === amountToSend ? "successful" : "overPayment";
-			await leaseConfirmation(
-				{ network: crypto, coin: crypto, zelfName },
-				{},
-				amountToSend
-			);
+			transactionDescription = amountDetected === amountToSend ? "successful" : "overPayment";
+			await leaseConfirmation({ network: crypto, coin: crypto, zelfName }, {}, amountToSend);
 		} else {
 			transactionDescription = "partialPayment";
 			remainingAmount = amountToSend - amountDetected;
@@ -356,9 +324,7 @@ const calculateCryptoValue = async (crypto, zelfName, duration) => {
 		const { price } = await getTickerPrice({ symbol: `${crypto}` });
 
 		if (!price) {
-			throw new Error(
-				`No se encontró información para la criptomoneda: ${crypto}`
-			);
+			throw new Error(`No se encontró información para la criptomoneda: ${crypto}`);
 		}
 
 		const priceBase = _calculateZelfNamePrice(wordsCount, duration);
