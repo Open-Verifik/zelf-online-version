@@ -701,7 +701,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed: false,
+		confirmed,
 	};
 };
 const confirmPayUniqueAddress = async (zelfName, network, value) => {
@@ -1181,7 +1181,10 @@ const update = async (params, authUser) => {
 
 	const { ipfs_pin_hash, publicData } = holdRecord;
 
-	holdRecord.price = _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration);
+	holdRecord.price = _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration, holdRecord.publicData.referralZelfName);
+
+	// imprime el valor de price
+	console.log("price", holdRecord.price);
 
 	holdRecord.coinbaseCharge = await createCoinbaseCharge({
 		name: `${holdRecord.zelfName}`,
