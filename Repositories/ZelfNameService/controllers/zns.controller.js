@@ -135,6 +135,11 @@ const referralRewards = async (ctx) => {
 	}
 };
 
+/**
+ * purchase rewards for user
+ * @param {Object} ctx
+ * @returns {Object} data
+ */
 const purchaseRewards = async (ctx) => {
 	try {
 		const data = await ZNSTokenModule.releasePurchaseRewards(ctx.state.user);

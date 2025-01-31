@@ -16,7 +16,7 @@ let connection;
 // Token mint address (ZNS token address)
 const tokenMintAddress = new solanaWeb3.PublicKey("GfF6PSkH8bKLkws5RMFdzgASwcVbgCfhhKfp8zeoFBkx"); // Replace with actual token mint address
 
-const giveTokensAfterPurchase = async (reward) => {
+const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 	try {
 		const senderKey = Uint8Array.from(JSON.parse(config.solana.sender));
 		const senderWallet = solanaWeb3.Keypair.fromSecretKey(senderKey);
@@ -36,17 +36,17 @@ const giveTokensAfterPurchase = async (reward) => {
 
 		const tokenBalance = await connection.getTokenAccountBalance(senderTokenAccount.address);
 
-		console.log("Sender Token Account Balance:", tokenBalance.value.uiAmount);
+		console.log({ tokenBalance, senderWallet });
 
 		// Ensure sender has enough tokens to send
-		const amountToSend = reward.zelfNamePriceSum * 0.25 * 10 ** 8; // 1 ZNS token (assuming 8 decimals)
+		const amountToSend = Math.round(amount * 10 ** 8);
 
 		if (tokenBalance.value.amount < amountToSend) {
 			throw new Error("Insufficient balance in sender's token account.");
 		}
 
 		// Receiver's public key
-		const receiverPublicKey = new solanaWeb3.PublicKey(reward.referralSolanaAddress);
+		const receiverPublicKey = new solanaWeb3.PublicKey(receiverSolanaAddress);
 
 		// Get the receiver's associated token account address
 		const associatedTokenAddress = await splToken.getAssociatedTokenAddress(tokenMintAddress, receiverPublicKey);
@@ -159,6 +159,7 @@ const addPurchaseReward = async (zelfNameObject) => {
 			ethAddress: zelfNameObject.ethAddress,
 			solanaAddress: zelfNameObject.solanaAddress,
 			zelfNamePrice: zelfNameObject.zelfNamePrice,
+			tokenAmount: Math.round(zelfNameObject.zelfNamePrice * config.token.rewardPrice),
 			status: "pending",
 			attempts: 0,
 			payload: {},
@@ -232,30 +233,39 @@ const releaseReferralRewards = async (authUser) => {
 	}
 };
 
+/**
+ * release purchase rewards
+ * @param {Object} authUser
+ * @returns
+ * @author Miguel Trevino
+ */
 const releasePurchaseRewards = async (authUser) => {
 	const purchaseReward = await MongoORM.buildQuery({ where_status: "pending", findOne: true }, PurchaseRewardModel, null);
 
+	if (!purchaseReward) {
+		return { nothingToProcess: true };
+	}
+
+	// if attempts is 5 then mark it as failed
+	if (purchaseReward.attempts === 5) {
+		purchaseReward.status = "failed";
+
+		purchaseReward.completedAt = new Date();
+
+		await purchaseReward.save();
+
+		return purchaseReward;
+	}
+
 	try {
-		if (!purchaseReward) {
-			return { nothingToProcess: true };
-		}
+		console.log("Processing purchase reward:", purchaseReward);
 
-		// if attempts is 5 then mark it as failed
-		if (purchaseReward.attempts === 5) {
-			purchaseReward.status = "failed";
-
-			purchaseReward.completedAt = new Date();
-
-			await purchaseReward.save();
-
-			return purchaseReward;
-		}
-
-		await giveTokensAfterPurchase(firstGroup);
+		const signature = await giveTokensAfterPurchase(purchaseReward.zelfNamePrice / config.token.rewardPrice, purchaseReward.solanaAddress);
 
 		purchaseReward.status = "completed";
 		purchaseReward.completedAt = new Date();
 		purchaseReward.attempts += 1;
+		purchaseReward.payload = { signature };
 
 		await purchaseReward.save();
 

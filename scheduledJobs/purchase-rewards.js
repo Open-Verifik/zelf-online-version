@@ -8,7 +8,7 @@ const baseUrl = `http://localhost:${process.env.PORT}`;
 
 const _run = async () => {
 	const response = await axios.post(
-		`${baseUrl}/api/zelf-name-service/referral-rewards`,
+		`${baseUrl}/api/zelf-name-service/purchase-rewards`,
 		{},
 		{
 			headers: {
