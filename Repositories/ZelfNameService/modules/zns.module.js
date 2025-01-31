@@ -701,7 +701,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed: config.env === "development" ? true : confirmed,
+		confirmed: config.env === "development_" ? true : confirmed,
 	};
 };
 const confirmPayUniqueAddress = async (zelfName, network, value) => {
