@@ -470,7 +470,7 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 					price: zelfNameObject.price,
 					duration: zelfNameObject.duration || 1,
 					coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
-					referralZelfName: referralZelfName || "migueltrevino.zelf",
+					referralZelfName: referralZelfName || null,
 					referralSolanaAddress:
 						referralZelfNameObject?.publicData?.solanaAddress || referralZelfNameObject?.metadata?.solanaAddress || "no_referral",
 				}),
