@@ -18,9 +18,7 @@ const configuration = {
 			"https://vision-verifik-ocr.cognitiveservices.azure.com/computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=read&language=en&gender-neutral-caption=False",
 		forms: {
 			key: process.env.AZURE_VISION_FORMS_KEY || "NOKEY",
-			endpoint:
-				process.env.AZURE_VISION_FORMS_ENDPOINT ||
-				"https://verifik-forms.cognitiveservices.azure.com",
+			endpoint: process.env.AZURE_VISION_FORMS_ENDPOINT || "https://verifik-forms.cognitiveservices.azure.com",
 		},
 	},
 	openai: {
@@ -74,16 +72,12 @@ const configuration = {
 	zelfEncrypt: {
 		serverKey: process.env.ZELF_ENCRYPT_SERVER_KEY,
 	},
-	opencv: {
-		environment: process.env.OPENCV_ENV || "production",
-		defaultClient:
-			process.env.OPENCV_DEFAULT_CLIENT || "613375a1eab2fe08527f81e2",
-		url: "https://us.opencv.fr",
-		apiKey: process.env.OPENCV_APIKEY || null,
-	},
 	zelfProof: {
 		url: process.env.ZELF_PROOF_URL || "https://api.zelf.world",
 		apiKey: process.env.ZELF_PROOF_API_KEY || "password",
+	},
+	token: {
+		rewardPrice: process.env.REWARD_PRICE || 0.1,
 	},
 	pgp: {
 		secretKey: process.env.PGP_SECRET_KEY || "",
@@ -143,6 +137,7 @@ const configuration = {
 		allowedEmail: process.env.REVENUECAT_ALLOWED_EMAIL,
 	},
 	solana: {
+		senderPublicKey: process.env.SOLANA_SENDER_PUBLIC_KEY,
 		sender: process.env.SENDER_KEY,
 	},
 	addressZelf: [
@@ -180,7 +175,6 @@ const configuration = {
 			id: "XRP",
 			address: "rvpkkVqZyqPFz4uzT4YbbrBMLzuUUyTdm",
 		},
-		//...{}
 	],
 };
 

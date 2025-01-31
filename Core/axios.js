@@ -21,17 +21,6 @@ const getAzureInstance = () => {
 	return _azureInstance;
 };
 
-const getOpenCVInstance = () => {
-	_openCVInstance = axios.create({
-		baseURL: config.opencv.url,
-		timeout: 36000,
-	});
-
-	_openCVInstance.defaults.headers.common["X-API-Key"] = config.opencv.apiKey;
-
-	return _openCVInstance;
-};
-
 const getDefaultInstance = (timeout) => {
 	_defaultAxios = axios.create({
 		timeout: timeout ?? 25000,
@@ -64,6 +53,6 @@ module.exports = {
 	getDefaultInstance,
 	getCleanInstance,
 	getAzureInstance,
-	getOpenCVInstance,
+
 	getEncryptionInstance,
 };
