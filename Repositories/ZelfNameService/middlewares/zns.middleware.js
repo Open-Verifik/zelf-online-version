@@ -149,9 +149,9 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	if (zelfName.length < 13) {
+	if (zelfName.length < 6) {
 		ctx.status = 409;
-		ctx.body = { validationError: "ZelfName should be 8 characters or more." };
+		ctx.body = { validationError: "ZelfName should be 1 character or more." };
 		return;
 	}
 

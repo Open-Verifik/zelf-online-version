@@ -807,7 +807,10 @@ const checkoutBTC = async (address, value) => {
  * @author Miguel Trevino
  */
 const _cloneZelfNameToProduction = async (zelfNameObject) => {
-	// first clone it to ipfs, then to arweave
+	const duration = zelfNameObject.publicData.duration === "lifetime" ? 100 : zelfNameObject.publicData.duration || 1;
+
+	const expiresAt = moment().add(duration, "year").format("YYYY-MM-DD HH:mm:ss");
+
 	const payload = {
 		base64: zelfNameObject.zelfProofQRCode,
 		name: zelfNameObject.preview?.publicData.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", ""),
@@ -815,9 +818,7 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 			hasPassword: `${Boolean(zelfNameObject.preview?.passwordLayer === "Password")}`,
 			zelfProof: zelfNameObject.publicData.zelfProof,
 			...zelfNameObject.preview?.publicData,
-			expiresAt: moment()
-				.add(zelfNameObject.publicData.duration || 1, "year")
-				.format("YYYY-MM-DD HH:mm:ss"),
+			expiresAt,
 			type: "mainnet",
 		},
 		pinIt: true,
@@ -831,9 +832,7 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 		publicData: {
 			...zelfNameObject.preview?.publicData,
 			type: "mainnet",
-			expiresAt: moment()
-				.add(zelfNameObject.publicData.duration || 1, "year")
-				.format("YYYY-MM-DD HH:mm:ss"),
+			expiresAt,
 		},
 	});
 
