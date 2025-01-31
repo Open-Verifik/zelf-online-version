@@ -18,6 +18,10 @@ const {
 const jwt = require("jsonwebtoken");
 const secretKey = config.signedData.key;
 
+const {
+	getCoinbaseCharge,
+} = require("../../coinbase/modules/coinbase_commerce.module");
+
 const search_zelf_lease = async (zelfName) => {
 	const previewData = await searchZelfName({ zelfName: zelfName });
 
@@ -105,8 +109,6 @@ const select_method = async (
 		zelfName = zelfName.split(".zelf")[0].length;
 		if (referralSolanaAddress === "no_referral") {
 			referralSolanaAddress = false;
-		} else {
-			referralSolanaAddress = true;
 		}
 		priceBase = _calculateZelfNamePrice(
 			zelfName,
@@ -150,10 +152,6 @@ const select_method = async (
 };
 
 const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
-	if (crypto === "CB") {
-		return await checkoutPayCoinbase(zelfName_);
-	}
-
 	const previewData2 = await searchZelfName({
 		zelfName: zelfName_,
 		environment: "hold",
@@ -166,15 +164,21 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 		throw error;
 	}
 
+	const chargeID =
+		previewData2.ipfs[0].publicData.coinbase_hosted_url.split("/pay/")[1];
 	const zelfNamesInIPFS =
 		previewData2.ipfs[0].publicData.zelfName.split(".hold")[0];
 	const durationInIPFS = parseFloat(previewData2.ipfs[0].publicData.duration);
 	const expiresAt = previewData2.ipfs[0].publicData.expiresAt;
 	const referralZelfNameInIPFS =
-		previewData2.ipfs[0].publicData.referralZelfName || false;
+		previewData2.ipfs[0].publicData.referralZelfName;
 
 	const referralSolanaAddressInIPFS =
-		previewData2.ipfs[0].publicData.referralSolanaAddress || false;
+		previewData2.ipfs[0].publicData.referralSolanaAddress;
+
+	if (crypto === "CB") {
+		return await checkoutPayCoinbase(chargeID);
+	}
 
 	const zelfNamePay = zelfName_.replace(".zelf", ".zelfpay");
 
@@ -182,8 +186,6 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 		zelfName: zelfNamePay,
 		environment: "both",
 	});
-
-	console.log({ durationInIPFS, zelfNamesInIPFS, referralZelfNameInIPFS });
 
 	const paymentAddressInIPFS = JSON.parse(
 		previewData3.ipfs[0].publicData.addresses
@@ -213,7 +215,14 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 		referralSolanaAddress,
 	} = verifyRecordData(signedDataPrice, secretKey);
 
-	console.log({ zelfName, duration, referralZelfName });
+	console.log({
+		zelfNamesInIPFS,
+		durationInIPFS,
+		referralZelfNameInIPFS,
+		referralSolanaAddressInIPFS,
+	});
+
+	console.log({ zelfName, duration, referralZelfName, referralSolanaAddress });
 
 	if (
 		zelfName !== zelfNamesInIPFS ||
@@ -289,7 +298,15 @@ const checkoutPayUniqueAddress = async (
 		remainingAmount: parseFloat(parseFloat(remainingAmount).toFixed(7)),
 	};
 };
+///funcion para checar pagos en coinbase
+const checkoutPayCoinbase = async (chargeID) => {
+	console.log({ chargeID });
+	const charge = await getCoinbaseCharge(chargeID);
 
+	if (!charge) return false;
+
+	return { timeline: charge.timeline };
+};
 ///funcion para checar balance en ETH
 const checkoutETH = async (address) => {
 	try {
@@ -356,8 +373,6 @@ const calculateCryptoValue = async (
 		console.log({ crypto, zelfName, duration, referralSolanaAddress });
 		if (referralSolanaAddress === "no_referral") {
 			referralSolanaAddress = false;
-		} else {
-			referralSolanaAddress = true;
 		}
 		const priceBase = _calculateZelfNamePrice(
 			wordsCount,
