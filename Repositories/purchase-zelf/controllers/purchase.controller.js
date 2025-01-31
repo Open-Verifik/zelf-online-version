@@ -18,10 +18,22 @@ const search_zelf_lease = async (ctx) => {
 };
 
 const select_method = async (ctx) => {
-	const { crypto, zelfName, duration } = ctx.request.body;
+	const {
+		crypto,
+		zelfName,
+		duration,
+		referralZelfName,
+		referralSolanaAddress,
+	} = ctx.request.body;
 
 	try {
-		const data = await Module.select_method(crypto, zelfName, duration);
+		const data = await Module.select_method(
+			crypto,
+			zelfName,
+			duration,
+			referralZelfName,
+			referralSolanaAddress
+		);
 
 		ctx.body = { data };
 	} catch (error) {
