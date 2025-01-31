@@ -5,6 +5,7 @@ const Schema = mongoose.Schema;
 const { ObjectId, String } = mongoose.Schema.Types;
 
 const { requiredEnumField, requiredField, refField, defaultField, addBasicPlugins } = require("../../../Core/mongoose-utils");
+const { token } = require("../../../Core/config");
 
 //####################################################//
 
@@ -29,6 +30,7 @@ const PurchaseRewardSchema = new Schema({
 	ipfsHash: requiredField(String),
 	arweaveId: requiredField(String),
 	zelfNamePrice: requiredField(Number),
+	tokenAmount: requiredField(Number),
 	payload: {
 		type: Object,
 		default: {},

@@ -612,7 +612,6 @@ const leaseConfirmation = async (data, authUser, value) => {
 	}
 
 	if (payment?.confirmed) {
-		//move this to another function
 		return await _confirmZelfNamePurchase(zelfNameObject);
 	}
 
@@ -647,7 +646,7 @@ const _confirmZelfNamePurchase = async (zelfNameObject) => {
 		  })
 		: "no_referral";
 
-	await addPurchaseReward({
+	const reward = await addPurchaseReward({
 		ethAddress: masterIPFSRecord.metadata.ethAddress,
 		solanaAddress: masterIPFSRecord.metadata.solanaAddress,
 		zelfName: masterIPFSRecord.metadata.zelfName,
@@ -665,6 +664,7 @@ const _confirmZelfNamePurchase = async (zelfNameObject) => {
 	return {
 		ipfs: [masterIPFSRecord],
 		arweave: [masterArweaveRecord],
+		reward,
 	};
 };
 
@@ -701,7 +701,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed,
+		confirmed: config.env === "development" ? true : confirmed,
 	};
 };
 const confirmPayUniqueAddress = async (zelfName, network, value) => {

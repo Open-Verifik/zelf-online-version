@@ -159,6 +159,7 @@ const addPurchaseReward = async (zelfNameObject) => {
 			ethAddress: zelfNameObject.ethAddress,
 			solanaAddress: zelfNameObject.solanaAddress,
 			zelfNamePrice: zelfNameObject.zelfNamePrice,
+			tokenAmount: Math.round(zelfNameObject.zelfNamePrice * config.token.rewardPrice),
 			status: "pending",
 			attempts: 0,
 			payload: {},
