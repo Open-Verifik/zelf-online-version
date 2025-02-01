@@ -88,6 +88,8 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	// Adjust price for development environment
 	price = config.env === "development" ? price / 60 : price;
 
+	if (config.token.whitelist.includes(referralZelfName)) return 0;
+
 	// Round up to 2 decimal places
 	return Math.ceil(price * 100) / 100;
 };
@@ -379,7 +381,9 @@ const _createWalletsFromPhrase = async (params, authUser) => {
  */
 const leaseZelfName = async (params, authUser) => {
 	const { zelfName, duration, referralZelfName } = params;
+
 	await _findDuplicatedZelfName(zelfName, "both", authUser);
+
 	const referralZelfNameObject = await _validateReferral(referralZelfName, authUser);
 
 	const { eth, btc, solana, zkProof, mnemonic, face, password } = await _createWalletsFromPhrase(params, authUser);
@@ -1182,9 +1186,6 @@ const update = async (params, authUser) => {
 
 	holdRecord.price = _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration, holdRecord.publicData.referralZelfName);
 
-	// imprime el valor de price
-	console.log("price", holdRecord.price);
-
 	holdRecord.coinbaseCharge = await createCoinbaseCharge({
 		name: `${holdRecord.zelfName}`,
 		description: `Purchase of the Zelf Name > ${holdRecord.zelfName} for $${holdRecord.price}`,
@@ -1232,9 +1233,7 @@ module.exports = {
 	decryptZelfName,
 	_calculateZelfNamePrice,
 	_confirmCoinbaseCharge,
-	//Offline
 	leaseOffline,
 	saveInProduction: _cloneZelfNameToProduction,
-	//update,
 	update,
 };

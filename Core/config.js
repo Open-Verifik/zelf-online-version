@@ -78,6 +78,7 @@ const configuration = {
 	},
 	token: {
 		rewardPrice: process.env.REWARD_PRICE || 0.1,
+		whitelist: process.env.WHITELIST,
 	},
 	pgp: {
 		secretKey: process.env.PGP_SECRET_KEY || "",
