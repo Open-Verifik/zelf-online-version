@@ -52,28 +52,20 @@ const search_zelf_lease = async (zelfName) => {
 		zelfName: zelfNamePay,
 		environment: "both",
 	});
-	console.log({ referralZelfName });
-	const cryptoValue = await calculateCryptoValue(
-		"ETH",
-		zelfName,
-		duration,
-		referralSolanaAddress
-	);
+
+	console.log({ USD });
+
+	const cryptoValue = await calculateCryptoValue("ETH", USD);
+
 	const crypto = cryptoValue.crypto;
 	const amountToSend = cryptoValue.amountToSend;
-	const wordsCount = cryptoValue.wordsCount;
 	const ratePriceInUSDT = cryptoValue.ratePriceInUSDT;
 
 	const recordData = {
-		zelfName,
-		duration: parseInt(duration),
 		crypto: crypto,
 		amountToSend: cryptoValue.amountToSend,
-		wordsCount: cryptoValue.wordsCount,
 		USD: cryptoValue.USD,
 		ratePriceInUSDT: cryptoValue.ratePriceInUSDT,
-		referralZelfName,
-		referralSolanaAddress,
 	};
 
 	const signedDataPrice = signRecordData(recordData, secretKey);
@@ -92,61 +84,30 @@ const search_zelf_lease = async (zelfName) => {
 		coinbase_hosted_url,
 		crypto,
 		amountToSend,
-		wordsCount,
 		referralSolanaAddress,
 		ratePriceInUSDT,
 		signedDataPrice,
 	};
 };
-const select_method = async (
-	crypto,
-	zelfName,
-	duration,
-	referralZelfName,
-	referralSolanaAddress
-) => {
+const select_method = async (crypto, price) => {
 	if (crypto === "CB") {
-		zelfName = zelfName.split(".zelf")[0].length;
-		if (referralSolanaAddress === "no_referral") {
-			referralSolanaAddress = false;
-		}
-		priceBase = _calculateZelfNamePrice(
-			zelfName,
-			duration,
-			referralSolanaAddress
-		);
 		return {
 			crypto,
-			USD: priceBase,
-			duration,
+			USD: price,
 			amountToSend: "",
 		};
 	}
 
-	const cryptoValue = await calculateCryptoValue(
-		crypto,
-		zelfName,
-		duration,
-		referralSolanaAddress
-	);
+	const cryptoValue = await calculateCryptoValue(crypto, price);
 
 	const recordData = {
-		zelfName,
-		duration: parseInt(duration),
 		crypto: crypto,
 		amountToSend: cryptoValue.amountToSend,
-		wordsCount: cryptoValue.wordsCount,
 		USD: cryptoValue.USD,
 		ratePriceInUSDT: cryptoValue.ratePriceInUSDT,
-		referralZelfName,
-		referralZelfName,
-		referralSolanaAddress,
 	};
 
 	const signedDataPrice = signRecordData(recordData, secretKey);
-	delete recordData.referralZelfName;
-	delete recordData.referralSolanaAddress;
-	delete recordData.zelfName;
 
 	return { ...recordData, signedDataPrice };
 };
@@ -168,13 +129,8 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 		previewData2.ipfs[0].publicData.coinbase_hosted_url.split("/pay/")[1];
 	const zelfNamesInIPFS =
 		previewData2.ipfs[0].publicData.zelfName.split(".hold")[0];
-	const durationInIPFS = parseFloat(previewData2.ipfs[0].publicData.duration);
+	const priceInIPFS = parseFloat(previewData2.ipfs[0].publicData.price);
 	const expiresAt = previewData2.ipfs[0].publicData.expiresAt;
-	const referralZelfNameInIPFS =
-		previewData2.ipfs[0].publicData.referralZelfName;
-
-	const referralSolanaAddressInIPFS =
-		previewData2.ipfs[0].publicData.referralSolanaAddress;
 
 	if (crypto === "CB") {
 		return await checkoutPayCoinbase(chargeID);
@@ -190,7 +146,7 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 	const paymentAddressInIPFS = JSON.parse(
 		previewData3.ipfs[0].publicData.addresses
 	);
-	console.log(paymentAddressInIPFS);
+
 	let selectedAddress = null;
 
 	switch (crypto.toUpperCase()) {
@@ -207,29 +163,19 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 			break;
 	}
 
-	const {
-		zelfName,
-		duration,
-		amountToSend,
-		referralZelfName,
-		referralSolanaAddress,
-	} = verifyRecordData(signedDataPrice, secretKey);
+	const { USD, amountToSend } = verifyRecordData(signedDataPrice, secretKey);
 
-	console.log({
-		zelfNamesInIPFS,
-		durationInIPFS,
-		referralZelfNameInIPFS,
-		referralSolanaAddressInIPFS,
-	});
+	console.log({ priceInIPFS, zelfNamesInIPFS });
 
-	console.log({ zelfName, duration, referralZelfName, referralSolanaAddress });
+	console.log({ USD, zelfName_, amountToSend });
 
 	if (
-		zelfName !== zelfNamesInIPFS ||
-		duration !== durationInIPFS ||
-		referralZelfName !== referralZelfNameInIPFS ||
-		paymentAddress !== selectedAddress ||
-		referralSolanaAddress !== referralSolanaAddressInIPFS
+		//zelfName_ !== zelfNamesInIPFS ||
+		USD !== priceInIPFS
+		//duration !== durationInIPFS ||
+		//referralZelfName !== referralZelfNameInIPFS ||
+		//paymentAddress !== selectedAddress ||
+		//referralSolanaAddress !== referralSolanaAddressInIPFS
 	) {
 		const error = new Error("Validation_failed");
 		error.status = 409;
@@ -240,7 +186,7 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 		crypto,
 		amountToSend,
 		paymentAddress,
-		zelfName
+		zelfName_
 	);
 };
 
@@ -353,15 +299,7 @@ const checkoutBICOIN = async (address) => {
 };
 
 //calcular precio en la difrente redes
-const calculateCryptoValue = async (
-	crypto,
-	zelfName,
-	duration,
-	referralSolanaAddress
-) => {
-	const originalZelfName = zelfName.split(".zelf")[0];
-	const wordsCount = originalZelfName.length;
-
+const calculateCryptoValue = async (crypto, price_) => {
 	try {
 		const { price } = await getTickerPrice({ symbol: `${crypto}` });
 
@@ -370,26 +308,27 @@ const calculateCryptoValue = async (
 				`No se encontró información para la criptomoneda: ${crypto}`
 			);
 		}
-		console.log({ crypto, zelfName, duration, referralSolanaAddress });
-		if (referralSolanaAddress === "no_referral") {
-			referralSolanaAddress = false;
-		}
-		const priceBase = _calculateZelfNamePrice(
-			wordsCount,
-			duration,
-			referralSolanaAddress
-		);
+		// console.log({ crypto, zelfName, duration, referralSolanaAddress });
+		// if (referralSolanaAddress === "no_referral") {
+		// 	referralSolanaAddress = false;
+		// }
+		// const priceBase = _calculateZelfNamePrice(
+		// 	wordsCount,
+		// 	duration,
+		// 	referralSolanaAddress
+		// );
 
-		const cryptoValue = priceBase / price;
+		console.log({ price_, price });
+
+		const cryptoValue = price_ / price;
+
+		console.log({ cryptoValue });
 
 		return {
 			crypto,
 			amountToSend: parseFloat(cryptoValue.toFixed(7)),
 			ratePriceInUSDT: parseFloat(parseFloat(price).toFixed(5)),
-			wordsCount,
-			USD: priceBase,
-			duration,
-			zelfName: originalZelfName,
+			USD: price_,
 		};
 	} catch (error) {
 		throw error;

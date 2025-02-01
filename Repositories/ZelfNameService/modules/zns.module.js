@@ -100,7 +100,7 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	}
 
 	// Adjust price for development environment
-	price = config.env === "development" ? price / 60 : price;
+	price = config.env === "development" ? price / 70 : price;
 
 	// Round up to 2 decimal places
 	return Math.ceil(price * 100) / 100;
@@ -789,57 +789,60 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed: config.env === "development_" ? true : confirmed,
+		confirmed: config.env === "development" ? true : confirmed,
 	};
 };
 const confirmPayUniqueAddress = async (zelfName, network, value) => {
-	if (!value)
+	try {
+		if (!value)
+			return {
+				confirmed: false,
+			};
+
+		console.log(zelfName, network, value);
+
+		const zelfNamePay = zelfName.replace(".zelf", ".zelfpay");
+
+		const previewData2 = await searchZelfName({
+			zelfName: zelfNamePay,
+			environment: "both",
+		});
+
+		const paymentAddressInIPFS = JSON.parse(
+			previewData2.ipfs[0].publicData.addresses
+		);
+
+		let selectedAddress = null;
+
+		switch (network.toUpperCase()) {
+			case "BTC":
+				selectedAddress = paymentAddressInIPFS.btcAddress;
+				break;
+			case "ETH":
+				selectedAddress = paymentAddressInIPFS.ethAddress;
+				break;
+			case "SOL":
+				selectedAddress = paymentAddressInIPFS.solanaAddress;
+				break;
+			default:
+				console.log("Método de pago no reconocido");
+				break;
+		}
+
+		const confirmed = await {
+			ETH: checkoutETH,
+			SOL: checkoutSOLANA,
+			BTC: checkoutBTC,
+		}[network]?.(selectedAddress, value);
+
 		return {
-			confirmed: false,
+			confirmed,
 		};
-
-	console.log(zelfName, network, value);
-
-	const zelfNamePay = zelfName.replace(".zelf", ".zelfpay");
-
-	const previewData2 = await searchZelfName({
-		zelfName: zelfNamePay,
-		environment: "both",
-	});
-
-	const paymentAddressInIPFS = JSON.parse(
-		previewData2.ipfs[0].publicData.addresses
-	);
-
-	let selectedAddress = null;
-
-	switch (network.toUpperCase()) {
-		case "BTC":
-			selectedAddress = paymentAddressInIPFS.btcAddress;
-			break;
-		case "ETH":
-			selectedAddress = paymentAddressInIPFS.ethAddress;
-			break;
-		case "SOL":
-			selectedAddress = paymentAddressInIPFS.solanaAddress;
-			break;
-		default:
-			console.log("Método de pago no reconocido");
-			break;
+	} catch (e) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
 	}
-
-	console.log({ selectedAddress, value, network });
-
-	///selectedAddress = "0x9eB697C8500e4abc9cF6C4E17F1Be8508010bd23"; //prueba
-	const confirmed = await {
-		ETH: checkoutETH,
-		SOL: checkoutSOLANA,
-		BTC: checkoutBTC,
-	}[network]?.(selectedAddress, value);
-
-	return {
-		confirmed,
-	};
 };
 //verificar balance  ETH
 const checkoutETH = async (address, value) => {
