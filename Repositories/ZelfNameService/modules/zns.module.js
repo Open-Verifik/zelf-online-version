@@ -890,7 +890,7 @@ const _validateReferral = async (referralZelfName, authUser) => {
 
 	let notFound = Boolean(searchResult.available);
 
-	if (!notFound) return searchResult.arweave?.length ? searchResult.arweave[0] : searchResult.ipfs[0];
+	if (!notFound) return searchResult.ipfs?.length ? searchResult.ipfs[0] : searchResult.arweave[0];
 
 	const error = new Error("zelfName_referring_you_not_found");
 
@@ -965,7 +965,7 @@ const _previewWithIPFS = async (params, authUser) => {
 
 		if (!searchResult || searchResult?.available) throw new Error("404:not_found");
 
-		const zelfNameObject = searchResult.arweave?.length ? searchResult.arweave[0] : searchResult.ipfs[0] || searchResult[0];
+		const zelfNameObject = searchResult.ipfs?.length ? searchResult.ipfs[0] : searchResult.arweave[0] || searchResult[0];
 
 		zelfNameObject.preview = await preview({
 			zelfProof: zelfNameObject.zelfProof,
