@@ -593,6 +593,7 @@ const leaseConfirmation = async (data, authUser, value) => {
 
 	switch (network) {
 		case "coinbase":
+		case "CB":
 			payment = await _confirmCoinbaseCharge(zelfNameObject);
 
 			break;
