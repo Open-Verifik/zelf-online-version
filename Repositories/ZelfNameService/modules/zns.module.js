@@ -526,7 +526,7 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
 		base64: image,
 		name: paymentName,
 		metadata: {
-			hasPassword: "true",
+			hasPassword: zelfNameObject.hasPassword,
 			zelfProof,
 			expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
 			type: "mainnet",
@@ -696,8 +696,6 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 	for (let index = 0; index < timeline.length; index++) {
 		const _timeline = timeline[index];
 
-		console.log(_timeline);
-
 		if (_timeline.status === "COMPLETED") {
 			confirmed = true;
 		}
@@ -705,7 +703,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed: config.env === "development_" ? true : confirmed,
+		confirmed: config.env === "development" ? true : confirmed,
 	};
 };
 const confirmPayUniqueAddress = async (zelfName, network, value) => {
@@ -819,7 +817,11 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 		base64: zelfNameObject.zelfProofQRCode,
 		name: zelfNameObject.preview?.publicData.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", ""),
 		metadata: {
-			hasPassword: `${Boolean(zelfNameObject.preview?.passwordLayer === "Password")}`,
+			hasPassword: `${
+				Boolean(zelfNameObject.preview?.passwordLayer === "Password") ||
+				Boolean(zelfNameObject.hasPassword) ||
+				zelfNameObject.publicData.hasPassword
+			}`,
 			zelfProof: zelfNameObject.publicData.zelfProof,
 			...zelfNameObject.preview?.publicData,
 			expiresAt,
