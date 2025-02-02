@@ -108,8 +108,6 @@ const searchZelfName = async (params, authUser) => {
 		const searchResults = await ArweaveModule.search(params.zelfName || params.key === "zelfName" ? params.value : null, query);
 
 		if (searchResults?.available) {
-			console.log({ query });
-
 			const error = new Error("not_found_in_arweave");
 
 			error.status = 404;
@@ -712,8 +710,6 @@ const confirmPayUniqueAddress = async (zelfName, network, value) => {
 			confirmed: false,
 		};
 
-	console.log(zelfName, network, value);
-
 	const zelfNamePay = zelfName.replace(".zelf", ".zelfpay");
 
 	const previewData2 = await searchZelfName({
@@ -736,11 +732,10 @@ const confirmPayUniqueAddress = async (zelfName, network, value) => {
 			selectedAddress = paymentAddressInIPFS.solanaAddress;
 			break;
 		default:
-			console.log("Método de pago no reconocido");
-			break;
+			const error = new Error("payment_method_not_supported");
+			error.status = 403;
+			throw error;
 	}
-
-	console.log({ selectedAddress, value, network });
 
 	///selectedAddress = "0x9eB697C8500e4abc9cF6C4E17F1Be8508010bd23"; //prueba
 	const confirmed = await {
@@ -761,8 +756,6 @@ const checkoutETH = async (address, value) => {
 		});
 
 		const balance = parseFloat(parseFloat(balanceETH.balance).toFixed(7));
-
-		console.log({ balance });
 
 		if (balance >= value) return true;
 
@@ -793,8 +786,6 @@ const checkoutBTC = async (address, value) => {
 		});
 
 		const balance = parseFloat(parseFloat(balanceBTC.balance).toFixed(7));
-
-		console.log({ balance });
 
 		if (balance >= value) return true;
 
