@@ -464,11 +464,11 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 		zelfProof: zelfNameObject.zelfProof,
 		zelfName: holdName,
 		hasPassword: zelfNameObject.hasPassword || "false",
-		payment: JSON.stringify({
+		payment: {
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
 			coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
-		}),
+		},
 		expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
 		type: "hold",
 	};
@@ -478,6 +478,8 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 
 		metadata.payment.referralSolanaAddress = referralZelfNameObject?.publicData?.solanaAddress || referralZelfNameObject?.metadata?.solanaAddress;
 	}
+
+	metadata.payment = JSON.stringify(metadata.payment);
 
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{
