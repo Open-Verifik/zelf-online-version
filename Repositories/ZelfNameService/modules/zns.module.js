@@ -474,9 +474,9 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 	};
 
 	if (referralZelfName && referralZelfNameObject) {
-		metadata.referralZelfName = referralZelfName;
+		metadata.payment.referralZelfName = referralZelfName;
 
-		metadata.referralSolanaAddress = referralZelfNameObject?.publicData?.solanaAddress || referralZelfNameObject?.metadata?.solanaAddress;
+		metadata.payment.referralSolanaAddress = referralZelfNameObject?.publicData?.solanaAddress || referralZelfNameObject?.metadata?.solanaAddress;
 	}
 
 	zelfNameObject.ipfs = await IPFSModule.insert(
