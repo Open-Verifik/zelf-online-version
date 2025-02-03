@@ -537,27 +537,32 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 		cancel_url: "https://name.zelf.world/#/coinbase-cancel",
 	});
 
+	const metadata = {
+		zelfProof: zelfNameObject.zelfProof,
+		zelfName: holdName,
+		hasPassword: zelfNameObject.hasPassword || "false",
+		payment: JSON.stringify({
+			price: zelfNameObject.price,
+			duration: zelfNameObject.duration || 1,
+			coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
+		}),
+		expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
+		type: "hold",
+	};
+
+	if (referralZelfName && referralZelfNameObject) {
+		metadata.referralZelfName = referralZelfName;
+
+		metadata.referralSolanaAddress =
+			referralZelfNameObject?.publicData?.solanaAddress ||
+			referralZelfNameObject?.metadata?.solanaAddress;
+	}
+
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{
 			base64: zelfNameObject.image,
 			name: holdName,
-			metadata: {
-				zelfProof: zelfNameObject.zelfProof,
-				zelfName: holdName,
-				hasPassword: zelfNameObject.hasPassword,
-				payment: JSON.stringify({
-					price: zelfNameObject.price,
-					duration: zelfNameObject.duration || 1,
-					coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
-					referralZelfName: referralZelfName || null,
-					referralSolanaAddress:
-						referralZelfNameObject?.publicData?.solanaAddress ||
-						referralZelfNameObject?.metadata?.solanaAddress ||
-						"no_referral",
-				}),
-				expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
-				type: "hold",
-			},
+			metadata,
 			pinIt: true,
 		},
 		{ ...authUser, pro: true }
@@ -575,12 +580,16 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
 
 	const zkProof = await OfflineProofModule.createProof(mnemonic);
 
+	// save it now in ipfs and arweave
+	const paymentName = `${zelfNameObject.zelfName}`.replace(".zelf", ".zelfpay");
+
 	const dataToEncrypt = {
 		publicData: {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
 			customerZelfName: zelfNameObject.zelfName,
+			zelfName: paymentName,
 		},
 		metadata: {
 			mnemonic,
@@ -588,16 +597,13 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
 		},
 		faceBase64: jsonfile.faceBase64,
 		password: jsonfile.password,
-		_id: `payment_${zelfNameObject.zelfName}.hold`,
+		_id: paymentName,
 		tolerance: "REGULAR",
 		addServerPassword: true,
 	};
 
 	const zelfProof = await encrypt(dataToEncrypt);
 	const image = await encryptQR(dataToEncrypt);
-
-	// save it now in ipfs and arweave
-	const paymentName = `${zelfNameObject.zelfName}`.replace(".zelf", ".zelfpay");
 
 	const payload = {
 		base64: image,
@@ -1348,6 +1354,18 @@ const update = async (params, authUser) => {
 		cancel_url: "https://purchase.zelf.world/#/coinbase-cancel",
 	});
 
+	console.log({
+		base64: holdRecord.zelfProofQRCode,
+		name: holdRecord.zelfName,
+		metadata: {
+			...publicData,
+			price: `${holdRecord.price}`,
+			duration,
+			coinbase_hosted_url: holdRecord.coinbaseCharge.hosted_url,
+		},
+		pinIt: true,
+	});
+
 	const updatedRecord = await IPFSModule.update(
 		ipfs_pin_hash,
 		{
@@ -1355,7 +1373,7 @@ const update = async (params, authUser) => {
 			name: holdRecord.zelfName,
 			metadata: {
 				...publicData,
-				price: holdRecord.price,
+				price: `${holdRecord.price}`,
 				duration,
 				coinbase_hosted_url: holdRecord.coinbaseCharge.hosted_url,
 			},

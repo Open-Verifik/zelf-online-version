@@ -37,8 +37,7 @@ const show = async (data, authUser) => {
 const insert = async (data, authUser) => {
 	const { base64, metadata, name, pinIt } = data;
 
-	if ((authUser.pro || config.env === "development") && pinIt)
-		return await IPFS.pinFile(base64, name, null, metadata);
+	if ((authUser.pro || config.env === "development") && pinIt) return await IPFS.pinFile(base64, name, null, metadata);
 
 	return await IPFS.upload(base64, name, null, metadata);
 };
@@ -53,7 +52,7 @@ const update = async (previousIpfsPinHash, data, authUser) => {
 	//unpin previous file
 	await IPFS.unPinFiles([previousIpfsPinHash]);
 
-	const { base64, metadata, name, pinIt } = data;
+	const { base64, metadata, name } = data;
 
 	return await IPFS.pinFile(base64, name, null, {
 		zelfName: metadata.zelfName,
