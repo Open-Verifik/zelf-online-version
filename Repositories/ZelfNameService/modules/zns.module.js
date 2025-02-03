@@ -102,6 +102,8 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	// Adjust price for development environment
 	price = config.env === "development" ? price / 70 : price;
 
+	if (config.token.whitelist.includes(referralZelfName)) return 0;
+
 	// Round up to 2 decimal places
 	return Math.ceil(price * 100) / 100;
 };
@@ -125,8 +127,6 @@ const searchZelfName = async (params, authUser) => {
 		);
 
 		if (searchResults?.available) {
-			console.log({ query });
-
 			const error = new Error("not_found_in_arweave");
 
 			error.status = 404;
@@ -441,7 +441,9 @@ const _createWalletsFromPhrase = async (params, authUser) => {
  */
 const leaseZelfName = async (params, authUser) => {
 	const { zelfName, duration, referralZelfName } = params;
+
 	await _findDuplicatedZelfName(zelfName, "both", authUser);
+
 	const referralZelfNameObject = await _validateReferral(
 		referralZelfName,
 		authUser
@@ -601,7 +603,7 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
 		base64: image,
 		name: paymentName,
 		metadata: {
-			hasPassword: "true",
+			hasPassword: zelfNameObject.hasPassword,
 			zelfProof,
 			expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
 			type: "mainnet",
@@ -676,6 +678,7 @@ const leaseConfirmation = async (data, authUser, value) => {
 
 	switch (network) {
 		case "coinbase":
+		case "CB":
 			payment = await _confirmCoinbaseCharge(zelfNameObject);
 
 			break;
@@ -780,8 +783,6 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 	for (let index = 0; index < timeline.length; index++) {
 		const _timeline = timeline[index];
 
-		console.log(_timeline);
-
 		if (_timeline.status === "COMPLETED") {
 			confirmed = true;
 		}
@@ -853,8 +854,6 @@ const checkoutETH = async (address, value) => {
 
 		const balance = parseFloat(parseFloat(balanceETH.balance).toFixed(7));
 
-		console.log({ balance });
-
 		if (balance >= value) return true;
 
 		return false;
@@ -885,8 +884,6 @@ const checkoutBTC = async (address, value) => {
 
 		const balance = parseFloat(parseFloat(balanceBTC.balance).toFixed(7));
 
-		console.log({ balance });
-
 		if (balance >= value) return true;
 
 		return false;
@@ -900,21 +897,29 @@ const checkoutBTC = async (address, value) => {
  * @author Miguel Trevino
  */
 const _cloneZelfNameToProduction = async (zelfNameObject) => {
-	// first clone it to ipfs, then to arweave
+	const duration =
+		zelfNameObject.publicData.duration === "lifetime"
+			? 100
+			: zelfNameObject.publicData.duration || 1;
+
+	const expiresAt = moment()
+		.add(duration, "year")
+		.format("YYYY-MM-DD HH:mm:ss");
+
 	const payload = {
 		base64: zelfNameObject.zelfProofQRCode,
 		name:
 			zelfNameObject.preview?.publicData.zelfName ||
 			zelfNameObject.publicData.zelfName.replace(".hold", ""),
 		metadata: {
-			hasPassword: `${Boolean(
-				zelfNameObject.preview?.passwordLayer === "Password"
-			)}`,
+			hasPassword: `${
+				Boolean(zelfNameObject.preview?.passwordLayer === "Password") ||
+				Boolean(zelfNameObject.hasPassword) ||
+				zelfNameObject.publicData.hasPassword
+			}`,
 			zelfProof: zelfNameObject.publicData.zelfProof,
 			...zelfNameObject.preview?.publicData,
-			expiresAt: moment()
-				.add(zelfNameObject.publicData.duration || 1, "year")
-				.format("YYYY-MM-DD HH:mm:ss"),
+			expiresAt,
 			type: "mainnet",
 		},
 		pinIt: true,
@@ -930,9 +935,7 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 			publicData: {
 				...zelfNameObject.preview?.publicData,
 				type: "mainnet",
-				expiresAt: moment()
-					.add(zelfNameObject.publicData.duration || 1, "year")
-					.format("YYYY-MM-DD HH:mm:ss"),
+				expiresAt,
 			},
 		}
 	);
@@ -1009,9 +1012,9 @@ const _validateReferral = async (referralZelfName, authUser) => {
 	let notFound = Boolean(searchResult.available);
 
 	if (!notFound)
-		return searchResult.arweave?.length
-			? searchResult.arweave[0]
-			: searchResult.ipfs[0];
+		return searchResult.ipfs?.length
+			? searchResult.ipfs[0]
+			: searchResult.arweave[0];
 
 	const error = new Error("zelfName_referring_you_not_found");
 
@@ -1092,9 +1095,9 @@ const _previewWithIPFS = async (params, authUser) => {
 		if (!searchResult || searchResult?.available)
 			throw new Error("404:not_found");
 
-		const zelfNameObject = searchResult.arweave?.length
-			? searchResult.arweave[0]
-			: searchResult.ipfs[0] || searchResult[0];
+		const zelfNameObject = searchResult.ipfs?.length
+			? searchResult.ipfs[0]
+			: searchResult.arweave[0] || searchResult[0];
 
 		zelfNameObject.preview = await preview({
 			zelfProof: zelfNameObject.zelfProof,
@@ -1326,9 +1329,6 @@ const update = async (params, authUser) => {
 		holdRecord.publicData.referralZelfName
 	);
 
-	// imprime el valor de price
-	console.log("price", holdRecord.price);
-
 	holdRecord.coinbaseCharge = await createCoinbaseCharge({
 		name: `${holdRecord.zelfName}`,
 		description: `Purchase of the Zelf Name > ${holdRecord.zelfName} for $${holdRecord.price}`,
@@ -1376,9 +1376,7 @@ module.exports = {
 	decryptZelfName,
 	_calculateZelfNamePrice,
 	_confirmCoinbaseCharge,
-	//Offline
 	leaseOffline,
 	saveInProduction: _cloneZelfNameToProduction,
-	//update,
 	update,
 };
