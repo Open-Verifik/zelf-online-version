@@ -53,10 +53,7 @@ const search_zelf_lease = async (zelfName) => {
 		environment: "both",
 	});
 
-	console.log({ USD });
-
 	const cryptoValue = await calculateCryptoValue("ETH", USD);
-
 	const crypto = cryptoValue.crypto;
 	const amountToSend = cryptoValue.amountToSend;
 	const ratePriceInUSDT = cryptoValue.ratePriceInUSDT;
@@ -127,10 +124,8 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 
 	const chargeID =
 		previewData2.ipfs[0].publicData.coinbase_hosted_url.split("/pay/")[1];
-	const zelfNamesInIPFS =
-		previewData2.ipfs[0].publicData.zelfName.split(".hold")[0];
+
 	const priceInIPFS = parseFloat(previewData2.ipfs[0].publicData.price);
-	const expiresAt = previewData2.ipfs[0].publicData.expiresAt;
 
 	if (crypto === "CB") {
 		return await checkoutPayCoinbase(chargeID);
@@ -165,18 +160,7 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 
 	const { USD, amountToSend } = verifyRecordData(signedDataPrice, secretKey);
 
-	console.log({ priceInIPFS, zelfNamesInIPFS });
-
-	console.log({ USD, zelfName_, amountToSend });
-
-	if (
-		//zelfName_ !== zelfNamesInIPFS ||
-		USD !== priceInIPFS
-		//duration !== durationInIPFS ||
-		//referralZelfName !== referralZelfNameInIPFS ||
-		//paymentAddress !== selectedAddress ||
-		//referralSolanaAddress !== referralSolanaAddressInIPFS
-	) {
+	if (USD !== priceInIPFS) {
 		const error = new Error("Validation_failed");
 		error.status = 409;
 		throw error;
@@ -246,7 +230,6 @@ const checkoutPayUniqueAddress = async (
 };
 ///funcion para checar pagos en coinbase
 const checkoutPayCoinbase = async (chargeID) => {
-	console.log({ chargeID });
 	const charge = await getCoinbaseCharge(chargeID);
 
 	if (!charge) return false;
@@ -274,8 +257,6 @@ const checkoutSOLANA = async (address) => {
 
 		const balance = parseFloat(parseFloat(balanceSOLANA.balance).toFixed(7));
 
-		console.log({ balance });
-
 		return balance;
 	} catch (error) {
 		console.log(error);
@@ -289,8 +270,6 @@ const checkoutBICOIN = async (address) => {
 		const balanceBICOIN = await getBalance({ id: address });
 
 		const balance = parseFloat(parseFloat(balanceBICOIN.balance).toFixed(7));
-
-		console.log({ balance });
 
 		return balance;
 	} catch (error) {
@@ -308,21 +287,8 @@ const calculateCryptoValue = async (crypto, price_) => {
 				`No se encontró información para la criptomoneda: ${crypto}`
 			);
 		}
-		// console.log({ crypto, zelfName, duration, referralSolanaAddress });
-		// if (referralSolanaAddress === "no_referral") {
-		// 	referralSolanaAddress = false;
-		// }
-		// const priceBase = _calculateZelfNamePrice(
-		// 	wordsCount,
-		// 	duration,
-		// 	referralSolanaAddress
-		// );
-
-		console.log({ price_, price });
 
 		const cryptoValue = price_ / price;
-
-		console.log({ cryptoValue });
 
 		return {
 			crypto,
