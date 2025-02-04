@@ -90,7 +90,7 @@ const getTransactionsList = async (params, query) => {
 			},
 		}
 	);
-	return { transactions: data.data.transactions };
+	return { solanaTransaction: data.data.transactions };
 };
 
 /**
