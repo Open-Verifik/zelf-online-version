@@ -41,7 +41,7 @@ const getAddress = async (params) => {
 			type: result.type,
 			account: {
 				asset: "SOL",
-				fiatValue: "0",
+				fiatBalance: "0",
 				price: price_usdt.data.metadata.tokens.So11111111111111111111111111111111111111112.price_usdt,
 			},
 			tokenHoldings: null,
@@ -50,12 +50,22 @@ const getAddress = async (params) => {
 		if (_response) {
 			_response.fiatBalance = (_response.balance * _response.account.price).toFixed(5);
 
-			_response.account.fiatValue = (_response.balance * _response.account.price).toFixed(5);
+			_response.account.fiatBalance = (_response.balance * _response.account.price).toFixed(5);
 		}
 
-		console.log({ _response });
-
 		_response.tokenHoldings = await getTokens({ id: params.id });
+
+		_response.tokenHoldings.tokens.unshift({
+			tokenType: "SOL",
+			fiatBalance: Number(_response.account.fiatBalance),
+			symbol: "SOL",
+			name: "Solana",
+			price: _response.account.price,
+			image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.net/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+			amount: _response.balance,
+		});
+
+		_response.transactions = await getTransactionsList({ id: params.id }, { show: 20 });
 
 		if (_response.tokenHoldings.balance) _response.fiatBalance += _response.tokenHoldings.balance;
 
@@ -82,6 +92,7 @@ const getTransactionsList = async (params, query) => {
 			"user-agent": generateRandomUserAgent(),
 		},
 	});
+
 	return { transactions: data.data.transactions };
 };
 

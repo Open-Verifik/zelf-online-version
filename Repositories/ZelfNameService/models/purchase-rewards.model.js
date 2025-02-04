@@ -18,12 +18,10 @@ const PurchaseRewardSchema = new Schema({
 	ethAddress: {
 		type: String,
 		required: true,
-		unique: true,
 	},
 	solanaAddress: {
 		type: String,
 		required: true,
-		unique: true,
 	},
 	status: requiredEnumField(String, ["pending", "completed", "failed"], "pending"),
 	attempts: requiredField(Number),

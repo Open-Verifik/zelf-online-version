@@ -116,7 +116,9 @@ const getAddress = async (params) => {
 					price: _price,
 					type: tokenType,
 					address: tokenLink,
-					image: tokenImage.includes("https") ? tokenImage : `${baseUrl}${tokenImage}`,
+					image: tokenImage.includes("https")
+						? tokenImage
+						: `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
 				};
 
 				tokens.push(token);
@@ -186,7 +188,7 @@ const getAddress = async (params) => {
 			symbol: "ETH",
 			name: "Ethereum",
 			price: account.price,
-			image: "",
+			image: "https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
 			amount: balance,
 		});
 
