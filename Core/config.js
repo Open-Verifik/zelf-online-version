@@ -18,7 +18,42 @@ const configuration = {
 			"https://vision-verifik-ocr.cognitiveservices.azure.com/computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=read&language=en&gender-neutral-caption=False",
 		forms: {
 			key: process.env.AZURE_VISION_FORMS_KEY || "NOKEY",
-			endpoint: process.env.AZURE_VISION_FORMS_ENDPOINT || "https://verifik-forms.cognitiveservices.azure.com",
+			endpoint:
+				process.env.AZURE_VISION_FORMS_ENDPOINT ||
+				"https://verifik-forms.cognitiveservices.azure.com",
+		},
+	},
+	email_providers: {
+		mailgun: {
+			proxyEmail: process.env.MAILGUN_PROXY_EMAIL || "anuar@verifik.co",
+			user: process.env.MAILGUN_USER,
+			password: process.env.MAILGUN_PASS,
+			host: process.env.MAILGUN_HOST,
+			port: process.env.MAILGUN_PORT,
+			from: process.env.MAILGUN_DEFAULT_FROM,
+			apiKey: process.env.MAILGUN_API_KEY,
+			publicKey: process.env.MAILGUN_PUBLIC_KEY,
+			templatesMapping: {
+				[process.env.MAILGUN_LIST_EMAIL_VALIDATION_OTP]: {
+					subject: "Verifica tu correo para usar tu cuenta",
+					email: process.env.MAILGUN_LIST_EMAIL_VALIDATION_OTP,
+					template: "otp_verifik",
+				},
+				[process.env.MAILGUN_LIST_EMAIL_VALIDATION_LINK]: {
+					subject: "Usa el link para comenzar a usar tu cuenta",
+					email: process.env.MAILGUN_LIST_EMAIL_VALIDATION_LINK,
+					template: "email_link",
+					type: "users",
+				},
+			},
+			templates: {
+				drivers_approved: {
+					subject: "Usa el link para comenzar a usar tu cuenta",
+					email: process.env.MAILGUN_LIST_EMAIL_VALIDATION_LINK,
+					template: "email_link",
+					type: "users",
+				},
+			},
 		},
 	},
 	openai: {

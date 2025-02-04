@@ -1,16 +1,22 @@
 const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
+const Mailgun = require("../../../Core/mailgun");
+const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
 
-const { leaseConfirmation, _calculateZelfNamePrice, searchZelfName } = require("../../ZelfNameService/modules/zns.module");
-
-const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
+const {
+	getAddress,
+} = require("../../etherscan/modules/etherscan-scrapping.module");
 
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
-const { getBalance } = require("../../bitcoin/modules/bitcoin-scrapping.module");
+const {
+	getBalance,
+} = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const jwt = require("jsonwebtoken");
 const secretKey = config.signedData.key;
 
-const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
+const {
+	getCoinbaseCharge,
+} = require("../../coinbase/modules/coinbase_commerce.module");
 
 const search_zelf_lease = async (zelfName) => {
 	const previewData = await searchZelfName({ zelfName: zelfName });
@@ -25,8 +31,10 @@ const search_zelf_lease = async (zelfName) => {
 	const duration = previewData.ipfs[0].publicData.duration;
 	const expiresAt = previewData.ipfs[0].publicData.expiresAt;
 	const referralZelfName = previewData.ipfs[0].publicData.referralZelfName;
-	const coinbase_hosted_url = previewData.ipfs[0].publicData.coinbase_hosted_url;
-	const referralSolanaAddress = previewData.ipfs[0].publicData.referralSolanaAddress;
+	const coinbase_hosted_url =
+		previewData.ipfs[0].publicData.coinbase_hosted_url;
+	const referralSolanaAddress =
+		previewData.ipfs[0].publicData.referralSolanaAddress;
 
 	if (previewData.ipfs[0].publicData.type === "mainnet") {
 		const error = new Error("zelfName_purchased_already");
@@ -80,7 +88,7 @@ const select_method = async (network, price) => {
 		return {
 			network,
 			price: price,
-			amountToSend: "",
+			amountToSend: price,
 		};
 	}
 
@@ -111,7 +119,8 @@ const pay = async (zelfName_, network, signedDataPrice, paymentAddress) => {
 		throw error;
 	}
 
-	const chargeID = previewData2.ipfs[0].publicData.coinbase_hosted_url.split("/pay/")[1];
+	const chargeID =
+		previewData2.ipfs[0].publicData.coinbase_hosted_url.split("/pay/")[1];
 
 	const priceInIPFS = parseFloat(previewData2.ipfs[0].publicData.price);
 
@@ -126,7 +135,9 @@ const pay = async (zelfName_, network, signedDataPrice, paymentAddress) => {
 		environment: "both",
 	});
 
-	const paymentAddressInIPFS = JSON.parse(previewData3.ipfs[0].publicData.addresses);
+	const paymentAddressInIPFS = JSON.parse(
+		previewData3.ipfs[0].publicData.addresses
+	);
 
 	let selectedAddress = null;
 
@@ -152,12 +163,22 @@ const pay = async (zelfName_, network, signedDataPrice, paymentAddress) => {
 		throw error;
 	}
 
-	return await checkoutPayUniqueAddress(network, amountToSend, paymentAddress, zelfName_);
+	return await checkoutPayUniqueAddress(
+		network,
+		amountToSend,
+		paymentAddress,
+		zelfName_
+	);
 };
 
 ///funcion para checar pagos con unica dirección
 
-const checkoutPayUniqueAddress = async (network, amountToSend, paymentAddress, zelfName) => {
+const checkoutPayUniqueAddress = async (
+	network,
+	amountToSend,
+	paymentAddress,
+	zelfName
+) => {
 	const balance = await {
 		ETH: checkoutETH,
 		SOL: checkoutSOLANA,
@@ -181,7 +202,8 @@ const checkoutPayUniqueAddress = async (network, amountToSend, paymentAddress, z
 	try {
 		if (amountDetected >= amountToSend) {
 			transactionStatus = true;
-			transactionDescription = amountDetected === amountToSend ? "successful" : "overPayment";
+			transactionDescription =
+				amountDetected === amountToSend ? "successful" : "overPayment";
 		} else {
 			transactionDescription = "partialPayment";
 			remainingAmount = amountToSend - amountDetected;
@@ -247,6 +269,9 @@ const checkoutBICOIN = async (address) => {
 		console.log(error);
 	}
 };
+const geReceipt_email = async (body) => {
+	return body;
+};
 
 //calcular precio en la difrente redes
 const calculateCryptoValue = async (network, price_) => {
@@ -254,7 +279,9 @@ const calculateCryptoValue = async (network, price_) => {
 		const { price } = await getTickerPrice({ symbol: `${network}` });
 
 		if (!price) {
-			throw new Error(`No se encontró información para la criptomoneda: ${network}`);
+			throw new Error(
+				`No se encontró información para la criptomoneda: ${network}`
+			);
 		}
 
 		const cryptoValue = price_ / price;
@@ -299,5 +326,6 @@ module.exports = {
 	search_zelf_lease,
 	select_method,
 	pay,
+	geReceipt_email,
 	calculateCryptoValue,
 };

@@ -27,8 +27,8 @@ module.exports = (server) => {
 	);
 
 	server.post(
-		`${PATH}/confirmation-email`,
+		`${PATH}/receipt-email`,
 
-		Controller.pay
+		Controller.receipt_email
 	);
 };
