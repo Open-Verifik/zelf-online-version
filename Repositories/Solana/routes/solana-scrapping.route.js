@@ -22,11 +22,11 @@ module.exports = (server) => {
 		Controller.transactionsList
 	);
 
-	server.get(
-		`${PATH}/transaction/:id`,
-		Middleware.validateAddressTransactions,
-		Controller.transactionsList
-	);
+	// server.get(
+	// 	`${PATH}/transaction/:id`,
+	// 	//Middleware.validateAddressTransactions,
+	// 	Controller.transaction
+	// );
 
 	server.get(
 		`${PATH}/transfers/:id`,
@@ -34,9 +34,9 @@ module.exports = (server) => {
 		Controller.transfers
 	);
 
-	server.get(
-		`${PATH}/transfer/:id`,
-		Middleware.validateAddressTransactions,
-		Controller.transfer
-	);
+	// server.get(
+	// 	`${PATH}/transfer/:id`,
+	// 	Middleware.validateAddressTransactions,
+	// 	Controller.transfer
+	// );
 };

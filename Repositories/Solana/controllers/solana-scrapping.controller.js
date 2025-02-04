@@ -49,9 +49,9 @@ const transactionsList = async (ctx) => {
 	}
 };
 
-const transactionStatus = async (ctx) => {
+const transaction = async (ctx) => {
 	try {
-		const data = await Module.getTransactionStatus(ctx.request.params);
+		const data = await Module.getTransaction(ctx.request.params);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -92,8 +92,8 @@ const transfer = async (ctx) => {
 module.exports = {
 	getAddress,
 	getToken,
-	transactionStatus,
 	transactionsList,
+	transaction,
 	transfers,
 	transfer,
 };
