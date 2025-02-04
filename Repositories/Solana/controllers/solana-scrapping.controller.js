@@ -34,7 +34,10 @@ const getToken = async (ctx) => {
 
 const transactionsList = async (ctx) => {
 	try {
-		const data = await Module.getTransactionsList(ctx.request.params, ctx.request.query);
+		const data = await Module.getTransactionsList(
+			ctx.request.params,
+			ctx.request.query
+		);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -46,9 +49,36 @@ const transactionsList = async (ctx) => {
 	}
 };
 
-const transactionStatus = async (ctx) => {
+const transaction = async (ctx) => {
 	try {
-		const data = await Module.getTransactionStatus(ctx.request.params);
+		const data = await Module.getTransaction(ctx.request.params);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error(error);
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
+const transfers = async (ctx) => {
+	try {
+		const data = await Module.getTransfers(ctx.request.params);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error(error);
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+const transfer = async (ctx) => {
+	try {
+		const data = await Module.getTransfer(ctx.request.params);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -62,6 +92,8 @@ const transactionStatus = async (ctx) => {
 module.exports = {
 	getAddress,
 	getToken,
-	transactionStatus,
 	transactionsList,
+	transaction,
+	transfers,
+	transfer,
 };
