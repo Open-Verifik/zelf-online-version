@@ -42,13 +42,35 @@ const insert = async (data, authUser) => {
 	return await IPFS.upload(base64, name, null, metadata);
 };
 
-const destroy = async () => {
-	return null;
+const unPinFiles = async (CIDs = []) => {
+	const unpinnedFiles = await IPFS.unPinFiles(CIDs);
+
+	return unpinnedFiles;
+};
+
+const update = async (previousIpfsPinHash, data, authUser) => {
+	//unpin previous file
+	await IPFS.unPinFiles([previousIpfsPinHash]);
+
+	const { base64, metadata, name } = data;
+
+	return await IPFS.pinFile(base64, name, null, {
+		zelfName: metadata.zelfName,
+		type: metadata.type,
+		price: metadata.price, // this has to be updated based on the name and duration
+		duration: metadata.duration,
+		expiresAt: metadata.expiresAt,
+		zelfProof: metadata.zelfProof,
+		referralZelfName: metadata.referralZelfName,
+		referralSolanaAddress: metadata.referralSolanaAddress,
+		coinbase_hosted_url: metadata.coinbase_hosted_url,
+	});
 };
 
 module.exports = {
 	get,
 	show,
 	insert,
-	destroy,
+	unPinFiles,
+	update,
 };

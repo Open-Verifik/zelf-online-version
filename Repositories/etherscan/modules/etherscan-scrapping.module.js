@@ -10,9 +10,9 @@ const baseUrls = {
 /**
  * @param {*} params
  */
-
+const environment = "production";
 const getAddress = async (params) => {
-	const baseUrl = baseUrls[params.env || "production"];
+	const baseUrl = baseUrls[params.env || environment];
 
 	try {
 		const address = params.address;
@@ -207,7 +207,7 @@ const getAddress = async (params) => {
 };
 
 const getGasTracker = async (params) => {
-	const baseUrl = baseUrls[params.env || "production"];
+	const baseUrl = baseUrls[params.env || environment];
 
 	try {
 		let { data } = await instance.get(`${baseUrl}/gastracker`, {
@@ -313,7 +313,9 @@ const getTransactionStatus = async (params) => {
 	try {
 		const id = params.id;
 
-		const { data } = await instance.get(`https://etherscan.io/tx/${id}`, {
+		const baseUrl = baseUrls[params.env || environment];
+
+		const { data } = await instance.get(`${baseUrl}/tx/${id}`, {
 			headers: {
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
@@ -333,12 +335,13 @@ const getTransactionStatus = async (params) => {
 
 		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0];
 
+		///en pruba 8
 		const from_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(10) > div.col-md-9").html();
 
 		const from_div = cheerio.load(from_a);
 
 		const from = from_div("a.js-clipboard").attr("data-clipboard-text");
-
+		///en pruba 9
 		const to_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(11) > div.col-md-9 > div").html();
 
 		const to_div = cheerio.load(to_a);
@@ -382,6 +385,7 @@ const getTransactionStatus = async (params) => {
 
 		return response;
 	} catch (exception) {
+		console.log(exception);
 		const error = new Error("transaction_not_found");
 
 		error.status = 404;
@@ -402,7 +406,7 @@ const getTransactionsList = async (params) => {
 
 	const show = params.show;
 
-	const baseUrl = baseUrls[params.env || "production"];
+	const baseUrl = baseUrls[params.env || environment];
 
 	try {
 		const { data } = await instance.get(`${baseUrl}/txs?a=${address}&ps=${show}&p=${page}`, {
@@ -421,8 +425,8 @@ const getTransactionsList = async (params) => {
 
 		const pagination = {
 			records,
-			pages: nPage[1].trim(),
-			page: nPage[0].trim(),
+			pages: nPage ? nPage[1].trim() : 0,
+			page: nPage ? nPage[0].trim() : 0,
 		};
 
 		try {
@@ -469,10 +473,13 @@ const getTransactionsList = async (params) => {
 
 				transactions.push(transaction);
 			});
-		} catch (error) {}
+		} catch (error) {
+			console.log(error);
+		}
 
 		return { pagination, transactions };
 	} catch (error) {
+		console.log(error);
 		return {
 			pagination: { records: "0", pages: "0", page: "0" },
 			transactions: [],

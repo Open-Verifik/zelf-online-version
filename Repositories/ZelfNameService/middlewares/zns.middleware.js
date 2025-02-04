@@ -1,5 +1,6 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
 const captchaService = require("../../../Core/captcha");
+const config = require("../../../Core/config");
 
 const schemas = {
 	search: {
@@ -8,6 +9,16 @@ const schemas = {
 		value: string(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]),
 		captchaToken: string(),
+	},
+	leaseOffline: {
+		zelfName: string().required(),
+		zelfProof: string().required(),
+		zelfProofQRCode: string().required(),
+	},
+	leaseConfirmation: {
+		zelfName: string().required(),
+		coin: string().required(),
+		network: string().required(),
 	},
 	lease: {
 		zelfName: string().required(),
@@ -37,6 +48,24 @@ const schemas = {
 		zelfName: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string().required(),
+	},
+	previewZelfProof: {
+		zelfProof: string().required(),
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
+		captchaToken: string().required(),
+	},
+	revenueCatWebhook: {
+		product_id: string().required(),
+		period_type: string().required(),
+		currency: string().required(),
+		price: number().required(),
+		id: string().required(),
+		app_id: string().required(),
+		transaction_id: string().required(),
+		environment: string().required(),
+	},
+	update: {
+		duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
 	},
 };
 
@@ -71,7 +100,9 @@ const getValidation = async (ctx, next) => {
 
 	const _zelfName = zelfName || value;
 
-	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, _zelfName.split(".zelf")[0]) : 1;
+	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
+
+	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, captchaZelfName) : 1;
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -102,7 +133,7 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	const { type, zelfName, captchaToken, os } = ctx.request.body;
+	const { type, zelfName, captchaToken, os, skipIt } = ctx.request.body;
 
 	const typeValid = validate(schemas[type], ctx.request.body);
 
@@ -118,13 +149,15 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
-	if (zelfName.length < 13) {
+	if (zelfName.length < 6) {
 		ctx.status = 409;
-		ctx.body = { validationError: "ZelfName should be 8 characters or more." };
+		ctx.body = { validationError: "ZelfName should be 1 character or more." };
 		return;
 	}
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
+	const captchaZelfName = _getZelfNameForCaptcha(`${zelfName}`);
+
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
 
 	if (captchaScore < 0.79) {
 		_consoleLogSuspicious(ctx, captchaScore, zelfName);
@@ -136,8 +169,63 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
+	// await ZNSTokenModule.giveTokensAfterPurchase();
+
 	await next();
 };
+
+/**
+ * lease offline validation
+ * @param {Object} ctx
+ * @param {Object} next
+ */
+const leaseOfflineValidation = async (ctx, next) => {
+	const valid = validate(schemas.leaseOffline, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	await next();
+};
+
+const leaseConfirmationValidation = async (ctx, next) => {
+	// Step 1: Extract necessary data from the request
+	const { zelfName, purchaseDetails } = ctx.request.body;
+
+	const validation = validate(schemas.leaseConfirmation, ctx.request.body);
+
+	// Step 2: Validate the Zelf name service purchase details
+	if (validation.error) {
+		ctx.status = 400;
+
+		ctx.body = { validationError: validation.error.message };
+
+		return;
+	}
+
+	// validation logic
+	const isValidPurchase = validatePurchaseDetails(zelfName, purchaseDetails);
+
+	// Step 3: Return a response indicating success or failure
+	if (!isValidPurchase) {
+		ctx.status = 400;
+
+		ctx.body = { validationError: "Invalid lease confirmation details" };
+	}
+
+	await next();
+};
+
+// Example validation function (replace with actual logic)
+function validatePurchaseDetails(zelfName, purchaseDetails) {
+	// Implement actual validation logic here
+	return true; // Placeholder
+}
 
 const _consoleLogSuspicious = (ctx, captchaScore, zelfName) => {
 	const origin = ctx.request.header.origin || null;
@@ -157,6 +245,34 @@ const _consoleLogSuspicious = (ctx, captchaScore, zelfName) => {
 		`);
 };
 
+const previewZelfProofValidation = async (ctx, next) => {
+	const validation = validate(schemas.previewZelfProof, ctx.request.body);
+
+	if (validation.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: validation.error.message };
+
+		return;
+	}
+
+	const { captchaToken, os, zelfProof } = ctx.request.body;
+
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, "preview");
+
+	if (captchaScore < 0.79) {
+		ctx.status = 409;
+
+		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+
+		console.log({ captchaFailed: true, zelfName });
+
+		return;
+	}
+
+	await next();
+};
+
 const previewValidation = async (ctx, next) => {
 	const validation = validate(schemas.preview, ctx.request.body);
 
@@ -170,7 +286,9 @@ const previewValidation = async (ctx, next) => {
 
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
+	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
+
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -207,7 +325,9 @@ const decryptValidation = async (ctx, next) => {
 
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, zelfName.split(".zelf")[0]);
+	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
+
+	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -216,6 +336,33 @@ const decryptValidation = async (ctx, next) => {
 		console.log({ captchaFailed: true, zelfName });
 
 		return;
+	}
+
+	await next();
+};
+
+const revenueCatWebhookValidation = async (ctx, next) => {
+	const { event } = ctx.request.body;
+
+	const { clientId, email } = ctx.state.user;
+
+	if (!clientId || email !== config.revenueCat.allowedEmail) {
+		ctx.status = 403;
+		ctx.body = { validationError: "Access forbidden" };
+		return;
+	}
+
+	if (!event) {
+		ctx.status = 409;
+		ctx.body = { validationError: "Missing event payload" };
+		return;
+	}
+
+	const valid = validate(schemas.revenueCatWebhook, ctx.request.body?.event);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
 	}
 
 	await next();
@@ -235,11 +382,42 @@ const referralRewardsValidation = async (ctx, next) => {
 	await next();
 };
 
+const updateValidation = async (ctx, next) => {
+	const { zelfName } = ctx.state.user;
+
+	if (!zelfName) {
+		ctx.status = 403;
+		ctx.body = { validationError: "Access forbidden" };
+		return;
+	}
+
+	const valid = validate(schemas.update, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
+const _getZelfNameForCaptcha = (zelfName) => {
+	return zelfName.split(".zelf")[0].replace(".", "_");
+};
+
 module.exports = {
 	getValidation,
 	leaseValidation,
+	leaseConfirmationValidation,
 	previewValidation,
+	previewZelfProofValidation,
 	deleteValidation,
 	decryptValidation,
+	//offline
+	leaseOfflineValidation,
+	revenueCatWebhookValidation,
 	referralRewardsValidation,
+	//update
+	updateValidation,
 };
