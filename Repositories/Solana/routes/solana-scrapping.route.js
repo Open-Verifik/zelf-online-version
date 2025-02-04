@@ -21,12 +21,11 @@ module.exports = (server) => {
 		Middleware.validateAddressTransactions,
 		Controller.transactionsList
 	);
-
-	// server.get(
-	// 	`${PATH}/transaction/:id`,
-	// 	//Middleware.validateAddressTransactions,
-	// 	Controller.transaction
-	// );
+	server.get(
+		`${PATH}/gas-tracker`,
+		//Middleware.validateAddressTransactions,
+		Controller.gas_tracker
+	);
 
 	server.get(
 		`${PATH}/transfers/:id`,

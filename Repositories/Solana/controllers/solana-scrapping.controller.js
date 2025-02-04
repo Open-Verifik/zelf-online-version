@@ -89,6 +89,20 @@ const transfer = async (ctx) => {
 		ctx.body = { error: error.message };
 	}
 };
+
+const gas_tracker = async (ctx) => {
+	try {
+		const data = await Module.get_gas_tracker();
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error(error);
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
 module.exports = {
 	getAddress,
 	getToken,
@@ -96,4 +110,5 @@ module.exports = {
 	transaction,
 	transfers,
 	transfer,
+	gas_tracker,
 };
