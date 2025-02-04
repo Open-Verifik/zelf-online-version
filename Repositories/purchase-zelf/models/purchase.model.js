@@ -17,7 +17,7 @@ const purchaseSchema = new Schema(
 			type: String,
 		},
 		cryptoValue: { type: String },
-		ratePriceInUSDT: { type: String },
+		ratePriceInUSD: { type: String },
 		wordsCount: { type: String },
 		USD: { type: String },
 		amountToSend: {

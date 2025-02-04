@@ -31,7 +31,7 @@ const search_zelf_lease = async (zelfName) => {
 		throw error;
 	}
 
-	const USD = previewData.ipfs[0].publicData.price;
+	const price = previewData.ipfs[0].publicData.price;
 	const duration = previewData.ipfs[0].publicData.duration;
 	const expiresAt = previewData.ipfs[0].publicData.expiresAt;
 	const referralZelfName = previewData.ipfs[0].publicData.referralZelfName;
@@ -53,16 +53,16 @@ const search_zelf_lease = async (zelfName) => {
 		environment: "both",
 	});
 
-	const cryptoValue = await calculateCryptoValue("ETH", USD);
-	const crypto = cryptoValue.crypto;
+	const cryptoValue = await calculateCryptoValue("ETH", price);
+	const network = cryptoValue.network;
 	const amountToSend = cryptoValue.amountToSend;
-	const ratePriceInUSDT = cryptoValue.ratePriceInUSDT;
+	const ratePriceInUSD = cryptoValue.ratePriceInUSD;
 
 	const recordData = {
-		crypto: crypto,
+		network: network,
 		amountToSend: cryptoValue.amountToSend,
-		USD: cryptoValue.USD,
-		ratePriceInUSDT: cryptoValue.ratePriceInUSDT,
+		price: cryptoValue.price,
+		ratePriceInUSD: cryptoValue.ratePriceInUSD,
 	};
 
 	const signedDataPrice = signRecordData(recordData, secretKey);
@@ -74,34 +74,34 @@ const search_zelf_lease = async (zelfName) => {
 	return {
 		paymentAddress,
 		zelfName,
-		USD,
+		price,
 		duration: parseInt(duration),
 		expiresAt,
 		referralZelfName,
 		coinbase_hosted_url,
-		crypto,
+		network,
 		amountToSend,
 		referralSolanaAddress,
-		ratePriceInUSDT,
+		ratePriceInUSD,
 		signedDataPrice,
 	};
 };
-const select_method = async (crypto, price) => {
-	if (crypto === "CB") {
+const select_method = async (network, price) => {
+	if (network === "CB") {
 		return {
-			crypto,
-			USD: price,
+			network,
+			price: price,
 			amountToSend: "",
 		};
 	}
 
-	const cryptoValue = await calculateCryptoValue(crypto, price);
+	const cryptoValue = await calculateCryptoValue(network, price);
 
 	const recordData = {
-		crypto: crypto,
+		network: network,
 		amountToSend: cryptoValue.amountToSend,
-		USD: cryptoValue.USD,
-		ratePriceInUSDT: cryptoValue.ratePriceInUSDT,
+		price: cryptoValue.price,
+		ratePriceInUSD: cryptoValue.ratePriceInUSD,
 	};
 
 	const signedDataPrice = signRecordData(recordData, secretKey);
@@ -109,7 +109,7 @@ const select_method = async (crypto, price) => {
 	return { ...recordData, signedDataPrice };
 };
 
-const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
+const pay = async (zelfName_, network, signedDataPrice, paymentAddress) => {
 	const previewData2 = await searchZelfName({
 		zelfName: zelfName_,
 		environment: "hold",
@@ -127,7 +127,7 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 
 	const priceInIPFS = parseFloat(previewData2.ipfs[0].publicData.price);
 
-	if (crypto === "CB") {
+	if (network === "CB") {
 		return await checkoutPayCoinbase(chargeID);
 	}
 
@@ -144,7 +144,7 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 
 	let selectedAddress = null;
 
-	switch (crypto.toUpperCase()) {
+	switch (network.toUpperCase()) {
 		case "BTC":
 			selectedAddress = paymentAddressInIPFS.btcAddress;
 			break;
@@ -158,16 +158,16 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 			break;
 	}
 
-	const { USD, amountToSend } = verifyRecordData(signedDataPrice, secretKey);
+	const { price, amountToSend } = verifyRecordData(signedDataPrice, secretKey);
 
-	if (USD !== priceInIPFS) {
+	if (price !== priceInIPFS) {
 		const error = new Error("Validation_failed");
 		error.status = 409;
 		throw error;
 	}
 
 	return await checkoutPayUniqueAddress(
-		crypto,
+		network,
 		amountToSend,
 		paymentAddress,
 		zelfName_
@@ -177,7 +177,7 @@ const pay = async (zelfName_, crypto, signedDataPrice, paymentAddress) => {
 ///funcion para checar pagos con unica dirección
 
 const checkoutPayUniqueAddress = async (
-	crypto,
+	network,
 	amountToSend,
 	paymentAddress,
 	zelfName
@@ -186,7 +186,7 @@ const checkoutPayUniqueAddress = async (
 		ETH: checkoutETH,
 		SOL: checkoutSOLANA,
 		BTC: checkoutBICOIN,
-	}[crypto]?.(paymentAddress);
+	}[network]?.(paymentAddress);
 
 	let amountDetected = balance;
 
@@ -207,11 +207,6 @@ const checkoutPayUniqueAddress = async (
 			transactionStatus = true;
 			transactionDescription =
 				amountDetected === amountToSend ? "successful" : "overPayment";
-			await leaseConfirmation(
-				{ network: crypto, coin: crypto, zelfName },
-				{},
-				amountToSend
-			);
 		} else {
 			transactionDescription = "partialPayment";
 			remainingAmount = amountToSend - amountDetected;
@@ -278,23 +273,23 @@ const checkoutBICOIN = async (address) => {
 };
 
 //calcular precio en la difrente redes
-const calculateCryptoValue = async (crypto, price_) => {
+const calculateCryptoValue = async (network, price_) => {
 	try {
-		const { price } = await getTickerPrice({ symbol: `${crypto}` });
+		const { price } = await getTickerPrice({ symbol: `${network}` });
 
 		if (!price) {
 			throw new Error(
-				`No se encontró información para la criptomoneda: ${crypto}`
+				`No se encontró información para la criptomoneda: ${network}`
 			);
 		}
 
 		const cryptoValue = price_ / price;
 
 		return {
-			crypto,
+			network,
 			amountToSend: parseFloat(cryptoValue.toFixed(7)),
-			ratePriceInUSDT: parseFloat(parseFloat(price).toFixed(5)),
-			USD: price_,
+			ratePriceInUSD: parseFloat(parseFloat(price).toFixed(5)),
+			price: price_,
 		};
 	} catch (error) {
 		throw error;

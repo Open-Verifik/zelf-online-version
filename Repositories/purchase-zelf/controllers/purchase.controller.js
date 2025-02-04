@@ -18,10 +18,10 @@ const search_zelf_lease = async (ctx) => {
 };
 
 const select_method = async (ctx) => {
-	const { crypto, price } = ctx.request.body;
+	const { network, price } = ctx.request.body;
 
 	try {
-		const data = await Module.select_method(crypto, price);
+		const data = await Module.select_method(network, price);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -35,12 +35,12 @@ const select_method = async (ctx) => {
 
 const pay = async (ctx) => {
 	const { zelfName } = ctx.request.params;
-	const { crypto, signedDataPrice, paymentAddress } = ctx.request.body;
+	const { network, signedDataPrice, paymentAddress } = ctx.request.body;
 
 	try {
 		const data = await Module.pay(
 			zelfName,
-			crypto,
+			network,
 			signedDataPrice,
 			paymentAddress
 		);

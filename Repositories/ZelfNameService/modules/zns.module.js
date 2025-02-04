@@ -7,6 +7,8 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const sessionModule = require("../../Session/modules/session.module");
+const BigNumber = require("bignumber.js");
+const { getTickerPrice } = require("../../binance/modules/binance.module");
 const {
 	encrypt,
 	decrypt,
@@ -100,7 +102,7 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	}
 
 	// Adjust price for development environment
-	price = config.env === "development" ? price / 70 : price;
+	price = config.env === "development" ? price / 80 : price;
 
 	if (config.token.whitelist.includes(referralZelfName)) return 0;
 
@@ -648,7 +650,7 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
  * @param {Object} authUser
  * @author Miguel Trevino
  */
-const leaseConfirmation = async (data, authUser, value) => {
+const leaseConfirmation = async (data, authUser) => {
 	const { network, coin, zelfName } = data;
 
 	let unpinResult;
@@ -683,7 +685,6 @@ const leaseConfirmation = async (data, authUser, value) => {
 	const zelfNameObject = zelfNameRecords[0];
 
 	let payment = false;
-
 	switch (network) {
 		case "coinbase":
 		case "CB":
@@ -691,15 +692,15 @@ const leaseConfirmation = async (data, authUser, value) => {
 
 			break;
 		case "ETH":
-			payment = await confirmPayUniqueAddress(zelfName, network, value);
+			payment = await confirmPayUniqueAddress(zelfNameObject, network);
 
 			break;
 		case "SOL":
-			payment = await confirmPayUniqueAddress(zelfName, network, value);
+			payment = await confirmPayUniqueAddress(zelfNameObject, network);
 
 			break;
 		case "BTC":
-			payment = await confirmPayUniqueAddress(zelfName, network, value);
+			payment = await confirmPayUniqueAddress(zelfNameObject, network);
 
 			break;
 
@@ -801,16 +802,12 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 		confirmed: config.env === "development" ? true : confirmed,
 	};
 };
-const confirmPayUniqueAddress = async (zelfName, network, value) => {
+const confirmPayUniqueAddress = async (zelfNameObject, network) => {
 	try {
-		if (!value)
-			return {
-				confirmed: false,
-			};
+		const price = zelfNameObject.publicData.price;
+		const zelfName = zelfNameObject.publicData.name;
 
-		console.log(zelfName, network, value);
-
-		const zelfNamePay = zelfName.replace(".zelf", ".zelfpay");
+		const zelfNamePay = zelfName.replace(".zelf.hold", ".zelfpay");
 
 		const previewData2 = await searchZelfName({
 			zelfName: zelfNamePay,
@@ -842,7 +839,7 @@ const confirmPayUniqueAddress = async (zelfName, network, value) => {
 			ETH: checkoutETH,
 			SOL: checkoutSOLANA,
 			BTC: checkoutBTC,
-		}[network]?.(selectedAddress, value);
+		}[network]?.(selectedAddress, price);
 
 		return {
 			confirmed,
@@ -854,15 +851,21 @@ const confirmPayUniqueAddress = async (zelfName, network, value) => {
 	}
 };
 //verificar balance  ETH
-const checkoutETH = async (address, value) => {
+const checkoutETH = async (address, price) => {
 	try {
 		const balanceETH = await getAddress({
 			address,
 		});
 
-		const balance = parseFloat(parseFloat(balanceETH.balance).toFixed(7));
+		const balance = new BigNumber(balanceETH.balance);
 
-		if (balance >= value) return true;
+		const { USD } = await calculateCryptoValue("ETH", balance);
+
+		console.log({ price, USD: USD.toFixed(2) });
+
+		if (USD.toFixed(2) >= price) {
+			return true;
+		}
 
 		return false;
 	} catch (error) {
@@ -870,13 +873,19 @@ const checkoutETH = async (address, value) => {
 	}
 };
 //verificar balance  SOlANA
-const checkoutSOLANA = async (address, value) => {
+const checkoutSOLANA = async (address, price) => {
 	try {
 		const balanceSOLANA = await solanaModule.getAddress({ id: address });
 
-		const balance = parseFloat(parseFloat(balanceSOLANA.balance).toFixed(7));
+		const balance = new BigNumber(balanceSOLANA.balance);
 
-		if (balance >= value) return true;
+		const { USD } = await calculateCryptoValue("SOL", balance);
+
+		console.log({ price, USD: USD.toFixed(2) });
+
+		if (USD.toFixed(2) >= price) {
+			return true;
+		}
 
 		return false;
 	} catch (error) {
@@ -884,21 +893,46 @@ const checkoutSOLANA = async (address, value) => {
 	}
 };
 //verificar balance  BTC
-const checkoutBTC = async (address, value) => {
+const checkoutBTC = async (address, price) => {
 	try {
 		const balanceBTC = await getBalance({
-			address,
+			id: address,
 		});
 
-		const balance = parseFloat(parseFloat(balanceBTC.balance).toFixed(7));
+		const balance = new BigNumber(balanceBTC.balance);
 
-		if (balance >= value) return true;
+		const { USD } = await calculateCryptoValue("BTC", balance);
 
+		console.log({ price, USD: USD.toFixed(2) });
+
+		if (USD.toFixed(2) >= price) {
+			return true;
+		}
 		return false;
 	} catch (error) {
 		console.log(error);
 	}
 };
+
+const calculateCryptoValue = async (network, amount) => {
+	try {
+		const { price } = await getTickerPrice({ symbol: `${network}` });
+
+		if (!price) {
+			throw new Error(
+				`No se encontró información para la criptomoneda: ${network}`
+			);
+		}
+
+		// Cálculo preciso con BigNumber
+		const USD = new BigNumber(amount).multipliedBy(new BigNumber(price));
+
+		return { USD };
+	} catch (error) {
+		throw error;
+	}
+};
+
 /**
  * clone zelf name to production
  * @param {Object} zelfNameObject
@@ -1060,7 +1094,7 @@ const previewZelfName = async (params, authUser) => {
 
 				zelfNameObject.explorerUrl = `${explorerUrl}/${zelfNameObject.publicData.arweaveId}`;
 			}
-
+			getTickerPrice;
 			zelfNameObject.source = zelfNameObject.ipfs_pin_hash ? "ipfs" : "arweave";
 
 			zelfNameObject.preview = await preview({

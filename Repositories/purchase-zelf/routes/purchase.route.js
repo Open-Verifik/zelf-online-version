@@ -27,7 +27,7 @@ module.exports = (server) => {
 	);
 
 	server.post(
-		`${PATH}/lease-confirmation-pay/:id`,
+		`${PATH}/confirmation-email`,
 
 		Controller.pay
 	);
