@@ -9,14 +9,11 @@ const endpoint = `https://api-v2.solscan.io/v2`;
 
 const getAddress = async (params) => {
 	try {
-		const { data } = await instance.get(
-			`https://api.xrpscan.com/api/v1/account/${params.id}`,
-			{
-				headers: {
-					"user-agent": generateRandomUserAgent(),
-				},
-			}
-		);
+		const { data } = await instance.get(`https://api.xrpscan.com/api/v1/account/${params.id}`, {
+			headers: {
+				"user-agent": generateRandomUserAgent(),
+			},
+		});
 
 		const _response = {
 			address: params.id,
@@ -33,8 +30,7 @@ const getAddress = async (params) => {
 
 		_response.tokenHoldings = await getTokens(`${params.id}`);
 
-		if (_response.tokenHoldings.balance)
-			_response.fiatBalance += _response.tokenHoldings.balance;
+		if (_response.tokenHoldings.balance) _response.fiatBalance += _response.tokenHoldings.balance;
 
 		return _response;
 	} catch (error) {
@@ -48,14 +44,11 @@ const getAddress = async (params) => {
  * @returns
  */
 const getTransactionsList = async (params, query) => {
-	const { data } = await instance.get(
-		`https://api.xrpscan.com/api/v1/account/${params.id}/transactions`,
-		{
-			headers: {
-				"user-agent": generateRandomUserAgent(),
-			},
-		}
-	);
+	const { data } = await instance.get(`https://api.xrpscan.com/api/v1/account/${params.id}/transactions`, {
+		headers: {
+			"user-agent": generateRandomUserAgent(),
+		},
+	});
 	return { transactions: data };
 };
 
@@ -64,17 +57,11 @@ const getTransactionsList = async (params, query) => {
  * @param {Object} params
  */
 const getTokens = async (params) => {
-	console.log({ params });
-	const { data } = await instance.get(
-		`https://api.xrpscan.com/api/v1/account/${params}/assets`,
-		{
-			headers: {
-				"user-agent": generateRandomUserAgent(),
-			},
-		}
-	);
-
-	console.log(data);
+	const { data } = await instance.get(`https://api.xrpscan.com/api/v1/account/${params}/assets`, {
+		headers: {
+			"user-agent": generateRandomUserAgent(),
+		},
+	});
 
 	const tokenHoldings = {
 		total: data.length,
@@ -86,8 +73,6 @@ const getTokens = async (params) => {
 	try {
 		for (let index = 0; index < data.length; index++) {
 			const token = data[index];
-
-			console.log({ token });
 
 			tokenHoldings.fiatBalance += token.value;
 

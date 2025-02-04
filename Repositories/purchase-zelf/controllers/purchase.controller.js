@@ -38,12 +38,7 @@ const pay = async (ctx) => {
 	const { network, signedDataPrice, paymentAddress } = ctx.request.body;
 
 	try {
-		const data = await Module.pay(
-			zelfName,
-			network,
-			signedDataPrice,
-			paymentAddress
-		);
+		const data = await Module.pay(zelfName, network, signedDataPrice, paymentAddress);
 
 		ctx.body = { data };
 	} catch (error) {

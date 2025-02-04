@@ -31,15 +31,9 @@ const createUnderName = async (payload) => {
 		processId,
 	});
 
-	console.log({ ant });
-
 	// const owner = await ant.getOwner();
 
-	// console.log({ owner });
-
 	// const records = await ant.getRecords();
-
-	// console.log({ records });
 
 	try {
 		// Create the under name
@@ -53,10 +47,12 @@ const createUnderName = async (payload) => {
 			{ tags: [{ name: "App-Name", value: "My-Awesome-App" }] }
 		);
 
-		console.log({ newUnderName });
+		return newUnderName;
 	} catch (error) {
 		console.error({ newUnderNameError: error });
 	}
+
+	return null;
 };
 
 module.exports = {

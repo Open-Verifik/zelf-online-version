@@ -13,7 +13,6 @@ const getTickerPrice = async (params) => {
 
 		return { price: data.price };
 	} catch (error) {
-		console.log(error);
 		throw new Error(`409:${error.response.data.msg}`);
 	}
 };

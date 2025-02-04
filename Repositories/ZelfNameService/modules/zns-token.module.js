@@ -5,12 +5,10 @@ const ReferralRewardModel = require("../models/referral-rewards.model");
 const PurchaseRewardModel = require("../models/purchase-rewards.model");
 const MongoORM = require("../../../Core/mongo-orm");
 
-// Connect to Solana devnet or mainnet
-// const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("mainnet-beta"), "confirmed");
 let connection;
 (async () => {
 	connection = new solanaWeb3.Connection("https://sparkling-special-mound.solana-mainnet.quiknode.pro/810558fcdec3e18eaf3701136d38bd6aa8d61b77/");
-	console.log(await connection.getSlot());
+	await connection.getSlot();
 })();
 
 // Token mint address (ZNS token address)
@@ -36,8 +34,6 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 
 		const tokenBalance = await connection.getTokenAccountBalance(senderTokenAccount.address);
 
-		console.log({ tokenBalance, senderWallet });
-
 		// Ensure sender has enough tokens to send
 		const amountToSend = Math.round(amount * 10 ** 8);
 
@@ -55,7 +51,7 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 		const receiverAccountInfo = await connection.getAccountInfo(associatedTokenAddress);
 
 		if (!receiverAccountInfo) {
-			console.log("Receiver Token Account does not exist. Creating...");
+			// console.log("Receiver Token Account does not exist. Creating...");
 
 			// Create the receiver's associated token account
 			const createReceiverAccountInstruction = splToken.createAssociatedTokenAccountInstruction(

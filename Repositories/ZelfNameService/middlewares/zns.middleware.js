@@ -109,8 +109,6 @@ const getValidation = async (ctx, next) => {
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
 
-		console.log({ captchaFailed: true, zelfName });
-
 		return;
 	}
 
@@ -265,8 +263,6 @@ const previewZelfProofValidation = async (ctx, next) => {
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
 
-		console.log({ captchaFailed: true, zelfName });
-
 		return;
 	}
 
@@ -294,8 +290,6 @@ const previewValidation = async (ctx, next) => {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
-
-		console.log({ captchaFailed: true, zelfName });
 
 		return;
 	}
@@ -333,7 +327,6 @@ const decryptValidation = async (ctx, next) => {
 		ctx.status = 409;
 
 		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
-		console.log({ captchaFailed: true, zelfName });
 
 		return;
 	}

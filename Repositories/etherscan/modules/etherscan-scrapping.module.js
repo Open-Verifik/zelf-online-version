@@ -387,7 +387,6 @@ const getTransactionStatus = async (params) => {
 
 		return response;
 	} catch (exception) {
-		console.log(exception);
 		const error = new Error("transaction_not_found");
 
 		error.status = 404;
@@ -431,57 +430,52 @@ const getTransactionsList = async (params) => {
 			page: nPage ? nPage[0].trim() : 0,
 		};
 
-		try {
-			const tabla = $("#ContentPlaceHolder1_divTransactions > div.table-responsive").html();
+		const tabla = $("#ContentPlaceHolder1_divTransactions > div.table-responsive").html();
 
-			const campos = cheerio.load(tabla);
+		const campos = cheerio.load(tabla);
 
-			campos("tbody tr").each((index, element) => {
-				const transaction = {};
+		campos("tbody tr").each((index, element) => {
+			const transaction = {};
 
-				transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
+			transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
 
-				transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
+			transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
 
-				transaction.block = campos(element).find("td:nth-child(4) a").text();
+			transaction.block = campos(element).find("td:nth-child(4) a").text();
 
-				transaction.age = campos(element).find("td:nth-child(5) span").attr("data-bs-title");
+			transaction.age = campos(element).find("td:nth-child(5) span").attr("data-bs-title");
 
-				const divFrom = campos(element).find("td:nth-child(8)").html();
+			const divFrom = campos(element).find("td:nth-child(8)").html();
 
-				const from = cheerio.load(divFrom);
+			const from = cheerio.load(divFrom);
 
-				transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
+			transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
 
-				transaction.traffic = campos(element).find("td:nth-child(9)").text();
+			transaction.traffic = campos(element).find("td:nth-child(9)").text();
 
-				const divTo = campos(element).find("td:nth-child(10)").html();
+			const divTo = campos(element).find("td:nth-child(10)").html();
 
-				const to = cheerio.load(divTo);
+			const to = cheerio.load(divTo);
 
-				transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
+			transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
 
-				let _amount = campos(element).find("td:nth-child(11)").text().split("$")[0].trim();
+			let _amount = campos(element).find("td:nth-child(11)").text().split("$")[0].trim();
 
-				_amount = _amount.split(" ");
+			_amount = _amount.split(" ");
 
-				transaction.fiatAmount = campos(element).find("td:nth-child(11)").text().split("$")[1].replace(/\n/g, "");
+			transaction.fiatAmount = campos(element).find("td:nth-child(11)").text().split("$")[1].replace(/\n/g, "");
 
-				transaction.amount = _amount[0];
+			transaction.amount = _amount[0];
 
-				transaction.asset = _amount[1];
+			transaction.asset = _amount[1];
 
-				transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
+			transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
 
-				transactions.push(transaction);
-			});
-		} catch (error) {
-			console.log(error);
-		}
+			transactions.push(transaction);
+		});
 
 		return { pagination, transactions };
 	} catch (error) {
-		console.log(error);
 		return {
 			pagination: { records: "0", pages: "0", page: "0" },
 			transactions: [],
