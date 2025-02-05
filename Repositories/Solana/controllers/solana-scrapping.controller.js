@@ -34,10 +34,7 @@ const getToken = async (ctx) => {
 
 const transactionsList = async (ctx) => {
 	try {
-		const data = await Module.getTransactionsList(
-			ctx.request.params,
-			ctx.request.query
-		);
+		const data = await Module.getTransactionsList(ctx.request.params, ctx.request.query);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -90,9 +87,9 @@ const transfer = async (ctx) => {
 	}
 };
 
-const gas_tracker = async (ctx) => {
+const gasTracker = async (ctx) => {
 	try {
-		const data = await Module.get_gas_tracker();
+		const data = await Module.getGasTracker();
 
 		ctx.body = { data };
 	} catch (error) {
@@ -110,5 +107,5 @@ module.exports = {
 	transaction,
 	transfers,
 	transfer,
-	gas_tracker,
+	gasTracker,
 };

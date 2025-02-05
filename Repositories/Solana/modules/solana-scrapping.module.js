@@ -191,7 +191,7 @@ const getTransfer = async (params) => {
 	return { id: params.id };
 };
 
-const get_gas_tracker = async () => {
+const getGasTracker = async () => {
 	try {
 		const { data } = await instance.get(`${endpoint}/common/sol-market?tokenAddress=So11111111111111111111111111111111111111112`, {
 			headers: {
@@ -245,5 +245,5 @@ module.exports = {
 	getTransaction,
 	getTransfers,
 	getTransfer,
-	get_gas_tracker,
+	getGasTracker,
 };

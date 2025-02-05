@@ -51,8 +51,6 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 		const receiverAccountInfo = await connection.getAccountInfo(associatedTokenAddress);
 
 		if (!receiverAccountInfo) {
-			// console.log("Receiver Token Account does not exist. Creating...");
-
 			// Create the receiver's associated token account
 			const createReceiverAccountInstruction = splToken.createAssociatedTokenAccountInstruction(
 				senderWallet.publicKey, // Payer
