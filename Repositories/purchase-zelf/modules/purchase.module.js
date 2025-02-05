@@ -13,7 +13,20 @@ const {
 } = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const jwt = require("jsonwebtoken");
 const secretKey = config.signedData.key;
-
+const templatesMap = {
+	es: {
+		staff: {
+			subject: "Invitacion de personal",
+			template: "staff invitation - esp",
+		},
+	},
+	en: {
+		staff: {
+			subject: "Staff invitation",
+			template: "staff invitation",
+		},
+	},
+};
 const {
 	getCoinbaseCharge,
 } = require("../../coinbase/modules/coinbase_commerce.module");
@@ -270,6 +283,16 @@ const checkoutBICOIN = async (address) => {
 	}
 };
 const geReceipt_email = async (body) => {
+	const { transactionDate, subtotal, discount, total, expires, year } = body;
+	console.log({ transactionDate, subtotal, discount, total, expires, year });
+	// return await sendEmail({
+	// 	language: "es",
+	// 	template: "staff",
+	// 	name: "Juan Pérez",
+	// 	phone: "+1234567890",
+	// 	email: "anuar.2004@hotmail.com",
+	// 	client: "Empresa XYZ",
+	// });
 	return body;
 };
 
@@ -295,6 +318,42 @@ const calculateCryptoValue = async (network, price_) => {
 	} catch (error) {
 		throw error;
 	}
+};
+
+const sendEmail = async (payload) => {
+	payload.language ??= "es";
+
+	const emailTemplate = templatesMap[payload.language]
+		? templatesMap[payload.language][payload.template]
+		: templatesMap.en[payload.template];
+
+	const extraParams = {
+		"recipient-variables": {
+			[payload.email]: {
+				firstName: payload.name,
+				email: payload.email,
+				phone: payload.phone,
+				client: payload.client,
+			},
+		},
+	};
+
+	let email;
+
+	try {
+		email = await Mailgun.sendEmail(
+			payload.email,
+			emailTemplate.subject,
+			emailTemplate.template,
+			extraParams
+		);
+	} catch (exception) {
+		console.error({
+			exception,
+		});
+	}
+
+	return email;
 };
 function isExpired(expirationDate) {
 	const now = new Date(); // Fecha y hora actual

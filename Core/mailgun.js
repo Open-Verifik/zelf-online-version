@@ -2,23 +2,73 @@ const formData = require("form-data");
 const Mailgun = require("mailgun.js");
 const config = require("./config");
 const domain = "mg.verifik.co";
-const axios = require("axios");
 
-const DOMAIN = "tudominio.com"; // O usa el sandbox de Mailgun
-const API_KEY = "TU_API_KEY";
+const mailgun = new Mailgun(formData);
 
-const mg = Mailgun({
-	apiKey: "key-91318ad363192a252ba1c0d9a81f4a3e",
-	domain: "tuemail@tudominio.com>",
+const mg = mailgun.client({
+	username: "api",
+	key: config.email_providers.mailgun.apiKey || "key-yourkeyhere",
 });
 
-const data = {
-	from: "Tu Nombre <tuemail@tudominio.com>",
-	to: "destinatario@example.com",
-	subject: "Correo con HTML",
-	html: `
-    <h1 style="color: blue;">¡Hola!</h1>
-    <p>Este es un correo con <strong>HTML</strong> enviado desde Mailgun.</p>
-    <img src="https://www.mailgun.com/static/img/mailgun-logo.png" width="200" />
-  `,
+/**
+ * send email
+ * @param {object} emailData
+ */
+const sendEmail = async (to, subject, template, extraParams = {}) => {
+	if (!subject || !template) {
+		return null;
+	}
+
+	const _to =
+		config.env === "production"
+			? to
+			: config.email_providers.mailgun.proxyEmail;
+
+	const emailData = {
+		from: "Verifik <noreply@verifik.co>",
+		to: _to,
+		subject,
+		template,
+	};
+
+	if (extraParams["recipient-variables"]) {
+		if (config.env === "development") {
+			const keys = Object.keys(extraParams["recipient-variables"]);
+
+			for (let index = 0; index < keys.length; index++) {
+				const key = keys[index];
+
+				extraParams["recipient-variables"][_to] =
+					extraParams["recipient-variables"][key];
+			}
+		}
+
+		emailData["recipient-variables"] = JSON.stringify(
+			extraParams["recipient-variables"]
+		);
+	}
+
+	try {
+		if (config.debug.sendEmail) console.log("emailData", emailData);
+
+		const response = await new Promise((resolve, reject) => {
+			mg.messages.create(domain, emailData).then((emailResponse) => {
+				if (config.debug.sendEmail) console.log("emailResponse", emailResponse);
+
+				resolve(emailResponse);
+			});
+		});
+
+		return response;
+	} catch (exception) {
+		console.error({
+			emailException: exception,
+		});
+
+		return null;
+	}
+};
+
+module.exports = {
+	sendEmail,
 };
