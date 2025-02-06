@@ -40,11 +40,13 @@ const createUnderName = async (payload) => {
 		const newUnderName = await ant.setRecord(
 			{
 				undername,
-				transactionId: "SGsts42Qi3dNiSAl6pSOwcNInPsLqZ1yExAuSQyrjos",
+				transactionId: "FmFk0i-Ph870VAFCjzX1bXUIUtYk2_Id_wplCqFv5kc",
 				ttlSeconds: 3600,
 			},
 			// optional additional tags
-			{ tags: [{ name: "App-Name", value: "My-Awesome-App" }] }
+			{
+				tags: [],
+			}
 		);
 
 		return newUnderName;
