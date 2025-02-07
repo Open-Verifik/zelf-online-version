@@ -95,15 +95,6 @@ const decrypt = async (data) => {
 	} catch (exception) {
 		const _error = exception.response?.data;
 
-		console.error({
-			data: _error,
-			exception: exception.response,
-			os: data.os || "DESKTOP",
-			password: data.password || undefined,
-			senseprint_base_64: data.zelfProof,
-			verifiers_auth_key: data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
-		});
-
 		let error = new Error(_error.code);
 
 		switch (_error.code) {

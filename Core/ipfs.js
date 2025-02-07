@@ -3,25 +3,27 @@ const { Blob } = require("buffer");
 require("dotenv").config();
 const FormData = require("form-data");
 const axios = require("axios");
+
+const prefix = process.env.NODE_ENV === "development" ? "_" : "";
+
+const pinataJwt = process.env[`${prefix}PINATA_JWT`];
+const pinataGateway = process.env[`${prefix}PINATA_GATEWAY_URL`];
+
 const pinata = new PinataSDK({
-	pinataJwt: process.env.PINATA_JWT,
-	pinataGateway: process.env.PINATA_GATEWAY_URL,
+	pinataJwt,
+	pinataGateway,
 });
+
 const os = process.env.ENVOS;
 
 const pinataWeb3 = require("pinata-web3");
 
 const web3Instance = new pinataWeb3.PinataSDK({
-	pinataJwt: process.env.PINATA_JWT,
-	pinataGateway: process.env.PINATA_GATEWAY_URL,
+	pinataJwt,
+	pinataGateway,
 });
 
-const upload = async (
-	base64Image,
-	filename = "image.png",
-	mimeType = "image/png",
-	metadata = {}
-) => {
+const upload = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
 	try {
 		// // Remove base64 header if present (data:image/png;base64,...)
 		// const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
@@ -85,28 +87,20 @@ const retrieve = async (cid, expires = 1800) => {
  * @param {Object} metadata
  * @returns ipfs file
  */
-const pinFile = async (
-	base64Image,
-	filename = "image.png",
-	mimeType = "image/png",
-	metadata = {}
-) => {
-	if (os === "Win")
-		return await pinFileWindows(base64Image, filename, mimeType, metadata);
+const pinFile = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
+	if (os === "Win") return await pinFileWindows(base64Image, filename, mimeType, metadata);
 
 	try {
 		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
 
 		// Upload the file to Pinata
-		const uploadResponse = await web3Instance.upload
-			.base64(base64Data)
-			.addMetadata({
-				name: filename,
-				keyValues: metadata,
-			});
+		const uploadResponse = await web3Instance.upload.base64(base64Data).addMetadata({
+			name: filename,
+			keyValues: metadata,
+		});
 
 		return {
-			url: `https://${process.env.PINATA_GATEWAY_URL}/ipfs/${uploadResponse.IpfsHash}`,
+			url: `https://${pinataGateway}/ipfs/${uploadResponse.IpfsHash}`,
 			...uploadResponse,
 			pinned: true,
 			web3: true,
@@ -119,14 +113,11 @@ const pinFile = async (
 
 	return null;
 };
-const pinFileWindows = async (
-	base64Image,
-	filename = "image.png",
-	mimeType = "image/png",
-	metadata = {}
-) => {
-	const PINATA_API_KEY = process.env.PINATA_API_KEY;
-	const PINATA_SECRET_API_KEY = process.env.PINATA_API_SECRET;
+
+const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
+	const PINATA_API_KEY = process.env[`${prefix}PINATA_API_KEY`];
+
+	const PINATA_SECRET_API_KEY = process.env[`${prefix}PINATA_API_SECRET`];
 
 	try {
 		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
@@ -146,22 +137,18 @@ const pinFileWindows = async (
 			);
 		}
 
-		const response = await axios.post(
-			"https://api.pinata.cloud/pinning/pinFileToIPFS",
-			formData,
-			{
-				headers: {
-					...formData.getHeaders(),
-					pinata_api_key: PINATA_API_KEY,
-					pinata_secret_api_key: PINATA_SECRET_API_KEY,
-				},
-			}
-		);
+		const response = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
+			headers: {
+				...formData.getHeaders(),
+				pinata_api_key: PINATA_API_KEY,
+				pinata_secret_api_key: PINATA_SECRET_API_KEY,
+			},
+		});
 
 		const uploadResponse = response.data;
 
 		return {
-			url: `https://${process.env.PINATA_GATEWAY_URL}/ipfs/${uploadResponse.IpfsHash}`,
+			url: `https://${pinataGateway}/ipfs/${uploadResponse.IpfsHash}`,
 			...uploadResponse,
 			pinned: true,
 			web3: true,
@@ -198,7 +185,7 @@ const filter = async (property = "name", value) => {
 	for (let index = 0; index < files.length; index++) {
 		const file = files[index];
 
-		file.url = `https://${process.env.PINATA_GATEWAY_URL}/ipfs/${file.ipfs_pin_hash}`;
+		file.url = `https://${pinataGateway}/ipfs/${file.ipfs_pin_hash}`;
 	}
 
 	return files;

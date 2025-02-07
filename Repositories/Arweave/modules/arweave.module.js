@@ -19,14 +19,14 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 
 	const jwk = {
 		kty: "RSA",
-		n: config.arwave.n,
-		e: config.arwave.e,
-		d: config.arwave.d,
-		p: config.arwave.p,
-		q: config.arwave.q,
-		dp: config.arwave.dp,
-		dq: config.arwave.dq,
-		qi: config.arwave.qi,
+		n: config.env === "development" ? config.arwave.hold.n : config.arwave.n,
+		e: config.env === "development" ? config.arwave.hold.e : config.arwave.e,
+		d: config.env === "development" ? config.arwave.hold.d : config.arwave.d,
+		p: config.env === "development" ? config.arwave.hold.p : config.arwave.p,
+		q: config.env === "development" ? config.arwave.hold.q : config.arwave.q,
+		dp: config.env === "development" ? config.arwave.hold.dp : config.arwave.dp,
+		dq: config.env === "development" ? config.arwave.hold.dq : config.arwave.dq,
+		qi: config.env === "development" ? config.arwave.hold.qi : config.arwave.qi,
 		kid: "2011-04-29",
 	};
 
@@ -68,10 +68,6 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 		{
 			name: "hasPassword",
 			value: hasPassword,
-		},
-		{
-			name: "expiresAt",
-			value: moment().add(12, "hour").format("YYYY-MM-DD"),
 		},
 	];
 

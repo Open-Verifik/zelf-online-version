@@ -40,7 +40,7 @@ const createUnderName = async (payload) => {
 		const newUnderName = await ant.setRecord(
 			{
 				undername,
-				transactionId: "FmFk0i-Ph870VAFCjzX1bXUIUtYk2_Id_wplCqFv5kc",
+				transactionId: config.arwave.transactionId,
 				ttlSeconds: 3600,
 			},
 			// optional additional tags
