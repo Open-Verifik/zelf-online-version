@@ -7,6 +7,11 @@ const agent = new https.Agent({
 	rejectUnauthorized: false,
 });
 const { getTickerPrice } = require("../../binance/modules/binance.module");
+const endpoint = `https://api-v2.solscan.io/v2`;
+const { getCleanInstance } = require("../../../Core/axios");
+const instance = getCleanInstance(30000);
+const { generateRandomUserAgent } = require("../../../Core/helpers");
+
 /**
  * @param {*} params
  */
@@ -57,6 +62,10 @@ const getAddress = async (params) => {
 			amount: data.balance,
 			image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
 		});
+
+		const { transactions } = await getTransactions({ id: address }, { page: 0, show: 10 });
+
+		data.transactions = transactions;
 
 		return data;
 	} catch (error) {
@@ -203,12 +212,18 @@ const getGasTracker = async () => {
 
 		return data.data;
 	} catch (error) {
+		console.error({ error });
 		return null;
 	}
 };
 
 function formatDataTransactions(transactions) {
 	try {
+		for (let index = 0; index < transactions.length; index++) {
+			const transaction = transactions[index];
+
+			console.log({ ...transaction });
+		}
 		return transactions.map((tx) => ({
 			txHash: tx.signature,
 			block_time: new Date(tx.timestamp * 1000),
