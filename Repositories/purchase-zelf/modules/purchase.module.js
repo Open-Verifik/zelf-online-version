@@ -1,8 +1,12 @@
 const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const Mailgun = require("../../../Core/mailgun");
-const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
-
+const {
+	searchZelfName,
+	_calculateZelfNamePrice,
+} = require("../../ZelfNameService/modules/zns.module");
+const Model = require("../../Subscribers/models/subscriber.model");
+const MongoORM = require("../../../Core/mongo-orm");
 const {
 	getAddress,
 } = require("../../etherscan/modules/etherscan-scrapping.module");
@@ -15,15 +19,15 @@ const jwt = require("jsonwebtoken");
 const secretKey = config.signedData.key;
 const templatesMap = {
 	es: {
-		staff: {
-			subject: "Invitacion de personal",
-			template: "staff invitation - esp",
+		Purchase_receipt: {
+			subject: "Purchase receipt",
+			template: "purchase receipt",
 		},
 	},
 	en: {
-		staff: {
-			subject: "Staff invitation",
-			template: "staff invitation",
+		Purchase_receipt: {
+			subject: "Purchase receipt",
+			template: "purchase receipt",
 		},
 	},
 };
@@ -243,6 +247,10 @@ const checkoutPayCoinbase = async (chargeID) => {
 };
 ///funcion para checar balance en ETH
 const checkoutETH = async (address) => {
+	address =
+		config.env === "development"
+			? "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
+			: address;
 	try {
 		const balanceETH = await getAddress({
 			address,
@@ -258,6 +266,10 @@ const checkoutETH = async (address) => {
 };
 ///funcion para checar balance en SOLANA
 const checkoutSOLANA = async (address) => {
+	address =
+		config.env === "development"
+			? "D27DgiipBR5dRdij2L6NQ27xwyiLK5Q2DsEM5ML5EuLK"
+			: address;
 	try {
 		const balanceSOLANA = await solanaModule.getAddress({ id: address });
 
@@ -271,7 +283,10 @@ const checkoutSOLANA = async (address) => {
 ///funcion para checar balance en BICOIN
 
 const checkoutBICOIN = async (address) => {
-	//address = "bc1qw8wrek2m7nlqldll66ajnwr9mh64syvkt67zlu";
+	address =
+		config.env === "development"
+			? "bc1q6zn0ea7p3jmn5e4jpfpp8m9ffkaz4ma6wayuna"
+			: address;
 	try {
 		const balanceBICOIN = await getBalance({ id: address });
 
@@ -283,17 +298,37 @@ const checkoutBICOIN = async (address) => {
 	}
 };
 const geReceipt_email = async (body) => {
-	const { transactionDate, subtotal, discount, total, expires, year } = body;
-	console.log({ transactionDate, subtotal, discount, total, expires, year });
-	// return await sendEmail({
-	// 	language: "es",
-	// 	template: "staff",
-	// 	name: "Juan Pérez",
-	// 	phone: "+1234567890",
-	// 	email: "anuar.2004@hotmail.com",
-	// 	client: "Empresa XYZ",
-	// });
-	return body;
+	const { zelfName, transactionDate, price, expires, year, email } = body;
+
+	const subtotal = _calculateZelfNamePrice(
+		zelfName.split(".zelf")[0].length,
+		year
+	);
+	const discount = Math.round((subtotal - price) * 100) / 100;
+
+	const formatDate = (date) =>
+		new Intl.DateTimeFormat("en-US", {
+			month: "short",
+			day: "numeric",
+			year: "numeric",
+			hour: "numeric",
+			minute: "numeric",
+			second: "numeric",
+			hour12: true,
+		}).format(new Date(date));
+
+	return await sendEmail({
+		language: "es",
+		template: "Purchase_receipt",
+		zelfName,
+		transactionDate: formatDate(transactionDate),
+		price,
+		subtotal,
+		discount,
+		expires: formatDate(expires.replace(/-/g, "/")), // Asegura compatibilidad con Safari
+		year,
+		email,
+	});
 };
 
 //calcular precio en la difrente redes
@@ -330,10 +365,13 @@ const sendEmail = async (payload) => {
 	const extraParams = {
 		"recipient-variables": {
 			[payload.email]: {
-				firstName: payload.name,
-				email: payload.email,
-				phone: payload.phone,
-				client: payload.client,
+				transactionDate: payload.transactionDate,
+				subtotal: payload.subtotal,
+				discount: payload.discount,
+				total: payload.price,
+				expires: payload.expires,
+				year: payload.year,
+				zelfName: payload.zelfName,
 			},
 		},
 	};
@@ -347,20 +385,34 @@ const sendEmail = async (payload) => {
 			emailTemplate.template,
 			extraParams
 		);
+
+		const existingSubscriber = await get({
+			where_email: payload.email,
+			findOne: true,
+		});
+
+		const subscriber =
+			existingSubscriber ||
+			new Model({
+				email: payload.email,
+				name: payload.name,
+				//lists: [list],
+			});
+		await subscriber.save();
+		return { message: `payment_receipt_sent_successfully` };
 	} catch (exception) {
 		console.error({
 			exception,
 		});
+		exception.status = 409;
+		throw exception;
 	}
-
-	return email;
 };
-function isExpired(expirationDate) {
-	const now = new Date(); // Fecha y hora actual
-	const expDate = new Date(expirationDate); // Fecha de expiración
+const get = async (params) => {
+	const queryParams = { ...params };
+	return await MongoORM.buildQuery(queryParams, Model, null, []);
+};
 
-	return expDate <= now; // Devuelve true si la fecha ya pasó o es igual a la actual
-}
 //firmar el precio fijo
 const signRecordData = (recordData, secretKey) => {
 	try {

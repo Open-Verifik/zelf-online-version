@@ -28,7 +28,7 @@ module.exports = (server) => {
 
 	server.post(
 		`${PATH}/receipt-email`,
-
+		Middleware.validateParamasEmail,
 		Controller.receipt_email
 	);
 };

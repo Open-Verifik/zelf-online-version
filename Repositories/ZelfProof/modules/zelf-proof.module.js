@@ -128,13 +128,17 @@ const preview = async (data) => {
 
 const _formattingError = (error = {}) => {
 	if (error?.code.includes(config.terms.zk)) {
-		error.code = error.code.replaceAll(config.terms.zk, config.terms._zk).toUpperCase();
+		error.code = error.code
+			.replaceAll(config.terms.zk, config.terms._zk)
+			.toUpperCase();
 	}
 
 	error.message = error.message.toUpperCase();
 
 	if (error.message.includes(config.terms.zk)) {
-		error.message = error.message.replaceAll(config.terms.zk, config.terms._zk).toUpperCase();
+		error.message = error.message
+			.replaceAll(config.terms.zk, config.terms._zk)
+			.toUpperCase();
 	}
 
 	return error;

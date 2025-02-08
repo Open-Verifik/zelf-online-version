@@ -1,8 +1,8 @@
 const formData = require("form-data");
 const Mailgun = require("mailgun.js");
 const config = require("./config");
-const domain = "mg.verifik.co";
-
+//const domain = "mg.verifik.co";
+const domain = "mg.zelf.world";
 const mailgun = new Mailgun(formData);
 
 const mg = mailgun.client({
@@ -25,7 +25,7 @@ const sendEmail = async (to, subject, template, extraParams = {}) => {
 			: config.email_providers.mailgun.proxyEmail;
 
 	const emailData = {
-		from: "Verifik <noreply@verifik.co>",
+		from: "ZNS <noreply@mg.zelf.world>>",
 		to: _to,
 		subject,
 		template,
