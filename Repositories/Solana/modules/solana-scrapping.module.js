@@ -41,7 +41,7 @@ const getAddress = async (params) => {
 
 		const data = formatData({
 			address,
-			balance: `${parseFloat(balance)}`,
+			balance: balance ? `${parseFloat(balance)}` : 0,
 			fiatBalance: `${parseFloat(SaldoSOL_USD) || 0}`,
 			type: "system_account",
 			account: {

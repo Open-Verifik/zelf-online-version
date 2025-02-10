@@ -77,7 +77,7 @@ const configuration = {
 		apiKey: process.env.ZELF_PROOF_API_KEY || "password",
 	},
 	token: {
-		rewardPrice: process.env.REWARD_PRICE || 0.1,
+		rewardPrice: process.env.REWARD_PRICE || 0.05,
 		whitelist: process.env.WHITELIST,
 	},
 	pgp: {
