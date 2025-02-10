@@ -1,10 +1,20 @@
 const Module = require("../modules/zelf-proof.module");
+const ClientModule = require("../../Client/modules/client.module");
 
 const encrypt = async (ctx) => {
 	try {
 		const data = await Module.encrypt(ctx.request.body, ctx.state.user);
 
 		ctx.body = { ...data };
+
+		if (ctx.state.user) {
+			await ClientModule.update(
+				{
+					increaseApiUsage: true,
+				},
+				ctx.state.user
+			);
+		}
 	} catch (error) {
 		console.error(error);
 
@@ -19,6 +29,15 @@ const encryptQRCode = async (ctx) => {
 		const data = await Module.encryptQRCode(ctx.request.body, ctx.state.user);
 
 		ctx.body = { ...data };
+
+		if (ctx.state.user) {
+			await ClientModule.update(
+				{
+					increaseApiUsage: true,
+				},
+				ctx.state.user
+			);
+		}
 	} catch (error) {
 		console.error(error);
 
@@ -33,6 +52,15 @@ const decrypt = async (ctx) => {
 		const data = await Module.decrypt(ctx.request.body, ctx.state.user);
 
 		ctx.body = { ...data };
+
+		if (ctx.state.user) {
+			await ClientModule.update(
+				{
+					increaseApiUsage: true,
+				},
+				ctx.state.user
+			);
+		}
 	} catch (error) {
 		console.error(error);
 
@@ -47,6 +75,15 @@ const preview = async (ctx) => {
 		const data = await Module.preview(ctx.request.body, ctx.state.user);
 
 		ctx.body = { ...data };
+
+		if (ctx.state.user) {
+			await ClientModule.update(
+				{
+					increaseApiUsage: true,
+				},
+				ctx.state.user
+			);
+		}
 	} catch (error) {
 		console.error({ error });
 

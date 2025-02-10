@@ -82,6 +82,10 @@ const ClientSchema = new Schema({
 		required: true,
 		default: null,
 	},
+	apiUsage: {
+		type: Number,
+		default: 0,
+	},
 });
 
 ClientSchema.pre("save", async function (next) {

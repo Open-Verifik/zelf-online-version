@@ -52,7 +52,21 @@ const create = async (data, authUser) => {
 	};
 };
 
-const update = async (data, authUser) => {};
+const update = async (data, authUser) => {
+	const { clientId } = authUser;
+
+	const record = await Model.findOne({ _id: clientId });
+
+	if (!record) throw new Error("404");
+
+	if (data.increaseApiUsage) {
+		if (!record.apiUsage) record.apiUsage = 0;
+
+		record.apiUsage += 1;
+	}
+
+	await record.save();
+};
 
 const destroy = async (data, authUser) => {};
 
