@@ -17,6 +17,8 @@ const createCoinbaseCharge = async (chargeData) => {
 		});
 		return response.data?.data;
 	} catch (error) {
+		console.log({ error, response: error.response.data });
+
 		throw new Error(error.response ? error.response.data : error.message);
 	}
 };

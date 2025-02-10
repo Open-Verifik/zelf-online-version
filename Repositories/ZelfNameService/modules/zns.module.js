@@ -88,9 +88,9 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	}
 
 	// Adjust price for development environment
-	price = config.env === "development" ? price / 80 : price;
+	price = config.env === "development" ? 0.05 : price;
 
-	if (config.token.whitelist.includes(referralZelfName)) return 0;
+	if (referralZelfName && config.token.whitelist.includes(referralZelfName)) return 0;
 
 	// Round up to 2 decimal places
 	return Math.ceil(price * 100) / 100;
@@ -409,19 +409,21 @@ const leaseZelfName = async (params, authUser) => {
 		addServerPassword: Boolean(params.addServerPassword),
 	};
 
-	zelfNameObject.zelfProof = await encrypt(dataToEncrypt);
-
-	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
-
 	zelfNameObject.zelfName = zelfName;
 	zelfNameObject.price = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
 	zelfNameObject.publicData = dataToEncrypt.publicData;
+
 	zelfNameObject.ethAddress = eth.address;
 	zelfNameObject.btcAddress = btc.address;
 	zelfNameObject.solanaAddress = solana.address;
 	zelfNameObject.hasPassword = `${Boolean(password)}`;
 	zelfNameObject.metadata = params.previewZelfProof ? dataToEncrypt.metadata : undefined;
 	zelfNameObject.duration = duration;
+
+	zelfNameObject.zelfProof = await encrypt(dataToEncrypt);
+
+	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
+
 	zelfNameObject.image = await encryptQR(dataToEncrypt);
 
 	await _createPaymentCharge(zelfNameObject, { referralZelfName, referralZelfNameObject }, authUser);
@@ -643,39 +645,7 @@ const leaseConfirmation = async (data, authUser) => {
 const _confirmZelfNamePurchase = async (zelfNameObject) => {
 	unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
 
-	const { masterIPFSRecord, masterArweaveRecord } = await _cloneZelfNameToProduction(zelfNameObject);
-
-	let reward;
-	// now here we will create the undername
-	if (config.env === "production") {
-		zelfNameObject.publicData.referralZelfName
-			? await addReferralReward({
-					ethAddress: masterIPFSRecord.metadata.ethAddress,
-					solanaAddress: masterIPFSRecord.metadata.solanaAddress,
-					zelfName: masterIPFSRecord.metadata.zelfName,
-					zelfNamePrice: zelfNameObject.publicData.price,
-					referralZelfName: zelfNameObject.publicData.referralZelfName,
-					referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
-					ipfsHash: masterIPFSRecord.IpfsHash,
-					arweaveId: masterArweaveRecord.id,
-			  })
-			: "no_referral";
-
-		reward = await addPurchaseReward({
-			ethAddress: masterIPFSRecord.metadata.ethAddress,
-			solanaAddress: masterIPFSRecord.metadata.solanaAddress,
-			zelfName: masterIPFSRecord.metadata.zelfName,
-			zelfNamePrice: zelfNameObject.publicData.price,
-			ipfsHash: masterIPFSRecord.IpfsHash,
-			arweaveId: masterArweaveRecord.id,
-		});
-
-		await createUnderName({
-			parentName: config.arwave.parentName,
-			undername: zelfNameObject.publicData.zelfName.split(".zelf")[0],
-			publicData: zelfNameObject.publicData,
-		});
-	}
+	const { masterIPFSRecord, masterArweaveRecord, reward } = await _cloneZelfNameToProduction(zelfNameObject);
 
 	return {
 		ipfs: [masterIPFSRecord],
@@ -884,9 +854,42 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 		publicData: payload.metadata,
 	});
 
+	let reward;
+
+	zelfNameObject.publicData.referralZelfName
+		? await addReferralReward({
+				ethAddress: masterIPFSRecord.metadata.ethAddress,
+				solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+				zelfName: masterIPFSRecord.metadata.zelfName,
+				zelfNamePrice: zelfNameObject.publicData.price,
+				referralZelfName: zelfNameObject.publicData.referralZelfName,
+				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
+				ipfsHash: masterIPFSRecord.IpfsHash,
+				arweaveId: masterArweaveRecord.id,
+		  })
+		: "no_referral";
+
+	reward = await addPurchaseReward({
+		ethAddress: masterIPFSRecord.metadata.ethAddress,
+		solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+		zelfName: masterIPFSRecord.metadata.zelfName,
+		zelfNamePrice: zelfNameObject.publicData.price,
+		ipfsHash: masterIPFSRecord.IpfsHash,
+		arweaveId: masterArweaveRecord.id,
+	});
+
+	if (config.env === "production") {
+		await createUnderName({
+			parentName: config.arwave.parentName,
+			undername: zelfNameObject.publicData.zelfName.split(".zelf")[0],
+			publicData: zelfNameObject.publicData,
+		});
+	}
+
 	return {
 		masterArweaveRecord,
 		masterIPFSRecord,
+		reward,
 	};
 };
 
