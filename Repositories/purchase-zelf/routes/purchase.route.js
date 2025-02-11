@@ -8,27 +8,11 @@ const base = "/payment";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.post(
-		`${PATH}/search_zelf_lease`,
+	server.post(`${PATH}/search_zelf_lease`, Controller.search_zelf_lease);
 
-		Controller.search_zelf_lease
-	);
+	server.post(`${PATH}/select-method`, Controller.select_method);
 
-	server.post(
-		`${PATH}/select-method`,
+	server.post(`${PATH}/pay/:zelfName`, Controller.pay);
 
-		Controller.select_method
-	);
-
-	server.post(
-		`${PATH}/pay/:zelfName`,
-
-		Controller.pay
-	);
-
-	server.post(
-		`${PATH}/confirmation-email`,
-
-		Controller.pay
-	);
+	server.post(`${PATH}/confirmation-email`, Controller.pay);
 };
