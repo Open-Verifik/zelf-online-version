@@ -747,7 +747,7 @@ const _confirmZelfNamePurchase = async (zelfNameObject) => {
 
 	let reward;
 	// now here we will create the undername
-	if (config.env === "development") {
+	if (config.env === "production") {
 		zelfNameObject.publicData.referralZelfName
 			? await addReferralReward({
 					ethAddress: masterIPFSRecord.metadata.ethAddress,
@@ -894,7 +894,6 @@ const confirmPayUniqueAddress = async (
 
 //verificar balance  ETH
 const checkoutETH = async (address, amountDetecte) => {
-	address = "0x71c7656ec7ab88b098defb751b7401b5f6d8976f";
 	try {
 		const balanceETH = await getAddress({
 			address,
