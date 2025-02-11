@@ -9,7 +9,6 @@ const { createBTCWallet } = require("../../Wallet/modules/btc");
 const sessionModule = require("../../Session/modules/session.module");
 const BigNumber = require("bignumber.js");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-
 const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
@@ -19,11 +18,8 @@ const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modu
 const config = require("../../../Core/config");
 const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const jwt = require("jsonwebtoken");
-const secretKey = config.signedData.key;
-const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
-const solanaModule = require("../../Solana/modules/solana-scrapping.module");
-const { getBalance } = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const { createUnderName } = require("./undernames.module");
+const { isETHPaymentConfirmed, isSolanaPaymentConfirmed, isBTCPaymentConfirmed } = require("../../purchase-zelf/modules/balance-checker.module");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -90,7 +86,7 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	}
 
 	// Adjust price for development environment
-	price = config.env === "development" ? price / 20 : price;
+	price = config.env === "development" ? 0.05 : price;
 
 	if (referralZelfName && config.token.whitelist.includes(referralZelfName)) return 0;
 
@@ -411,19 +407,21 @@ const leaseZelfName = async (params, authUser) => {
 		addServerPassword: Boolean(params.addServerPassword),
 	};
 
-	zelfNameObject.zelfProof = await encrypt(dataToEncrypt);
-
-	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
-
 	zelfNameObject.zelfName = zelfName;
 	zelfNameObject.price = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
 	zelfNameObject.publicData = dataToEncrypt.publicData;
+
 	zelfNameObject.ethAddress = eth.address;
 	zelfNameObject.btcAddress = btc.address;
 	zelfNameObject.solanaAddress = solana.address;
 	zelfNameObject.hasPassword = `${Boolean(password)}`;
 	zelfNameObject.metadata = params.previewZelfProof ? dataToEncrypt.metadata : undefined;
 	zelfNameObject.duration = duration;
+
+	zelfNameObject.zelfProof = await encrypt(dataToEncrypt);
+
+	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
+
 	zelfNameObject.image = await encryptQR(dataToEncrypt);
 
 	await _createPaymentCharge(zelfNameObject, { referralZelfName, referralZelfNameObject }, authUser);
@@ -574,7 +572,7 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
  * @author Miguel Trevino
  */
 const leaseConfirmation = async (data, authUser) => {
-	const { network, coin, zelfName, amountDetectedsign } = data;
+	const { network, coin, zelfName } = data;
 
 	let unpinResult;
 	let inMainnet = false;
@@ -609,15 +607,15 @@ const leaseConfirmation = async (data, authUser) => {
 
 			break;
 		case "ETH":
-			payment = await confirmPayUniqueAddress(zelfNameObject, network, amountDetectedsign);
+			payment = await confirmPayUniqueAddress(zelfNameObject, network);
 
 			break;
 		case "SOL":
-			payment = await confirmPayUniqueAddress(zelfNameObject, network, amountDetectedsign);
+			payment = await confirmPayUniqueAddress(zelfNameObject, network);
 
 			break;
 		case "BTC":
-			payment = await confirmPayUniqueAddress(zelfNameObject, network, amountDetectedsign);
+			payment = await confirmPayUniqueAddress(zelfNameObject, network);
 
 			break;
 
@@ -645,39 +643,7 @@ const leaseConfirmation = async (data, authUser) => {
 const _confirmZelfNamePurchase = async (zelfNameObject) => {
 	unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
 
-	const { masterIPFSRecord, masterArweaveRecord } = await _cloneZelfNameToProduction(zelfNameObject);
-
-	let reward;
-	// now here we will create the undername
-	if (config.env === "production") {
-		zelfNameObject.publicData.referralZelfName
-			? await addReferralReward({
-					ethAddress: masterIPFSRecord.metadata.ethAddress,
-					solanaAddress: masterIPFSRecord.metadata.solanaAddress,
-					zelfName: masterIPFSRecord.metadata.zelfName,
-					zelfNamePrice: zelfNameObject.publicData.price,
-					referralZelfName: zelfNameObject.publicData.referralZelfName,
-					referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
-					ipfsHash: masterIPFSRecord.IpfsHash,
-					arweaveId: masterArweaveRecord.id,
-			  })
-			: "no_referral";
-
-		reward = await addPurchaseReward({
-			ethAddress: masterIPFSRecord.metadata.ethAddress,
-			solanaAddress: masterIPFSRecord.metadata.solanaAddress,
-			zelfName: masterIPFSRecord.metadata.zelfName,
-			zelfNamePrice: zelfNameObject.publicData.price,
-			ipfsHash: masterIPFSRecord.IpfsHash,
-			arweaveId: masterArweaveRecord.id,
-		});
-
-		await createUnderName({
-			parentName: config.arwave.parentName,
-			undername: zelfNameObject.publicData.zelfName.split(".zelf")[0],
-			publicData: zelfNameObject.publicData,
-		});
-	}
+	const { masterIPFSRecord, masterArweaveRecord, reward } = await _cloneZelfNameToProduction(zelfNameObject);
 
 	return {
 		ipfs: [masterIPFSRecord],
@@ -717,32 +683,22 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed: config.env === "development" ? false : confirmed,
+		confirmed: config.env === "development" ? true : confirmed,
 	};
 };
 
 const confirmPayUniqueAddress = async (zelfNameObject, network, amountDetectedsign) => {
 	try {
-		//const price = zelfNameObject.publicData.price;
-
-		const amountDetecte = verifyRecordData(amountDetectedsign, secretKey);
-
-		console.log({ amountDetecte });
+		const price = zelfNameObject.publicData.price;
 
 		const zelfName = zelfNameObject.publicData.name;
 
-		console.log({ zelfName });
-
 		const zelfNamePay = zelfName.replace(".zelf.hold", ".zelfpay");
-
-		console.log({ zelfNamePay });
 
 		const previewData2 = await searchZelfName({
 			zelfName: zelfNamePay,
 			environment: "both",
 		});
-
-		console.log({ previewData2 });
 
 		const paymentAddressInIPFS = JSON.parse(previewData2.ipfs[0].publicData.addresses);
 
@@ -768,91 +724,20 @@ const confirmPayUniqueAddress = async (zelfNameObject, network, amountDetectedsi
 			throw error;
 		}
 
+		const amountDetected = verifyRecordData(amountDetectedsign, secretKey);
+
 		const confirmed = await {
-			ETH: checkoutETH,
-			SOL: checkoutSOLANA,
-			BTC: checkoutBTC,
-		}[network]?.(selectedAddress, amountDetecte);
+			ETH: isETHPaymentConfirmed,
+			SOL: isSolanaPaymentConfirmed,
+			BTC: isBTCPaymentConfirmed,
+		}[network]?.(selectedAddress, price);
 
 		return {
 			confirmed,
 		};
 	} catch (e) {
-		console.log({ e });
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
-		throw error;
-	}
-};
-
-//verificar balance  ETH
-const checkoutETH = async (address, amountDetecte) => {
-	try {
-		const balanceETH = await getAddress({
-			address,
-		});
-
-		let balance = Number(balanceETH.balance).toFixed(7);
-
-		if (Number(balance) === Number(amountDetecte)) {
-			return true;
-		}
-	} catch (error) {
-		console.log(error);
-	}
-
-	return false;
-};
-//verificar balance  SOlANA
-const checkoutSOLANA = async (address, amountDetecte) => {
-	try {
-		const balanceSOLANA = await solanaModule.getAddress({ id: address });
-
-		let balance = Number(balanceSOLANA.balance).toFixed(7);
-
-		if (Number(balance) === Number(amountDetecte)) {
-			return true;
-		}
-	} catch (error) {}
-
-	return false;
-};
-
-/**
- * checkout BTC
- * @param {String} address
- * @param {Number} price
- * @returns
- */
-const checkoutBTC = async (address, amountDetecte) => {
-	try {
-		const balanceBTC = await getBalance({
-			id: address,
-		});
-
-		let balance = Number(balanceBTC.balance).toFixed(7);
-
-		if (Number(balance) === Number(amountDetecte)) {
-			return true;
-		}
-	} catch (error) {}
-
-	return false;
-};
-
-const calculateCryptoValue = async (network, amount) => {
-	try {
-		const { price } = await getTickerPrice({ symbol: `${network}` });
-
-		if (!price) {
-			throw new Error(`No se encontró información para la criptomoneda: ${network}`);
-		}
-
-		// Cálculo preciso con BigNumber
-		const USD = new BigNumber(amount).multipliedBy(new BigNumber(price));
-
-		return { USD };
-	} catch (error) {
 		throw error;
 	}
 };
@@ -894,9 +779,42 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 		publicData: payload.metadata,
 	});
 
+	let reward;
+
+	zelfNameObject.publicData.referralZelfName
+		? await addReferralReward({
+				ethAddress: masterIPFSRecord.metadata.ethAddress,
+				solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+				zelfName: masterIPFSRecord.metadata.zelfName,
+				zelfNamePrice: zelfNameObject.publicData.price,
+				referralZelfName: zelfNameObject.publicData.referralZelfName,
+				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
+				ipfsHash: masterIPFSRecord.IpfsHash,
+				arweaveId: masterArweaveRecord.id,
+		  })
+		: "no_referral";
+
+	reward = await addPurchaseReward({
+		ethAddress: masterIPFSRecord.metadata.ethAddress,
+		solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+		zelfName: masterIPFSRecord.metadata.zelfName,
+		zelfNamePrice: zelfNameObject.publicData.price,
+		ipfsHash: masterIPFSRecord.IpfsHash,
+		arweaveId: masterArweaveRecord.id,
+	});
+
+	if (config.env === "production") {
+		await createUnderName({
+			parentName: config.arwave.parentName,
+			undername: zelfNameObject.publicData.zelfName.split(".zelf")[0],
+			publicData: zelfNameObject.publicData,
+		});
+	}
+
 	return {
 		masterArweaveRecord,
 		masterIPFSRecord,
+		reward,
 	};
 };
 
@@ -1276,16 +1194,6 @@ const update = async (params, authUser) => {
 	);
 
 	return updatedRecord;
-};
-
-const verifyRecordData = (token, secretKey) => {
-	try {
-		const decodedData = jwt.verify(token, secretKey);
-		return decodedData;
-	} catch (error) {
-		error.status = 409;
-		throw error;
-	}
 };
 
 module.exports = {

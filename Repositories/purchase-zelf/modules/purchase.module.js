@@ -239,7 +239,6 @@ const checkoutSOLANA = async (address) => {
 		console.log(error);
 	}
 };
-///funcion para checar balance en BICOIN
 
 const checkoutBICOIN = async (address) => {
 	//address = "bc1qw8wrek2m7nlqldll66ajnwr9mh64syvkt67zlu";
@@ -281,7 +280,7 @@ function isExpired(expirationDate) {
 
 	return expDate <= now; // Devuelve true si la fecha ya pasó o es igual a la actual
 }
-//firmar el precio fijo
+
 const signRecordData = (recordData, secretKey) => {
 	try {
 		const token = jwt.sign(recordData, secretKey);
@@ -291,7 +290,6 @@ const signRecordData = (recordData, secretKey) => {
 	}
 };
 
-//ver el precio fijo
 const verifyRecordData = (token, secretKey) => {
 	try {
 		const decodedData = jwt.verify(token, secretKey);
@@ -301,6 +299,7 @@ const verifyRecordData = (token, secretKey) => {
 		throw error;
 	}
 };
+
 module.exports = {
 	search_zelf_lease,
 	select_method,
