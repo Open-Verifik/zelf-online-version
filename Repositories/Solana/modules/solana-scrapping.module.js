@@ -28,7 +28,7 @@ const getAddress = async (params) => {
 		const $ = cheerio.load(response.data);
 
 		const balance = $(
-			"#root > main > div > div.single-pannel > div.index_infoWrapper__4GvU6 > div:nth-child(1) > div:nth-child(3) > div.index_value__vVl9q > div > span.inline-flex.align-items-center.max-w-100.overflow-hidden > div > div"
+			"#root > main > div > div > div.single-pannel > div.index_infoWrapper__4GvU6 > div:nth-child(1) > div:nth-child(3) > div.index_value__vVl9q > div > span.inline-flex.align-items-center.max-w-100.overflow-hidden > div > div"
 		).text();
 
 		const SaldoSOL_USD = $(
@@ -41,17 +41,20 @@ const getAddress = async (params) => {
 
 		const data = formatData({
 			address,
-			balance: balance ? `${parseFloat(balance)}` : 0,
+			balance: `${parseFloat(balance) || 0}`,
 			fiatBalance: `${parseFloat(SaldoSOL_USD) || 0}`,
 			type: "system_account",
 			account: {
 				asset: "SOL",
-				fiatValue: `${parseFloat(SaldoSOL_USD)}` || 0,
+				fiatValue: `${parseFloat(SaldoSOL_USD) || 0}`,
 				price: price || 0,
 			},
 		});
 
-		data.tokenHoldings = await getTokens({ id: address }, { page: 0, show: 10 });
+		data.tokenHoldings = await getTokens(
+			{ id: address },
+			{ page: 0, show: 10 }
+		);
 
 		data.tokenHoldings.tokens.unshift({
 			tokenType: "SOL",
@@ -60,10 +63,14 @@ const getAddress = async (params) => {
 			name: "Solana",
 			price: data.account.price,
 			amount: data.balance,
-			image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+			image:
+				"https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
 		});
 
-		const { transactions } = await getTransactions({ id: address }, { page: 0, show: 10 });
+		const { transactions } = await getTransactions(
+			{ id: address },
+			{ page: 0, show: 10 }
+		);
 
 		data.transactions = transactions;
 
@@ -88,7 +95,8 @@ const getTokens = async (params, query) => {
 				// Cookie: coookie,
 				// Devid: `${devId.replace("devId=", "")}`,
 				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 				//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 			},
 		}
@@ -144,7 +152,8 @@ const getTransactions = async (params, query) => {
 				// Cookie: coookie,
 				// Devid: `${devId.replace("devId=", "")}`,
 				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 				//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 			},
 		}
@@ -154,17 +163,21 @@ const getTransactions = async (params, query) => {
 };
 
 const getTransaction = async (params, query) => {
-	const { data } = await instance.get(`${endpoint}/transaction/detail?tx=${params.id}`, {
-		headers: {
-			cookie: "__cf_bm=6Nb_BhzZtOdGxVrRrnJoN83pN6rfOtlvuRxjI90nJ0E-1728040658-1.0.1.1-wWYmBJNnH55RvNIFlxo41XFAhHH4kt68pEvyR2fW2Zb_6hVNARhlKxBPCqoZQ_ZhtRQjCeFp6vReppgZbEYgbw; cf_clearance=ibbR6Iox6IDDq4r5WTmuKO0tkKPcwv8GloL.CCp7V3w-1728040665-1.2.1.1-Ef84Taqzk5aSmCiHV321WYtxUv7EIDJTG0SDgp4J.kjIs6gG9J7GVpSV9HE12tuH7xN5vtzdNt1sm6dOee1c20DQO2Lqd.rymeTv.0g340.1jEjK1BnkO4QUlkmEWdbBHzBOc43akGgAef7InJnNEKcg2eO5dPLXT0waBuDCHTs1VMJWBHhfeAE9jZz4C.pPKJKtUDvCyqvR.KRlokRlHo_gnzTVUQDawAtgdLimOOWAK5huvgGQURDoHngS1E5ne03ScjMqfL9HGKME7wXjsK1M9v6zX0WjGMiRDiXkMX3H8oZieb0wyG.j.UKR7jS3K9ElZYtMaZ2kTH1dRJ2DW13.4Q.H3Q.RZlc7Bv3a9FEKf79.2TUxXaiGtKqFH9IbCrPVxFCQ09YxgSp_U0H0AA; _ga=GA1.1.1401977830.1728040664; _ga_PS3V7B7KV0=GS1.1.1728040664.1.1.1728040689.0.0.0; __cf_bm=Mz6cAvTNjPAeUi30bGhjWOHzNal5QLqwS2T6omWu3c8-1728267695-1.0.1.1-oPl.fRzgy_UIvX86I4hXorbEOT5HKcOEAxcTsfbsYnUgtBpIH.Cck88Gm0KcosZyt6sRto_BNTjyJegI2oYryQ",
-			"if-none-match": 'W/"622-Ukdydv8vKaxhKj3QjdlU5A1PS9k"',
-			origin: "https://solscan.io",
-			priority: "u=1, i",
-			referer: "https://solscan.io/",
-			"sol-aut": "5GvLD-NW7B9dls0fKbJHWeJeCUXOPQAbf70dKwfI:",
-			"user-agent": generateRandomUserAgent(),
-		},
-	});
+	const { data } = await instance.get(
+		`${endpoint}/transaction/detail?tx=${params.id}`,
+		{
+			headers: {
+				cookie:
+					"__cf_bm=6Nb_BhzZtOdGxVrRrnJoN83pN6rfOtlvuRxjI90nJ0E-1728040658-1.0.1.1-wWYmBJNnH55RvNIFlxo41XFAhHH4kt68pEvyR2fW2Zb_6hVNARhlKxBPCqoZQ_ZhtRQjCeFp6vReppgZbEYgbw; cf_clearance=ibbR6Iox6IDDq4r5WTmuKO0tkKPcwv8GloL.CCp7V3w-1728040665-1.2.1.1-Ef84Taqzk5aSmCiHV321WYtxUv7EIDJTG0SDgp4J.kjIs6gG9J7GVpSV9HE12tuH7xN5vtzdNt1sm6dOee1c20DQO2Lqd.rymeTv.0g340.1jEjK1BnkO4QUlkmEWdbBHzBOc43akGgAef7InJnNEKcg2eO5dPLXT0waBuDCHTs1VMJWBHhfeAE9jZz4C.pPKJKtUDvCyqvR.KRlokRlHo_gnzTVUQDawAtgdLimOOWAK5huvgGQURDoHngS1E5ne03ScjMqfL9HGKME7wXjsK1M9v6zX0WjGMiRDiXkMX3H8oZieb0wyG.j.UKR7jS3K9ElZYtMaZ2kTH1dRJ2DW13.4Q.H3Q.RZlc7Bv3a9FEKf79.2TUxXaiGtKqFH9IbCrPVxFCQ09YxgSp_U0H0AA; _ga=GA1.1.1401977830.1728040664; _ga_PS3V7B7KV0=GS1.1.1728040664.1.1.1728040689.0.0.0; __cf_bm=Mz6cAvTNjPAeUi30bGhjWOHzNal5QLqwS2T6omWu3c8-1728267695-1.0.1.1-oPl.fRzgy_UIvX86I4hXorbEOT5HKcOEAxcTsfbsYnUgtBpIH.Cck88Gm0KcosZyt6sRto_BNTjyJegI2oYryQ",
+				"if-none-match": 'W/"622-Ukdydv8vKaxhKj3QjdlU5A1PS9k"',
+				origin: "https://solscan.io",
+				priority: "u=1, i",
+				referer: "https://solscan.io/",
+				"sol-aut": "5GvLD-NW7B9dls0fKbJHWeJeCUXOPQAbf70dKwfI:",
+				"user-agent": generateRandomUserAgent(),
+			},
+		}
+	);
 
 	return { transaction: data.data };
 };
@@ -182,14 +195,18 @@ const getTransfers = async (params, query) => {
 				// Cookie: coookie,
 				// Devid: `${devId.replace("devId=", "")}`,
 				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 				//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 			},
 		}
 	);
 
 	return {
-		transfers: addTrafficParameter(formatDataTransfers(data.data.hits, address), address),
+		transfers: addTrafficParameter(
+			formatDataTransfers(data.data.hits, address),
+			address
+		),
 	};
 };
 const getTransfer = async (params) => {
@@ -198,17 +215,21 @@ const getTransfer = async (params) => {
 
 const getGasTracker = async () => {
 	try {
-		const { data } = await instance.get(`${endpoint}/common/sol-market?tokenAddress=So11111111111111111111111111111111111111112`, {
-			headers: {
-				cookie: "__cf_bm=6Nb_BhzZtOdGxVrRrnJoN83pN6rfOtlvuRxjI90nJ0E-1728040658-1.0.1.1-wWYmBJNnH55RvNIFlxo41XFAhHH4kt68pEvyR2fW2Zb_6hVNARhlKxBPCqoZQ_ZhtRQjCeFp6vReppgZbEYgbw; cf_clearance=ibbR6Iox6IDDq4r5WTmuKO0tkKPcwv8GloL.CCp7V3w-1728040665-1.2.1.1-Ef84Taqzk5aSmCiHV321WYtxUv7EIDJTG0SDgp4J.kjIs6gG9J7GVpSV9HE12tuH7xN5vtzdNt1sm6dOee1c20DQO2Lqd.rymeTv.0g340.1jEjK1BnkO4QUlkmEWdbBHzBOc43akGgAef7InJnNEKcg2eO5dPLXT0waBuDCHTs1VMJWBHhfeAE9jZz4C.pPKJKtUDvCyqvR.KRlokRlHo_gnzTVUQDawAtgdLimOOWAK5huvgGQURDoHngS1E5ne03ScjMqfL9HGKME7wXjsK1M9v6zX0WjGMiRDiXkMX3H8oZieb0wyG.j.UKR7jS3K9ElZYtMaZ2kTH1dRJ2DW13.4Q.H3Q.RZlc7Bv3a9FEKf79.2TUxXaiGtKqFH9IbCrPVxFCQ09YxgSp_U0H0AA; _ga=GA1.1.1401977830.1728040664; _ga_PS3V7B7KV0=GS1.1.1728040664.1.1.1728040689.0.0.0; __cf_bm=Mz6cAvTNjPAeUi30bGhjWOHzNal5QLqwS2T6omWu3c8-1728267695-1.0.1.1-oPl.fRzgy_UIvX86I4hXorbEOT5HKcOEAxcTsfbsYnUgtBpIH.Cck88Gm0KcosZyt6sRto_BNTjyJegI2oYryQ",
-				"if-none-match": 'W/"622-Ukdydv8vKaxhKj3QjdlU5A1PS9k"',
-				origin: "https://solscan.io",
-				priority: "u=1, i",
-				referer: "https://solscan.io/",
-				"sol-aut": "uommLFJFHe0I=7pB9dls0fKSHLSixPco",
-				"user-agent": generateRandomUserAgent(),
-			},
-		});
+		const { data } = await instance.get(
+			`${endpoint}/common/sol-market?tokenAddress=So11111111111111111111111111111111111111112`,
+			{
+				headers: {
+					cookie:
+						"__cf_bm=6Nb_BhzZtOdGxVrRrnJoN83pN6rfOtlvuRxjI90nJ0E-1728040658-1.0.1.1-wWYmBJNnH55RvNIFlxo41XFAhHH4kt68pEvyR2fW2Zb_6hVNARhlKxBPCqoZQ_ZhtRQjCeFp6vReppgZbEYgbw; cf_clearance=ibbR6Iox6IDDq4r5WTmuKO0tkKPcwv8GloL.CCp7V3w-1728040665-1.2.1.1-Ef84Taqzk5aSmCiHV321WYtxUv7EIDJTG0SDgp4J.kjIs6gG9J7GVpSV9HE12tuH7xN5vtzdNt1sm6dOee1c20DQO2Lqd.rymeTv.0g340.1jEjK1BnkO4QUlkmEWdbBHzBOc43akGgAef7InJnNEKcg2eO5dPLXT0waBuDCHTs1VMJWBHhfeAE9jZz4C.pPKJKtUDvCyqvR.KRlokRlHo_gnzTVUQDawAtgdLimOOWAK5huvgGQURDoHngS1E5ne03ScjMqfL9HGKME7wXjsK1M9v6zX0WjGMiRDiXkMX3H8oZieb0wyG.j.UKR7jS3K9ElZYtMaZ2kTH1dRJ2DW13.4Q.H3Q.RZlc7Bv3a9FEKf79.2TUxXaiGtKqFH9IbCrPVxFCQ09YxgSp_U0H0AA; _ga=GA1.1.1401977830.1728040664; _ga_PS3V7B7KV0=GS1.1.1728040664.1.1.1728040689.0.0.0; __cf_bm=Mz6cAvTNjPAeUi30bGhjWOHzNal5QLqwS2T6omWu3c8-1728267695-1.0.1.1-oPl.fRzgy_UIvX86I4hXorbEOT5HKcOEAxcTsfbsYnUgtBpIH.Cck88Gm0KcosZyt6sRto_BNTjyJegI2oYryQ",
+					"if-none-match": 'W/"622-Ukdydv8vKaxhKj3QjdlU5A1PS9k"',
+					origin: "https://solscan.io",
+					priority: "u=1, i",
+					referer: "https://solscan.io/",
+					"sol-aut": "uommLFJFHe0I=7pB9dls0fKSHLSixPco",
+					"user-agent": generateRandomUserAgent(),
+				},
+			}
+		);
 
 		return data.data;
 	} catch (error) {
@@ -221,8 +242,6 @@ function formatDataTransactions(transactions) {
 	try {
 		for (let index = 0; index < transactions.length; index++) {
 			const transaction = transactions[index];
-
-			console.log({ ...transaction });
 		}
 		return transactions.map((tx) => ({
 			txHash: tx.signature,
