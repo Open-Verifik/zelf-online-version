@@ -14,5 +14,9 @@ module.exports = (server) => {
 
 	server.post(`${PATH}/pay/:zelfName`, Controller.pay);
 
-	server.post(`${PATH}/confirmation-email`, Controller.pay);
+	server.post(
+		`${PATH}/receipt-email`,
+		Middleware.validateParamasEmail,
+		Controller.receipt_email
+	);
 };

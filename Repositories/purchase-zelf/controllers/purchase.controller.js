@@ -37,7 +37,12 @@ const pay = async (ctx) => {
 	const { network, signedDataPrice, paymentAddress } = ctx.request.body;
 
 	try {
-		const data = await Module.pay(zelfName, network, signedDataPrice, paymentAddress);
+		const data = await Module.pay(
+			zelfName,
+			network,
+			signedDataPrice,
+			paymentAddress
+		);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -49,9 +54,9 @@ const pay = async (ctx) => {
 	}
 };
 
-const lease_confirmation_pay = async (ctx) => {
+const receipt_email = async (ctx) => {
 	try {
-		const data = await Module.getLease_confirmation_pay(ctx.request.params);
+		const data = await Module.geReceipt_email(ctx.request.body);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -66,6 +71,6 @@ const lease_confirmation_pay = async (ctx) => {
 module.exports = {
 	search_zelf_lease,
 	select_method,
+	receipt_email,
 	pay,
-	lease_confirmation_pay,
 };
