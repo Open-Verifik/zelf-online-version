@@ -1,6 +1,7 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
 const captchaService = require("../../../Core/captcha");
 const config = require("../../../Core/config");
+const Session = require("../../Session/models/session.model");
 
 const schemas = {
 	search: {
@@ -25,7 +26,7 @@ const schemas = {
 		faceBase64: string().required(),
 		type: stringEnum(["create", "import"]).required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string().required(),
+		// captchaToken: string().required(),
 	},
 	create: {
 		password: string(),
@@ -80,6 +81,28 @@ const getValidation = async (ctx, next) => {
 
 	const valid = validate(schemas.search, payload);
 
+	const authUser = ctx.state.user;
+
+	if (authUser.session) {
+		// we will now check if the session is active
+		const session = await Session.findOne({ _id: authUser.session });
+
+		if (session?.status !== "active") {
+			ctx.status = 403;
+			ctx.body = { validationError: "Session is not active" };
+			return;
+		}
+
+		if (session.searchCount >= 10) {
+			ctx.status = 403;
+			ctx.body = { validationError: "Search limit exceeded" };
+			return;
+		}
+
+		// then after is that we will increment searchCount
+		await Session.updateOne({ _id: authUser.session }, { $inc: { searchCount: 1 } });
+	}
+
 	if (valid.error) {
 		ctx.status = 409;
 
@@ -123,6 +146,28 @@ const getValidation = async (ctx, next) => {
 const leaseValidation = async (ctx, next) => {
 	const valid = validate(schemas.lease, ctx.request.body);
 
+	const authUser = ctx.state.user;
+
+	if (authUser.session) {
+		// we will now check if the session is active
+		const session = await Session.findOne({ _id: authUser.session });
+
+		if (session?.status !== "active") {
+			ctx.status = 403;
+			ctx.body = { validationError: "Session is not active" };
+			return;
+		}
+
+		if (session.leaseCount >= 4) {
+			ctx.status = 403;
+			ctx.body = { validationError: "Search limit exceeded" };
+			return;
+		}
+
+		// then after is that we will increment searchCount
+		await Session.updateOne({ _id: authUser.session }, { $inc: { leaseCount: 1 } });
+	}
+
 	if (valid.error) {
 		ctx.status = 409;
 
@@ -155,7 +200,7 @@ const leaseValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(`${zelfName}`);
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
+	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
 
 	if (captchaScore < 0.79) {
 		_consoleLogSuspicious(ctx, captchaScore, zelfName);
@@ -166,8 +211,6 @@ const leaseValidation = async (ctx, next) => {
 
 		return;
 	}
-
-	// await ZNSTokenModule.giveTokensAfterPurchase();
 
 	await next();
 };
@@ -185,6 +228,21 @@ const leaseOfflineValidation = async (ctx, next) => {
 
 		ctx.body = { validationError: valid.error.message };
 
+		return;
+	}
+
+	const { zelfName } = ctx.request.body;
+
+	// check that name includes .zelf
+	if (!zelfName.includes(".zelf")) {
+		ctx.status = 409;
+		ctx.body = { validationError: "Not a valid zelf name" };
+		return;
+	}
+
+	if (zelfName.length < 6) {
+		ctx.status = 409;
+		ctx.body = { validationError: "ZelfName should be 1 character or more." };
 		return;
 	}
 
@@ -232,6 +290,7 @@ const _consoleLogSuspicious = (ctx, captchaScore, zelfName) => {
 	const userAgent = ctx.request.header["user-agent"] || null;
 
 	const forwardedFor = ctx.request.header["x-forwarded-for"] || "No X-Forwarded-For header";
+
 	console.log(`Request Details: 
 			CaptchaScore: ${captchaScore}
 			ZelfName: ${zelfName}
@@ -252,6 +311,28 @@ const previewZelfProofValidation = async (ctx, next) => {
 		ctx.body = { validationError: validation.error.message };
 
 		return;
+	}
+
+	const authUser = ctx.state.user;
+
+	if (authUser.session) {
+		// we will now check if the session is active
+		const session = await Session.findOne({ _id: authUser.session });
+
+		if (session?.status !== "active") {
+			ctx.status = 403;
+			ctx.body = { validationError: "Session is not active" };
+			return;
+		}
+
+		if (session.previewCount >= 10) {
+			ctx.status = 403;
+			ctx.body = { validationError: "Decrypt limit exceeded" };
+			return;
+		}
+
+		// then after is that we will increment searchCount
+		await Session.updateOne({ _id: authUser.session }, { $inc: { previewCount: 1 } });
 	}
 
 	const { captchaToken, os, zelfProof } = ctx.request.body;
@@ -278,6 +359,28 @@ const previewValidation = async (ctx, next) => {
 		ctx.body = { validationError: validation.error.message };
 
 		return;
+	}
+
+	const authUser = ctx.state.user;
+
+	if (authUser.session) {
+		// we will now check if the session is active
+		const session = await Session.findOne({ _id: authUser.session });
+
+		if (session?.status !== "active") {
+			ctx.status = 403;
+			ctx.body = { validationError: "Session is not active" };
+			return;
+		}
+
+		if (session.previewCount >= 10) {
+			ctx.status = 403;
+			ctx.body = { validationError: "Decrypt limit exceeded" };
+			return;
+		}
+
+		// then after is that we will increment searchCount
+		await Session.updateOne({ _id: authUser.session }, { $inc: { previewCount: 1 } });
 	}
 
 	const { captchaToken, os, zelfName } = ctx.request.body;
@@ -315,6 +418,28 @@ const decryptValidation = async (ctx, next) => {
 		ctx.body = { validationError: validation.error.message };
 
 		return;
+	}
+
+	const authUser = ctx.state.user;
+
+	if (authUser.session) {
+		// we will now check if the session is active
+		const session = await Session.findOne({ _id: authUser.session });
+
+		if (session?.status !== "active") {
+			ctx.status = 403;
+			ctx.body = { validationError: "Session is not active" };
+			return;
+		}
+
+		if (session.decryptCount >= 10) {
+			ctx.status = 403;
+			ctx.body = { validationError: "Decrypt limit exceeded" };
+			return;
+		}
+
+		// then after is that we will increment searchCount
+		await Session.updateOne({ _id: authUser.session }, { $inc: { decryptCount: 1 } });
 	}
 
 	const { captchaToken, os, zelfName } = ctx.request.body;

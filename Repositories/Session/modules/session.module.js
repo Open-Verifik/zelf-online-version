@@ -35,29 +35,42 @@ const get = async (params, authUser = {}) => {
  * @param {*} authUser
  */
 const insert = async (params, authUser) => {
-	await deleteSession(
-		authUser || {
-			identifier: params.identifier,
-		}
-	);
+	// get session by identifier
+
+	const existingSession = await get({
+		where_clientIP: params.clientIP,
+		findOne: true,
+	});
+
+	if (existingSession) {
+		return {
+			token: jwt.sign(
+				{
+					session: existingSession._id,
+					identifier: existingSession.identifier,
+				},
+				config.JWT_SECRET
+			),
+		};
+	}
 
 	const session = new Model({
 		identifier: params.identifier,
+		clientIP: params.clientIP,
 		type: params.type || "createWallet",
 		status: "active",
+		isWebExtension: params.isWebExtension || false,
 	});
 
 	try {
 		await session.save();
 	} catch (exception) {
-		console.error({ exception });
-		if (params.type !== "general") {
-			const error = new Error("zelfName_is_taken");
+		console.log({ exception });
+		const error = new Error("session_duplication");
 
-			error.status = 409;
+		error.status = 409;
 
-			throw error;
-		}
+		throw error;
 	}
 
 	return {
