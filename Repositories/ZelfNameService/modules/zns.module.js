@@ -88,12 +88,16 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	}
 
 	// Adjust price for development environment
-	price = config.env === "development" ? 0.05 : price;
+	price = config.env === "development" ? price / 30 : price;
 
 	if (referralZelfName && config.token.whitelist.includes(referralZelfName)) return 0;
 
 	// Round up to 2 decimal places
-	return Math.ceil(price * 100) / 100;
+	return {
+		price: Math.ceil(price * 100) / 100,
+		currency: "USD",
+		reward: Math.ceil(price * config.token.rewardPrice * 100) / 100,
+	};
 };
 
 /**
@@ -210,20 +214,23 @@ const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, au
  * @author Miguel Trevino
  */
 const _searchInIPFS = async (environment = "both", query, authUser, foundInArweave) => {
+	const zelfName = query.value || query.zelfName;
+
+	const { price, reward } = _calculateZelfNamePrice(zelfName.split(".zelf")[0].length, query.duration);
+
 	try {
 		let ipfsRecords = [];
 
 		await _retriveFromIPFSByEnvironment(ipfsRecords, environment, query, authUser);
 
-		const value = query.value || query.zelfName;
-
 		if (!ipfsRecords.length) {
 			return foundInArweave
 				? []
-				: value && value.includes(".zelf")
+				: zelfName && zelfName.includes(".zelf")
 				? {
-						price: _calculateZelfNamePrice(value.split(".zelf")[0].length, query.duration),
-						zelfName: value,
+						price,
+						reward,
+						zelfName,
 						available: true,
 				  }
 				: null;
@@ -256,8 +263,9 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 			? []
 			: query.key === "zelfName"
 			? {
-					price: _calculateZelfNamePrice(query.value.split(".zelf")[0].length, query.duration),
-					zelfName: query.value,
+					price,
+					reward,
+					zelfName,
 					available: true,
 			  }
 			: null;
@@ -410,7 +418,13 @@ const leaseZelfName = async (params, authUser) => {
 	};
 
 	zelfNameObject.zelfName = zelfName;
-	zelfNameObject.price = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
+
+	const { price, reward } = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
+
+	zelfNameObject.price = price;
+
+	zelfNameObject.reward = reward;
+
 	zelfNameObject.publicData = dataToEncrypt.publicData;
 
 	zelfNameObject.ethAddress = eth.address;
@@ -1131,11 +1145,14 @@ const leaseOffline = async (params, authUser) => {
 
 	let _preview = holdRecord?.preview || mainnetRecord?.preview;
 
+	const { price, reward } = _calculateZelfNamePrice(zelfName.length - 5, duration);
+
 	const zelfNameObject = {
 		zelfName: `${zelfName}.hold`,
 		zelfProof,
 		image: zelfProofQRCode,
-		price: _calculateZelfNamePrice(zelfName.length - 5, duration),
+		price,
+		reward,
 	};
 
 	if (!_preview) _preview = await preview({ zelfProof: zelfNameObject.zelfProof });
@@ -1231,7 +1248,9 @@ const update = async (params, authUser) => {
 
 	const { ipfs_pin_hash, publicData } = holdRecord;
 
-	holdRecord.price = _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration, holdRecord.publicData.referralZelfName);
+	const { price } = _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration, holdRecord.publicData.referralZelfName);
+
+	holdRecord.price = price;
 
 	holdRecord.coinbaseCharge = await createCoinbaseCharge({
 		name: `${holdRecord.zelfName}`,

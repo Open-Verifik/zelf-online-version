@@ -1,7 +1,7 @@
 const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 
-const { leaseConfirmation, _calculateZelfNamePrice, searchZelfName } = require("../../ZelfNameService/modules/zns.module");
+const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
 
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 
