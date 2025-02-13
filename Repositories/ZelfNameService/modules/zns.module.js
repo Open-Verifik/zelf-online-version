@@ -93,7 +93,7 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	return {
 		price: Math.ceil(price * 100) / 100,
 		currency: "USD",
-		reward: Math.ceil(price * config.token.rewardPrice * 100) / 100,
+		reward: Math.ceil((price / config.token.rewardPrice) * 100) / 100,
 	};
 };
 
