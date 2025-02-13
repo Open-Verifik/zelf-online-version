@@ -14,10 +14,7 @@ const secretKey = config.signedData.key;
 
 const confirmPayUniqueAddress = async (network, confirmationData) => {
 	try {
-		const { amountDetected, paymentAddress } = verifyRecordData(
-			confirmationData,
-			secretKey
-		);
+		const { amountDetected, paymentAddress } = verifyRecordData(confirmationData, secretKey);
 
 		const confirmed = await {
 			ETH: isETHPaymentConfirmed,
@@ -81,6 +78,7 @@ const isSolanaPaymentConfirmed = async (address, amountDetected) => {
 
 	return false;
 };
+
 const verifyRecordData = (confirmationData, secretKey) => {
 	try {
 		const decodedData = jwt.verify(confirmationData, secretKey);
@@ -90,6 +88,7 @@ const verifyRecordData = (confirmationData, secretKey) => {
 		throw error;
 	}
 };
+
 module.exports = {
 	confirmPayUniqueAddress,
 };

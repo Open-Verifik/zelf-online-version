@@ -29,6 +29,7 @@ const configuration = {
 	},
 	debug: {
 		mongo: Boolean(process.env.DEBUG_MONGO),
+		sendEmail: Boolean(process.env.DEBUG_SEND_EMAIL),
 	},
 	db: {
 		uri: process.env.MONGODB_URI_PROD || process.env.MONGODB_URI,

@@ -1,7 +1,6 @@
 const formData = require("form-data");
 const Mailgun = require("mailgun.js");
 const config = require("./config");
-//const domain = "mg.verifik.co";
 const domain = "mg.zelf.world";
 const mailgun = new Mailgun(formData);
 
@@ -19,13 +18,10 @@ const sendEmail = async (to, subject, template, extraParams = {}) => {
 		return null;
 	}
 
-	const _to =
-		config.env === "production"
-			? to
-			: config.email_providers.mailgun.proxyEmail;
+	const _to = config.env === "production" ? to : config.email_providers.mailgun.proxyEmail;
 
 	const emailData = {
-		from: "ZNS <noreply@mg.zelf.world>>",
+		from: "Zelf Name Service <noreply@mg.zelf.world>>",
 		to: _to,
 		subject,
 		template,
@@ -38,14 +34,11 @@ const sendEmail = async (to, subject, template, extraParams = {}) => {
 			for (let index = 0; index < keys.length; index++) {
 				const key = keys[index];
 
-				extraParams["recipient-variables"][_to] =
-					extraParams["recipient-variables"][key];
+				extraParams["recipient-variables"][_to] = extraParams["recipient-variables"][key];
 			}
 		}
 
-		emailData["recipient-variables"] = JSON.stringify(
-			extraParams["recipient-variables"]
-		);
+		emailData["recipient-variables"] = JSON.stringify(extraParams["recipient-variables"]);
 	}
 
 	try {

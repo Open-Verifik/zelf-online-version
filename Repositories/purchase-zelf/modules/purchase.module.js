@@ -3,25 +3,16 @@ const { getTickerPrice } = require("../../binance/modules/binance.module");
 const Mailgun = require("../../../Core/mailgun");
 const Model = require("../../Subscribers/models/subscriber.model");
 const MongoORM = require("../../../Core/mongo-orm");
-const {
-	searchZelfName,
-	_calculateZelfNamePrice,
-} = require("../../ZelfNameService/modules/zns.module");
+const { searchZelfName, _calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns.module");
 
-const {
-	getAddress,
-} = require("../../etherscan/modules/etherscan-scrapping.module");
+const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
-const {
-	getBalance,
-} = require("../../bitcoin/modules/bitcoin-scrapping.module");
+const { getBalance } = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const jwt = require("jsonwebtoken");
 const secretKey = config.signedData.key;
 
-const {
-	getCoinbaseCharge,
-} = require("../../coinbase/modules/coinbase_commerce.module");
+const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 
 const templatesMap = {
 	es: {
@@ -38,7 +29,7 @@ const templatesMap = {
 	},
 };
 
-const search_zelf_lease = async (zelfName) => {
+const searchZelfLease = async (zelfName) => {
 	const previewData = await searchZelfName({ zelfName: zelfName });
 
 	if (!previewData?.ipfs?.[0]?.publicData) {
@@ -51,10 +42,8 @@ const search_zelf_lease = async (zelfName) => {
 	const duration = previewData.ipfs[0].publicData.duration;
 	const expiresAt = previewData.ipfs[0].publicData.expiresAt;
 	const referralZelfName = previewData.ipfs[0].publicData.referralZelfName;
-	const coinbase_hosted_url =
-		previewData.ipfs[0].publicData.coinbase_hosted_url;
-	const referralSolanaAddress =
-		previewData.ipfs[0].publicData.referralSolanaAddress;
+	const coinbase_hosted_url = previewData.ipfs[0].publicData.coinbase_hosted_url;
+	const referralSolanaAddress = previewData.ipfs[0].publicData.referralSolanaAddress;
 
 	if (previewData.ipfs[0].publicData.type === "mainnet") {
 		const error = new Error("zelfName_purchased_already");
@@ -103,7 +92,7 @@ const search_zelf_lease = async (zelfName) => {
 	};
 };
 
-const select_method = async (network, price) => {
+const selectMethod = async (network, price) => {
 	if (network === "CB") {
 		return {
 			network,
@@ -139,8 +128,7 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 		throw error;
 	}
 
-	const chargeID =
-		previewData2.ipfs[0].publicData.coinbase_hosted_url.split("/pay/")[1];
+	const chargeID = previewData2.ipfs[0].publicData.coinbase_hosted_url.split("/pay/")[1];
 
 	const priceInIPFS = parseFloat(previewData2.ipfs[0].publicData.price);
 
@@ -155,9 +143,7 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 		environment: "both",
 	});
 
-	const paymentAddressInIPFS = JSON.parse(
-		previewData3.ipfs[0].publicData.addresses
-	);
+	const paymentAddressInIPFS = JSON.parse(previewData3.ipfs[0].publicData.addresses);
 
 	let selectedAddress = null;
 
@@ -183,21 +169,12 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 		throw error;
 	}
 
-	return await checkoutPayUniqueAddress(
-		network,
-		amountToSend,
-		selectedAddress,
-		zelfName_
-	);
+	return await checkoutPayUniqueAddress(network, amountToSend, selectedAddress, zelfName_);
 };
 
 ///funcion para checar pagos con unica dirección
 
-const checkoutPayUniqueAddress = async (
-	network,
-	amountToSend,
-	selectedAddress
-) => {
+const checkoutPayUniqueAddress = async (network, amountToSend, selectedAddress) => {
 	const balance = await {
 		ETH: checkoutETH,
 		SOL: checkoutSOLANA,
@@ -220,8 +197,7 @@ const checkoutPayUniqueAddress = async (
 	try {
 		if (amountDetected >= Number(amountToSend)) {
 			transactionStatus = true;
-			transactionDescription =
-				amountDetected === Number(amountToSend) ? "successful" : "overPayment";
+			transactionDescription = amountDetected === Number(amountToSend) ? "successful" : "overPayment";
 		} else {
 			transactionDescription = "partialPayment";
 			remainingAmount = Number(amountToSend) - amountDetected;
@@ -231,10 +207,7 @@ const checkoutPayUniqueAddress = async (
 		transactionStatus = false;
 	}
 
-	const confirmationData = signRecordData(
-		{ amountDetected, selectedAddress },
-		secretKey
-	);
+	const confirmationData = signRecordData({ amountDetected, selectedAddress }, secretKey);
 
 	return {
 		transactionDescription,
@@ -267,7 +240,7 @@ const checkoutETH = async (address) => {
 	}
 	return null;
 };
-///funcion para checar balance en SOLANA
+
 const checkoutSOLANA = async (address) => {
 	try {
 		const balanceSOLANA = await solanaModule.getAddress({ id: address });
@@ -281,7 +254,6 @@ const checkoutSOLANA = async (address) => {
 };
 
 const checkoutBICOIN = async (address) => {
-	//address = "bc1qw8wrek2m7nlqldll66ajnwr9mh64syvkt67zlu";
 	try {
 		const balanceBICOIN = await getBalance({ id: address });
 
@@ -292,13 +264,11 @@ const checkoutBICOIN = async (address) => {
 		console.log(error);
 	}
 };
-const geReceipt_email = async (body) => {
+
+const getReceiptEmail = async (body) => {
 	const { zelfName, transactionDate, price, expires, year, email } = body;
 
-	const subtotal = _calculateZelfNamePrice(
-		zelfName.split(".zelf")[0].length,
-		year
-	);
+	const subtotal = _calculateZelfNamePrice(zelfName.split(".zelf")[0].length, year);
 	const discount = Math.round((subtotal - price) * 100) / 100;
 
 	const formatDate = (date) =>
@@ -331,9 +301,7 @@ const calculateCryptoValue = async (network, price_) => {
 		const { price } = await getTickerPrice({ symbol: `${network}` });
 
 		if (!price) {
-			throw new Error(
-				`No se encontró información para la criptomoneda: ${network}`
-			);
+			throw new Error(`No se encontró información para la criptomoneda: ${network}`);
 		}
 
 		const cryptoValue = price_ / price;
@@ -354,9 +322,7 @@ const calculateCryptoValue = async (network, price_) => {
 const sendEmail = async (payload) => {
 	payload.language ??= "es";
 
-	const emailTemplate = templatesMap[payload.language]
-		? templatesMap[payload.language][payload.template]
-		: templatesMap.en[payload.template];
+	const emailTemplate = templatesMap[payload.language] ? templatesMap[payload.language][payload.template] : templatesMap.en[payload.template];
 
 	const extraParams = {
 		"recipient-variables": {
@@ -373,12 +339,7 @@ const sendEmail = async (payload) => {
 	};
 
 	try {
-		email = await Mailgun.sendEmail(
-			payload.email,
-			emailTemplate.subject,
-			emailTemplate.template,
-			extraParams
-		);
+		email = await Mailgun.sendEmail(payload.email, emailTemplate.subject, emailTemplate.template, extraParams);
 
 		const existingSubscriber = await get({
 			where_email: payload.email,
@@ -427,8 +388,8 @@ const verifyRecordData = (token, secretKey) => {
 };
 
 module.exports = {
-	search_zelf_lease,
-	geReceipt_email,
-	select_method,
+	searchZelfLease,
+	getReceiptEmail,
+	selectMethod,
 	pay,
 };

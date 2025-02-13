@@ -1,10 +1,10 @@
 const Module = require("../modules/purchase.module");
 
-const search_zelf_lease = async (ctx) => {
+const searchZelfLease = async (ctx) => {
 	try {
 		const { zelfName } = ctx.request.body;
 
-		const data = await Module.search_zelf_lease(zelfName);
+		const data = await Module.searchZelfLease(zelfName);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -16,11 +16,11 @@ const search_zelf_lease = async (ctx) => {
 	}
 };
 
-const select_method = async (ctx) => {
+const selectMethod = async (ctx) => {
 	const { network, price } = ctx.request.body;
 
 	try {
-		const data = await Module.select_method(network, price);
+		const data = await Module.selectMethod(network, price);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -37,12 +37,7 @@ const pay = async (ctx) => {
 	const { network, signedDataPrice, paymentAddress } = ctx.request.body;
 
 	try {
-		const data = await Module.pay(
-			zelfName,
-			network,
-			signedDataPrice,
-			paymentAddress
-		);
+		const data = await Module.pay(zelfName, network, signedDataPrice, paymentAddress);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -54,9 +49,9 @@ const pay = async (ctx) => {
 	}
 };
 
-const receipt_email = async (ctx) => {
+const receiptEmail = async (ctx) => {
 	try {
-		const data = await Module.geReceipt_email(ctx.request.body);
+		const data = await Module.getReceiptEmail(ctx.request.body);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -69,8 +64,8 @@ const receipt_email = async (ctx) => {
 };
 
 module.exports = {
-	search_zelf_lease,
-	select_method,
-	receipt_email,
+	searchZelfLease,
+	selectMethod,
+	receiptEmail,
 	pay,
 };
