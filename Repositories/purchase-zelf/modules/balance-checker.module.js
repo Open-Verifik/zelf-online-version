@@ -13,14 +13,15 @@ const secretKey = config.signedData.key;
  */
 
 const confirmPayUniqueAddress = async (network, confirmationData) => {
+	const map = {
+		ETH: isETHPaymentConfirmed,
+		SOL: isSolanaPaymentConfirmed,
+		BTC: isBTCPaymentConfirmed,
+	};
 	try {
 		const { amountDetected, paymentAddress } = verifyRecordData(confirmationData, secretKey);
 
-		const confirmed = await {
-			ETH: isETHPaymentConfirmed,
-			SOL: isSolanaPaymentConfirmed,
-			BTC: isBTCPaymentConfirmed,
-		}[network]?.(paymentAddress, amountDetected);
+		const confirmed = await map[network]?.(paymentAddress, amountDetected);
 
 		return {
 			confirmed,
