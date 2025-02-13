@@ -14,7 +14,7 @@ const configuration = {
 	},
 	email_providers: {
 		mailgun: {
-			proxyEmail: process.env.MAILGUN_PROXY_EMAIL || "anuar@verifik.co",
+			proxyEmail: process.env.MAILGUN_PROXY_EMAIL,
 			user: process.env.MAILGUN_USER,
 			password: process.env.MAILGUN_PASS,
 			host: process.env.MAILGUN_HOST,

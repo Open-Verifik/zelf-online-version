@@ -574,6 +574,7 @@ const leaseConfirmation = async (data, authUser) => {
 	const { network, coin, zelfName, confirmationData } = data;
 
 	let unpinResult;
+
 	let inMainnet = false;
 
 	const zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
@@ -599,6 +600,7 @@ const leaseConfirmation = async (data, authUser) => {
 	const zelfNameObject = zelfNameRecords[0];
 
 	let payment = false;
+
 	switch (network) {
 		case "coinbase":
 		case "CB":

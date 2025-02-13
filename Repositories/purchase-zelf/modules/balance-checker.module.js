@@ -18,16 +18,17 @@ const confirmPayUniqueAddress = async (network, confirmationData) => {
 		SOL: isSolanaPaymentConfirmed,
 		BTC: isBTCPaymentConfirmed,
 	};
-	try {
-		const { amountDetected, paymentAddress } = verifyRecordData(confirmationData, secretKey);
 
-		const confirmed = await map[network]?.(paymentAddress, amountDetected);
+	try {
+		const { amountDetected, selectedAddress } = verifyRecordData(confirmationData, secretKey);
+
+		const confirmed = await map[network](selectedAddress, amountDetected);
 
 		return {
 			confirmed,
 		};
-	} catch (e) {
-		console.log({ e });
+	} catch (exception) {
+		console.log({ exception });
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
 		throw error;
@@ -62,7 +63,7 @@ const isETHPaymentConfirmed = async (address, amountDetected) => {
 
 		return Number(balance) === Number(amountDetected);
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 	}
 
 	return false;

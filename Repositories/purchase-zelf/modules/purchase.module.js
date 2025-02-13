@@ -306,8 +306,6 @@ const calculateCryptoValue = async (network, price_) => {
 
 		const cryptoValue = price_ / price;
 
-		console.log(cryptoValue);
-
 		return {
 			network,
 			amountToSend: cryptoValue.toFixed(7),
@@ -353,16 +351,20 @@ const sendEmail = async (payload) => {
 				name: payload.name,
 				//lists: [list],
 			});
+
 		await subscriber.save();
+
 		return { message: `payment_receipt_sent_successfully` };
 	} catch (exception) {
 		console.error({
-			exception,
+			sendEmailException: exception,
+			hola: true,
 		});
 		exception.status = 409;
 		throw exception;
 	}
 };
+
 const get = async (params) => {
 	const queryParams = { ...params };
 	return await MongoORM.buildQuery(queryParams, Model, null, []);
