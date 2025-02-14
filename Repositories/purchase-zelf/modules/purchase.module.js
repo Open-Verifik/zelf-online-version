@@ -1,7 +1,9 @@
 const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-
-const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
+const Mailgun = require("../../../Core/mailgun");
+const Model = require("../../Subscribers/models/subscriber.model");
+const MongoORM = require("../../../Core/mongo-orm");
+const { searchZelfName, _calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns.module");
 
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 
@@ -12,7 +14,22 @@ const secretKey = config.signedData.key;
 
 const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 
-const search_zelf_lease = async (zelfName) => {
+const templatesMap = {
+	es: {
+		Purchase_receipt: {
+			subject: "Purchase receipt",
+			template: "purchase receipt",
+		},
+	},
+	en: {
+		Purchase_receipt: {
+			subject: "Purchase receipt",
+			template: "purchase receipt",
+		},
+	},
+};
+
+const searchZelfLease = async (zelfName) => {
 	const previewData = await searchZelfName({ zelfName: zelfName });
 
 	if (!previewData?.ipfs?.[0]?.publicData) {
@@ -75,12 +92,12 @@ const search_zelf_lease = async (zelfName) => {
 	};
 };
 
-const select_method = async (network, price) => {
+const selectMethod = async (network, price) => {
 	if (network === "CB") {
 		return {
 			network,
 			price: price,
-			amountToSend: "",
+			amountToSend: price,
 		};
 	}
 
@@ -98,7 +115,7 @@ const select_method = async (network, price) => {
 	return { ...recordData, signedDataPrice };
 };
 
-const pay = async (zelfName_, network, signedDataPrice, paymentAddress) => {
+const pay = async (zelfName_, network, signedDataPrice) => {
 	const previewData2 = await searchZelfName({
 		zelfName: zelfName_,
 		environment: "hold",
@@ -152,20 +169,19 @@ const pay = async (zelfName_, network, signedDataPrice, paymentAddress) => {
 		throw error;
 	}
 
-	return await checkoutPayUniqueAddress(network, amountToSend, paymentAddress, zelfName_);
+	return await checkoutPayUniqueAddress(network, amountToSend, selectedAddress, zelfName_);
 };
 
 ///funcion para checar pagos con unica dirección
 
-const checkoutPayUniqueAddress = async (network, amountToSend, paymentAddress, zelfName) => {
+const checkoutPayUniqueAddress = async (network, amountToSend, selectedAddress) => {
 	const balance = await {
 		ETH: checkoutETH,
 		SOL: checkoutSOLANA,
 		BTC: checkoutBICOIN,
-	}[network]?.(paymentAddress);
+	}[network]?.(selectedAddress);
 
 	let amountDetected = balance;
-
 	let transactionStatus = false;
 	let transactionDescription = "pending";
 	let remainingAmount = 0;
@@ -179,26 +195,26 @@ const checkoutPayUniqueAddress = async (network, amountToSend, paymentAddress, z
 	}
 
 	try {
-		if (amountDetected >= amountToSend) {
+		if (amountDetected >= Number(amountToSend)) {
 			transactionStatus = true;
-			transactionDescription = amountDetected === amountToSend ? "successful" : "overPayment";
+			transactionDescription = amountDetected === Number(amountToSend) ? "successful" : "overPayment";
 		} else {
 			transactionDescription = "partialPayment";
-			remainingAmount = amountToSend - amountDetected;
+			remainingAmount = Number(amountToSend) - amountDetected;
 		}
 	} catch (error) {
 		transactionDescription = "confirmationError";
 		transactionStatus = false;
 	}
 
-	const amountDetectedsign = signRecordData(amountDetected, secretKey);
+	const confirmationData = signRecordData({ amountDetected, selectedAddress }, secretKey);
 
 	return {
 		transactionDescription,
 		transactionStatus,
 		amountDetected,
 		remainingAmount: parseFloat(parseFloat(remainingAmount).toFixed(7)),
-		amountDetectedsign: amountDetectedsign,
+		confirmationData: confirmationData,
 	};
 };
 ///funcion para checar pagos en coinbase
@@ -211,7 +227,6 @@ const checkoutPayCoinbase = async (chargeID) => {
 };
 ///funcion para checar balance en ETH
 const checkoutETH = async (address) => {
-	address = "0x71c7656ec7ab88b098defb751b7401b5f6d8976f";
 	try {
 		const balanceETH = await getAddress({
 			address,
@@ -225,14 +240,12 @@ const checkoutETH = async (address) => {
 	}
 	return null;
 };
-///funcion para checar balance en SOLANA
+
 const checkoutSOLANA = async (address) => {
 	try {
 		const balanceSOLANA = await solanaModule.getAddress({ id: address });
 
 		const balance = parseFloat(parseFloat(balanceSOLANA.balance).toFixed(7));
-
-		console.log(balance);
 
 		return balance;
 	} catch (error) {
@@ -241,7 +254,6 @@ const checkoutSOLANA = async (address) => {
 };
 
 const checkoutBICOIN = async (address) => {
-	//address = "bc1qw8wrek2m7nlqldll66ajnwr9mh64syvkt67zlu";
 	try {
 		const balanceBICOIN = await getBalance({ id: address });
 
@@ -253,6 +265,36 @@ const checkoutBICOIN = async (address) => {
 	}
 };
 
+const getReceiptEmail = async (body) => {
+	const { zelfName, transactionDate, price, expires, year, email } = body;
+
+	const subtotal = _calculateZelfNamePrice(zelfName.split(".zelf")[0].length, year);
+	const discount = Math.round((subtotal - price) * 100) / 100;
+
+	const formatDate = (date) =>
+		new Intl.DateTimeFormat("en-US", {
+			month: "short",
+			day: "numeric",
+			year: "numeric",
+			hour: "numeric",
+			minute: "numeric",
+			second: "numeric",
+			hour12: true,
+		}).format(new Date(date));
+
+	return await sendEmail({
+		language: "es",
+		template: "Purchase_receipt",
+		zelfName,
+		transactionDate: formatDate(transactionDate),
+		price,
+		subtotal,
+		discount,
+		expires: formatDate(expires.replace(/-/g, "/")),
+		year,
+		email,
+	});
+};
 //calcular precio en la difrente redes
 const calculateCryptoValue = async (network, price_) => {
 	try {
@@ -266,7 +308,7 @@ const calculateCryptoValue = async (network, price_) => {
 
 		return {
 			network,
-			amountToSend: parseFloat(cryptoValue.toFixed(7)),
+			amountToSend: cryptoValue.toFixed(7),
 			ratePriceInUSD: parseFloat(parseFloat(price).toFixed(5)),
 			price: price_,
 		};
@@ -274,12 +316,59 @@ const calculateCryptoValue = async (network, price_) => {
 		throw error;
 	}
 };
-function isExpired(expirationDate) {
-	const now = new Date(); // Fecha y hora actual
-	const expDate = new Date(expirationDate); // Fecha de expiración
 
-	return expDate <= now; // Devuelve true si la fecha ya pasó o es igual a la actual
-}
+const sendEmail = async (payload) => {
+	payload.language ??= "es";
+
+	const emailTemplate = templatesMap[payload.language] ? templatesMap[payload.language][payload.template] : templatesMap.en[payload.template];
+
+	const extraParams = {
+		"recipient-variables": {
+			[payload.email]: {
+				transactionDate: payload.transactionDate,
+				subtotal: payload.subtotal,
+				discount: payload.discount,
+				total: payload.price,
+				expires: payload.expires,
+				year: payload.year,
+				zelfName: payload.zelfName,
+			},
+		},
+	};
+
+	try {
+		email = await Mailgun.sendEmail(payload.email, emailTemplate.subject, emailTemplate.template, extraParams);
+
+		const existingSubscriber = await get({
+			where_email: payload.email,
+			findOne: true,
+		});
+
+		const subscriber =
+			existingSubscriber ||
+			new Model({
+				email: payload.email,
+				name: payload.name,
+				//lists: [list],
+			});
+
+		await subscriber.save();
+
+		return { message: `payment_receipt_sent_successfully` };
+	} catch (exception) {
+		console.error({
+			sendEmailException: exception,
+			hola: true,
+		});
+		exception.status = 409;
+		throw exception;
+	}
+};
+
+const get = async (params) => {
+	const queryParams = { ...params };
+	return await MongoORM.buildQuery(queryParams, Model, null, []);
+};
 
 const signRecordData = (recordData, secretKey) => {
 	try {
@@ -301,8 +390,8 @@ const verifyRecordData = (token, secretKey) => {
 };
 
 module.exports = {
-	search_zelf_lease,
-	select_method,
+	searchZelfLease,
+	getReceiptEmail,
+	selectMethod,
 	pay,
-	calculateCryptoValue,
 };
