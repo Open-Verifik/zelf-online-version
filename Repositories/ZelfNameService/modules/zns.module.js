@@ -7,7 +7,6 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const sessionModule = require("../../Session/modules/session.module");
-const BigNumber = require("bignumber.js");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
@@ -19,7 +18,7 @@ const config = require("../../../Core/config");
 const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const jwt = require("jsonwebtoken");
 const { createUnderName } = require("./undernames.module");
-const { isETHPaymentConfirmed, isSolanaPaymentConfirmed, isBTCPaymentConfirmed } = require("../../purchase-zelf/modules/balance-checker.module");
+const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -86,12 +85,16 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	}
 
 	// Adjust price for development environment
-	price = config.env === "development" ? 0.05 : price;
+	price = config.env === "development" ? price / 30 : price;
 
 	if (referralZelfName && config.token.whitelist.includes(referralZelfName)) return 0;
 
 	// Round up to 2 decimal places
-	return Math.ceil(price * 100) / 100;
+	return {
+		price: Math.ceil(price * 100) / 100,
+		currency: "USD",
+		reward: Math.ceil((price / config.token.rewardPrice) * 100) / 100,
+	};
 };
 
 /**
@@ -208,20 +211,23 @@ const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, au
  * @author Miguel Trevino
  */
 const _searchInIPFS = async (environment = "both", query, authUser, foundInArweave) => {
+	const zelfName = query.value || query.zelfName;
+
+	const { price, reward } = _calculateZelfNamePrice(zelfName.split(".zelf")[0].length, query.duration);
+
 	try {
 		let ipfsRecords = [];
 
 		await _retriveFromIPFSByEnvironment(ipfsRecords, environment, query, authUser);
 
-		const value = query.value || query.zelfName;
-
 		if (!ipfsRecords.length) {
 			return foundInArweave
 				? []
-				: value && value.includes(".zelf")
+				: zelfName && zelfName.includes(".zelf")
 				? {
-						price: _calculateZelfNamePrice(value.split(".zelf")[0].length, query.duration),
-						zelfName: value,
+						price,
+						reward,
+						zelfName,
 						available: true,
 				  }
 				: null;
@@ -254,8 +260,9 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 			? []
 			: query.key === "zelfName"
 			? {
-					price: _calculateZelfNamePrice(query.value.split(".zelf")[0].length, query.duration),
-					zelfName: query.value,
+					price,
+					reward,
+					zelfName,
 					available: true,
 			  }
 			: null;
@@ -408,7 +415,13 @@ const leaseZelfName = async (params, authUser) => {
 	};
 
 	zelfNameObject.zelfName = zelfName;
-	zelfNameObject.price = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
+
+	const { price, reward } = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
+
+	zelfNameObject.price = price;
+
+	zelfNameObject.reward = reward;
+
 	zelfNameObject.publicData = dataToEncrypt.publicData;
 
 	zelfNameObject.ethAddress = eth.address;
@@ -572,9 +585,10 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
  * @author Miguel Trevino
  */
 const leaseConfirmation = async (data, authUser) => {
-	const { network, coin, zelfName } = data;
+	const { network, coin, zelfName, confirmationData } = data;
 
 	let unpinResult;
+
 	let inMainnet = false;
 
 	const zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
@@ -600,6 +614,7 @@ const leaseConfirmation = async (data, authUser) => {
 	const zelfNameObject = zelfNameRecords[0];
 
 	let payment = false;
+
 	switch (network) {
 		case "coinbase":
 		case "CB":
@@ -607,15 +622,15 @@ const leaseConfirmation = async (data, authUser) => {
 
 			break;
 		case "ETH":
-			payment = await confirmPayUniqueAddress(zelfNameObject, network);
+			payment = await confirmPayUniqueAddress(network, confirmationData);
 
 			break;
 		case "SOL":
-			payment = await confirmPayUniqueAddress(zelfNameObject, network);
+			payment = await confirmPayUniqueAddress(network, confirmationData);
 
 			break;
 		case "BTC":
-			payment = await confirmPayUniqueAddress(zelfNameObject, network);
+			payment = await confirmPayUniqueAddress(network, confirmationData);
 
 			break;
 
@@ -685,61 +700,6 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 		...charge,
 		confirmed: config.env === "development" ? true : confirmed,
 	};
-};
-
-const confirmPayUniqueAddress = async (zelfNameObject, network, amountDetectedsign) => {
-	try {
-		const price = zelfNameObject.publicData.price;
-
-		const zelfName = zelfNameObject.publicData.name;
-
-		const zelfNamePay = zelfName.replace(".zelf.hold", ".zelfpay");
-
-		const previewData2 = await searchZelfName({
-			zelfName: zelfNamePay,
-			environment: "both",
-		});
-
-		const paymentAddressInIPFS = JSON.parse(previewData2.ipfs[0].publicData.addresses);
-
-		let selectedAddress = null;
-
-		switch (network.toUpperCase()) {
-			case "BTC":
-				selectedAddress = paymentAddressInIPFS.btcAddress;
-				break;
-			case "ETH":
-				selectedAddress = paymentAddressInIPFS.ethAddress;
-				break;
-			case "SOL":
-				selectedAddress = paymentAddressInIPFS.solanaAddress;
-				break;
-			default:
-				break;
-		}
-
-		if (!selectedAddress) {
-			const error = new Error("payment_address_not_found");
-			error.status = 404;
-			throw error;
-		}
-
-		const amountDetected = verifyRecordData(amountDetectedsign, secretKey);
-
-		const confirmed = await {
-			ETH: isETHPaymentConfirmed,
-			SOL: isSolanaPaymentConfirmed,
-			BTC: isBTCPaymentConfirmed,
-		}[network]?.(selectedAddress, price);
-
-		return {
-			confirmed,
-		};
-	} catch (e) {
-		const error = new Error("zelfName_not_found");
-		error.status = 404;
-		throw error;
-	}
 };
 
 /**
@@ -1056,11 +1016,14 @@ const leaseOffline = async (params, authUser) => {
 
 	let _preview = holdRecord?.preview || mainnetRecord?.preview;
 
+	const { price, reward } = _calculateZelfNamePrice(zelfName.length - 5, duration);
+
 	const zelfNameObject = {
 		zelfName: `${zelfName}.hold`,
 		zelfProof,
 		image: zelfProofQRCode,
-		price: _calculateZelfNamePrice(zelfName.length - 5, duration),
+		price,
+		reward,
 	};
 
 	if (!_preview) _preview = await preview({ zelfProof: zelfNameObject.zelfProof });
@@ -1156,7 +1119,9 @@ const update = async (params, authUser) => {
 
 	const { ipfs_pin_hash, publicData } = holdRecord;
 
-	holdRecord.price = _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration, holdRecord.publicData.referralZelfName);
+	const { price } = _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration, holdRecord.publicData.referralZelfName);
+
+	holdRecord.price = price;
 
 	holdRecord.coinbaseCharge = await createCoinbaseCharge({
 		name: `${holdRecord.zelfName}`,

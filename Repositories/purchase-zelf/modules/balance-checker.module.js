@@ -1,7 +1,39 @@
-const BigNumber = require("bignumber.js");
 const bitcoinModule = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const ethModule = require("../../etherscan/modules/etherscan-scrapping.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
+const config = require("../../../Core/config");
+const jwt = require("jsonwebtoken");
+const secretKey = config.signedData.key;
+
+/**
+ *  confirm Pay Single Address
+ * @param {String} network
+ * @param {String} confirmationData
+ * @returns Boolean
+ */
+
+const confirmPayUniqueAddress = async (network, confirmationData) => {
+	const map = {
+		ETH: isETHPaymentConfirmed,
+		SOL: isSolanaPaymentConfirmed,
+		BTC: isBTCPaymentConfirmed,
+	};
+
+	try {
+		const { amountDetected, selectedAddress } = verifyRecordData(confirmationData, secretKey);
+
+		const confirmed = await map[network](selectedAddress, amountDetected);
+
+		return {
+			confirmed,
+		};
+	} catch (exception) {
+		console.log({ exception });
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+};
 
 /**
  * checkout BTC comparison
@@ -31,7 +63,7 @@ const isETHPaymentConfirmed = async (address, amountDetected) => {
 
 		return Number(balance) === Number(amountDetected);
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 	}
 
 	return false;
@@ -49,8 +81,16 @@ const isSolanaPaymentConfirmed = async (address, amountDetected) => {
 	return false;
 };
 
+const verifyRecordData = (confirmationData, secretKey) => {
+	try {
+		const decodedData = jwt.verify(confirmationData, secretKey);
+		return decodedData;
+	} catch (error) {
+		error.status = 409;
+		throw error;
+	}
+};
+
 module.exports = {
-	isBTCPaymentConfirmed,
-	isETHPaymentConfirmed,
-	isSolanaPaymentConfirmed,
+	confirmPayUniqueAddress,
 };
