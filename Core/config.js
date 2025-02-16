@@ -6,23 +6,23 @@ const configuration = {
 	name: "API",
 	env: process.env.NODE_ENV || "development",
 	port: process.env.PORT || "3000",
-	secondary_port: process.env.SECONDARY_PORT || "3001",
 	base_url: process.env.BASE_URL || "https://verifik.co",
-	documentationUrl: process.env.DOCUMENTATION_URL || "null",
 	sessionSecret: process.env.SESSION_SECRET,
 	so: process.env.ENVOS,
-	azureVision: {
-		key: process.env.AZURE_VISION_KEY || null,
-		url:
-			process.env.AZURE_VISION_URL ||
-			"https://vision-verifik-ocr.cognitiveservices.azure.com/computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=read&language=en&gender-neutral-caption=False",
-		forms: {
-			key: process.env.AZURE_VISION_FORMS_KEY || "NOKEY",
-			endpoint: process.env.AZURE_VISION_FORMS_ENDPOINT || "https://verifik-forms.cognitiveservices.azure.com",
-		},
-	},
 	openai: {
 		key: process.env.OPENAI_API_KEY,
+	},
+	email_providers: {
+		mailgun: {
+			proxyEmail: process.env.MAILGUN_PROXY_EMAIL,
+			user: process.env.MAILGUN_USER,
+			password: process.env.MAILGUN_PASS,
+			host: process.env.MAILGUN_HOST,
+			port: process.env.MAILGUN_PORT,
+			from: process.env.MAILGUN_DEFAULT_FROM,
+			apiKey: process.env.MAILGUN_API_KEY,
+			publicKey: process.env.MAILGUN_PUBLIC_KEY,
+		},
 	},
 	signedData: {
 		key: process.env.SECRET_KEY_PRICI,
@@ -30,10 +30,6 @@ const configuration = {
 	debug: {
 		mongo: Boolean(process.env.DEBUG_MONGO),
 		sendEmail: Boolean(process.env.DEBUG_SEND_EMAIL),
-		sendSms: Boolean(process.env.DEBUG_SEND_SMS),
-		sendWhatsapp: Boolean(process.env.DEBUG_SEND_WHATSAPP),
-		sendWebhookEvent: Boolean(process.env.DEBUG_SEND_WEBHOOK_EVENT),
-		whatsAppNumber: process.env.WHATSAPP_NUMBER,
 	},
 	db: {
 		uri: process.env.MONGODB_URI_PROD || process.env.MONGODB_URI,
@@ -42,22 +38,11 @@ const configuration = {
 		poolSize: Number(process.env.MONGO_POOLSIZE) || 50,
 		test_uri: "mongodb://127.0.0.1:27017/testdb",
 	},
-	backup: {
-		isActive: Boolean(process.env.AWS_ACCESS_KEY_ID) || true,
-		access_key_id: process.env.AWS_ACCESS_KEY_ID,
-		secret_access_key: process.env.AWS_SECRET_ACCESS_KEY,
-	},
 	queue: {
 		collectionName: process.env.QUEUE_NAME,
 		instance: Number(process.env.QUEUE_INSTANCE),
 		time: process.env.QUEUE_TIME,
 	},
-	cronjob: {
-		instance: Number(process.env.CRONJOB_INSTANCE),
-		active: {},
-		times: {},
-	},
-	adminVersion: 1,
 	JWT_SECRET: process.env.CONNECTION_KEY,
 	SUPERADMIN_JWT_SECRET: process.env.SUPER_ADMINS_JWT_SECRET,
 	encryptionSecret: process.env.FRONTEND_KEY,
@@ -65,10 +50,6 @@ const configuration = {
 		return API_ROOT.replace(/\/$/, "") + "/" + path.replace(/^\//, "");
 	},
 	full_url: process.env.BASE_URL + ":" + process.env.PORT,
-	proxy: {
-		port: process.env.PROXY_PORT || 4250,
-		basePath: process.env.PROXY_BASEPATH || "http://localhost",
-	},
 	zelfEncrypt: {
 		serverKey: process.env.ZELF_ENCRYPT_SERVER_KEY,
 	},
@@ -142,42 +123,6 @@ const configuration = {
 		senderPublicKey: process.env.SOLANA_SENDER_PUBLIC_KEY,
 		sender: process.env.SENDER_KEY,
 	},
-	addressZelf: [
-		{
-			id: "ETH",
-			address: "0x1BC125bC681685f216935798453F70fb423eB392",
-			//address: "0x9eB697C8500e4abc9cF6C4E17F1Be8508010bd23",
-		},
-		{
-			id: "SOL",
-			address: "6gDQQQMRveayDFSz5bA2wyjNZr9Jue9hS1S4kkmLDqBt",
-		},
-		{
-			id: "BTC",
-			address: "bc1p6lsrl8amjuwrwxcwaa9ncuuzljuc3zv4jg55xdruuq5nxxwnvj4qd23dxl",
-		},
-		{
-			id: "BNB",
-			address: "0xD3b0d838cCCEAe7ebF1781D11D1bB741DB7Fe1A7",
-		},
-		{
-			id: "MINA",
-			address: "B62qoA5XwfEVnXbcrzphGH1TVuqxeJ5bhX7vTS3hcxpQFHnStG3MQk9",
-		},
-		{
-			id: "ADA",
-			address: "stake1u9m0ny47rdn9x43gcg0hjmg6xsnlz80hnz7kf6v6vplqtrcd9pnhj",
-		},
-
-		{
-			id: "TRX",
-			address: "TXPLNPmLC7XSazCEPVZMQkyx9YEdbvFXkU",
-		},
-		{
-			id: "XRP",
-			address: "rvpkkVqZyqPFz4uzT4YbbrBMLzuUUyTdm",
-		},
-	],
 };
 
 module.exports = configuration;
