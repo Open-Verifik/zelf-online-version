@@ -184,7 +184,7 @@ const getTransaction = async (params, query) => {
 
 	return { transaction: data.data };
 };
-
+let transactions = [];
 const getTransfers = async (params, query) => {
 	const t = Date.now();
 	const address = params.id;
@@ -205,9 +205,35 @@ const getTransfers = async (params, query) => {
 		}
 	);
 
+	const slp = await axios.get(
+		`https://www.oklink.com/api/explorer/v2/sol/splTransaction/${address}?offset=${query.page}&limit=${query.show}&chain=solana&t=${t}`,
+
+		{
+			httpsAgent: agent,
+			headers: {
+				// Cookie: coookie,
+				// Devid: `${devId.replace("devId=", "")}`,
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
+			},
+		}
+	);
+	transactions = [...data.data.hits, ...slp.data.data.hits];
+	console.log(data.data.hits.length);
+	console.log(slp.data.data.hits.length);
+	// console.log(
+	// 	addTrafficParameter(
+	// 		formatDataSLPTransfers(slp.data.data.hits, address),
+	// 		address
+	// 	)
+	// );
+
+	//console.log(transactions);
 	return {
 		transfers: addTrafficParameter(
-			formatDataTransfers(data.data.hits, address),
+			formatDataTransfers(transactions, address),
 			address
 		),
 	};
@@ -260,6 +286,7 @@ function formatDataTransactions(transactions) {
 }
 
 function formatDataTransfers(transfers, address) {
+	//console.log({ transfers, address });
 	try {
 		return transfers.map((tx) => ({
 			hash: tx.signature,
@@ -268,18 +295,42 @@ function formatDataTransfers(transfers, address) {
 			from: tx.from,
 			traffic: tx.flow,
 			to: tx.to,
-			amount: tx.changeAmount.toFixed(9),
+			amount: tx.changeAmount,
 			from_token_account: tx.from,
 			to_token_account: address,
 			status: tx.status,
-			asset: "SOL",
+			asset: tx.tokenName ? tx.tokenName : "SOL",
 		}));
 	} catch (error) {
+		console.error({ error });
+		return [];
+	}
+}
+
+function formatDataSLPTransfers(transfers, address) {
+	//console.log({ transfers, address });
+	try {
+		return transfers.map((tx) => ({
+			hash: tx.signature,
+			block: tx.slot.toString(),
+			date: new Date(tx.timestamp * 1000),
+			from: tx.from,
+			traffic: tx.flow,
+			to: tx.to,
+			amount: tx.changeAmount,
+			from_token_account: tx.from,
+			to_token_account: address,
+			status: tx.status,
+			asset: tx.tokenName,
+		}));
+	} catch (error) {
+		console.error({ error });
 		return [];
 	}
 }
 
 function addTrafficParameter(transactions, userAddress) {
+	//	console.log({ transactions, userAddress });
 	return transactions.map((tx) => ({
 		...tx,
 		traffic: tx.to_address === userAddress ? "IN" : "OUT",
