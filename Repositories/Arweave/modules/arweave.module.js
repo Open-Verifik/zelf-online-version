@@ -7,8 +7,9 @@ const axios = require("axios");
 const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 const moment = require("moment");
-const holdOwner = config.arwave.hold.owner;
-const owner = config.arwave.owner;
+
+const owner = config.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
+
 const graphql = `${arweaveUrl}/graphql`;
 
 const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
