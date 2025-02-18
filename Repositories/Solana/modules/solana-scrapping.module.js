@@ -70,12 +70,12 @@ const getAddress = async (params) => {
 				"https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
 		});
 
-		const { transfers } = await getTransfers(
+		const { transactions } = await getTransfers(
 			{ id: address },
 			{ page: 0, show: 10 }
 		);
 
-		data.transactions = transfers;
+		data.transactions = transactions;
 
 		return data;
 	} catch (error) {
@@ -139,31 +139,31 @@ const getTokens = async (params, query) => {
 	return tokenHoldings;
 };
 
-/**
- * get transactions list
- * @param {Object} params
- * @returns
- */
-const getTransactions = async (params, query) => {
-	const t = Date.now();
+// /**
+//  * get transactions list
+//  * @param {Object} params
+//  * @returns
+//  */
+// const getTransactions = async (params, query) => {
+// 	const t = Date.now();
 
-	const transactions = await axios.get(
-		`https://www.oklink.com/api/explorer/v2/sol/transaction/${params.id}?offset=${query.page}&limit=${query.show}&address=${params.id}&chain=solana&t=${t}`,
-		{
-			httpsAgent: agent,
-			headers: {
-				// Cookie: coookie,
-				// Devid: `${devId.replace("devId=", "")}`,
-				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-				//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
-			},
-		}
-	);
+// 	const transactions = await axios.get(
+// 		`https://www.oklink.com/api/explorer/v2/sol/transaction/${params.id}?offset=${query.page}&limit=${query.show}&address=${params.id}&chain=solana&t=${t}`,
+// 		{
+// 			httpsAgent: agent,
+// 			headers: {
+// 				// Cookie: coookie,
+// 				// Devid: `${devId.replace("devId=", "")}`,
+// 				"X-Apikey": get_ApiKey().getApiKey(),
+// 				"User-Agent":
+// 					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+// 				//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
+// 			},
+// 		}
+// 	);
 
-	return { transactions: formatDataTransactions(transactions.data.data.hits) };
-};
+// 	return { transactions: formatDataTransactions(transactions.data.data.hits) };
+// };
 
 const getTransaction = async (params, query) => {
 	const { data } = await instance.get(
@@ -185,7 +185,7 @@ const getTransaction = async (params, query) => {
 	return { transaction: data.data };
 };
 let transactions = [];
-const getTransfers = async (params, query) => {
+const getTransactions = async (params, query) => {
 	const t = Date.now();
 	const address = params.id;
 
@@ -221,25 +221,20 @@ const getTransfers = async (params, query) => {
 		}
 	);
 	transactions = [...data.data.hits, ...slp.data.data.hits];
-	console.log(data.data.hits.length);
-	console.log(slp.data.data.hits.length);
-	// console.log(
-	// 	addTrafficParameter(
-	// 		formatDataSLPTransfers(slp.data.data.hits, address),
-	// 		address
-	// 	)
-	// );
 
-	//console.log(transactions);
+	let total = (data.data.hits.length += slp.data.data.hits.length);
+
 	return {
-		transfers: addTrafficParameter(
+		pagination: {
+			records: total.toString(),
+			pages: query.page,
+			page: query.page,
+		},
+		transactions: addTrafficParameter(
 			formatDataTransfers(transactions, address),
 			address
 		),
 	};
-};
-const getTransfer = async (params) => {
-	return { id: params.id };
 };
 
 const getGasTracker = async () => {
@@ -286,16 +281,16 @@ function formatDataTransactions(transactions) {
 }
 
 function formatDataTransfers(transfers, address) {
-	//console.log({ transfers, address });
 	try {
 		return transfers.map((tx) => ({
 			hash: tx.signature,
 			block: tx.slot.toString(),
 			date: new Date(tx.timestamp * 1000),
 			from: tx.from,
+			method: "Transfer",
 			traffic: tx.flow,
 			to: tx.to,
-			amount: tx.changeAmount,
+			amount: Number(tx.changeAmount).toFixed(9),
 			from_token_account: tx.from,
 			to_token_account: address,
 			status: tx.status,
@@ -307,33 +302,10 @@ function formatDataTransfers(transfers, address) {
 	}
 }
 
-function formatDataSLPTransfers(transfers, address) {
-	//console.log({ transfers, address });
-	try {
-		return transfers.map((tx) => ({
-			hash: tx.signature,
-			block: tx.slot.toString(),
-			date: new Date(tx.timestamp * 1000),
-			from: tx.from,
-			traffic: tx.flow,
-			to: tx.to,
-			amount: tx.changeAmount,
-			from_token_account: tx.from,
-			to_token_account: address,
-			status: tx.status,
-			asset: tx.tokenName,
-		}));
-	} catch (error) {
-		console.error({ error });
-		return [];
-	}
-}
-
 function addTrafficParameter(transactions, userAddress) {
-	//	console.log({ transactions, userAddress });
 	return transactions.map((tx) => ({
 		...tx,
-		traffic: tx.to_address === userAddress ? "IN" : "OUT",
+		traffic: tx.to === userAddress ? "IN" : "OUT",
 	}));
 }
 function get_ApiKey() {
@@ -390,7 +362,6 @@ module.exports = {
 	getTokens,
 	getTransactions,
 	getTransaction,
-	getTransfers,
-	getTransfer,
+	//getTransfers,
 	getGasTracker,
 };
