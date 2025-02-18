@@ -125,7 +125,7 @@ const getValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
 
-	const captchaScore = captchaToken ? await captchaService.createAssessment(captchaToken, os, captchaZelfName) : 1;
+	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -337,7 +337,7 @@ const previewZelfProofValidation = async (ctx, next) => {
 
 	const { captchaToken, os, zelfProof } = ctx.request.body;
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, "preview");
+	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, "preview");
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -387,7 +387,7 @@ const previewValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName);
+	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -446,7 +446,7 @@ const decryptValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName);
+	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
