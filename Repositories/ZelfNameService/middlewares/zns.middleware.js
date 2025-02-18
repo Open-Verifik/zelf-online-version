@@ -87,7 +87,7 @@ const getValidation = async (ctx, next) => {
 		// we will now check if the session is active
 		const session = await Session.findOne({ _id: authUser.session });
 
-		if (session?.status !== "active") {
+		if (session?.status !== "active" || !session?.clientIP) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Session is not active" };
 			return;
@@ -152,7 +152,7 @@ const leaseValidation = async (ctx, next) => {
 		// we will now check if the session is active
 		const session = await Session.findOne({ _id: authUser.session });
 
-		if (session?.status !== "active") {
+		if (session?.status !== "active" || !session?.clientIP) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Session is not active" };
 			return;
@@ -279,7 +279,6 @@ const leaseConfirmationValidation = async (ctx, next) => {
 
 // Example validation function (replace with actual logic)
 function validatePurchaseDetails(zelfName, purchaseDetails) {
-	// Implement actual validation logic here
 	return true; // Placeholder
 }
 
@@ -319,7 +318,7 @@ const previewZelfProofValidation = async (ctx, next) => {
 		// we will now check if the session is active
 		const session = await Session.findOne({ _id: authUser.session });
 
-		if (session?.status !== "active") {
+		if (session?.status !== "active" || !session?.clientIP) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Session is not active" };
 			return;
@@ -367,7 +366,7 @@ const previewValidation = async (ctx, next) => {
 		// we will now check if the session is active
 		const session = await Session.findOne({ _id: authUser.session });
 
-		if (session?.status !== "active") {
+		if (session?.status !== "active" || !session?.clientIP) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Session is not active" };
 			return;
@@ -426,7 +425,7 @@ const decryptValidation = async (ctx, next) => {
 		// we will now check if the session is active
 		const session = await Session.findOne({ _id: authUser.session });
 
-		if (session?.status !== "active") {
+		if (session?.status !== "active" || !session?.clientIP) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Session is not active" };
 			return;
