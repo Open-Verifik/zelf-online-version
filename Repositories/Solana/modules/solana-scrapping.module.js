@@ -70,7 +70,7 @@ const getAddress = async (params) => {
 				"https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
 		});
 
-		const { transactions } = await getTransfers(
+		const { transactions } = await getTransactions(
 			{ id: address },
 			{ page: 0, show: 10 }
 		);
