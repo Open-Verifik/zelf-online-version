@@ -128,7 +128,7 @@ const getTokens = async (params) => {
 
 			tokenHoldings.fiatBalance += token.value || 0;
 
-			tokenHoldings.tokens.push({
+			const tokenData = {
 				fiatBalance: token.value,
 				name: token.tokenName,
 				amount: token.balance,
@@ -142,7 +142,13 @@ const getTokens = async (params) => {
 				quantity: token.amount,
 				decimals: token.decimals,
 				owner: token.owner,
-			});
+			};
+
+			tokenData.fiatBalance = parseFloat(tokenData.fiatBalance?.toFixed(4));
+			// do the same for amount
+			tokenData.amount = parseFloat(tokenData.amount.toFixed(4));
+
+			tokenHoldings.tokens.push(tokenData);
 		}
 	} catch (exception) {
 		console.error({ exception });
