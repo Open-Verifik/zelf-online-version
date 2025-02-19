@@ -26,7 +26,7 @@ const schemas = {
 		faceBase64: string().required(),
 		type: stringEnum(["create", "import"]).required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		// captchaToken: string().required(),
+		captchaToken: string(),
 	},
 	create: {
 		password: string(),
@@ -43,17 +43,17 @@ const schemas = {
 		zelfName: string().required(),
 		addServerPassword: boolean(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string().required(),
+		captchaToken: string(),
 	},
 	preview: {
 		zelfName: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string().required(),
+		captchaToken: string(),
 	},
 	previewZelfProof: {
 		zelfProof: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string().required(),
+		captchaToken: string(),
 	},
 	revenueCatWebhook: {
 		product_id: string().required(),
@@ -334,7 +334,7 @@ const previewZelfProofValidation = async (ctx, next) => {
 		await Session.updateOne({ _id: authUser.session }, { $inc: { previewCount: 1 } });
 	}
 
-	const { captchaToken, os, zelfProof } = ctx.request.body;
+	const { captchaToken, os } = ctx.request.body;
 
 	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, "preview");
 
@@ -385,7 +385,6 @@ const previewValidation = async (ctx, next) => {
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
 	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
-
 	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
@@ -444,7 +443,6 @@ const decryptValidation = async (ctx, next) => {
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
 	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
-
 	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
