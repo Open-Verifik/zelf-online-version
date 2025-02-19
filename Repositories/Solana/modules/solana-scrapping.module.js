@@ -26,7 +26,7 @@ const getAddress = async (params) => {
 		response = (await solscan.getAddress(params)) || (await oklink.getAddress(params));
 	}
 
-	return { response, source: params.source };
+	return response;
 };
 
 /**
