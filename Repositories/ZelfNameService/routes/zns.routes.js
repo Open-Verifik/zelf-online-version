@@ -15,6 +15,10 @@ module.exports = (server) => {
 
 	server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseZelfName);
 
+	server.post(`${PATH}/v2/lease`, Middleware.leaseValidation, Controller.leaseZelfName_v2);
+
+	server.get(`${PATH}/zelfpay`, Middleware.zelfPayValidation, Controller.zelfPay);
+
 	server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOfflineZelfName);
 
 	server.post(`${PATH}/lease-confirmation`, Middleware.leaseConfirmationValidation, Controller.leaseConfirmation);

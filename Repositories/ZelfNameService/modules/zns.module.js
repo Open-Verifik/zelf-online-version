@@ -19,6 +19,7 @@ const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const jwt = require("jsonwebtoken");
 const { createUnderName } = require("./undernames.module");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
+const ZNSPartsModule = require("./zns-parts.module");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -239,7 +240,7 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 			const ipfsRecord = ipfsRecords[index];
 
 			if (environment === "both") {
-				zelfNamesInIPFS.push(await _formatIPFSSearchResult(ipfsRecord, foundInArweave));
+				zelfNamesInIPFS.push(await ZNSPartsModule.formatIPFSRecord(ipfsRecord, foundInArweave));
 
 				continue;
 			}
@@ -248,7 +249,7 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 				(environment === "hold" && ipfsRecord.metadata.keyvalues.type === "hold") ||
 				(environment === "mainnet" && (!ipfsRecord.metadata.keyvalues.type || ipfsRecord.metadata.keyvalues.type === "mainnet"))
 			) {
-				zelfNamesInIPFS.push(await _formatIPFSSearchResult(ipfsRecord, foundInArweave));
+				zelfNamesInIPFS.push(await ZNSPartsModule.formatIPFSRecord(ipfsRecord, foundInArweave));
 			}
 		}
 
@@ -294,56 +295,6 @@ const _formatArweaveSearchResult = async (transactionRecord) => {
 	zelfNameObject.zelfProofQRCode = await _arweaveIDToBase64(zelfNameObject.id);
 
 	return zelfNameObject;
-};
-
-const _formatIPFSSearchResult = async (ipfsRecord, foundInArweave) => {
-	const zelfNameObject = {
-		...ipfsRecord,
-		publicData: {
-			name: ipfsRecord.metadata.name,
-			...ipfsRecord.metadata.keyvalues,
-		},
-		zelfName: ipfsRecord.metadata.name,
-	};
-
-	if (zelfNameObject.publicData.payment) {
-		const payment = JSON.parse(zelfNameObject.publicData.payment);
-
-		// assign the payment to the publicData
-		zelfNameObject.publicData.price = payment.price;
-		zelfNameObject.publicData.duration = payment.duration;
-		zelfNameObject.publicData.coinbase_hosted_url = payment.coinbase_hosted_url;
-		zelfNameObject.publicData.referralZelfName = payment.referralZelfName;
-		zelfNameObject.publicData.referralSolanaAddress = payment.referralSolanaAddress;
-	}
-
-	if (!foundInArweave) {
-		zelfNameObject.zelfProof = zelfNameObject.publicData.zelfProof;
-
-		zelfNameObject.zelfProofQRCode = await _IPFSToBase64(zelfNameObject.url);
-	}
-
-	delete zelfNameObject.metadata;
-
-	return zelfNameObject;
-};
-
-const _IPFSToBase64 = async (url) => {
-	try {
-		const encryptedResponse = await axios.get(url, {
-			responseType: "arraybuffer",
-		});
-
-		if (encryptedResponse?.data) {
-			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
-
-			return `data:image/png;base64,${base64Image}`;
-		}
-	} catch (exception) {
-		console.error({ VWEx: exception });
-
-		return exception?.message;
-	}
 };
 
 const _arweaveIDToBase64 = async (id) => {

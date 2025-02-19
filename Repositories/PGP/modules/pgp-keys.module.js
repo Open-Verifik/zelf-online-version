@@ -14,7 +14,7 @@ const generateKey = async (type = "session", identifier, name, email, password) 
 		type: "ecc",
 		curve: "curve25519",
 		userIDs: [{ name, email }],
-		passphrase: type === "session" ? passphrase : globalPassphrase,
+		passphrase: password || (type === "session" ? passphrase : globalPassphrase),
 	});
 
 	await _saveKey(type, identifier, privateKey, publicKey, { name, email });

@@ -203,7 +203,7 @@ const walletEncrypt = async (content, identifier, password = "") => {
 		encryptionKeys: publicKey,
 	});
 
-	return encryptedMessage;
+	return { encryptedMessage, privateKey: payload.privateKey };
 };
 
 const _generateNewWalletKeys = async (identifier, walletData, password) => {

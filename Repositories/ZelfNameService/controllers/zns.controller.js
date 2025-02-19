@@ -1,10 +1,27 @@
 const Module = require("../modules/zns.module");
+const Modulev2 = require("../modules/zns.v2.module");
 const ZNSTokenModule = require("../modules/zns-token.module");
 const RevenueCatModule = require("../modules/revenue-cat.module");
 
 const searchZelfName = async (ctx) => {
 	try {
 		const data = await Module.searchZelfName(ctx.request.query, ctx.state.user);
+
+		if (data && data.available && data.zelfName.includes("zelfpay")) {
+			const zelfName = data.zelfName.replace("zelfpay", "zelf");
+
+			const zelfNameData = await Module.searchZelfName({ zelfName }, ctx.state.user);
+
+			const zelfNameObject = zelfNameData.ipfs?.length ? zelfNameData.ipfs[0] : zelfNameData.arweave[0];
+
+			if (zelfNameObject) {
+				ctx.body = {
+					data: await Modulev2.createZelfPay(zelfNameObject, ctx.state.user),
+				};
+
+				return;
+			}
+		}
 
 		ctx.body = { data };
 	} catch (error) {
@@ -18,6 +35,20 @@ const searchZelfName = async (ctx) => {
 const leaseZelfName = async (ctx) => {
 	try {
 		const data = await Module.leaseZelfName({ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() }, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
+const leaseZelfName_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.leaseZelfName({ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() }, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -168,9 +199,24 @@ const update = async (ctx) => {
 	}
 };
 
+const zelfPay = async (ctx) => {
+	try {
+		const data = await Module.zelfPay(ctx.request.query, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	searchZelfName,
 	leaseZelfName,
+	leaseZelfName_v2,
 	leaseConfirmation,
 	previewZelfName,
 	previewZelfProof,
@@ -180,4 +226,5 @@ module.exports = {
 	referralRewards,
 	purchaseRewards,
 	update,
+	zelfPay,
 };

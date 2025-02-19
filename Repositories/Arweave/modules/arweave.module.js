@@ -252,7 +252,26 @@ const search = async (zelfName, extraConditions = {}) => {
 	return searchResults;
 };
 
+const arweaveIDToBase64 = async (id) => {
+	try {
+		const encryptedResponse = await axios.get(`${arweaveUrl}/${id}`, {
+			responseType: "arraybuffer",
+		});
+
+		if (encryptedResponse?.data) {
+			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
+
+			return `data:image/png;base64,${base64Image}`;
+		}
+	} catch (exception) {
+		console.error({ VWEx: exception });
+
+		return exception?.message;
+	}
+};
+
 module.exports = {
 	zelfNameRegistration,
 	search,
+	arweaveIDToBase64,
 };
