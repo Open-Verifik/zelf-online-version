@@ -62,7 +62,10 @@ const getAddress = async (params) => {
 
 		_response.tokenHoldings = await getTokens({ id: params.id });
 
-		if (_response.tokenHoldings.balance) _response.fiatBalance += _response.tokenHoldings.balance;
+		if (_response.tokenHoldings.fiatBalance) _response.fiatBalance += _response.tokenHoldings.fiatBalance;
+
+		// round up to 4 decimal places
+		_response.fiatBalance = parseFloat(_response.fiatBalance.toFixed(4));
 
 		return _response;
 	} catch (error) {
