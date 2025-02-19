@@ -5,6 +5,7 @@ const formatterClass = require("../../class/data-formatterClass");
 const agent = new https.Agent({
 	rejectUnauthorized: false,
 });
+const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 
 const getAddress = async (params) => {
@@ -45,10 +46,7 @@ const getAddress = async (params) => {
 
 		data.account.fiatValue = data.fiatBalance;
 
-		data.tokenHoldings = await getTokens(
-			{ id: address },
-			{ page: 0, show: 10 }
-		);
+		data.tokenHoldings = await getTokens({ id: address }, { page: 0, show: 10 });
 
 		data.tokenHoldings.tokens.unshift({
 			tokenType: "SOL",
@@ -57,14 +55,10 @@ const getAddress = async (params) => {
 			name: "Solana",
 			price: data.account.price,
 			amount: data.balance,
-			image:
-				"https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+			image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
 		});
 
-		const { transactions } = await getTransactions(
-			{ id: address },
-			{ page: 0, show: 10 }
-		);
+		const { transactions } = await getTransactions({ id: address }, { page: 0, show: 10 });
 
 		data.transactions = transactions;
 
@@ -87,8 +81,7 @@ const getTokens = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -147,8 +140,7 @@ const getTransactions = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -163,8 +155,7 @@ const getTransactions = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -179,10 +170,7 @@ const getTransactions = async (params, query) => {
 				pages: query.page,
 				page: query.page,
 			},
-			transactions: addTrafficParameter(
-				formatDataTransfers(transactions, address),
-				address
-			),
+			transactions: addTrafficParameter(formatDataTransfers(transactions, address), address),
 		};
 	} catch (error) {
 		return null;
@@ -226,7 +214,7 @@ function addTrafficParameter(transactions, userAddress) {
 }
 
 function get_ApiKey() {
-	const API_KEY = "a2c903cc-b31e-4547-9299-b6d07b7631ab";
+	const API_KEY = config.oklink.apiKey;
 	const c = 1111111111111;
 
 	function encryptApiKey() {

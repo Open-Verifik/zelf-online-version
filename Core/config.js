@@ -123,6 +123,9 @@ const configuration = {
 		senderPublicKey: process.env.SOLANA_SENDER_PUBLIC_KEY,
 		sender: process.env.SENDER_KEY,
 	},
+	oklink: {
+		apiKey: process.env.OKLINK_API_KEY,
+	},
 };
 
 module.exports = configuration;
