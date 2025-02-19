@@ -626,8 +626,8 @@ const createZelfPay = async (zelfNameObject, authUser) => {
 			type: "mainnet",
 			addresses: JSON.stringify(dataToEncrypt.publicData),
 			zelfName: paymentName,
-			coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
-			coinbase_expires_at: zelfNameObject.coinbaseCharge.expires_at,
+			coinbase_hosted_url: coinbaseCharge.hosted_url,
+			coinbase_expires_at: coinbaseCharge.expires_at,
 		},
 		pinIt: true,
 	};
@@ -638,7 +638,9 @@ const createZelfPay = async (zelfNameObject, authUser) => {
 		hasPassword: "true",
 		zelfProof,
 		publicData: {
-			...payload.metadata,
+			...dataToEncrypt.publicData,
+			coinbase_hosted_url: coinbaseCharge.hosted_url,
+			coinbase_expires_at: `${coinbaseCharge.expires_at}`,
 			zelfName: paymentName,
 			type: "mainnet",
 			expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
