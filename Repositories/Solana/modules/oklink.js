@@ -21,45 +21,55 @@ const getAddress = async (params) => {
 		const $ = cheerio.load(response.data);
 
 		const balance = $(
-			"#root > main > div > div > div.single-pannel > div.index_infoWrapper__4GvU6 > div:nth-child(1) > div:nth-child(3) > div.index_value__vVl9q > div > span.inline-flex.align-items-center.max-w-100.overflow-hidden > div > div"
+			"#root > main > div > div > div.single-pannel > div.index_info__kvp1Q.index_layout__2uO5I > div.index_title__064bd.index_card__GOZsN > div > div > div:nth-child(2) > div > div > div > span.inline-flex.align-items-center.max-w-100.overflow-hidden > div > div"
 		).text();
 
 		const SaldoSOL_USD = $(
-			"#root > main > div > div.single-pannel > div.index_infoWrapper__4GvU6 > div:nth-child(1) > div:nth-child(3) > div.index_value__vVl9q > div > span.index_usdValue__M2TO1 > div > div"
+			"#root > main > div > div > div.single-pannel > div.index_info__kvp1Q.index_layout__2uO5I > div.index_title__064bd.index_card__GOZsN > div > div > div:nth-child(1) > div > div > span > div"
+		)
+			.text()
+			.split("$")[1];
+
+		const fia = $(
+			"#root > main > div > div > div.single-pannel > div.index_info__kvp1Q.index_layout__2uO5I > div.index_title__064bd.index_card__GOZsN > div > div > div:nth-child(2) > div > div > div > span.index_usdValue__M2TO1 > div > div"
 		)
 			.text()
 			.split("$")[1];
 
 		const { price } = await getTickerPrice({ symbol: "SOL" });
 
-		const data = formatData({
+		const data = {
 			address,
 			balance: `${parseFloat(balance) || 0}`,
+			fiatBalance: Number(`${parseFloat(SaldoSOL_USD) || 0}`),
 			type: "system_account",
 			account: {
 				asset: "SOL",
-				fiatValue: `${parseFloat(SaldoSOL_USD) || 0}`,
+				fiatBalance: `${parseFloat(fia) || 0}`,
 				price: price || 0,
 			},
-		});
+		};
 
-		data.fiatBalance = `${(parseFloat(balance) || 0) * (price || 0)}`;
-
-		data.account.fiatValue = data.fiatBalance;
-
-		data.tokenHoldings = await getTokens({ id: address }, { page: 0, show: 10 });
+		data.tokenHoldings = await getTokens(
+			{ id: address },
+			{ page: 0, show: 10 }
+		);
 
 		data.tokenHoldings.tokens.unshift({
 			tokenType: "SOL",
-			fiatBalance: data.fiatBalance,
+			fiatBalance: fia,
 			symbol: "SOL",
 			name: "Solana",
 			price: data.account.price,
 			amount: data.balance,
-			image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+			image:
+				"https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
 		});
 
-		const { transactions } = await getTransactions({ id: address }, { page: 0, show: 10 });
+		const { transactions } = await getTransactions(
+			{ id: address },
+			{ page: 0, show: 10 }
+		);
 
 		data.transactions = transactions;
 
@@ -82,7 +92,8 @@ const getTokens = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -104,14 +115,14 @@ const getTokens = async (params, query) => {
 				tokenHoldings.tokens.push({
 					fiatBalance: parseFloat(token.valueUsd) || undefined,
 					name: token.tokenName,
-					amount: parseFloat(token.amount),
-					price: parseFloat(token.price) || 0,
+					amount: Number(parseFloat(token.amount).toFixed(5) || 0),
+					price: Number(parseFloat(token.price).toFixed(5)) || 0,
 					symbol: token.tokenSymbol,
 					image: token.tokenSymbolUrl,
 					address: token.tokenAccount,
 					tokenAddress: token.mintAccount,
 					tokenType: token.tokenType,
-					blockTimestamp: new Date(token.blockTimestamp * 1000),
+					//blockTimestamp: new Date(token.blockTimestamp * 1000),
 					owner: params.id,
 				});
 			}
@@ -140,7 +151,8 @@ const getTransactions = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -155,7 +167,8 @@ const getTransactions = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -170,7 +183,10 @@ const getTransactions = async (params, query) => {
 				pages: query.page,
 				page: query.page,
 			},
-			transactions: addTrafficParameter(formatDataTransfers(transactions, address), address),
+			transactions: addTrafficParameter(
+				formatDataTransfers(transactions, address),
+				address
+			),
 		};
 	} catch (error) {
 		return null;
