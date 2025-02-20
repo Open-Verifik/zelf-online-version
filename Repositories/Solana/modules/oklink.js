@@ -210,7 +210,7 @@ function formatDataTransfers(transfers, address) {
 			method: "Transfer",
 			traffic: tx.flow,
 			to: tx.to,
-			amount: Number(tx.changeAmount).toFixed(9),
+			amount: Number(tx.changeAmount).toFixed(4),
 			from_token_account: tx.from,
 			to_token_account: address,
 			status: tx.status,

@@ -259,9 +259,7 @@ function formatDataTranfe(transactions, token) {
 				: tx.activity_type,
 		traffic: tx.flow.toUpperCase(),
 		to: tx.to_address,
-		amount: (tx.amount / Math.pow(10, tx.token_decimals)).toFixed(
-			tx.token_decimals
-		),
+		amount: (tx.amount / Math.pow(10, tx.token_decimals)).toFixed(4),
 		fiatAmount: tx.value.toString(),
 		from_token_account: tx.from_token_account,
 		to_token_account: tx.to_token_account,
