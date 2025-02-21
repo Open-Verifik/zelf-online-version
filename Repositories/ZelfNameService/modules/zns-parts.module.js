@@ -148,12 +148,16 @@ const formatIPFSRecord = async (ipfsRecord, foundInArweave) => {
 
 		// assign all payment properties to the publicData
 		Object.assign(zelfNameObject.publicData, payment);
+
+		delete zelfNameObject.publicData.payment;
 	}
 
 	if (zelfNameObject.publicData.addresses) {
 		const addresses = JSON.parse(zelfNameObject.publicData.addresses);
 
 		Object.assign(zelfNameObject.publicData, addresses);
+
+		delete zelfNameObject.publicData.addresses;
 	}
 
 	if (!foundInArweave) {
