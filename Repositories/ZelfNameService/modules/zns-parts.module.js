@@ -134,6 +134,7 @@ const removeExpiredRecords = async (records) => {
 const formatIPFSRecord = async (ipfsRecord, foundInArweave) => {
 	const zelfNameObject = {
 		...ipfsRecord,
+		metadata: undefined,
 		publicData: {
 			name: ipfsRecord.metadata.name || ipfsRecord.metadata.zelfName,
 		},
@@ -160,10 +161,6 @@ const formatIPFSRecord = async (ipfsRecord, foundInArweave) => {
 
 		zelfNameObject.zelfProofQRCode = await _IPFSToBase64(zelfNameObject.url);
 	}
-
-	console.log({ zelfNameObject });
-
-	delete zelfNameObject.metadata;
 
 	return zelfNameObject;
 };

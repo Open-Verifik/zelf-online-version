@@ -34,7 +34,7 @@ const searchZelfName = async (ctx) => {
 
 const leaseZelfName = async (ctx) => {
 	try {
-		const data = await Module.leaseZelfName({ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() }, ctx.state.user);
+		const data = await Modulev2.leaseZelfName({ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() }, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
