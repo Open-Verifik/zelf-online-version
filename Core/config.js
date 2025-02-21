@@ -28,8 +28,8 @@ const configuration = {
 		key: process.env.SECRET_KEY_PRICI,
 	},
 	debug: {
-		mongo: Boolean(process.env.DEBUG_MONGO),
-		sendEmail: Boolean(process.env.DEBUG_SEND_EMAIL),
+		mongo: process.env.DEBUG_MONGO === "true",
+		sendEmail: process.env.DEBUG_SEND_EMAIL === "true",
 	},
 	db: {
 		uri: process.env.MONGODB_URI_PROD || process.env.MONGODB_URI,
@@ -109,6 +109,7 @@ const configuration = {
 	},
 	coinbase: {
 		key: process.env.COINBASE_API_KEY,
+		forceApproval: Boolean(process.env.COINBASE_FORCE_APPROVAL === "true"),
 	},
 	google: {
 		captchaProjectID: process.env.CAPTCHA_PROJECT_ID,
@@ -122,6 +123,9 @@ const configuration = {
 	solana: {
 		senderPublicKey: process.env.SOLANA_SENDER_PUBLIC_KEY,
 		sender: process.env.SENDER_KEY,
+	},
+	oklink: {
+		apiKey: process.env.OKLINK_API_KEY,
 	},
 };
 
