@@ -116,6 +116,7 @@ const configuration = {
 		webSiteKey: process.env.CAPTCHA_WEB_SITE_KEY,
 		androidSiteKey: process.env.CAPTCHA_ANDROID_SITE_KEY,
 		iOSSiteKey: process.env.CAPTCHA_IOS_SITE_KEY,
+		captchaApproval: Boolean(process.env.CAPTCHA_APPROVAL === "true"),
 	},
 	revenueCat: {
 		allowedEmail: process.env.REVENUECAT_ALLOWED_EMAIL,

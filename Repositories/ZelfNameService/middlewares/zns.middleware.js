@@ -445,7 +445,10 @@ const decryptValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
 
-	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName);
+	const captchaScore =
+		(authUser.session && !captchaToken) || config.google.captchaApproval
+			? 1
+			: await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
