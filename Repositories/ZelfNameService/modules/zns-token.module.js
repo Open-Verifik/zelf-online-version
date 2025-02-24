@@ -15,6 +15,7 @@ let connection;
 	await connection.getSlot();
 })();
 
+console.log({ tokenMintAddress: config.solana.tokenMintAddress });
 // Token mint address (ZNS token address)
 const tokenMintAddress = new solanaWeb3.PublicKey(config.solana.tokenMintAddress);
 
