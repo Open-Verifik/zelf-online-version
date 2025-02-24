@@ -89,7 +89,7 @@ const extractPublicKey = async (params) => {
 
 	if (storedKey) return storedKey.publicKey;
 
-	const pgpRecord = await PGPKeyModule.generateKey("session", params.identifier, params.name, params.email, params.identifier, params.password);
+	const pgpRecord = await PGPKeyModule.generateKey("session", params.identifier, params.name, params.email, params.password);
 
 	return pgpRecord.publicKey;
 };

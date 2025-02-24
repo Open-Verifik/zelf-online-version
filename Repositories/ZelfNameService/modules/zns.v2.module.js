@@ -141,11 +141,11 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, p
 	zelfNameObject.publicData = Object.assign(zelfNameObject.publicData, zelfNameObject.ipfs.publicData);
 
 	// create undername
-	zelfNameObject.undername = await createUnderName({
-		parentName: "zelf",
-		undername: holdName,
-		publicData: zelfNameObject.publicData,
-	});
+	// zelfNameObject.undername = await createUnderName({
+	// 	parentName: "zelf",
+	// 	undername: holdName,
+	// 	publicData: zelfNameObject.publicData,
+	// });
 };
 
 /**

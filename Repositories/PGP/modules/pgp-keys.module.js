@@ -7,7 +7,6 @@ const MongoORM = require("../../../Core/mongo-orm");
 
 const generateKey = async (type = "session", identifier, name, email, password) => {
 	name = name || "Miguel T";
-
 	email = email || "miguel@zelf.world";
 
 	const { privateKey, publicKey } = await openpgp.generateKey({
