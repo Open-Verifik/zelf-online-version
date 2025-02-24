@@ -7,15 +7,12 @@ const MongoORM = require("../../../Core/mongo-orm");
 
 let connection;
 (async () => {
-	const url = `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}`;
-
-	console.log({ url });
+	const url = `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}/`;
 
 	connection = new solanaWeb3.Connection(url);
 	await connection.getSlot();
 })();
 
-console.log({ tokenMintAddress: config.solana.tokenMintAddress });
 // Token mint address (ZNS token address)
 const tokenMintAddress = new solanaWeb3.PublicKey(config.solana.tokenMintAddress);
 
