@@ -9,12 +9,18 @@ let connection;
 (async () => {
 	const url = `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}/`;
 
+	console.log({ url });
+
 	connection = new solanaWeb3.Connection(url);
 	await connection.getSlot();
 })();
 
+console.log({ config: config.solana.tokenMintAddress });
+
 // Token mint address (ZNS token address)
 const tokenMintAddress = new solanaWeb3.PublicKey(config.solana.tokenMintAddress);
+
+console.log({ tokenMintAddress });
 
 const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 	try {
