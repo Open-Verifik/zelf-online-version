@@ -124,6 +124,8 @@ const configuration = {
 	solana: {
 		senderPublicKey: process.env.SOLANA_SENDER_PUBLIC_KEY,
 		sender: process.env.SENDER_KEY,
+		nodeSecret: process.env.SOLANA_NODE_SECRET,
+		tokenMintAddress: process.env.SOLANA_TOKEN_MINT_ADDRESS,
 	},
 	oklink: {
 		apiKey: process.env.OKLINK_API_KEY,

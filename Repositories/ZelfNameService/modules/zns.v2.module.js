@@ -16,6 +16,7 @@ const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const { createCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const config = require("../../../Core/config");
 const jwt = require("jsonwebtoken");
+const { createUnderName } = require("./undernames.module");
 
 /**
  * lease zelfName
@@ -138,6 +139,13 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, p
 	delete zelfNameObject.ipfs.publicData.zelfProof;
 
 	zelfNameObject.publicData = Object.assign(zelfNameObject.publicData, zelfNameObject.ipfs.publicData);
+
+	// create undername
+	zelfNameObject.undername = await createUnderName({
+		parentName: "zelf",
+		undername: holdName,
+		publicData: zelfNameObject.publicData,
+	});
 };
 
 /**

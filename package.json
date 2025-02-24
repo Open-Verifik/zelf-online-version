@@ -11,7 +11,7 @@
 		"test": "tests"
 	},
 	"dependencies": {
-		"@ar.io/sdk": "^3.2.0",
+		"@ar.io/sdk": "3.8.1",
 		"@ardrive/turbo-sdk": "1.22.1",
 		"@google-cloud/recaptcha-enterprise": "^5.13.0",
 		"@joi/date": "^2.1.0",
