@@ -26,7 +26,7 @@ const schemas = {
 		faceBase64: string().required(),
 		type: stringEnum(["create", "import"]).required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		// captchaToken: string().required(),
+		captchaToken: string(),
 	},
 	create: {
 		password: string(),
@@ -43,17 +43,17 @@ const schemas = {
 		zelfName: string().required(),
 		addServerPassword: boolean(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string().required(),
+		captchaToken: string(),
 	},
 	preview: {
 		zelfName: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string().required(),
+		captchaToken: string(),
 	},
 	previewZelfProof: {
 		zelfProof: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string().required(),
+		captchaToken: string(),
 	},
 	revenueCatWebhook: {
 		product_id: string().required(),
@@ -337,7 +337,7 @@ const previewZelfProofValidation = async (ctx, next) => {
 		await Session.updateOne({ _id: authUser.session }, { $inc: { previewCount: 1 } });
 	}
 
-	const { captchaToken, os, zelfProof } = ctx.request.body;
+	const { captchaToken, os } = ctx.request.body;
 
 	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, "preview");
 
@@ -416,7 +416,6 @@ const decryptValidation = async (ctx, next) => {
 
 	if (validation.error) {
 		ctx.status = 409;
-
 		ctx.body = { validationError: validation.error.message };
 
 		return;
@@ -431,12 +430,14 @@ const decryptValidation = async (ctx, next) => {
 		if (session?.status !== "active" || !session?.clientIP) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Session is not active" };
+
 			return;
 		}
 
 		if (session.decryptCount >= 10) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Decrypt limit exceeded" };
+
 			return;
 		}
 
