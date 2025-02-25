@@ -3,7 +3,7 @@ const HttpHandler = require("../../../Core/http-handler");
 
 const getAddress = async (ctx) => {
 	try {
-		const data = await Module.getAddress(ctx.request.params);
+		const data = await Module.getAddress({ ...ctx.request.query, ...ctx.request.params });
 
 		ctx.body = { data };
 	} catch (error) {

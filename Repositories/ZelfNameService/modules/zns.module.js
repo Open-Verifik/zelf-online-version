@@ -698,7 +698,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 
 	return {
 		...charge,
-		confirmed: config.env === "development" ? true : confirmed,
+		confirmed: config.coinbase.forceApproval || confirmed,
 	};
 };
 

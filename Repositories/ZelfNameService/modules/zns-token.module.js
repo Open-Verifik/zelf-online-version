@@ -7,12 +7,14 @@ const MongoORM = require("../../../Core/mongo-orm");
 
 let connection;
 (async () => {
-	connection = new solanaWeb3.Connection("https://sparkling-special-mound.solana-mainnet.quiknode.pro/810558fcdec3e18eaf3701136d38bd6aa8d61b77/");
+	const url = `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}/`;
+
+	connection = new solanaWeb3.Connection(url);
 	await connection.getSlot();
 })();
 
 // Token mint address (ZNS token address)
-const tokenMintAddress = new solanaWeb3.PublicKey("GfF6PSkH8bKLkws5RMFdzgASwcVbgCfhhKfp8zeoFBkx"); // Replace with actual token mint address
+const tokenMintAddress = new solanaWeb3.PublicKey(config.solana.tokenMintAddress);
 
 const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 	try {
