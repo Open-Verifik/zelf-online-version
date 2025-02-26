@@ -7,16 +7,13 @@ const descriptions = require("../description.json");
 
 const get_data_analytics = async (params) => {
 	try {
-		const crypto = await instance.get(
-			"https://s3.coinmarketcap.com/generated/core/crypto/app-search.json",
-			{
-				headers: {
-					"user-agent": "Dart/3.2 (dart:io)",
-					appversion: "4.63.1",
-					platform: "android",
-				},
-			}
-		);
+		const crypto = await instance.get("https://s3.coinmarketcap.com/generated/core/crypto/app-search.json", {
+			headers: {
+				"user-agent": "Dart/3.2 (dart:io)",
+				appversion: "4.63.1",
+				platform: "android",
+			},
+		});
 
 		function searchCryptoID(simbolo) {
 			const resultado = crypto.data.values.find((item) => item[2] === simbolo);
@@ -67,8 +64,7 @@ const get_data_analytics = async (params) => {
 			`https://www.coinbase.com/graphql/query?&operationName=useGetPriceChartDataQuery&extensions={"persistedQuery":{"version":1,"sha256Hash":"2f667e92bca631b26ec8179b1e484b24553daaaf690b94ef251fa4aed988ea34"}}&variables={"skip":false,"slug":"${cryptoName}","currency":"${params.symbol}"}`,
 			{
 				headers: {
-					"user-agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					"cb-client": "CoinbaseWeb",
 					"cb-version": "2021-01-11",
 					"content-type": "application/json",
@@ -81,17 +77,16 @@ const get_data_analytics = async (params) => {
 		);
 
 		function getCryptoBySymbol(symbol) {
-			return (
-				descriptions.cryptos.find(
-					(crypto) => crypto.symbol.toUpperCase() === symbol.toUpperCase()
-				) || { error: "Crypto not found" }
-			);
+			return descriptions.cryptos.find((crypto) => crypto.symbol.toUpperCase() === symbol.toUpperCase()) || { error: "Crypto not found" };
 		}
+
 		delete statistics.data.data.urls.message_board;
 		delete statistics.data.data.urls.explorer;
 		delete statistics.data.data.urls.announcement;
-		delete data.data.assetBySlug.id;
-		delete data.data.assetBySlug.latestPrice.id;
+		// delete data.data?.assetBySlug?.id;
+		// delete data.data.assetBySlug?.latestPrice.id;
+
+		console.log({ data: data, errors: data.errors });
 
 		return {
 			description: getCryptoBySymbol(params.network),

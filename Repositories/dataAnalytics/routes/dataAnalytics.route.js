@@ -3,14 +3,10 @@ const Controller = require("../controllers/dataAnalytics.controller");
 
 const Middleware = require("../middlewares/dataAnalytics.middleware");
 
-const base = "/data-analytics";
+const base = "/asset/:network/:symbol";
 
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.get(
-		`${PATH}`,
-		Middleware.validateAnalytics,
-		Controller.data_analytics
-	);
+	server.get(`${PATH}`, Middleware.validateAssetDetails, Controller.data_analytics);
 };

@@ -1,14 +1,14 @@
 const { string, validate } = require("../../../Core/JoiUtils");
 
 const schemas = {
-	validateAnalytics_: {
+	asset: {
 		network: string().required(),
 		symbol: string().required(),
 	},
 };
 
-const validateAnalytics = async (ctx, next) => {
-	const valid = validate(schemas.validateAnalytics_, ctx.request.query);
+const validateAssetDetails = async (ctx, next) => {
+	const valid = validate(schemas.asset, { ...ctx.params, ...ctx.request.query });
 
 	if (valid.error) {
 		ctx.status = 409;
@@ -22,5 +22,5 @@ const validateAnalytics = async (ctx, next) => {
 };
 
 module.exports = {
-	validateAnalytics,
+	validateAssetDetails,
 };
