@@ -26,7 +26,7 @@ const get_data_analytics = async (params) => {
 		const iDCrypto = searchCryptoID(params.network);
 
 		const statistics = await instance.get(
-			`https://api.coinmarketcap.com/aggr/v3.1/mobile/coin-detail?id=${iDCrypto}&langCode=es&convertId=${iDCrypto}`,
+			`https://api.coinmarketcap.com/aggr/v3.1/mobile/coin-detail?id=${iDCrypto}&langCode=en&convertId=${iDCrypto}`,
 			{
 				headers: {
 					"user-agent": "Dart/3.2 (dart:io)",
@@ -35,7 +35,7 @@ const get_data_analytics = async (params) => {
 				},
 			}
 		);
-
+		//console.log(statistics.data.data.description);
 		function getCryptoName(symbol) {
 			switch (symbol.toUpperCase()) {
 				case "BTC":
@@ -50,12 +50,162 @@ const get_data_analytics = async (params) => {
 					return "ripple";
 				case "DOGE":
 					return "dogecoin";
+				case "IP":
+					return "ip";
 				case "DOT":
 					return "polkadot";
-				case "POL":
+				case "MATIC":
 					return "polygon";
 				case "LTC":
-					return "Lltecoin";
+					return "litecoin";
+				case "BCH":
+					return "bitcoin cash";
+				case "BNB":
+					return "binance-coin";
+				case "XLM":
+					return "stellar";
+				case "TRX":
+					return "tron";
+				case "AVAX":
+					return "avalanche";
+				case "LINK":
+					return "chainlink";
+				case "ATOM":
+					return "cosmos";
+				case "ALGO":
+					return "algorand";
+				case "VET":
+					return "vechain";
+				case "FIL":
+					return "filecoin";
+				case "ICP":
+					return "internet-computer";
+				case "HBAR":
+					return "hedera";
+				case "QNT":
+					return "quant";
+				case "FTM":
+					return "fantom";
+				case "NEAR":
+					return "near-protocol";
+				case "GRT":
+					return "the graph";
+				case "EGLD":
+					return "elrond";
+				case "SAND":
+					return "the sandbox";
+				case "AXS":
+					return "axie infinity";
+				case "AAVE":
+					return "aave";
+				case "MKR":
+					return "maker";
+				case "ZEC":
+					return "zcash";
+				case "XMR":
+					return "monero";
+				case "IOTA":
+					return "iota";
+				case "KSM":
+					return "kusama";
+				case "XTZ":
+					return "tezos";
+				case "THETA":
+					return "theta";
+				case "ENJ":
+					return "enjin-coin";
+				case "RVN":
+					return "ravencoin";
+				case "CHZ":
+					return "chiliz";
+				case "FLOW":
+					return "flow";
+				case "ONE":
+					return "harmony";
+				case "BAT":
+					return "basic-attention-token";
+				case "STX":
+					return "stacks";
+				case "ZIL":
+					return "zilliqa";
+				case "ONT":
+					return "ontology";
+				case "WAVES":
+					return "waves";
+				case "AR":
+					return "arweave";
+				case "CELO":
+					return "celo";
+				case "GALA":
+					return "gala";
+				case "DASH":
+					return "dash";
+				case "COMP":
+					return "compound";
+				case "CRV":
+					return "curve-dao-token";
+				case "SNX":
+					return "synthetix";
+				case "YFI":
+					return "yearn.finance";
+				case "UMA":
+					return "uma";
+				case "DGB":
+					return "digibyte";
+				case "ICX":
+					return "icon";
+				case "OMG":
+					return "omg network";
+				case "BTT":
+					return "bittorrent";
+				case "SC":
+					return "siacoin";
+				case "ANKR":
+					return "ankr";
+				case "STORJ":
+					return "storj";
+				case "OCEAN":
+					return "ocean-protocol";
+				case "LRC":
+					return "loopring";
+				case "KNC":
+					return "kyber network";
+				case "SRM":
+					return "serum";
+				case "REN":
+					return "ren";
+				case "TRUMP":
+					return "official-trump";
+				case "REEF":
+					return "reef-finance";
+				case "BAND":
+					return "band-protocol";
+				case "FTT":
+					return "ftx-token";
+				case "RUNE":
+					return "thorchain";
+				case "CVC":
+					return "civic";
+				case "BAL":
+					return "balancer";
+				case "SUSHI":
+					return "sushiswap";
+				case "PAXG":
+					return "pax-gold";
+				case "RSR":
+					return "reserve rights";
+				case "AUDIO":
+					return "audius";
+				case "JST":
+					return "just";
+				case "HNT":
+					return "helium";
+				case "TWT":
+					return "trust-wallet-token";
+				case "DODO":
+					return "dodo";
+				case "KP3R":
+					return "keep3r";
 
 				default:
 					return "Criptomoneda no reconocida";
@@ -94,7 +244,7 @@ const get_data_analytics = async (params) => {
 		delete data.data.assetBySlug.latestPrice.id;
 
 		return {
-			description: getCryptoBySymbol(params.network),
+			description: statistics.data.data.description, //getCryptoBySymbol(params.network),
 			statistics: statistics.data.data.statistics,
 			urls: statistics.data.data.urls,
 			assetBySlug: data.data.assetBySlug,
