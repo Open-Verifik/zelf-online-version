@@ -7,14 +7,8 @@ const base = "/asset";
 
 module.exports = (server) => {
 	const PATH = config.basePath(base);
-	server.get(
-		`${PATH}/chart-data/:asset`,
-		Middleware.validateChart,
-		Controller.chart_data
-	);
-	server.get(
-		`${PATH}/:asset/:currency`,
-		//Middleware.validateAssetDetails,
-		Controller.data_analytics
-	);
+
+	// server.get(`${PATH}/chart/:asset`, Middleware.validateChart, Controller.chart_data);
+
+	server.get(`${PATH}/:asset/:currency`, Controller.data_analytics);
 };
