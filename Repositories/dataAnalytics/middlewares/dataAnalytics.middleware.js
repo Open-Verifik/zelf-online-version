@@ -1,14 +1,21 @@
-const { string, validate } = require("../../../Core/JoiUtils");
+const { randomBytes } = require("ethers");
+const { string, validate, rangeValidate } = require("../../../Core/JoiUtils");
 
 const schemas = {
 	asset: {
-		network: string().required(),
-		symbol: string().required(),
+		asset: string().required(),
+		currency: string().required(),
+	},
+	asset_chart_data: {
+		range: rangeValidate().required(),
 	},
 };
 
 const validateAssetDetails = async (ctx, next) => {
-	const valid = validate(schemas.asset, { ...ctx.params, ...ctx.request.query });
+	const valid = validate(schemas.asset, {
+		...ctx.params,
+		...ctx.request.query,
+	});
 
 	if (valid.error) {
 		ctx.status = 409;
@@ -20,7 +27,23 @@ const validateAssetDetails = async (ctx, next) => {
 
 	await next();
 };
+const validateChart = async (ctx, next) => {
+	const valid = validate(schemas.asset_chart_data, {
+		...ctx.params,
+		...ctx.query,
+	});
 
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	await next();
+};
 module.exports = {
 	validateAssetDetails,
+	validateChart,
 };

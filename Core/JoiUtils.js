@@ -3,6 +3,8 @@ const Joi = require("joi").extend(JoiDate);
 
 const recordShow = ["10", "25", "50", "100"];
 
+const range = ["1h", "1y", "24h", "30d", "60d", "7d", "90d", "all"];
+
 const crypto = ["ETH", "SOL", "BTC", "CB"];
 
 const zelfNameDuration = ["1"]; //, "2", "3", "4", "5", "lifetime"
@@ -100,6 +102,11 @@ const showRecords = () =>
 		.valid(...recordShow)
 		.error(_customErrors);
 
+const rangeValidate = () =>
+	Joi.string()
+		.valid(...range)
+		.error(_customErrors);
+
 const stringEnum = (enumArray) =>
 	Joi.string()
 		.valid(...enumArray)
@@ -187,4 +194,5 @@ module.exports = {
 	jsonObjectWithMinKeys,
 	zelfNameDuration_,
 	crypto_,
+	rangeValidate,
 };
