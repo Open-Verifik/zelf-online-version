@@ -87,13 +87,40 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	// Adjust price for development environment
 	price = config.env === "development" ? price / 30 : price;
 
-	if (referralZelfName && config.token.whitelist.includes(referralZelfName)) return 0;
+	let discount = 0;
+	let discountType = "amount";
+
+	const whitelist = config.token.whitelist || "";
+
+	if (whitelist.length && referralZelfName && whitelist.includes(referralZelfName)) {
+		// calculate the discount for the referral it's a string that we need to separate by commas "zelfmedellin.zelf:24$,zelfbogota.zelf:25%"
+		// format is the following {{zelfname:amount:type}} - type can be percentage or fixed amount
+		const referralDiscounts = config.token.whitelist.split(",");
+
+		const referralDiscount = referralDiscounts.find((discount) => discount.includes(`${referralZelfName}.zelf`));
+
+		if (referralDiscount) {
+			const [zelfName, amount] = referralDiscount.split(":");
+
+			if (amount.includes("%")) {
+				discountType = "percentage";
+				discount = parseInt(amount);
+				price = price - price * (discount / 100);
+			} else {
+				discount = parseInt(amount);
+				discountType = "amount";
+				price = price - discount;
+			}
+		}
+	}
 
 	// Round up to 2 decimal places
 	return {
-		price: Math.ceil(price * 100) / 100,
+		price: Math.max(Math.ceil(price * 100) / 100, 0),
 		currency: "USD",
-		reward: Math.ceil((price / config.token.rewardPrice) * 100) / 100,
+		reward: Math.max(Math.ceil((price / config.token.rewardPrice) * 100) / 100, 0),
+		discount,
+		discountType,
 	};
 };
 
@@ -291,6 +318,11 @@ const _formatArweaveSearchResult = async (transactionRecord) => {
 
 	zelfNameObject.zelfName = zelfNameTag.value;
 
+	const { discount, discountType } = _calculateZelfNamePrice(15, 1, zelfNameObject.zelfName.split(".zelf")[0]);
+
+	zelfNameObject.publicData.discount = discount;
+	zelfNameObject.publicData.discountType = discountType;
+
 	zelfNameObject.zelfProofQRCode = await _arweaveIDToBase64(zelfNameObject.id);
 
 	return zelfNameObject;
@@ -305,6 +337,13 @@ const _formatIPFSSearchResult = async (ipfsRecord, foundInArweave) => {
 		},
 		zelfName: ipfsRecord.metadata.name,
 	};
+
+	const zelfNameWithoutExtension = ipfsRecord.metadata.name.split(".zelf")[0];
+
+	const { price, reward, discount, discountType } = _calculateZelfNamePrice(15, 1, zelfNameWithoutExtension);
+
+	zelfNameObject.publicData.discount = discount;
+	zelfNameObject.publicData.discountType = discountType;
 
 	if (zelfNameObject.publicData.payment) {
 		const payment = JSON.parse(zelfNameObject.publicData.payment);

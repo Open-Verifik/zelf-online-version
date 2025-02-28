@@ -155,7 +155,7 @@ const leaseValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(`${zelfName}`);
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
+	const captchaScore = config.google.captchaApproval || (await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt));
 
 	if (captchaScore < 0.79) {
 		_consoleLogSuspicious(ctx, captchaScore, zelfName);
