@@ -481,7 +481,7 @@ const leaseZelfName = async (params, authUser) => {
 			{
 				network: "coinbase",
 				coin: "coinbase",
-				zelfName,
+				zelfName: zelfName.endsWith(".hold") ? zelfName : `${zelfName}.hold`,
 			},
 			authUser
 		);
