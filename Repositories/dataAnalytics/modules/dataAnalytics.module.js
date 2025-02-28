@@ -82,7 +82,7 @@ const _getBinanceInstance = () => {
 	}
 
 	_binanceInstance = axios.create({
-		baseURL: "https://api.binance.com/api",
+		baseURL: "https://api.binance.us/api",
 		timeout: 15000,
 	});
 
