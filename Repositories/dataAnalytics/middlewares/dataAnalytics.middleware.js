@@ -1,5 +1,4 @@
-const { randomBytes } = require("ethers");
-const { string, validate, rangeValidate } = require("../../../Core/JoiUtils");
+const { string, validate, stringEnum } = require("../../../Core/JoiUtils");
 
 const schemas = {
 	asset: {
@@ -7,7 +6,7 @@ const schemas = {
 		currency: string().required(),
 	},
 	asset_chart_data: {
-		range: rangeValidate().required(),
+		interval: stringEnum(["1m", "1h", "4h", "8h", "1d", "7d", "30d", "90d", "180d", "365d"]).required(),
 	},
 };
 
@@ -35,9 +34,7 @@ const validateChart = async (ctx, next) => {
 
 	if (valid.error) {
 		ctx.status = 409;
-
 		ctx.body = { validationError: valid.error.message };
-
 		return;
 	}
 

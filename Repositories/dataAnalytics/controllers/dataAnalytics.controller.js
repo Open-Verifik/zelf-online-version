@@ -1,15 +1,8 @@
 const Module = require("../modules/dataAnalytics.module");
-const HttpHandler = require("../../../Core/http-handler");
 
 const data_analytics = async (ctx) => {
 	try {
-		const data = await Module.get_data_analytics(
-			{
-				asset: ctx.params.asset,
-				currency: ctx.params.currency,
-			},
-			{ langCode: ctx.query.langCode }
-		);
+		const data = await Module.getAssetDetails({ ...ctx.params, ...ctx.query });
 
 		ctx.body = { data };
 	} catch (error) {
@@ -22,11 +15,8 @@ const data_analytics = async (ctx) => {
 };
 
 const chart_data = async (ctx) => {
-	const asset = ctx.params.asset;
-	const range = ctx.query.range;
-
 	try {
-		const data = await Module.get_chart_data(asset, range);
+		const data = await Module.getChart({ ...ctx.params, ...ctx.query });
 
 		ctx.body = { data };
 	} catch (error) {
