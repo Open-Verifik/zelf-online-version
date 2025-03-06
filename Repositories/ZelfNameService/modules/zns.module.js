@@ -569,8 +569,8 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 const _createReceivingWallets = async (zelfNameObject, authUser) => {
 	if (zelfNameObject.price === 0) {
 		return {
-			ipfs: [],
-			arweave: [],
+			ipfsRecord: null,
+			arweaveRecord: null,
 		};
 	}
 
