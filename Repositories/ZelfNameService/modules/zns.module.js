@@ -630,9 +630,7 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
 			...dataToEncrypt.publicData,
 			zelfName: paymentName,
 			type: "mainnet",
-			expiresAt: moment()
-				.add(zelfNameObject.publicData.duration || 1, "year")
-				.format("YYYY-MM-DD HH:mm:ss"),
+			expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
 		},
 	});
 
@@ -885,7 +883,7 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
 };
 
 const _validateReferral = async (referralZelfName, authUser) => {
-	if (!referralZelfName) return;
+	if (!referralZelfName) return null;
 
 	const searchResult = await searchZelfName(
 		{
@@ -1056,7 +1054,7 @@ const decryptZelfName = async (params, authUser) => {
 };
 
 const leaseOffline = async (params, authUser) => {
-	const { zelfName, duration, zelfProof, zelfProofQRCode } = params;
+	const { zelfName, duration, zelfProof, zelfProofQRCode, referralZelfName } = params;
 
 	let mainnetRecord = null;
 	let holdRecord = null;
@@ -1086,15 +1084,16 @@ const leaseOffline = async (params, authUser) => {
 
 	const { price, reward } = _calculateZelfNamePrice(zelfName.length - 5, duration);
 
+	if (!_preview) _preview = await preview({ zelfProof });
+
 	const zelfNameObject = {
-		zelfName: `${zelfName}.hold`,
+		zelfName,
 		zelfProof,
 		image: zelfProofQRCode,
+		hasPassword: _preview.passwordLayer === "WithPassword" ? "true" : "false",
 		price,
 		reward,
 	};
-
-	if (!_preview) _preview = await preview({ zelfProof: zelfNameObject.zelfProof });
 
 	if (!zelfName.includes(_preview.publicData.zelfName)) {
 		const error = new Error("zelfName_does_not_match_in_zelfProof");
@@ -1112,52 +1111,33 @@ const leaseOffline = async (params, authUser) => {
 		return {
 			existed: true,
 			...holdRecord,
+			hasPassword: Boolean(_preview.passwordLayer === "WithPassword"),
 			zelfName,
 			preview: _preview,
 		};
 
-	const coinbasePayload = {
-		name: `${zelfName}`,
-		description: `Purchase of the Zelf Name > ${zelfName} for $${zelfNameObject.price}`,
-		pricing_type: "fixed_price",
-		local_price: {
-			amount: `${zelfNameObject.price}`,
-			currency: "USD",
-		},
-		metadata: {
-			zelfName,
-			ethAddress: _preview.publicData.ethAddress,
-			btcAddress: _preview.publicData.btcAddress,
-			solanaAddress: _preview.publicData.solanaAddress,
-		},
-		redirect_url: "https://name.zelf.world/#/coinbase-success",
-		cancel_url: "https://name.zelf.world/#/coinbase-cancel",
-	};
+	const referralZelfNameObject = await _validateReferral(referralZelfName, authUser);
 
-	zelfNameObject.coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
+	await _createPaymentCharge(zelfNameObject, { referralZelfName, referralZelfNameObject }, authUser);
 
-	zelfNameObject.ipfs = await IPFSModule.insert(
-		{
-			base64: zelfNameObject.image,
-			name: zelfNameObject.zelfName,
-			metadata: {
-				zelfProof: zelfNameObject.zelfProof,
-				zelfName: zelfNameObject.zelfName,
-				duration: duration || 1,
-				price: zelfNameObject.price,
-				expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
-				type: "hold",
-				coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
-				coinbase_expires_at: zelfNameObject.coinbaseCharge.expires_at,
+	return {
+		...zelfNameObject,
+		hasPassword: Boolean(_preview.passwordLayer === "WithPassword"),
+		durationToken: jwt.sign(
+			{
+				zelfName,
+				exp: moment().add(12, "hour").unix(),
 			},
-			pinIt: true,
-		},
-		{ ...authUser, pro: true }
-	);
-
-	return zelfNameObject;
+			config.JWT_SECRET
+		),
+	};
 };
 
+/**
+ * update zelfName
+ * @param {Object} params
+ * @param {Object} authUser
+ */
 const update = async (params, authUser) => {
 	const { duration } = params;
 	const { zelfName } = authUser;
