@@ -484,6 +484,8 @@ const leaseZelfName = async (params, authUser) => {
 
 	await _createPaymentCharge(zelfNameObject, { referralZelfName, referralZelfNameObject }, authUser);
 
+	console.log({ discount, discountType, whitelist, referralZelfName, price: zelfNameObject.price });
+
 	if (zelfNameObject.price === 0) {
 		zelfNameObject.confirmation = await _confirmZelfNamePurchase({
 			...zelfNameObject,
