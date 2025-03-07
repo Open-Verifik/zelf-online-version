@@ -1087,7 +1087,7 @@ const leaseOffline = async (params, authUser) => {
 
 	const _zelfProof = holdRecord?.publicData?.zelfProof || mainnetRecord?.publicData?.zelfProof;
 
-	if (zelfNameRecords.length === 2 || mainnetRecord) {
+	if (mainnetRecord) {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
 		throw error;
@@ -1095,7 +1095,7 @@ const leaseOffline = async (params, authUser) => {
 
 	let _preview = holdRecord?.preview || mainnetRecord?.preview;
 
-	const { price, reward } = _calculateZelfNamePrice(zelfName.length - 5, duration);
+	const { price, reward, priceWithoutDiscount } = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
 
 	if (!_preview) _preview = await preview({ zelfProof });
 
