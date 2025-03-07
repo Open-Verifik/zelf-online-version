@@ -255,7 +255,7 @@ const checkoutSOLANA = async (address) => {
 
 		return balance;
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 	}
 };
 

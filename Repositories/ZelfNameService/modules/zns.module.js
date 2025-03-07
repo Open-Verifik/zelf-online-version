@@ -674,7 +674,6 @@ const leaseConfirmation = async (data, authUser) => {
 	}
 
 	if (!zelfNameRecords.length) {
-		console.log({ zelfName });
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
 		throw error;
