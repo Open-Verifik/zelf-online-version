@@ -503,6 +503,8 @@ const leaseZelfName = async (params, authUser) => {
 		zelfNameObject.ipfs = Array.isArray(zelfNameObject.confirmation.ipfs)
 			? zelfNameObject.confirmation.ipfs[0]
 			: zelfNameObject.confirmation.ipfs;
+
+		console.log({ confirmation: zelfNameObject.confirmation });
 	}
 
 	return {
