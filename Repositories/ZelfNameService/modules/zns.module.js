@@ -735,8 +735,6 @@ const leaseConfirmation = async (data, authUser) => {
  * @returns {Object} - Returns the referral reward and the cloned Zelf Name records
  */
 const _confirmZelfNamePurchase = async (zelfNameObject) => {
-	await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
-
 	const { masterIPFSRecord, masterArweaveRecord, reward } = await _cloneZelfNameToProduction(zelfNameObject);
 
 	return {
@@ -810,13 +808,15 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 
 	payload.metadata.expiresAt = expiresAt;
 
-	const masterIPFSRecord = await IPFSModule.insert(payload, { pro: true });
-
 	const masterArweaveRecord = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
 		hasPassword: payload.metadata.hasPassword,
 		zelfProof: payload.metadata.zelfProof,
 		publicData: payload.metadata,
 	});
+
+	await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
+
+	const masterIPFSRecord = await IPFSModule.insert(payload, { pro: true });
 
 	let reward;
 
