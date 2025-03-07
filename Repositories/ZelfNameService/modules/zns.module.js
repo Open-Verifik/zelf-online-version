@@ -82,6 +82,7 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	// Adjust price for development environment
 	price = config.env === "development" ? price / 30 : price;
 
+	const priceWithoutDiscount = Number(price);
 	let discount = 10;
 	let discountType = "percentage";
 
@@ -110,6 +111,8 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 				price = price - discount;
 			}
 		}
+	} else if (referralZelfName) {
+		price = price - price * 0.1;
 	}
 
 	// Round up to 2 decimal places
@@ -118,6 +121,7 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 		currency: "USD",
 		reward: Math.max(Math.ceil((price / config.token.rewardPrice) * 100) / 100, 0),
 		discount,
+		priceWithoutDiscount,
 		discountType,
 		whitelist,
 	};
@@ -454,7 +458,11 @@ const leaseZelfName = async (params, authUser) => {
 
 	zelfNameObject.zelfName = zelfName;
 
-	const { price, reward, discount, discountType, whitelist } = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
+	const { price, priceWithoutDiscount, reward, discount, discountType, whitelist } = _calculateZelfNamePrice(
+		zelfName.length - 5,
+		duration,
+		referralZelfName
+	);
 
 	zelfNameObject.price = price;
 	zelfNameObject.reward = reward;
@@ -477,14 +485,20 @@ const leaseZelfName = async (params, authUser) => {
 	await _createPaymentCharge(zelfNameObject, { referralZelfName, referralZelfNameObject }, authUser);
 
 	if (zelfNameObject.price === 0) {
-		zelfNameObject.confirmation = await leaseConfirmation(
-			{
-				network: "coinbase",
-				coin: "coinbase",
-				zelfName: zelfName.endsWith(".hold") ? zelfName : `${zelfName}.hold`,
+		zelfNameObject.confirmation = await _confirmZelfNamePurchase({
+			...zelfNameObject,
+			ipfs_pin_hash: zelfNameObject.ipfs.IpfsHash,
+			publicData: {
+				...zelfNameObject.publicData,
+				price: priceWithoutDiscount,
+				referralZelfName,
+				referralSolanaAddress: referralZelfNameObject?.publicData?.solanaAddress || referralZelfNameObject?.metadata?.solanaAddress,
+				zelfProof: zelfNameObject.zelfProof,
+				...dataToEncrypt.publicData,
 			},
-			authUser
-		);
+			zelfProofQRCode: zelfNameObject.image,
+			preview: { publicData: dataToEncrypt.publicData },
+		});
 
 		zelfNameObject.ipfs = Array.isArray(zelfNameObject.confirmation.ipfs)
 			? zelfNameObject.confirmation.ipfs[0]

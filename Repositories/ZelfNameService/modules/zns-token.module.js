@@ -142,7 +142,6 @@ const addReferralReward = async (zelfNameObject) => {
 		return referralReward;
 	} catch (error) {
 		console.error("Error adding purchase:", error);
-		throw error; // Re-throw for higher-level error handling if needed
 	}
 };
 
