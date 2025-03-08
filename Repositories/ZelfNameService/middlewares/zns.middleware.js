@@ -19,7 +19,7 @@ const schemas = {
 	leaseConfirmation: {
 		zelfName: string().required(),
 		coin: string().required(),
-		network: string().required(),
+		network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC"]).required(),
 	},
 	lease: {
 		zelfName: string().required(),

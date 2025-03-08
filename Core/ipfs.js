@@ -102,10 +102,11 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 		return {
 			url: `https://${pinataGateway}/ipfs/${uploadResponse.IpfsHash}`,
 			...uploadResponse,
+			Keyvalues: undefined,
 			pinned: true,
 			web3: true,
 			name: filename,
-			metadata,
+			metadata: uploadResponse.Keyvalues,
 		};
 	} catch (error) {
 		console.error(error);

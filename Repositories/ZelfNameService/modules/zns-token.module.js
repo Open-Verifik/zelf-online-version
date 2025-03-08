@@ -7,7 +7,7 @@ const MongoORM = require("../../../Core/mongo-orm");
 
 let connection;
 (async () => {
-	const url = `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}`;
+	const url = `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}/`;
 
 	connection = new solanaWeb3.Connection(url);
 	await connection.getSlot();
@@ -142,7 +142,6 @@ const addReferralReward = async (zelfNameObject) => {
 		return referralReward;
 	} catch (error) {
 		console.error("Error adding purchase:", error);
-		throw error; // Re-throw for higher-level error handling if needed
 	}
 };
 

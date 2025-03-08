@@ -1,0 +1,29 @@
+{
+	"cryptos": [
+		{
+			"symbol": "BTC",
+			"name": "Bitcoin",
+			"description": "Bitcoin is the first cryptocurrency and a decentralized digital asset designed as an alternative to traditional money. It operates on a secure blockchain network that enables transactions without intermediaries. Its supply is limited to 21 million coins, reinforcing its value as a digital store of wealth."
+		},
+		{
+			"symbol": "ETH",
+			"name": "Ethereum",
+			"description": "Ethereum is a decentralized platform that enables the creation of smart contracts and applications without intermediaries. Launched in 2015 by Vitalik Buterin, its network is the foundation for most DeFi and NFT projects. With the transition to Ethereum 2.0, it aims to improve scalability and reduce energy consumption."
+		},
+		{
+			"symbol": "BNB",
+			"name": "Binance Coin",
+			"description": "Binance Coin started as a utility token within the Binance exchange, but its use has expanded with the Binance Smart Chain (BSC), an efficient and low-cost blockchain compatible with Ethereum."
+		},
+		{
+			"symbol": "SOL",
+			"name": "Solana",
+			"description": "Solana is a high-performance blockchain that offers fast and cost-effective transactions. Launched in 2020 by the Solana Foundation, its architecture is designed to support large-scale decentralized applications and DeFi projects."
+		},
+		{
+			"symbol": "XRP",
+			"name": "XRP",
+			"description": "XRP is a digital asset created by Ripple Labs to facilitate fast and low-cost international payments. Unlike other cryptocurrencies, its network does not rely on mining, allowing for shorter settlement times and greater energy efficiency."
+		}
+	]
+}
