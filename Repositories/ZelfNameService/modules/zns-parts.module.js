@@ -48,21 +48,48 @@ const calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 		throw new Error("Invalid name length. Length must be between 1 and 27.");
 	}
 
-	// Apply 10% discount if referralZelfName is provided
-	if (referralZelfName) {
-		price = price - price * 0.1; // Subtract 10% from the price
-	}
-
 	// Adjust price for development environment
 	price = config.env === "development" ? price / 30 : price;
 
-	if (referralZelfName && config.token.whitelist.includes(referralZelfName)) return 0;
+	const priceWithoutDiscount = Number(price);
+	let discount = 10;
+	let discountType = "percentage";
+
+	const whitelist = config.token.whitelist || "";
+
+	if (whitelist.length && referralZelfName && whitelist.includes(referralZelfName)) {
+		const referralDiscounts = config.token.whitelist.split(",");
+
+		const referralDiscount = referralDiscounts.find((discount) => {
+			const [name] = discount.split(":");
+			return name === referralZelfName || name === `${referralZelfName}.zelf`;
+		});
+
+		if (referralDiscount) {
+			const [zelfName, amount] = referralDiscount.split(":");
+
+			if (amount.includes("%")) {
+				discountType = "percentage";
+				discount = parseInt(amount);
+				price = price - price * (discount / 100);
+			} else {
+				discount = parseInt(amount);
+				discountType = "amount";
+				price = price - discount;
+			}
+		}
+	} else if (referralZelfName) {
+		price = price - price * 0.1;
+	}
 
 	// Round up to 2 decimal places
 	return {
-		price: Math.ceil(price * 100) / 100,
+		price: Math.max(Math.ceil(price * 100) / 100, 0),
 		currency: "USD",
-		reward: Math.ceil((price / config.token.rewardPrice) * 100) / 100,
+		reward: Math.max(Math.ceil((price / config.token.rewardPrice) * 100) / 100, 0),
+		discount,
+		priceWithoutDiscount,
+		discountType,
 	};
 };
 

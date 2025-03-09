@@ -61,72 +61,6 @@ const zelfNamePricing = {
 };
 
 /**
- * Get Zelf Name price based on name length and duration
- * @param {number} length - The length of the Zelf name
- * @param {string} duration - Duration ("1", "2", "3", "4", "5", "lifetime")
- * @returns {number} - Price of the Zelf name
- */
-const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
-	if (!["1", "2", "3", "4", "5", "lifetime"].includes(`${duration}`))
-		throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
-
-	let price = 24;
-
-	if (length >= 6 && length <= 15) {
-		price = zelfNamePricing["6-15"][duration];
-	} else if (zelfNamePricing[length]) {
-		price = zelfNamePricing[length][duration];
-	} else {
-		throw new Error("Invalid name length. Length must be between 1 and 27.");
-	}
-
-	// Adjust price for development environment
-	price = config.env === "development" ? price / 30 : price;
-
-	const priceWithoutDiscount = Number(price);
-	let discount = 10;
-	let discountType = "percentage";
-
-	const whitelist = config.token.whitelist || "";
-
-	if (whitelist.length && referralZelfName && whitelist.includes(referralZelfName)) {
-		const referralDiscounts = config.token.whitelist.split(",");
-
-		const referralDiscount = referralDiscounts.find((discount) => {
-			const [name] = discount.split(":");
-			return name === referralZelfName || name === `${referralZelfName}.zelf`;
-		});
-
-		if (referralDiscount) {
-			const [zelfName, amount] = referralDiscount.split(":");
-
-			if (amount.includes("%")) {
-				discountType = "percentage";
-				discount = parseInt(amount);
-				price = price - price * (discount / 100);
-			} else {
-				discount = parseInt(amount);
-				discountType = "amount";
-				price = price - discount;
-			}
-		}
-	} else if (referralZelfName) {
-		price = price - price * 0.1;
-	}
-
-	// Round up to 2 decimal places
-	return {
-		price: Math.max(Math.ceil(price * 100) / 100, 0),
-		currency: "USD",
-		reward: Math.max(Math.ceil((price / config.token.rewardPrice) * 100) / 100, 0),
-		discount,
-		priceWithoutDiscount,
-		discountType,
-		whitelist,
-	};
-};
-
-/**
  *
  * @param {*} params
  * @param {*} authUser
@@ -243,7 +177,7 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 	const zelfName = query.value || query.zelfName;
 
 	const { price, reward } = zelfName.includes(".zelf")
-		? _calculateZelfNamePrice(zelfName.split(".zelf")[0].length, query.duration)
+		? ZNSPartsModule.calculateZelfNamePrice(zelfName.split(".zelf")[0].length, query.duration)
 		: { price: 0, reward: 0 };
 
 	try {
@@ -322,7 +256,7 @@ const _formatArweaveSearchResult = async (transactionRecord) => {
 
 	zelfNameObject.zelfName = zelfNameTag.value;
 
-	const { discount, discountType } = _calculateZelfNamePrice(15, 1, zelfNameObject.zelfName.split(".zelf")[0]);
+	const { discount, discountType } = ZNSPartsModule.calculateZelfNamePrice(15, 1, zelfNameObject.zelfName.split(".zelf")[0]);
 
 	zelfNameObject.publicData.discount = discount;
 	zelfNameObject.publicData.discountType = discountType;
@@ -402,7 +336,7 @@ const leaseZelfName = async (params, authUser) => {
 
 	zelfNameObject.zelfName = zelfName;
 
-	const { price, priceWithoutDiscount, reward, discount, discountType, whitelist } = _calculateZelfNamePrice(
+	const { price, priceWithoutDiscount, reward, discount, discountType } = ZNSPartsModule.calculateZelfNamePrice(
 		zelfName.length - 5,
 		duration,
 		referralZelfName
@@ -683,7 +617,7 @@ const _confirmZelfNamePurchase = async (zelfNameObject) => {
 
 	return {
 		ipfs: [masterIPFSRecord],
-		arweave: [masterArweaveRecord],
+		arweave: masterArweaveRecord,
 		reward,
 	};
 };
@@ -1039,7 +973,7 @@ const leaseOffline = async (params, authUser) => {
 
 	let _preview = holdRecord?.preview || mainnetRecord?.preview;
 
-	const { price, reward, priceWithoutDiscount } = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
+	const { price, reward, priceWithoutDiscount } = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
 
 	if (!_preview) _preview = await preview({ zelfProof });
 
@@ -1124,7 +1058,11 @@ const update = async (params, authUser) => {
 
 	const { ipfs_pin_hash, publicData } = holdRecord;
 
-	const { price } = _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration, holdRecord.publicData.referralZelfName);
+	const { price } = ZNSPartsModule.calculateZelfNamePrice(
+		holdRecord.zelfName.split(".zelf")[0].length,
+		duration,
+		holdRecord.publicData.referralZelfName
+	);
 
 	holdRecord.price = price;
 
@@ -1173,7 +1111,6 @@ module.exports = {
 	previewZelfName,
 	previewZelfProof,
 	decryptZelfName,
-	_calculateZelfNamePrice,
 	_confirmCoinbaseCharge,
 	leaseOffline,
 	saveInProduction: _cloneZelfNameToProduction,

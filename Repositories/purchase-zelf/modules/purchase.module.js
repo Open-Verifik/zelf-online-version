@@ -3,7 +3,8 @@ const { getTickerPrice } = require("../../binance/modules/binance.module");
 const Mailgun = require("../../../Core/mailgun");
 const Model = require("../../Subscribers/models/subscriber.model");
 const MongoORM = require("../../../Core/mongo-orm");
-const { searchZelfName, _calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns.module");
+const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
+const { calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns-parts.module");
 
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 
@@ -274,8 +275,9 @@ const checkoutBICOIN = async (address) => {
 const getReceiptEmail = async (body) => {
 	const { zelfName, transactionDate, price, expires, year, email } = body;
 
-	const subtotal = _calculateZelfNamePrice(zelfName.split(".zelf")[0].length, year);
-	const discount = Math.round((subtotal - price) * 100) / 100;
+	const subtotal = calculateZelfNamePrice(zelfName.split(".zelf")[0].length, year);
+
+	const discount = Math.round((subtotal.price - price) * 100) / 100;
 
 	const formatDate = (date) =>
 		new Intl.DateTimeFormat("en-US", {

@@ -1,12 +1,11 @@
 const moment = require("moment");
-const axios = require("axios");
 const SessionModule = require("../../Session/modules/session.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const ZNSPartsModule = require("./zns-parts.module");
 const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
-const { createEthWallet, generatePublicKey } = require("../../Wallet/modules/eth");
+const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
@@ -110,6 +109,8 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 		zelfProof: zelfNameObject.zelfProof,
 		zelfName: zelfNameObject.zelfName,
 		hasPassword: zelfNameObject.hasPassword,
+		ethAddress: zelfNameObject.ethAddress,
+		btcAddress: zelfNameObject.btcAddress,
 		payment: {
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
@@ -148,11 +149,11 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 
 	zelfNameObject.publicData = Object.assign(zelfNameObject.publicData, zelfNameObject.ipfs.publicData);
 
-	// zelfNameObject.arweave = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
-	// 	hasPassword: payload.metadata.hasPassword,
-	// 	zelfProof: payload.metadata.zelfProof,
-	// 	publicData: payload.metadata,
-	// });
+	zelfNameObject.arweave = await ArweaveModule.zelfNameRegistration(zelfNameObject.image, {
+		hasPassword: metadata.hasPassword,
+		zelfProof: metadata.zelfProof,
+		publicData: metadata,
+	});
 
 	// create undername
 	// zelfNameObject.undername = await createUnderName({
@@ -413,8 +414,6 @@ const _validateReferral = async (referralZelfName, authUser) => {
 		},
 		authUser
 	);
-
-	console.log({ searchResult });
 
 	let notFound = Boolean(searchResult.available);
 
