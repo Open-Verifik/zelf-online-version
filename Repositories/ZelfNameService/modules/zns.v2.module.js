@@ -56,10 +56,16 @@ const leaseZelfName = async (params, authUser) => {
 
 	zelfNameObject.zelfName = zelfName;
 
-	const { price, reward } = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
+	const { price, reward, priceWithoutDiscount, discount, discountType } = ZNSPartsModule.calculateZelfNamePrice(
+		zelfName.length - 5,
+		duration,
+		referralZelfName
+	);
 
 	zelfNameObject.price = price;
 	zelfNameObject.reward = reward;
+	zelfNameObject.discount = discount;
+	zelfNameObject.discountType = discountType;
 	zelfNameObject.publicData = dataToEncrypt.publicData;
 	zelfNameObject.ethAddress = eth.address;
 	zelfNameObject.btcAddress = btc.address;
@@ -79,7 +85,11 @@ const leaseZelfName = async (params, authUser) => {
 		password
 	);
 
-	await _saveHoldZelfNameInIPFS(zelfNameObject, referralZelfNameObject, password, authUser);
+	if (zelfNameObject.price === 0) {
+		await _confirmFreeZelfName(zelfNameObject, referralZelfNameObject, authUser);
+	} else {
+		await _saveHoldZelfNameInIPFS(zelfNameObject, referralZelfNameObject, password, authUser);
+	}
 
 	return {
 		...zelfNameObject,
@@ -93,6 +103,63 @@ const leaseZelfName = async (params, authUser) => {
 			config.JWT_SECRET
 		),
 	};
+};
+
+const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, authUser) => {
+	const metadata = {
+		zelfProof: zelfNameObject.zelfProof,
+		zelfName: zelfNameObject.zelfName,
+		hasPassword: zelfNameObject.hasPassword,
+		payment: {
+			price: zelfNameObject.price,
+			duration: zelfNameObject.duration || 1,
+		},
+		addresses: {
+			ethAddress: zelfNameObject.ethAddress,
+			btcAddress: zelfNameObject.btcAddress,
+			solanaAddress: zelfNameObject.solanaAddress,
+		},
+		expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
+		type: "mainnet",
+	};
+
+	if (referralZelfNameObject) {
+		metadata.payment.referralZelfName = referralZelfNameObject.publicData?.zelfName || referralZelfNameObject.metadata?.zelfName;
+
+		metadata.payment.referralSolanaAddress = referralZelfNameObject.publicData?.solanaAddress || referralZelfNameObject.metadata?.solanaAddress;
+	}
+
+	metadata.payment = JSON.stringify(metadata.payment);
+	metadata.addresses = JSON.stringify(metadata.addresses);
+
+	zelfNameObject.ipfs = await IPFSModule.insert(
+		{
+			base64: zelfNameObject.image,
+			name: zelfNameObject.zelfName,
+			metadata,
+			pinIt: true,
+		},
+		{ ...authUser, pro: true }
+	);
+
+	zelfNameObject.ipfs = await ZNSPartsModule.formatIPFSRecord(zelfNameObject.ipfs, true);
+
+	delete zelfNameObject.ipfs.publicData.zelfProof;
+
+	zelfNameObject.publicData = Object.assign(zelfNameObject.publicData, zelfNameObject.ipfs.publicData);
+
+	// zelfNameObject.arweave = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
+	// 	hasPassword: payload.metadata.hasPassword,
+	// 	zelfProof: payload.metadata.zelfProof,
+	// 	publicData: payload.metadata,
+	// });
+
+	// create undername
+	// zelfNameObject.undername = await createUnderName({
+	// 	parentName: "zelf",
+	// 	undername: zelfNameObject.zelfName,
+	// 	publicData: zelfNameObject.publicData,
+	// });
 };
 
 const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, password, authUser) => {

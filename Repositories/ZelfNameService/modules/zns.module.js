@@ -90,8 +90,6 @@ const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	const whitelist = config.token.whitelist || "";
 
 	if (whitelist.length && referralZelfName && whitelist.includes(referralZelfName)) {
-		// calculate the discount for the referral it's a string that we need to separate by commas "zelfmedellin.zelf:24$,zelfbogota.zelf:25%"
-		// format is the following {{zelfname:amount:type}} - type can be percentage or fixed amount
 		const referralDiscounts = config.token.whitelist.split(",");
 
 		const referralDiscount = referralDiscounts.find((discount) => {
