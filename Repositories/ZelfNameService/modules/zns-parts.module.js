@@ -125,6 +125,8 @@ const formatArweaveSearchResult = async (transactionRecord) => {
 		zelfNameObject.publicData[tag.name] = tag.value;
 	}
 
+	if (zelfNameObject.publicData.leaseExpiresAt) zelfNameObject.publicData.expiresAt = zelfNameObject.publicData.leaseExpiresAt;
+
 	const zelfProofTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfProof");
 
 	const zelfNameTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfName");
@@ -186,6 +188,8 @@ const formatIPFSRecord = async (ipfsRecord, foundInArweave) => {
 
 		delete zelfNameObject.publicData.addresses;
 	}
+
+	if (zelfNameObject.publicData.leaseExpiresAt) zelfNameObject.publicData.expiresAt = zelfNameObject.publicData.leaseExpiresAt;
 
 	if (!foundInArweave) {
 		zelfNameObject.zelfProof = zelfNameObject.publicData.zelfProof;
