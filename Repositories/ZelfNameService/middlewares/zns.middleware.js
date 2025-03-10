@@ -88,6 +88,8 @@ const getValidation = async (ctx, next) => {
 		return;
 	}
 
+	if (payload.zelfName) payload.zelfName = payload.zelfName.toLowerCase();
+
 	const { zelfName, key, value, captchaToken, os } = payload;
 
 	if (!zelfName && (!key || !value)) {
@@ -130,6 +132,8 @@ const leaseValidation = async (ctx, next) => {
 
 		return;
 	}
+
+	ctx.request.body.zelfName = ctx.request.body.zelfName.toLowerCase();
 
 	const { type, zelfName, captchaToken, os, skipIt } = ctx.request.body;
 
@@ -316,6 +320,8 @@ const decryptValidation = async (ctx, next) => {
 
 		return;
 	}
+
+	ctx.request.body.zelfName = ctx.request.body.zelfName.toLowerCase();
 
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
