@@ -313,7 +313,9 @@ const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, au
 const _searchInIPFS = async (environment = "both", query, authUser, foundInArweave) => {
 	const zelfName = query.value || query.zelfName;
 
-	const { price, reward } = ZNSPartsModule.calculateZelfNamePrice(zelfName.split(".zelf")[0].length, query.duration);
+	const { price, reward } = zelfName.includes(".zelf")
+		? ZNSPartsModule.calculateZelfNamePrice(zelfName.split(".zelf")[0].length, query.duration)
+		: { price: 0, reward: 0 };
 
 	try {
 		let ipfsRecords = [];

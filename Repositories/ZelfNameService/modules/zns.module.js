@@ -102,8 +102,6 @@ const searchZelfName = async (params, authUser) => {
 const _removeExpiredRecords = async (records) => {
 	const now = moment();
 
-	// testing adding few days, so it's expired
-
 	for (let index = records.length - 1; index >= 0; index--) {
 		const record = records[index];
 
