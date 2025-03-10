@@ -19,6 +19,7 @@ const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const jwt = require("jsonwebtoken");
 const { createUnderName } = require("./undernames.module");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
+const { bitcoin } = require("bitcoinjs-lib/src/networks");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -360,6 +361,18 @@ const _formatIPFSSearchResult = async (ipfsRecord, foundInArweave) => {
 		zelfNameObject.publicData.coinbase_hosted_url = payment.coinbase_hosted_url;
 		zelfNameObject.publicData.referralZelfName = payment.referralZelfName;
 		zelfNameObject.publicData.referralSolanaAddress = payment.referralSolanaAddress;
+
+		delete zelfNameObject.publicData.payment;
+	}
+
+	if (zelfNameObject.publicData.addresses) {
+		const addresses = JSON.parse(zelfNameObject.publicData.addresses);
+
+		zelfNameObject.publicData.ethAddress = addresses.ethAddress;
+		zelfNameObject.publicData.solanaAddress = addresses.solanaAddress;
+		zelfNameObject.publicData.btcAddress = addresses.btcAddress;
+
+		delete zelfNameObject.publicData.addresses;
 	}
 
 	if (!foundInArweave) {
@@ -558,6 +571,11 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 			duration: zelfNameObject.duration || 1,
 			coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
 		},
+		addresses: {
+			ethAddress: zelfNameObject.ethAddress,
+			solanaAddress: zelfNameObject.solanaAddress,
+			btcAddress: zelfNameObject.btcAddress,
+		},
 		expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
 		type: "hold",
 	};
@@ -569,6 +587,7 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 	}
 
 	metadata.payment = JSON.stringify(metadata.payment);
+	metadata.addresses = JSON.stringify(metadata.addresses);
 
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{
@@ -890,6 +909,8 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
 	if (searchResult.available) return null;
 
 	if (returnResults) return searchResult;
+
+	console.log({ searchResult, zelfName });
 
 	const error = new Error("zelfName_is_taken");
 
