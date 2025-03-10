@@ -159,7 +159,7 @@ const leaseValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(`${zelfName}`);
 
-	const captchaScore = config.google.captchaApproval || (await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt));
+	const captchaScore = config.google.captchaApproval ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
 
 	if (captchaScore < 0.79) {
 		_consoleLogSuspicious(ctx, captchaScore, zelfName);
@@ -258,9 +258,9 @@ const previewZelfProofValidation = async (ctx, next) => {
 		return;
 	}
 
-	const { captchaToken, os, zelfProof } = ctx.request.body;
+	const { captchaToken, os } = ctx.request.body;
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, "preview");
+	const captchaScore = config.google.captchaApproval ? 1 : await captchaService.createAssessment(captchaToken, os, "preview");
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -288,7 +288,7 @@ const previewValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName);
+	const captchaScore = config.google.captchaApproval ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
