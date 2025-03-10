@@ -150,7 +150,9 @@ const removeExpiredRecords = async (records) => {
 
 		const isExpired = now.isAfter(expiresAt);
 
-		if (isExpired) {
+		const type = record.metadata.keyvalues.type;
+
+		if (isExpired && type === "hold") {
 			records.splice(index, 1);
 
 			record.ipfs_pin_hash ? await IPFSModule.unPinFiles([record.ipfs_pin_hash]) : "do nothing";
