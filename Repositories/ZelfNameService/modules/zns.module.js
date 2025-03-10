@@ -171,16 +171,17 @@ const _removeExpiredRecords = async (records) => {
 	const now = moment();
 
 	// testing adding few days, so it's expired
-	// now.add(3, "day");
 
 	for (let index = records.length - 1; index >= 0; index--) {
 		const record = records[index];
 
 		const expiresAt = moment(record.metadata.keyvalues.expiresAt);
 
+		const type = record.metadata.keyvalues.type;
+
 		const isExpired = now.isAfter(expiresAt);
 
-		if (isExpired) {
+		if (isExpired && type === "hold") {
 			records.splice(index, 1);
 
 			record.ipfs_pin_hash ? await IPFSModule.unPinFiles([record.ipfs_pin_hash]) : "do nothing";
