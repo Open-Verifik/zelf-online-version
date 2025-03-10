@@ -13,7 +13,6 @@ const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
 const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
-
 const config = require("../../../Core/config");
 const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const jwt = require("jsonwebtoken");
@@ -104,16 +103,17 @@ const _removeExpiredRecords = async (records) => {
 	const now = moment();
 
 	// testing adding few days, so it's expired
-	// now.add(3, "day");
 
 	for (let index = records.length - 1; index >= 0; index--) {
 		const record = records[index];
 
 		const expiresAt = moment(record.metadata.keyvalues.expiresAt);
 
+		const type = record.metadata.keyvalues.type;
+
 		const isExpired = now.isAfter(expiresAt);
 
-		if (isExpired) {
+		if (isExpired && type === "hold") {
 			records.splice(index, 1);
 
 			record.ipfs_pin_hash ? await IPFSModule.unPinFiles([record.ipfs_pin_hash]) : "do nothing";
@@ -433,6 +433,11 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 			duration: zelfNameObject.duration || 1,
 			coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
 		},
+		addresses: {
+			ethAddress: zelfNameObject.ethAddress,
+			solanaAddress: zelfNameObject.solanaAddress,
+			btcAddress: zelfNameObject.btcAddress,
+		},
 		expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
 		type: "hold",
 	};
@@ -444,6 +449,7 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 	}
 
 	metadata.payment = JSON.stringify(metadata.payment);
+	metadata.addresses = JSON.stringify(metadata.addresses);
 
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{
@@ -765,6 +771,8 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
 	if (searchResult.available) return null;
 
 	if (returnResults) return searchResult;
+
+	console.log({ searchResult, zelfName });
 
 	const error = new Error("zelfName_is_taken");
 

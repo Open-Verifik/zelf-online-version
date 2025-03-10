@@ -111,6 +111,8 @@ const getValidation = async (ctx, next) => {
 		return;
 	}
 
+	if (payload.zelfName) payload.zelfName = payload.zelfName.toLowerCase();
+
 	const { zelfName, key, value, captchaToken, os } = payload;
 
 	if (!zelfName && (!key || !value)) {
@@ -125,7 +127,10 @@ const getValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
 
-	const captchaScore = authUser.session && !captchaToken ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName);
+	const captchaScore =
+		(authUser.session && !captchaToken) || config.google.captchaApproval
+			? 1
+			: await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -175,6 +180,8 @@ const leaseValidation = async (ctx, next) => {
 
 		return;
 	}
+
+	ctx.request.body.zelfName = ctx.request.body.zelfName.toLowerCase();
 
 	const { type, zelfName, captchaToken, os, skipIt } = ctx.request.body;
 

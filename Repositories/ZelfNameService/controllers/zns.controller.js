@@ -32,6 +32,35 @@ const searchZelfName = async (ctx) => {
 	}
 };
 
+const searchZelfName_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.searchZelfName(ctx.request.query, ctx.state.user);
+
+		if (data && data.available && data.zelfName.includes("zelfpay")) {
+			const zelfName = data.zelfName.replace("zelfpay", "zelf");
+
+			const zelfNameData = await Module.searchZelfName({ zelfName }, ctx.state.user);
+
+			const zelfNameObject = zelfNameData.ipfs?.length ? zelfNameData.ipfs[0] : zelfNameData.arweave[0];
+
+			if (zelfNameObject) {
+				ctx.body = {
+					data: await Modulev2.createZelfPay(zelfNameObject, ctx.state.user),
+				};
+
+				return;
+			}
+		}
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 const leaseZelfName = async (ctx) => {
 	try {
 		const data = await Module.leaseZelfName({ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() }, ctx.state.user);
@@ -215,6 +244,7 @@ const zelfPay = async (ctx) => {
 
 module.exports = {
 	searchZelfName,
+	searchZelfName_v2,
 	leaseZelfName,
 	leaseZelfName_v2,
 	leaseConfirmation,
