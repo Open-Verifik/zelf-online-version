@@ -123,7 +123,7 @@ const getValidation = async (ctx, next) => {
 		return;
 	}
 
-	const _zelfName = zelfName || value;
+	const _zelfName = zelfName || key;
 
 	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
 
