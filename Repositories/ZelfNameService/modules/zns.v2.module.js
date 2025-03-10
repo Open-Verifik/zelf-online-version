@@ -617,7 +617,7 @@ const leaseOffline = async (params, authUser) => {
 				zelfName: zelfNameObject.zelfName,
 				duration: duration || 1,
 				price: zelfNameObject.price,
-				expiresAt: moment().add(1, "month").format("YYYY-MM-DD HH:mm:ss"),
+				expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
 				type: "hold",
 				coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
 				coinbase_expires_at: zelfNameObject.coinbaseCharge.expires_at,
