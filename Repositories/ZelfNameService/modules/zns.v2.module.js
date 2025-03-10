@@ -120,7 +120,7 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 			btcAddress: zelfNameObject.btcAddress,
 			solanaAddress: zelfNameObject.solanaAddress,
 		},
-		expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
+		expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
 		type: "mainnet",
 	};
 
@@ -179,7 +179,7 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, p
 			btcAddress: zelfNameObject.btcAddress,
 			solanaAddress: zelfNameObject.solanaAddress,
 		},
-		expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
+		expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
 		type: "hold",
 	};
 
