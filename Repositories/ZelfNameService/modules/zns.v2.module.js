@@ -106,33 +106,29 @@ const leaseZelfName = async (params, authUser) => {
 
 const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, authUser) => {
 	const metadata = {
+		hasPassword: zelfNameObject.hasPassword,
 		zelfProof: zelfNameObject.zelfProof,
 		zelfName: zelfNameObject.zelfName,
-		hasPassword: zelfNameObject.hasPassword,
 		ethAddress: zelfNameObject.ethAddress,
+		solanaAddress: zelfNameObject.solanaAddress,
 		btcAddress: zelfNameObject.btcAddress,
-		payment: {
+		extraParams: {
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+			expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
 		},
-		addresses: {
-			ethAddress: zelfNameObject.ethAddress,
-			btcAddress: zelfNameObject.btcAddress,
-			solanaAddress: zelfNameObject.solanaAddress,
-		},
-		expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
 		type: "mainnet",
 	};
 
 	if (referralZelfNameObject) {
-		metadata.payment.referralZelfName = referralZelfNameObject.publicData?.zelfName || referralZelfNameObject.metadata?.zelfName;
+		metadata.extraParams.referralZelfName = referralZelfNameObject.publicData?.zelfName || referralZelfNameObject.metadata?.zelfName;
 
-		metadata.payment.referralSolanaAddress = referralZelfNameObject.publicData?.solanaAddress || referralZelfNameObject.metadata?.solanaAddress;
+		metadata.extraParams.referralSolanaAddress =
+			referralZelfNameObject.publicData?.solanaAddress || referralZelfNameObject.metadata?.solanaAddress;
 	}
 
-	metadata.payment = JSON.stringify(metadata.payment);
-	metadata.addresses = JSON.stringify(metadata.addresses);
+	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{

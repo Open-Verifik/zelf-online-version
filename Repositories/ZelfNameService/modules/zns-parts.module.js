@@ -183,6 +183,15 @@ const formatIPFSRecord = async (ipfsRecord, foundInArweave) => {
 		delete zelfNameObject.publicData.payment;
 	}
 
+	if (zelfNameObject.publicData.extraParams) {
+		const extraParams = JSON.parse(zelfNameObject.publicData.extraParams);
+
+		// assign all extraParams properties to the publicData
+		Object.assign(zelfNameObject.publicData, extraParams);
+
+		delete zelfNameObject.publicData.extraParams;
+	}
+
 	if (zelfNameObject.publicData.addresses) {
 		const addresses = JSON.parse(zelfNameObject.publicData.addresses);
 

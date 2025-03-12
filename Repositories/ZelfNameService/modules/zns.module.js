@@ -105,7 +105,9 @@ const _removeExpiredRecords = async (records) => {
 	for (let index = records.length - 1; index >= 0; index--) {
 		const record = records[index];
 
-		const expiresAt = moment(record.metadata.keyvalues.expiresAt);
+		const extraParams = JSON.parse(record.metadata.keyvalues.extraParams || "{}");
+
+		const expiresAt = moment(record.metadata.keyvalues.expiresAt || extraParams.expiresAt);
 
 		const type = record.metadata.keyvalues.type;
 
@@ -671,9 +673,11 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 
 	const expiresAt = moment().add(duration, "year").format("YYYY-MM-DD HH:mm:ss");
 
+	const zelfName = zelfNameObject.preview?.publicData.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", "");
+
 	const payload = {
 		base64: zelfNameObject.zelfProofQRCode,
-		name: zelfNameObject.preview?.publicData.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", ""),
+		name: zelfName,
 		metadata: {
 			hasPassword: `${
 				Boolean(zelfNameObject.preview?.passwordLayer === "Password") ||
@@ -681,8 +685,15 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 				zelfNameObject.publicData.hasPassword
 			}`,
 			zelfProof: zelfNameObject.publicData.zelfProof,
-			...zelfNameObject.preview?.publicData,
-			expiresAt,
+			zelfName,
+			ethAddress: zelfNameObject.preview.publicData.ethAddress,
+			solanaAddress: zelfNameObject.preview.publicData.solanaAddress,
+			btcAddress: zelfNameObject.preview.publicData.btcAddress,
+			extraParams: JSON.stringify({
+				origin: zelfNameObject.preview.publicData.origin || "online",
+				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+				expiresAt,
+			}),
 			type: "mainnet",
 		},
 		pinIt: true,
