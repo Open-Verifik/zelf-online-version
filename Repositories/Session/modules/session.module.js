@@ -191,7 +191,11 @@ const walletEncrypt = async (content, identifier, password = "") => {
 		new: false,
 	};
 
-	if (!pgpRecord) await _generateNewWalletKeys(identifier, payload, password);
+	if (!pgpRecord) {
+		await _generateNewWalletKeys(identifier, payload, password);
+	} else {
+		payload.privateKey = await PGPKeyModule.decryptKey(pgpRecord.type, pgpRecord.key);
+	}
 
 	const publicKey = await openpgp.readKey({
 		armoredKey: payload.publicKey,
