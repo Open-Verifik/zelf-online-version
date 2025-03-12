@@ -938,10 +938,17 @@ const decryptZelfName = async (params, authUser) => {
 		throw error;
 	}
 
+	const { encryptedMessage, privateKey } = await SessionModule.walletEncrypt(
+		decryptedZelfProof.metadata,
+		zelfNameObject.publicData.ethAddress,
+		password
+	);
+
 	return {
 		zelfName: zelfNameObject.publicData.zelfName,
 		image: zelfNameObject.zelfProofQRCode,
-		metadata: decryptedZelfProof.metadata,
+		metadata: decryptedZelfProof.metadata, // once you implement it in znsv2, this has to be removed and only keep pgp.
+		pgp: { encryptedMessage, privateKey },
 		url: zelfNameObject.url,
 		publicData: {
 			...zelfNameObject.publicData,
