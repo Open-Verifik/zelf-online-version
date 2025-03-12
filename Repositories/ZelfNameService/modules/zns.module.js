@@ -6,7 +6,7 @@ const { generateMnemonic } = require("../../Wallet/modules/helpers");
 const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
-const sessionModule = require("../../Session/modules/session.module");
+const SessionModule = require("../../Session/modules/session.module");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
@@ -748,11 +748,11 @@ const _decryptParams = async (data, authUser) => {
 		};
 	}
 
-	const password = await sessionModule.sessionDecrypt(data.password || null, authUser);
+	const password = await SessionModule.sessionDecrypt(data.password || null, authUser);
 
-	const mnemonic = await sessionModule.sessionDecrypt(data.mnemonic || null, authUser);
+	const mnemonic = await SessionModule.sessionDecrypt(data.mnemonic || null, authUser);
 
-	const face = await sessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
+	const face = await SessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
 
 	return { password, mnemonic, face };
 };
