@@ -1,6 +1,7 @@
 const moment = require("moment");
 const SessionModule = require("../../Session/modules/session.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
+const PGPKeysModule = require("../../PGP/modules/pgp-keys.module");
 const ZNSPartsModule = require("./zns-parts.module");
 const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
@@ -9,7 +10,7 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-const { encrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
+const { decrypt, encrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const { createCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
@@ -101,6 +102,58 @@ const leaseZelfName = async (params, authUser) => {
 			},
 			config.JWT_SECRET
 		),
+	};
+};
+
+/**
+ * decrypt zelfName
+ * @param {Object} params
+ * @param {Object} authUser
+ */
+const decryptZelfName = async (params, authUser) => {
+	const zelfNameObjects = await _findZelfName({ zelfName: params.zelfName }, "both", authUser);
+	const zelfNameObject = zelfNameObjects[0];
+
+	const { face, password } = await _decryptParams(params, authUser);
+
+	const decryptedZelfProof = await decrypt({
+		addServerPassword: Boolean(params.addServerPassword),
+		faceBase64: face,
+		password,
+		zelfProof: zelfNameObject.zelfProof || params.zelfProof,
+	});
+
+	if (decryptedZelfProof.error) {
+		const error = new Error(decryptedZelfProof.error.code);
+
+		error.status = 409;
+
+		throw error;
+	}
+
+	const { mnemonic, zkProof, solanaSecretKey } = decryptedZelfProof.metadata;
+
+	const { encryptedMessage, privateKey } = await SessionModule.walletEncrypt(
+		{ mnemonic, zkProof, solanaSecretKey },
+		zelfNameObject.publicData.ethAddress,
+		password
+	);
+
+	return {
+		hasPassword: Boolean(password),
+		image: zelfNameObject.zelfProofQRCode,
+		pgp: { encryptedMessage, privateKey },
+		url: zelfNameObject.url,
+		zelfName: zelfNameObject.publicData.zelfName,
+		addresses: {
+			ethAddress: zelfNameObject.ethAddress,
+			btcAddress: zelfNameObject.btcAddress,
+			solanaAddress: zelfNameObject.solanaAddress,
+		},
+		publicData: {
+			...zelfNameObject.publicData,
+			...decryptedZelfProof.publicData,
+		},
 	};
 };
 
@@ -728,8 +781,25 @@ const createZelfPay = async (zelfNameObject, authUser) => {
 	return { ipfs, arweave };
 };
 
+const _decryptParams = async (data, authUser) => {
+	if (data.removePGP) {
+		return {
+			password: data.password,
+			mnemonic: data.mnemonic,
+			face: data.faceBase64,
+		};
+	}
+
+	const password = await SessionModule.sessionDecrypt(data.password || null, authUser);
+	const mnemonic = await SessionModule.sessionDecrypt(data.mnemonic || null, authUser);
+	const face = await SessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
+
+	return { password, mnemonic, face };
+};
+
 module.exports = {
 	searchZelfName,
+	decryptZelfName,
 	leaseZelfName,
 	leaseOffline,
 	createZelfPay,

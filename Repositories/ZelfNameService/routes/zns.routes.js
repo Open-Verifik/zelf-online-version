@@ -13,7 +13,6 @@ module.exports = (server) => {
 	server.post(`${PATH}/search`, Middleware.getValidation, Controller.searchZelfName);
 
 	server.get(`${PATH}/v2/search`, Middleware.getValidation, Controller.searchZelfName_v2);
-
 	server.post(`${PATH}/v2/search`, Middleware.getValidation, Controller.searchZelfName_v2);
 
 	server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseZelfName);
@@ -31,6 +30,8 @@ module.exports = (server) => {
 	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof);
 
 	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptZelfName);
+
+	server.post(`${PATH}/v2/decrypt`, Middleware.decryptValidation, Controller.decryptZelfName_v2);
 
 	server.post(`${PATH}/revenue-cat`, Middleware.revenueCatWebhookValidation, Controller.revenueCatWebhook);
 

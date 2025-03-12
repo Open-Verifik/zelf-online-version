@@ -157,6 +157,26 @@ const decryptZelfName = async (ctx) => {
 	}
 };
 
+const decryptZelfName_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.decryptZelfName(
+			{
+				...ctx.request.body,
+				zelfName: `${ctx.request.body.zelfName}`.toLowerCase(),
+			},
+			ctx.state.user
+		);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 const leaseOfflineZelfName = async (ctx) => {
 	try {
 		const data = await Module.leaseOffline(ctx.request.body, ctx.state.user);
@@ -251,6 +271,7 @@ module.exports = {
 	previewZelfName,
 	previewZelfProof,
 	decryptZelfName,
+	decryptZelfName_v2,
 	leaseOfflineZelfName,
 	revenueCatWebhook,
 	referralRewards,
