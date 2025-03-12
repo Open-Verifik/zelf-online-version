@@ -214,9 +214,7 @@ const _generateNewWalletKeys = async (identifier, walletData, password) => {
 	const newPgpRecord = await PGPKeyModule.generateKey("storage", identifier, null, null, password);
 
 	walletData.publicKey = newPgpRecord.publicKey;
-
 	walletData.privateKey = newPgpRecord.privateKey;
-
 	walletData.new = true;
 };
 
