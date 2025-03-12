@@ -919,9 +919,9 @@ const _findZelfName = async (params, environment = "both", authUser) => {
  * @param {Object} authUser
  */
 const decryptZelfName = async (params, authUser) => {
-	const zelfNameObjects = await _findZelfName({ zelfName: params.zelfName }, "both", authUser);
+	const zelfNameObjects = await _findZelfName({ zelfName: params.zelfName }, "both", authUser); //ipfs or arweave [0]
 
-	const zelfNameObject = zelfNameObjects[0];
+	const zelfNameObject = zelfNameObjects[0]; // arweave[0] or ipfs[0] or othersource[0] or nostr[0]
 
 	const { face, password } = await _decryptParams(params, authUser);
 
@@ -945,6 +945,7 @@ const decryptZelfName = async (params, authUser) => {
 	);
 
 	return {
+		...zelfNameObject,
 		zelfName: zelfNameObject.publicData.zelfName,
 		image: zelfNameObject.zelfProofQRCode,
 		metadata: decryptedZelfProof.metadata, // once you implement it in znsv2, this has to be removed and only keep pgp.

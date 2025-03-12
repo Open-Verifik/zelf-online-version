@@ -114,6 +114,7 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 		payment: {
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
+			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 		},
 		addresses: {
 			ethAddress: zelfNameObject.ethAddress,
@@ -173,6 +174,7 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, p
 		payment: {
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
+			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 		},
 		addresses: {
 			ethAddress: zelfNameObject.ethAddress,
