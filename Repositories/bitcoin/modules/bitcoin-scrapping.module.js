@@ -4,6 +4,7 @@ const { generateRandomUserAgent } = require("../../../Core/helpers");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const formatterClass = require("../../class/data-formatterClass");
 const formatterNumberClass = require("../../class/data-formatterNumberClass");
+
 /**
  * @param {*} params
  */
@@ -44,7 +45,7 @@ const getBalance = async (params) => {
 				balance: 0,
 				tokens: [],
 			},
-			transactions: formatTransactionData(transactions),
+			transactions: transactions,
 		};
 	} catch (error) {
 		console.error({ error });
@@ -66,6 +67,8 @@ function formatTransactionData(transactions) {
  * @returns
  */
 const getTransactionsList = async (params, query) => {
+	const txids = [];
+
 	const { data } = await instance.get(
 		`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/transactions?limit=${query.show}&offset=0`,
 		{
@@ -74,7 +77,22 @@ const getTransactionsList = async (params, query) => {
 			},
 		}
 	);
-	return { transactions: data };
+	console.log(data);
+
+	txids.push(data.map((tx) => tx.txid));
+
+	const response = await instance.get(
+		`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`,
+		{
+			headers: {
+				"user-agent": generateRandomUserAgent(),
+			},
+		}
+	);
+
+	console.log(response.data);
+
+	return { transactions: response.data };
 };
 
 /**
