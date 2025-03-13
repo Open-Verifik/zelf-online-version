@@ -1,40 +1,92 @@
 const { getCleanInstance } = require("../../../Core/axios");
-const instance = getCleanInstance(30000);
 const { generateRandomUserAgent } = require("../../../Core/helpers");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-const formatterClass = require("../../class/data-formatterClass");
-const formatterNumberClass = require("../../class/data-formatterNumberClass");
 
-/**
- * @param {*} params
- */
+const instance = getCleanInstance(30000);
+const SATOSHI_TO_BTC = 100000000;
 
+// Función para realizar solicitudes a la API con el User-Agent generado aleatoriamente
+const makeApiRequest = async (url) => {
+	try {
+		const { data } = await instance.get(url, {
+			headers: {
+				"user-agent": generateRandomUserAgent(),
+			},
+		});
+		return data;
+	} catch (error) {
+		console.error("API Request Error:", error);
+		throw error;
+	}
+};
+
+// Convertir valores de satoshis a BTC
+const convertSatoshiToBTC = (satoshi) => satoshi / SATOSHI_TO_BTC;
+
+// Convertir valores en transacciones a formato extendido
+const convertTransactionValues = (transactions) => {
+	if (!Array.isArray(transactions)) {
+		transactions = [transactions];
+	}
+
+	return transactions.map((tx) => ({
+		...tx,
+		fee_satoshis: tx.fee,
+		fee_btc: convertSatoshiToBTC(tx.fee),
+		inputs: tx.inputs.map((input) => ({
+			...input,
+			value_satoshis: input.value,
+			value_btc: convertSatoshiToBTC(input.value),
+		})),
+		outputs: tx.outputs.map((output) => ({
+			...output,
+			value_satoshis: output.value,
+			value_btc: convertSatoshiToBTC(output.value),
+		})),
+	}));
+};
+
+// Obtener lista de transacciones
+const getTransactionsList = async (params, query = { show: "25" }) => {
+	const txsData = await makeApiRequest(
+		`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/transactions?limit=${query.show}&offset=0`
+	);
+
+	const txids = txsData.map((tx) => tx.txid).join(",");
+
+	const response = await makeApiRequest(
+		`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`
+	);
+
+	return { transactions: convertTransactionValues(response) };
+};
+
+// Obtener detalles de una transacción específica
+const getTransactionDetail = async (params) => {
+	const data = await makeApiRequest(
+		`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`
+	);
+
+	return convertTransactionValues(data)[0];
+};
+
+// Obtener balance de una dirección
 const getBalance = async (params) => {
 	try {
-		const { data } = await instance.get(
-			`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`,
-			{
-				headers: {
-					"user-agent": generateRandomUserAgent(),
-				},
-			}
+		const data = await makeApiRequest(
+			`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`
 		);
 
 		const { price } = await getTickerPrice({ symbol: "BTC" });
+		const formatBTC = convertSatoshiToBTC(data.confirmed);
 
-		const formatBTC = data.confirmed / 10_000_000;
-
-		const { transactions } = await getTransactionsList(
-			{ id: params.id },
-			{ show: "25" }
-		);
+		const { transactions } = await getTransactionsList({ id: params.id });
 
 		return {
 			address: params.id,
 			fullName: "not_available",
 			balance: formatBTC.toString(),
 			fiatBalance: formatBTC * price,
-			//currency: "USD",
 			account: {
 				asset: "BTC",
 				fiatBalance: (formatBTC * price).toString(),
@@ -48,80 +100,9 @@ const getBalance = async (params) => {
 			transactions: transactions,
 		};
 	} catch (error) {
-		console.error({ error });
+		console.error("Error getting balance:", error);
+		throw error;
 	}
-};
-
-function formatTransactionData(transactions) {
-	return transactions.map((tx) => {
-		return {
-			blockHeight: tx.block.height,
-			blockPosition: tx.block.position,
-			hash: tx.txid,
-		};
-	});
-}
-/**
- * get transactions list
- * @param {Object} params
- * @returns
- */
-const getTransactionsList = async (params, query) => {
-	const txids = [];
-
-	const { data } = await instance.get(
-		`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/transactions?limit=${query.show}&offset=0`,
-		{
-			headers: {
-				"user-agent": generateRandomUserAgent(),
-			},
-		}
-	);
-	console.log(data);
-
-	txids.push(data.map((tx) => tx.txid));
-
-	const response = await instance.get(
-		`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`,
-		{
-			headers: {
-				"user-agent": generateRandomUserAgent(),
-			},
-		}
-	);
-
-	console.log(response.data);
-
-	return { transactions: response.data };
-};
-
-/**
- * get transaction status
- * @param {Object} params
- */
-const getTransactionDetail = async (params, query) => {
-	const { data } = await instance.get(
-		`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`,
-		{
-			headers: {
-				"user-agent": generateRandomUserAgent(),
-			},
-		}
-	);
-
-	return { transactionDetail: data };
-};
-const formatData = (data) => {
-	const forma = new formatterClass(data);
-
-	const translated = forma.translateKeys();
-
-	return translated;
-};
-const formatNumber = (data) => {
-	const formattedData = formatterNumberClass.formatData(data);
-
-	return formattedData;
 };
 
 module.exports = {
