@@ -25,6 +25,8 @@ module.exports = (server) => {
 
 	server.post(`${PATH}/lease-confirmation`, Middleware.leaseConfirmationValidation, Controller.leaseConfirmation);
 
+	server.post(`${PATH}/v2/lease-confirmation`, Middleware.leaseConfirmationValidation, Controller.leaseConfirmation_v2);
+
 	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewZelfName);
 
 	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof);

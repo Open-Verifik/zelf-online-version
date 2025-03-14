@@ -1,7 +1,6 @@
 const moment = require("moment");
 const SessionModule = require("../../Session/modules/session.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
-const PGPKeysModule = require("../../PGP/modules/pgp-keys.module");
 const ZNSPartsModule = require("./zns-parts.module");
 const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
@@ -13,9 +12,11 @@ const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { decrypt, encrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
-const { createCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
+const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const config = require("../../../Core/config");
 const jwt = require("jsonwebtoken");
+const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
+const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const { createUnderName } = require("./undernames.module");
 
 /**
@@ -204,13 +205,6 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 		zelfProof: metadata.zelfProof,
 		publicData: metadata,
 	});
-
-	// create undername
-	// zelfNameObject.undername = await createUnderName({
-	// 	parentName: "zelf",
-	// 	undername: zelfNameObject.zelfName,
-	// 	publicData: zelfNameObject.publicData,
-	// });
 };
 
 const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, password, authUser) => {
@@ -255,13 +249,6 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, p
 	delete zelfNameObject.ipfs.publicData.zelfProof;
 
 	zelfNameObject.publicData = Object.assign(zelfNameObject.publicData, zelfNameObject.ipfs.publicData);
-
-	// create undername
-	// zelfNameObject.undername = await createUnderName({
-	// 	parentName: "zelf",
-	// 	undername: holdName,
-	// 	publicData: zelfNameObject.publicData,
-	// });
 };
 
 /**
@@ -775,7 +762,10 @@ const createZelfPay = async (zelfNameObject, authUser) => {
 		},
 	});
 
-	return { ipfs, arweave };
+	return {
+		ipfs: await ZNSPartsModule.formatIPFSRecord(ipfs, false),
+		arweave,
+	};
 };
 
 const _decryptParams = async (data, authUser) => {
@@ -794,10 +784,272 @@ const _decryptParams = async (data, authUser) => {
 	return { password, mnemonic, face };
 };
 
+/**
+ * get ZelfName
+ * @param {String} zelfName
+ * @param {Object} authUser
+ * @author Miguel Trevino
+ */
+const _getZelfNameToConfirm = async (zelfName, authUser) => {
+	const zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
+
+	let isMainnet = false;
+
+	for (let index = 0; index < zelfNameRecords.length; index++) {
+		const record = zelfNameRecords[index];
+
+		inMainnet = Boolean(record.publicData?.type === "mainnet" || !record.publicData?.zelfName.includes(".hold"));
+	}
+
+	if (!zelfNameRecords.length) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	if (zelfNameRecords.length === 2 || inMainnet) {
+		const error = new Error("zelfName_purchased_already");
+		error.status = 409;
+		throw error;
+	}
+
+	const zelfNameObject = zelfNameRecords[0];
+
+	const chargeID = zelfNameObject.publicData?.coinbase_id || zelfNameObject.publicData?.coinbase_hosted_url?.split("/pay/")[1];
+
+	let zelfPayNameObject = null;
+
+	if (!chargeID && zelfNameObject) {
+		// bring it from zelfPay
+		const zelfPay = `${zelfName.replace(".zelf.hold", ".zelfpay").replace(".zelf", ".zelfpay")}`;
+
+		let zelfPayRecords = [];
+
+		try {
+			zelfPayRecords = await previewZelfName(
+				{
+					zelfName: zelfPay,
+					environment: "mainnet",
+				},
+				authUser
+			);
+		} catch (exception) {
+			console.error({ exception });
+		}
+
+		if (zelfPayRecords.length) {
+			zelfPayNameObject = zelfPayRecords[0];
+		} else {
+			const createdZelfPay = await createZelfPay(zelfNameObject, authUser);
+
+			zelfPayNameObject = createdZelfPay.ipfs || createdZelfPay.arweave;
+		}
+	}
+
+	return {
+		zelfNameObject,
+		isMainnet,
+		zelfPayNameObject,
+	};
+};
+
+/**
+ * lease confirmation
+ * @param {Object} data
+ * @param {Object} authUser
+ * @author Miguel Trevino
+ */
+const leaseConfirmation = async (data, authUser) => {
+	const { network, zelfName, confirmationData } = data;
+
+	const { zelfNameObject, isMainnet, zelfPayNameObject } = await _getZelfNameToConfirm(zelfName, authUser);
+
+	let payment = false;
+
+	switch (zelfNameObject.publicData.price === 0 ? "free" : network) {
+		case "coinbase":
+		case "CB":
+			payment = await _confirmCoinbaseCharge(zelfNameObject, zelfPayNameObject);
+
+			break;
+		case "ETH":
+			payment = await confirmPayUniqueAddress(network, confirmationData);
+
+			break;
+		case "SOL":
+			payment = await confirmPayUniqueAddress(network, confirmationData);
+
+			break;
+		case "BTC":
+			payment = await confirmPayUniqueAddress(network, confirmationData);
+
+			break;
+		case "free":
+			payment = {
+				confirmed: true,
+			};
+
+			break;
+
+		default:
+			break;
+	}
+
+	if (payment?.confirmed) {
+		return await _confirmZelfNamePurchase(zelfNameObject);
+	}
+
+	return {
+		zelfNameObject,
+		zelfName,
+		payment,
+	};
+};
+
+/**
+ *
+ * @param {Object} zelfNameObject
+ * @returns {Object} - Returns the referral reward and the cloned Zelf Name records
+ */
+const _confirmZelfNamePurchase = async (zelfNameObject) => {
+	const { masterIPFSRecord, masterArweaveRecord, reward } = await _cloneZelfNameToProduction(zelfNameObject);
+
+	return {
+		ipfs: [masterIPFSRecord],
+		arweave: masterArweaveRecord,
+		reward,
+	};
+};
+
+/**
+ * clone zelf name to production
+ * @param {Object} zelfNameObject
+ * @author Miguel Trevino
+ */
+const _cloneZelfNameToProduction = async (zelfNameObject) => {
+	const duration = zelfNameObject.publicData.duration === "lifetime" ? 100 : zelfNameObject.publicData.duration || 1;
+
+	const expiresAt = moment().add(duration, "year").format("YYYY-MM-DD HH:mm:ss");
+
+	const zelfName = zelfNameObject.preview?.publicData.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", "");
+
+	const payload = {
+		base64: zelfNameObject.zelfProofQRCode,
+		name: zelfName,
+		metadata: {
+			hasPassword: `${
+				Boolean(zelfNameObject.preview?.passwordLayer === "Password") ||
+				Boolean(zelfNameObject.hasPassword) ||
+				zelfNameObject.publicData.hasPassword
+			}`,
+			zelfProof: zelfNameObject.publicData.zelfProof,
+			zelfName,
+			ethAddress: zelfNameObject.preview.publicData.ethAddress,
+			solanaAddress: zelfNameObject.preview.publicData.solanaAddress,
+			btcAddress: zelfNameObject.preview.publicData.btcAddress,
+			extraParams: JSON.stringify({
+				origin: zelfNameObject.preview.publicData.origin || "online",
+				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+				expiresAt,
+			}),
+			type: "mainnet",
+		},
+		pinIt: true,
+	};
+
+	payload.metadata.expiresAt = expiresAt;
+
+	const masterArweaveRecord = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
+		hasPassword: payload.metadata.hasPassword,
+		zelfProof: payload.metadata.zelfProof,
+		publicData: payload.metadata,
+	});
+
+	await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
+
+	const masterIPFSRecord = await IPFSModule.insert(payload, { pro: true });
+
+	let reward;
+
+	zelfNameObject.publicData.referralZelfName
+		? await addReferralReward({
+				ethAddress: masterIPFSRecord.metadata.ethAddress,
+				solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+				zelfName: masterIPFSRecord.metadata.zelfName,
+				zelfNamePrice: zelfNameObject.publicData.price,
+				referralZelfName: zelfNameObject.publicData.referralZelfName,
+				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
+				ipfsHash: masterIPFSRecord.IpfsHash,
+				arweaveId: masterArweaveRecord.id,
+		  })
+		: "no_referral";
+
+	reward = await addPurchaseReward({
+		ethAddress: masterIPFSRecord.metadata.ethAddress,
+		solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+		zelfName: masterIPFSRecord.metadata.zelfName,
+		zelfNamePrice: zelfNameObject.publicData.price,
+		ipfsHash: masterIPFSRecord.IpfsHash,
+		arweaveId: masterArweaveRecord.id,
+	});
+
+	if (config.env === "production") {
+		await createUnderName({
+			parentName: config.arwave.parentName,
+			undername: zelfNameObject.publicData.zelfName.split(".zelf")[0],
+			publicData: zelfNameObject.publicData,
+		});
+	}
+
+	return {
+		masterArweaveRecord,
+		masterIPFSRecord,
+		reward,
+	};
+};
+
+const _confirmCoinbaseCharge = async (zelfNameObject, zelfPayNameObject = {}) => {
+	const chargeID =
+		zelfNameObject.publicData?.coinbase_id ||
+		zelfPayNameObject?.publicData?.coinbase_id ||
+		zelfNameObject.publicData?.coinbase_hosted_url?.split("/pay/")[1] ||
+		zelfPayNameObject?.publicData?.coinbase_hosted_url?.split("/pay/")[1];
+
+	if (!chargeID) {
+		const error = new Error("coinbase_charge_id_not_found");
+
+		error.status = 404;
+
+		throw error;
+	}
+
+	const charge = await getCoinbaseCharge(chargeID);
+
+	if (!charge) return false;
+
+	const timeline = charge.timeline;
+
+	let confirmed = false;
+
+	for (let index = 0; index < timeline.length; index++) {
+		const _timeline = timeline[index];
+
+		if (_timeline.status === "COMPLETED") {
+			confirmed = true;
+		}
+	}
+
+	return {
+		...charge,
+		confirmed: config.coinbase.forceApproval || confirmed,
+	};
+};
+
 module.exports = {
 	searchZelfName,
 	decryptZelfName,
 	leaseZelfName,
 	leaseOffline,
 	createZelfPay,
+	leaseConfirmation,
 };

@@ -103,6 +103,20 @@ const leaseConfirmation = async (ctx) => {
 	}
 };
 
+const leaseConfirmation_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.leaseConfirmation(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 const previewZelfName = async (ctx) => {
 	try {
 		const data = await Module.previewZelfName(
@@ -268,6 +282,7 @@ module.exports = {
 	leaseZelfName,
 	leaseZelfName_v2,
 	leaseConfirmation,
+	leaseConfirmation_v2,
 	previewZelfName,
 	previewZelfProof,
 	decryptZelfName,

@@ -7,7 +7,6 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const SessionModule = require("../../Session/modules/session.module");
-const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
@@ -631,6 +630,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 	const chargeID = zelfNameObject.publicData?.coinbase_id || zelfNameObject.publicData?.coinbase_hosted_url?.split("/pay/")[1];
 
 	if (!chargeID) {
+		console.log({ publicData: zelfNameObject.publicData });
 		const error = new Error("coinbase_charge_id_not_found");
 
 		error.status = 404;
