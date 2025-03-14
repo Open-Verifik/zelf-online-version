@@ -72,7 +72,13 @@ const searchZelfLease = async (zelfName) => {
 
 	const signedDataPrice = signRecordData(recordData, secretKey);
 
-	const paymentAddress = JSON.parse(previewData2.ipfs[0].publicData.addresses);
+	let paymentAddress;
+
+	if (Array.isArray(previewData2.ipfs) && previewData2.ipfs.length > 0) {
+		paymentAddress = JSON.parse(previewData2.ipfs[0].publicData.addresses);
+	} else {
+		throw new Error("Invalid IPFS data");
+	}
 
 	delete paymentAddress.customerZelfName;
 
@@ -249,7 +255,7 @@ const checkoutSOLANA = async (address) => {
 
 		return balance;
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 	}
 };
 

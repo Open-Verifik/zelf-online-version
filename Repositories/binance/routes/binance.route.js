@@ -8,7 +8,7 @@ const base = "/assets";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.post(`${PATH}/price`, Controller.tickerPrice);
+	server.get(`${PATH}/price`, Controller.tickerPrice);
 
-	server.post(`${PATH}/klines`, Middleware.validateParamas, Controller.Klines);
+	server.get(`${PATH}/klines`, Middleware.validateParamas, Controller.Klines);
 };

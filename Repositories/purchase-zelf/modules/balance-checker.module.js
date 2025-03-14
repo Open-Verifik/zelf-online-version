@@ -28,7 +28,6 @@ const confirmPayUniqueAddress = async (network, confirmationData) => {
 			confirmed,
 		};
 	} catch (exception) {
-		console.log({ exception });
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
 		throw error;

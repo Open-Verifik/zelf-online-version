@@ -18,7 +18,7 @@ const schemas = {
 	leaseConfirmation: {
 		zelfName: string().required(),
 		coin: string().required(),
-		network: string().required(),
+		network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC"]).required(),
 	},
 	lease: {
 		zelfName: string().required(),
@@ -88,6 +88,8 @@ const getValidation = async (ctx, next) => {
 		return;
 	}
 
+	if (payload.zelfName) payload.zelfName = payload.zelfName.toLowerCase();
+
 	const { zelfName, key, value, captchaToken, os } = payload;
 
 	if (!zelfName && (!key || !value)) {
@@ -131,6 +133,8 @@ const leaseValidation = async (ctx, next) => {
 		return;
 	}
 
+	ctx.request.body.zelfName = ctx.request.body.zelfName.toLowerCase();
+
 	const { type, zelfName, captchaToken, os, skipIt } = ctx.request.body;
 
 	const typeValid = validate(schemas[type], ctx.request.body);
@@ -155,7 +159,7 @@ const leaseValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(`${zelfName}`);
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
+	const captchaScore = config.google.captchaApproval ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
 
 	if (captchaScore < 0.79) {
 		_consoleLogSuspicious(ctx, captchaScore, zelfName);
@@ -254,9 +258,9 @@ const previewZelfProofValidation = async (ctx, next) => {
 		return;
 	}
 
-	const { captchaToken, os, zelfProof } = ctx.request.body;
+	const { captchaToken, os } = ctx.request.body;
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, "preview");
+	const captchaScore = config.google.captchaApproval ? 1 : await captchaService.createAssessment(captchaToken, os, "preview");
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -284,7 +288,7 @@ const previewValidation = async (ctx, next) => {
 
 	const captchaZelfName = _getZelfNameForCaptcha(zelfName);
 
-	const captchaScore = await captchaService.createAssessment(captchaToken, os, captchaZelfName);
+	const captchaScore = config.google.captchaApproval ? 1 : await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
 	if (captchaScore < 0.79) {
 		ctx.status = 409;
@@ -316,6 +320,8 @@ const decryptValidation = async (ctx, next) => {
 
 		return;
 	}
+
+	ctx.request.body.zelfName = ctx.request.body.zelfName.toLowerCase();
 
 	const { captchaToken, os, zelfName } = ctx.request.body;
 
