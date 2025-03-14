@@ -17,23 +17,23 @@ const agent = new https.Agent({ rejectUnauthorized: false });
 const getBalance = async (params) => {
 	try {
 		// Obtener balance nativo
-		const { data } = await instance.get(
-			`https://glacier-api.avax.network/v1/chains/43114/addresses/${params.id}/balances:getNative`,
-			{ headers: { "user-agent": generateRandomUserAgent() } }
-		);
+		const { data } = await instance.get(`https://glacier-api.avax.network/v1/chains/43114/addresses/${params.id}/balances:getNative`, {
+			headers: { "user-agent": generateRandomUserAgent() },
+		});
 
 		// Obtener tokens y transacciones
 		const tokenHoldings = await getTokens({ id: params.id }, { show: "200" });
-		const transactions = await getTransactionsList(
-			{ id: params.id },
-			{ page: "0", show: "100" }
-		);
+		const transactions = await getTransactionsList({ id: params.id }, { page: "0", show: "100" });
 
 		return {
 			address: params.id,
-			fullName: "not_available",
-			balance: data.nativeTokenBalance.balance,
+			image: data.nativeTokenBalance.logoUri,
+			balance: (Number(data.nativeTokenBalance.balance) / 10 ** data.nativeTokenBalance.decimals).toFixed(data.nativeTokenBalance.decimals),
+			_balance: parseFloat(
+				(Number(data.nativeTokenBalance.balance) / 10 ** data.nativeTokenBalance.decimals).toFixed(data.nativeTokenBalance.decimals)
+			),
 			fiatBalance: data.nativeTokenBalance?.balanceValue?.value || 0,
+			decimals: data.nativeTokenBalance.decimals,
 			account: {
 				asset: "AVAX",
 				fiatBalance: data.nativeTokenBalance?.balanceValue?.value.toString(),
@@ -60,10 +60,9 @@ const getTokens = async (params, query) => {
 	);
 
 	// Obtener conteo total de tokens
-	const total = await instance.get(
-		`https://cdn.routescan.io/api/blockchain/all/address/${params.id}?ecosystem=avalanche`,
-		{ headers: { "user-agent": generateRandomUserAgent() } }
-	);
+	const total = await instance.get(`https://cdn.routescan.io/api/blockchain/all/address/${params.id}?ecosystem=avalanche`, {
+		headers: { "user-agent": generateRandomUserAgent() },
+	});
 
 	const erc20Count = total.data.erc20Count;
 	const erc721Count = total.data.erc721Count;
@@ -73,18 +72,20 @@ const getTokens = async (params, query) => {
 	const formattedTokens = data.erc20TokenBalances.map((token) => ({
 		tokenType: token.ercType,
 		fiatBalance: token.balanceValue?.value || 0,
+		_fiatBalance: token.balanceValue?.value.toString(),
 		symbol: token.symbol,
 		name: token.name,
-		price: token.price?.value?.toFixed(2) || "0.00",
+		price: token.price?.value?.toString() || "0",
+		_price: token.price?.value,
 		image: token.logoUri,
-		amount: parseFloat(token.balance).toString() || 0,
+		decimals: token.decimals,
+		amount: (Number(token.balance) / 10 ** token.decimals).toFixed(12),
+		_amount: parseFloat((Number(token.balance) / 10 ** token.decimals).toFixed(12)),
+		address: token.address,
 	}));
 
 	// Calcular balance total en moneda fiat
-	const totalFiatBalance = formattedTokens.reduce(
-		(sum, token) => sum + parseFloat(token.fiatBalance),
-		0
-	);
+	const totalFiatBalance = formattedTokens.reduce((sum, token) => sum + parseFloat(token.fiatBalance), 0);
 
 	return {
 		balance: totalFiatBalance.toString(),
@@ -106,8 +107,7 @@ const getTransactionsList = async (params, query) => {
 			httpsAgent: agent,
 			headers: {
 				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 			},
 		}
 	);
@@ -137,10 +137,9 @@ const getTransactionsList = async (params, query) => {
  * @param {Object} params - Contiene el id (hash de la transacción)
  */
 const getTransactionDetail = async (params) => {
-	const { data } = await instance.get(
-		`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`,
-		{ headers: { "user-agent": generateRandomUserAgent() } }
-	);
+	const { data } = await instance.get(`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`, {
+		headers: { "user-agent": generateRandomUserAgent() },
+	});
 
 	return { transactionDetail: data };
 };
