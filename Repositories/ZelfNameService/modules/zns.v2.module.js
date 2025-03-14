@@ -220,17 +220,15 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, p
 		zelfProof: zelfNameObject.zelfProof,
 		zelfName: holdName,
 		hasPassword: zelfNameObject.hasPassword,
-		payment: {
+		ethAddress: zelfNameObject.ethAddress,
+		btcAddress: zelfNameObject.btcAddress,
+		solanaAddress: zelfNameObject.solanaAddress,
+		extraParams: {
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+			expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
 		},
-		addresses: {
-			ethAddress: zelfNameObject.ethAddress,
-			btcAddress: zelfNameObject.btcAddress,
-			solanaAddress: zelfNameObject.solanaAddress,
-		},
-		expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
 		type: "hold",
 	};
 
@@ -240,8 +238,7 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, p
 		metadata.payment.referralSolanaAddress = referralZelfNameObject.publicData?.solanaAddress || referralZelfNameObject.metadata?.solanaAddress;
 	}
 
-	metadata.payment = JSON.stringify(metadata.payment);
-	metadata.addresses = JSON.stringify(metadata.addresses);
+	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{
