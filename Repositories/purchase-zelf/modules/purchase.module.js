@@ -45,7 +45,7 @@ const searchZelfLease = async (zelfName) => {
 
 	const zelfNameObject = previewData.ipfs[0] || previewData.arweave[0];
 
-	const { price, duration, expiresAt, referralZelfName, coinbase_hosted_url, referralSolanaAddress } = zelfNameObject.publicData;
+	const { price, duration, expiresAt, referralZelfName, referralSolanaAddress } = zelfNameObject.publicData;
 
 	if (previewData.ipfs[0].publicData.type === "mainnet") {
 		const error = new Error("zelfName_purchased_already");
@@ -76,6 +76,12 @@ const searchZelfLease = async (zelfName) => {
 		zelfPayNameObject = createdZelfPay.ipfs || createdZelfPay.arweave;
 	}
 
+	if (!zelfPayNameObject) {
+		const error = new Error("zelfPayName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
 	const cryptoValue = await calculateCryptoValue("ETH", price);
 	const network = cryptoValue.network;
 	const amountToSend = cryptoValue.amountToSend;
@@ -90,12 +96,6 @@ const searchZelfLease = async (zelfName) => {
 
 	const signedDataPrice = signRecordData(recordData, secretKey);
 
-	if (!zelfPayNameObject) {
-		const error = new Error("zelfPayName_not_found");
-		error.status = 404;
-		throw error;
-	}
-
 	const paymentAddress = {
 		ethAddress: zelfPayNameObject.publicData.ethAddress,
 		btcAddress: zelfPayNameObject.publicData.btcAddress,
@@ -109,7 +109,7 @@ const searchZelfLease = async (zelfName) => {
 		duration: parseInt(duration),
 		expiresAt,
 		referralZelfName,
-		coinbase_hosted_url,
+		coinbase_hosted_url: zelfPayNameObject.publicData.coinbase_hosted_url,
 		network,
 		amountToSend,
 		referralSolanaAddress,
@@ -149,8 +149,6 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 
 	const zelfPayObject = zelfNameRecords.ipfs[0] || zelfNameRecords.arweave[0];
 
-	// return { zelfPayObject: zelfPayObject.publicData, zelfName_ };
-
 	if (network === "CB") {
 		const chargeID = zelfPayObject.publicData.coinbase_hosted_url.split("/pay/")[1];
 
@@ -185,16 +183,13 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 	const priceInIPFS = parseFloat(zelfPayObject.publicData.price);
 
 	if (price !== priceInIPFS) {
-		console.log({ zelfPayObject: zelfPayObject.publicData, price, priceInIPFS });
 		const error = new Error(`Validation_failed:${price}!==${priceInIPFS}`);
 		error.status = 409;
 		throw error;
 	}
 
-	return await checkoutPayUniqueAddress(network, amountToSend, selectedAddress, zelfName_);
+	return await checkoutPayUniqueAddress(network, amountToSend, selectedAddress);
 };
-
-///funcion para checar pagos con unica dirección
 
 const checkoutPayUniqueAddress = async (network, amountToSend, selectedAddress) => {
 	const balance = await {
@@ -203,18 +198,18 @@ const checkoutPayUniqueAddress = async (network, amountToSend, selectedAddress) 
 		BTC: checkoutBICOIN,
 	}[network]?.(selectedAddress);
 
-	let amountDetected = balance;
-	let transactionStatus = false;
-	let transactionDescription = "pending";
-	let remainingAmount = 0;
-
-	if (amountDetected === 0) {
+	if (balance === 0) {
 		return {
 			transactionStatus: false,
 			transactionDescription: "pending",
 			amountDetected,
 		};
 	}
+
+	let amountDetected = balance;
+	let transactionStatus = false;
+	let transactionDescription = "pending";
+	let remainingAmount = 0;
 
 	try {
 		if (amountDetected >= Number(amountToSend)) {
@@ -239,7 +234,7 @@ const checkoutPayUniqueAddress = async (network, amountToSend, selectedAddress) 
 		confirmationData: confirmationData,
 	};
 };
-///funcion para checar pagos en coinbase
+
 const checkoutPayCoinbase = async (chargeID) => {
 	const charge = await getCoinbaseCharge(chargeID);
 
@@ -247,7 +242,7 @@ const checkoutPayCoinbase = async (chargeID) => {
 
 	return { timeline: charge.timeline };
 };
-///funcion para checar balance en ETH
+
 const checkoutETH = async (address) => {
 	try {
 		const balanceETH = await getAddress({
@@ -260,7 +255,8 @@ const checkoutETH = async (address) => {
 	} catch (error) {
 		console.error(error);
 	}
-	return null;
+
+	return 0;
 };
 
 const checkoutSOLANA = async (address) => {
@@ -273,6 +269,8 @@ const checkoutSOLANA = async (address) => {
 	} catch (error) {
 		console.error(error);
 	}
+
+	return 0;
 };
 
 const checkoutBICOIN = async (address) => {
@@ -283,8 +281,10 @@ const checkoutBICOIN = async (address) => {
 
 		return balance;
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 	}
+
+	return 0;
 };
 
 const getReceiptEmail = async (body) => {
