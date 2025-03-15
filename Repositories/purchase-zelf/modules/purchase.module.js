@@ -29,15 +29,19 @@ const templatesMap = {
 	},
 };
 
+// Function to search for a Zelf lease
 const searchZelfLease = async (zelfName) => {
+	// Search for the Zelf name in the database
 	const previewData = await searchZelfName({ zelfName: zelfName });
 
+	// If no data is found, throw an error
 	if (!previewData?.ipfs?.[0]?.publicData) {
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
 		throw error;
 	}
 
+	// Extract relevant data from the search result
 	const price = previewData.ipfs[0].publicData.price;
 	const duration = previewData.ipfs[0].publicData.duration;
 	const expiresAt = previewData.ipfs[0].publicData.expiresAt;
@@ -45,24 +49,29 @@ const searchZelfLease = async (zelfName) => {
 	const coinbase_hosted_url = previewData.ipfs[0].publicData.coinbase_hosted_url;
 	const referralSolanaAddress = previewData.ipfs[0].publicData.referralSolanaAddress;
 
+	// If the Zelf name is already purchased, throw an error
 	if (previewData.ipfs[0].publicData.type === "mainnet") {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
 		throw error;
 	}
 
+	// Replace ".zelf" with ".zelfpay" for payment purposes
 	const zelfNamePay = zelfName.replace(".zelf", ".zelfpay");
 
-	const previewData2 = await searchZelfName({
+	// Search for the payment Zelf name in the database
+	const zelfPayObject = await searchZelfName({
 		zelfName: zelfNamePay,
-		environment: "both",
+		environment: "mainnet",
 	});
 
+	// Calculate the crypto value for the payment
 	const cryptoValue = await calculateCryptoValue("ETH", price);
 	const network = cryptoValue.network;
 	const amountToSend = cryptoValue.amountToSend;
 	const ratePriceInUSD = cryptoValue.ratePriceInUSD;
 
+	// Create a record data object for signing
 	const recordData = {
 		network: network,
 		amountToSend: cryptoValue.amountToSend,
@@ -70,18 +79,23 @@ const searchZelfLease = async (zelfName) => {
 		ratePriceInUSD: cryptoValue.ratePriceInUSD,
 	};
 
+	// Sign the record data
 	const signedDataPrice = signRecordData(recordData, secretKey);
 
 	let paymentAddress;
 
-	if (Array.isArray(previewData2.ipfs) && previewData2.ipfs.length > 0) {
-		paymentAddress = JSON.parse(previewData2.ipfs[0].publicData.addresses);
-	} else {
+	// Extract payment address from the search result
+	if (!Array.isArray(zelfPayObject.ipfs) || !zelfPayObject.ipfs.length) {
 		throw new Error("Invalid IPFS data");
 	}
 
-	delete paymentAddress.customerZelfName;
+	paymentAddress = {
+		ethAddress: zelfPayObject.ipfs[0].publicData.ethAddress,
+		solanaAddress: zelfPayObject.ipfs[0].publicData.solanaAddress,
+		btcAddress: zelfPayObject.ipfs[0].publicData.btcAddress,
+	};
 
+	// Return the relevant data for the Zelf lease
 	return {
 		paymentAddress,
 		zelfName,
