@@ -676,7 +676,7 @@ const leaseOffline = async (params, authUser) => {
 	return zelfNameObject;
 };
 
-const createZelfPay = async (zelfNameObject, authUser) => {
+const createZelfPay = async (zelfNameObject) => {
 	// create link for coinbase
 	const params = zelfNameObject.publicData || zelfNameObject.metadata;
 
@@ -849,7 +849,7 @@ const _getZelfNameToConfirm = async (zelfName, authUser) => {
 		if (zelfPayRecords.length) {
 			zelfPayNameObject = zelfPayRecords[0];
 		} else {
-			const createdZelfPay = await createZelfPay(zelfNameObject, authUser);
+			const createdZelfPay = await createZelfPay(zelfNameObject);
 
 			zelfPayNameObject = createdZelfPay.ipfs || createdZelfPay.arweave;
 		}

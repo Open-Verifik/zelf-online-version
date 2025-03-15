@@ -5,7 +5,7 @@ const Model = require("../../Subscribers/models/subscriber.model");
 const MongoORM = require("../../../Core/mongo-orm");
 const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
 const { calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns-parts.module");
-
+const { createZelfPay } = require("../../ZelfNameService/modules/zns.v2.module");
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
@@ -39,12 +39,9 @@ const searchZelfLease = async (zelfName) => {
 		throw error;
 	}
 
-	const price = previewData.ipfs[0].publicData.price;
-	const duration = previewData.ipfs[0].publicData.duration;
-	const expiresAt = previewData.ipfs[0].publicData.expiresAt;
-	const referralZelfName = previewData.ipfs[0].publicData.referralZelfName;
-	const coinbase_hosted_url = previewData.ipfs[0].publicData.coinbase_hosted_url;
-	const referralSolanaAddress = previewData.ipfs[0].publicData.referralSolanaAddress;
+	const zelfNameObject = previewData.ipfs[0] || previewData.arweave[0];
+
+	const { price, duration, expiresAt, referralZelfName, coinbase_hosted_url, referralSolanaAddress } = zelfNameObject.publicData;
 
 	if (previewData.ipfs[0].publicData.type === "mainnet") {
 		const error = new Error("zelfName_purchased_already");
@@ -52,12 +49,28 @@ const searchZelfLease = async (zelfName) => {
 		throw error;
 	}
 
-	const zelfNamePay = zelfName.replace(".zelf", ".zelfpay");
+	let zelfPayNameObject = null;
+	let zelfPayRecords = [];
 
-	const previewData2 = await searchZelfName({
-		zelfName: zelfNamePay,
-		environment: "both",
-	});
+	try {
+		zelfPayRecords = await previewZelfName(
+			{
+				zelfName: zelfName.replace(".zelf", ".zelfpay"),
+				environment: "mainnet",
+			},
+			{}
+		);
+	} catch (exception) {
+		console.error({ exception });
+	}
+
+	if (zelfPayRecords.length) {
+		zelfPayNameObject = zelfPayRecords[0];
+	} else {
+		const createdZelfPay = await createZelfPay(zelfNameObject);
+
+		zelfPayNameObject = createdZelfPay.ipfs || createdZelfPay.arweave;
+	}
 
 	const cryptoValue = await calculateCryptoValue("ETH", price);
 	const network = cryptoValue.network;
@@ -73,15 +86,17 @@ const searchZelfLease = async (zelfName) => {
 
 	const signedDataPrice = signRecordData(recordData, secretKey);
 
-	let paymentAddress;
-
-	if (Array.isArray(previewData2.ipfs) && previewData2.ipfs.length > 0) {
-		paymentAddress = JSON.parse(previewData2.ipfs[0].publicData.addresses);
-	} else {
-		throw new Error("Invalid IPFS data");
+	if (!zelfPayNameObject) {
+		const error = new Error("zelfPayName_not_found");
+		error.status = 404;
+		throw error;
 	}
 
-	delete paymentAddress.customerZelfName;
+	const paymentAddress = {
+		ethAddress: zelfPayNameObject.publicData.ethAddress,
+		btcAddress: zelfPayNameObject.publicData.btcAddress,
+		solanaAddress: zelfPayNameObject.publicData.solanaAddress,
+	};
 
 	return {
 		paymentAddress,
