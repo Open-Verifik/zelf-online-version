@@ -35,29 +35,42 @@ const get = async (params, authUser = {}) => {
  * @param {*} authUser
  */
 const insert = async (params, authUser) => {
-	await deleteSession(
-		authUser || {
-			identifier: params.identifier,
-		}
-	);
+	// get session by identifier
+
+	const existingSession = await get({
+		where_clientIP: params.clientIP,
+		findOne: true,
+	});
+
+	if (existingSession) {
+		return {
+			token: jwt.sign(
+				{
+					session: existingSession._id,
+					identifier: existingSession.identifier,
+				},
+				config.JWT_SECRET
+			),
+		};
+	}
 
 	const session = new Model({
 		identifier: params.identifier,
+		clientIP: params.clientIP,
 		type: params.type || "createWallet",
 		status: "active",
+		isWebExtension: params.isWebExtension || false,
 	});
 
 	try {
 		await session.save();
 	} catch (exception) {
-		console.error({ exception });
-		if (params.type !== "general") {
-			const error = new Error("zelfName_is_taken");
+		console.log({ exception });
+		const error = new Error("session_duplication");
 
-			error.status = 409;
+		error.status = 409;
 
-			throw error;
-		}
+		throw error;
 	}
 
 	return {
@@ -76,7 +89,7 @@ const extractPublicKey = async (params) => {
 
 	if (storedKey) return storedKey.publicKey;
 
-	const pgpRecord = await PGPKeyModule.generateKey("session", params.identifier, params.name, params.email, params.identifier, params.password);
+	const pgpRecord = await PGPKeyModule.generateKey("session", params.identifier, params.name, params.email, params.password);
 
 	return pgpRecord.publicKey;
 };
@@ -178,7 +191,11 @@ const walletEncrypt = async (content, identifier, password = "") => {
 		new: false,
 	};
 
-	if (!pgpRecord) await _generateNewWalletKeys(identifier, payload, password);
+	if (!pgpRecord) {
+		await _generateNewWalletKeys(identifier, payload, password);
+	} else {
+		payload.privateKey = await PGPKeyModule.decryptKey(pgpRecord.type, pgpRecord.key);
+	}
 
 	const publicKey = await openpgp.readKey({
 		armoredKey: payload.publicKey,
@@ -190,16 +207,14 @@ const walletEncrypt = async (content, identifier, password = "") => {
 		encryptionKeys: publicKey,
 	});
 
-	return encryptedMessage;
+	return { encryptedMessage, privateKey: payload.privateKey };
 };
 
 const _generateNewWalletKeys = async (identifier, walletData, password) => {
 	const newPgpRecord = await PGPKeyModule.generateKey("storage", identifier, null, null, password);
 
 	walletData.publicKey = newPgpRecord.publicKey;
-
 	walletData.privateKey = newPgpRecord.privateKey;
-
 	walletData.new = true;
 };
 

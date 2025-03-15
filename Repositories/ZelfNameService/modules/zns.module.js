@@ -6,20 +6,18 @@ const { generateMnemonic } = require("../../Wallet/modules/helpers");
 const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
-const sessionModule = require("../../Session/modules/session.module");
-const { getTickerPrice } = require("../../binance/modules/binance.module");
+const SessionModule = require("../../Session/modules/session.module");
 const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
 const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
-
 const config = require("../../../Core/config");
 const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const jwt = require("jsonwebtoken");
 const { createUnderName } = require("./undernames.module");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
-const { bitcoin } = require("bitcoinjs-lib/src/networks");
+const ZNSPartsModule = require("./zns-parts.module");
 
 const evmCompatibleTickers = [
 	"ETH", // Ethereum
@@ -58,74 +56,6 @@ const zelfNamePricing = {
 	25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
 	26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
 	27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
-};
-
-/**
- * Get Zelf Name price based on name length and duration
- * @param {number} length - The length of the Zelf name
- * @param {string} duration - Duration ("1", "2", "3", "4", "5", "lifetime")
- * @returns {number} - Price of the Zelf name
- */
-const _calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
-	if (!["1", "2", "3", "4", "5", "lifetime"].includes(`${duration}`))
-		throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
-
-	let price = 24;
-
-	if (length >= 6 && length <= 15) {
-		price = zelfNamePricing["6-15"][duration];
-	} else if (zelfNamePricing[length]) {
-		price = zelfNamePricing[length][duration];
-	} else {
-		throw new Error("Invalid name length. Length must be between 1 and 27.");
-	}
-
-	// Adjust price for development environment
-	price = config.env === "development" ? price / 30 : price;
-
-	const priceWithoutDiscount = Number(price);
-	let discount = 10;
-	let discountType = "percentage";
-
-	const whitelist = config.token.whitelist || "";
-
-	if (whitelist.length && referralZelfName && whitelist.includes(referralZelfName)) {
-		// calculate the discount for the referral it's a string that we need to separate by commas "zelfmedellin.zelf:24$,zelfbogota.zelf:25%"
-		// format is the following {{zelfname:amount:type}} - type can be percentage or fixed amount
-		const referralDiscounts = config.token.whitelist.split(",");
-
-		const referralDiscount = referralDiscounts.find((discount) => {
-			const [name] = discount.split(":");
-			return name === referralZelfName || name === `${referralZelfName}.zelf`;
-		});
-
-		if (referralDiscount) {
-			const [zelfName, amount] = referralDiscount.split(":");
-
-			if (amount.includes("%")) {
-				discountType = "percentage";
-				discount = parseInt(amount);
-				price = price - price * (discount / 100);
-			} else {
-				discount = parseInt(amount);
-				discountType = "amount";
-				price = price - discount;
-			}
-		}
-	} else if (referralZelfName) {
-		price = price - price * 0.1;
-	}
-
-	// Round up to 2 decimal places
-	return {
-		price: Math.max(Math.ceil(price * 100) / 100, 0),
-		currency: "USD",
-		reward: Math.max(Math.ceil((price / config.token.rewardPrice) * 100) / 100, 0),
-		discount,
-		priceWithoutDiscount,
-		discountType,
-		whitelist,
-	};
 };
 
 /**
@@ -171,12 +101,12 @@ const searchZelfName = async (params, authUser) => {
 const _removeExpiredRecords = async (records) => {
 	const now = moment();
 
-	// testing adding few days, so it's expired
-
 	for (let index = records.length - 1; index >= 0; index--) {
 		const record = records[index];
 
-		const expiresAt = moment(record.metadata.keyvalues.expiresAt);
+		const extraParams = JSON.parse(record.metadata.keyvalues.extraParams || "{}");
+
+		const expiresAt = moment(record.metadata.keyvalues.expiresAt || extraParams.expiresAt);
 
 		const type = record.metadata.keyvalues.type;
 
@@ -246,7 +176,7 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 	const zelfName = query.value || query.zelfName;
 
 	const { price, reward } = zelfName.includes(".zelf")
-		? _calculateZelfNamePrice(zelfName.split(".zelf")[0].length, query.duration)
+		? ZNSPartsModule.calculateZelfNamePrice(zelfName.split(".zelf")[0].length, query.duration)
 		: { price: 0, reward: 0 };
 
 	try {
@@ -273,7 +203,7 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 			const ipfsRecord = ipfsRecords[index];
 
 			if (environment === "both") {
-				zelfNamesInIPFS.push(await _formatIPFSSearchResult(ipfsRecord, foundInArweave));
+				zelfNamesInIPFS.push(await ZNSPartsModule.formatIPFSRecord(ipfsRecord, foundInArweave));
 
 				continue;
 			}
@@ -282,7 +212,7 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 				(environment === "hold" && ipfsRecord.metadata.keyvalues.type === "hold") ||
 				(environment === "mainnet" && (!ipfsRecord.metadata.keyvalues.type || ipfsRecord.metadata.keyvalues.type === "mainnet"))
 			) {
-				zelfNamesInIPFS.push(await _formatIPFSSearchResult(ipfsRecord, foundInArweave));
+				zelfNamesInIPFS.push(await ZNSPartsModule.formatIPFSRecord(ipfsRecord, foundInArweave));
 			}
 		}
 
@@ -325,7 +255,7 @@ const _formatArweaveSearchResult = async (transactionRecord) => {
 
 	zelfNameObject.zelfName = zelfNameTag.value;
 
-	const { discount, discountType } = _calculateZelfNamePrice(15, 1, zelfNameObject.zelfName.split(".zelf")[0]);
+	const { discount, discountType } = ZNSPartsModule.calculateZelfNamePrice(15, 1, zelfNameObject.zelfName.split(".zelf")[0]);
 
 	zelfNameObject.publicData.discount = discount;
 	zelfNameObject.publicData.discountType = discountType;
@@ -333,75 +263,6 @@ const _formatArweaveSearchResult = async (transactionRecord) => {
 	zelfNameObject.zelfProofQRCode = await _arweaveIDToBase64(zelfNameObject.id);
 
 	return zelfNameObject;
-};
-
-const _formatIPFSSearchResult = async (ipfsRecord, foundInArweave) => {
-	const zelfNameObject = {
-		...ipfsRecord,
-		publicData: {
-			name: ipfsRecord.metadata.name,
-			...ipfsRecord.metadata.keyvalues,
-		},
-		zelfName: ipfsRecord.metadata.name,
-	};
-
-	const zelfNameWithoutExtension = ipfsRecord.metadata.name.split(".zelf")[0];
-
-	const { discount, discountType } = _calculateZelfNamePrice(15, 1, zelfNameWithoutExtension);
-
-	zelfNameObject.publicData.discount = discount;
-	zelfNameObject.publicData.discountType = discountType;
-
-	if (zelfNameObject.publicData.payment) {
-		const payment = JSON.parse(zelfNameObject.publicData.payment);
-
-		// assign the payment to the publicData
-		zelfNameObject.publicData.price = payment.price;
-		zelfNameObject.publicData.duration = payment.duration;
-		zelfNameObject.publicData.coinbase_hosted_url = payment.coinbase_hosted_url;
-		zelfNameObject.publicData.referralZelfName = payment.referralZelfName;
-		zelfNameObject.publicData.referralSolanaAddress = payment.referralSolanaAddress;
-
-		delete zelfNameObject.publicData.payment;
-	}
-
-	if (zelfNameObject.publicData.addresses) {
-		const addresses = JSON.parse(zelfNameObject.publicData.addresses);
-
-		zelfNameObject.publicData.ethAddress = addresses.ethAddress;
-		zelfNameObject.publicData.solanaAddress = addresses.solanaAddress;
-		zelfNameObject.publicData.btcAddress = addresses.btcAddress;
-
-		delete zelfNameObject.publicData.addresses;
-	}
-
-	if (!foundInArweave) {
-		zelfNameObject.zelfProof = zelfNameObject.publicData.zelfProof;
-
-		zelfNameObject.zelfProofQRCode = await _IPFSToBase64(zelfNameObject.url);
-	}
-
-	delete zelfNameObject.metadata;
-
-	return zelfNameObject;
-};
-
-const _IPFSToBase64 = async (url) => {
-	try {
-		const encryptedResponse = await axios.get(url, {
-			responseType: "arraybuffer",
-		});
-
-		if (encryptedResponse?.data) {
-			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
-
-			return `data:image/png;base64,${base64Image}`;
-		}
-	} catch (exception) {
-		console.error({ VWEx: exception });
-
-		return exception?.message;
-	}
 };
 
 const _arweaveIDToBase64 = async (id) => {
@@ -474,7 +335,7 @@ const leaseZelfName = async (params, authUser) => {
 
 	zelfNameObject.zelfName = zelfName;
 
-	const { price, priceWithoutDiscount, reward, discount, discountType, whitelist } = _calculateZelfNamePrice(
+	const { price, priceWithoutDiscount, reward, discount, discountType } = ZNSPartsModule.calculateZelfNamePrice(
 		zelfName.length - 5,
 		duration,
 		referralZelfName
@@ -599,7 +460,7 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 	await _createReceivingWallets(zelfNameObject, authUser);
 };
 
-const _createReceivingWallets = async (zelfNameObject, authUser) => {
+const _createReceivingWallets = async (zelfNameObject) => {
 	if (zelfNameObject.price === 0) {
 		return {
 			ipfsRecord: null,
@@ -646,9 +507,14 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
 		metadata: {
 			hasPassword: zelfNameObject.hasPassword,
 			zelfProof,
-			expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
 			type: "mainnet",
-			addresses: JSON.stringify(dataToEncrypt.publicData),
+			ethAddress: eth.address,
+			solanaAddress: solana.address,
+			btcAddress: btc.address,
+			extraParams: JSON.stringify({
+				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+				price: zelfNameObject.price,
+			}),
 			zelfName: paymentName,
 		},
 		pinIt: true,
@@ -758,7 +624,7 @@ const _confirmZelfNamePurchase = async (zelfNameObject) => {
 
 	return {
 		ipfs: [masterIPFSRecord],
-		arweave: [masterArweaveRecord],
+		arweave: masterArweaveRecord,
 		reward,
 	};
 };
@@ -769,6 +635,7 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 	const chargeID = zelfNameObject.publicData?.coinbase_id || zelfNameObject.publicData?.coinbase_hosted_url?.split("/pay/")[1];
 
 	if (!chargeID) {
+		console.log({ publicData: zelfNameObject.publicData });
 		const error = new Error("coinbase_charge_id_not_found");
 
 		error.status = 404;
@@ -808,9 +675,11 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 
 	const expiresAt = moment().add(duration, "year").format("YYYY-MM-DD HH:mm:ss");
 
+	const zelfName = zelfNameObject.preview?.publicData.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", "");
+
 	const payload = {
 		base64: zelfNameObject.zelfProofQRCode,
-		name: zelfNameObject.preview?.publicData.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", ""),
+		name: zelfName,
 		metadata: {
 			hasPassword: `${
 				Boolean(zelfNameObject.preview?.passwordLayer === "Password") ||
@@ -818,8 +687,15 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 				zelfNameObject.publicData.hasPassword
 			}`,
 			zelfProof: zelfNameObject.publicData.zelfProof,
-			...zelfNameObject.preview?.publicData,
-			expiresAt,
+			zelfName,
+			ethAddress: zelfNameObject.preview.publicData.ethAddress,
+			solanaAddress: zelfNameObject.preview.publicData.solanaAddress,
+			btcAddress: zelfNameObject.preview.publicData.btcAddress,
+			extraParams: JSON.stringify({
+				origin: zelfNameObject.preview.publicData.origin || "online",
+				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+				expiresAt,
+			}),
 			type: "mainnet",
 		},
 		pinIt: true,
@@ -885,11 +761,11 @@ const _decryptParams = async (data, authUser) => {
 		};
 	}
 
-	const password = await sessionModule.sessionDecrypt(data.password || null, authUser);
+	const password = await SessionModule.sessionDecrypt(data.password || null, authUser);
 
-	const mnemonic = await sessionModule.sessionDecrypt(data.mnemonic || null, authUser);
+	const mnemonic = await SessionModule.sessionDecrypt(data.mnemonic || null, authUser);
 
-	const face = await sessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
+	const face = await SessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
 
 	return { password, mnemonic, face };
 };
@@ -1056,9 +932,9 @@ const _findZelfName = async (params, environment = "both", authUser) => {
  * @param {Object} authUser
  */
 const decryptZelfName = async (params, authUser) => {
-	const zelfNameObjects = await _findZelfName({ zelfName: params.zelfName }, "both", authUser);
+	const zelfNameObjects = await _findZelfName({ zelfName: params.zelfName }, "both", authUser); //ipfs or arweave [0]
 
-	const zelfNameObject = zelfNameObjects[0];
+	const zelfNameObject = zelfNameObjects[0]; // arweave[0] or ipfs[0] or othersource[0] or nostr[0]
 
 	const { face, password } = await _decryptParams(params, authUser);
 
@@ -1075,10 +951,18 @@ const decryptZelfName = async (params, authUser) => {
 		throw error;
 	}
 
+	const { encryptedMessage, privateKey } = await SessionModule.walletEncrypt(
+		decryptedZelfProof.metadata,
+		zelfNameObject.publicData.ethAddress,
+		password
+	);
+
 	return {
+		...zelfNameObject,
 		zelfName: zelfNameObject.publicData.zelfName,
 		image: zelfNameObject.zelfProofQRCode,
-		metadata: decryptedZelfProof.metadata,
+		metadata: decryptedZelfProof.metadata, // once you implement it in znsv2, this has to be removed and only keep pgp.
+		pgp: { encryptedMessage, privateKey },
 		url: zelfNameObject.url,
 		publicData: {
 			...zelfNameObject.publicData,
@@ -1116,7 +1000,7 @@ const leaseOffline = async (params, authUser) => {
 
 	let _preview = holdRecord?.preview || mainnetRecord?.preview;
 
-	const { price, reward, priceWithoutDiscount } = _calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
+	const { price, reward, priceWithoutDiscount } = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, duration, referralZelfName);
 
 	if (!_preview) _preview = await preview({ zelfProof });
 
@@ -1201,7 +1085,11 @@ const update = async (params, authUser) => {
 
 	const { ipfs_pin_hash, publicData } = holdRecord;
 
-	const { price } = _calculateZelfNamePrice(holdRecord.zelfName.split(".zelf")[0].length, duration, holdRecord.publicData.referralZelfName);
+	const { price } = ZNSPartsModule.calculateZelfNamePrice(
+		holdRecord.zelfName.split(".zelf")[0].length,
+		duration,
+		holdRecord.publicData.referralZelfName
+	);
 
 	holdRecord.price = price;
 
@@ -1250,7 +1138,6 @@ module.exports = {
 	previewZelfName,
 	previewZelfProof,
 	decryptZelfName,
-	_calculateZelfNamePrice,
 	_confirmCoinbaseCharge,
 	leaseOffline,
 	saveInProduction: _cloneZelfNameToProduction,

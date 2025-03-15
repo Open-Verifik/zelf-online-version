@@ -1,7 +1,7 @@
 const { ARIO, ArweaveSigner, ANT } = require("@ar.io/sdk");
 const config = require("../../../Core/config");
 
-const ario = ARIO.init();
+const ario = ARIO.init({ processId: "qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE" });
 
 // create under name logic here
 const createUnderName = async (payload) => {

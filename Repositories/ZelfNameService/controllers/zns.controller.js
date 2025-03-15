@@ -1,10 +1,56 @@
 const Module = require("../modules/zns.module");
+const Modulev2 = require("../modules/zns.v2.module");
 const ZNSTokenModule = require("../modules/zns-token.module");
 const RevenueCatModule = require("../modules/revenue-cat.module");
 
 const searchZelfName = async (ctx) => {
 	try {
 		const data = await Module.searchZelfName(ctx.request.query, ctx.state.user);
+
+		if (data && data.available && data.zelfName.includes("zelfpay")) {
+			const zelfName = data.zelfName.replace("zelfpay", "zelf");
+
+			const zelfNameData = await Module.searchZelfName({ zelfName }, ctx.state.user);
+
+			const zelfNameObject = zelfNameData.ipfs?.length ? zelfNameData.ipfs[0] : zelfNameData.arweave[0];
+
+			if (zelfNameObject) {
+				ctx.body = {
+					data: await Modulev2.createZelfPay(zelfNameObject, ctx.state.user),
+				};
+
+				return;
+			}
+		}
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
+const searchZelfName_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.searchZelfName(ctx.request.query, ctx.state.user);
+
+		if (data && data.available && data.zelfName.includes("zelfpay")) {
+			const zelfName = data.zelfName.replace("zelfpay", "zelf");
+
+			const zelfNameData = await Module.searchZelfName({ zelfName }, ctx.state.user);
+
+			const zelfNameObject = zelfNameData.ipfs?.length ? zelfNameData.ipfs[0] : zelfNameData.arweave[0];
+
+			if (zelfNameObject) {
+				ctx.body = {
+					data: await Modulev2.createZelfPay(zelfNameObject, ctx.state.user),
+				};
+
+				return;
+			}
+		}
 
 		ctx.body = { data };
 	} catch (error) {
@@ -29,9 +75,37 @@ const leaseZelfName = async (ctx) => {
 	}
 };
 
+const leaseZelfName_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.leaseZelfName({ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() }, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 const leaseConfirmation = async (ctx) => {
 	try {
 		const data = await Module.leaseConfirmation(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
+const leaseConfirmation_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.leaseConfirmation(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -80,6 +154,26 @@ const previewZelfProof = async (ctx) => {
 const decryptZelfName = async (ctx) => {
 	try {
 		const data = await Module.decryptZelfName(
+			{
+				...ctx.request.body,
+				zelfName: `${ctx.request.body.zelfName}`.toLowerCase(),
+			},
+			ctx.state.user
+		);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
+const decryptZelfName_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.decryptZelfName(
 			{
 				...ctx.request.body,
 				zelfName: `${ctx.request.body.zelfName}`.toLowerCase(),
@@ -168,16 +262,35 @@ const update = async (ctx) => {
 	}
 };
 
+const zelfPay = async (ctx) => {
+	try {
+		const data = await Module.zelfPay(ctx.request.query, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	searchZelfName,
+	searchZelfName_v2,
 	leaseZelfName,
+	leaseZelfName_v2,
 	leaseConfirmation,
+	leaseConfirmation_v2,
 	previewZelfName,
 	previewZelfProof,
 	decryptZelfName,
+	decryptZelfName_v2,
 	leaseOfflineZelfName,
 	revenueCatWebhook,
 	referralRewards,
 	purchaseRewards,
 	update,
+	zelfPay,
 };

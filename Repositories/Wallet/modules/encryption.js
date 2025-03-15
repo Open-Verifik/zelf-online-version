@@ -95,11 +95,15 @@ const decrypt = async (data) => {
 	} catch (exception) {
 		const _error = exception.response?.data;
 
+		console.log({ _error, senseprint_base_64: data.zelfProof });
 		let error = new Error(_error.code);
 
 		switch (_error.code) {
 			case "ERR_INVALID_IMAGE":
+			case "ERR_INVALID_SENSEPRINT_BYTES":
 				error.status = 400;
+
+				error.message = "Decrypting error";
 
 				break;
 			case "ERR_PASSWORD_REQUIRED":

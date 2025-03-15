@@ -137,6 +137,12 @@ const insert = async (params, authUser = {}) => {
 
 	const zelfProof = await encrypt(dataToEncrypt);
 
+	const { encryptedMessage, privateKey } = await sessionModule.walletEncrypt(
+		{ mnemonic, zkProof, solanaPrivateKey: solana.secretKey },
+		eth.address,
+		password
+	);
+
 	if (!zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
 
 	if (!params.skipQRCode) {
@@ -178,6 +184,9 @@ const insert = async (params, authUser = {}) => {
 		zelfProof,
 		metadata: params.previewZelfProof ? dataToEncrypt.metadata : undefined,
 		zkProof,
+		encryptedMessage,
+		privateKey,
+		solana,
 	};
 };
 

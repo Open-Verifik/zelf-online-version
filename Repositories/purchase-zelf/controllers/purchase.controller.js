@@ -4,7 +4,7 @@ const searchZelfLease = async (ctx) => {
 	try {
 		const { zelfName } = ctx.request.body;
 
-		const data = await Module.searchZelfLease(zelfName);
+		const data = await Module.searchZelfLease(`${zelfName}`.toLowerCase());
 
 		ctx.body = { data };
 	} catch (error) {
@@ -37,7 +37,7 @@ const pay = async (ctx) => {
 	const { network, signedDataPrice, paymentAddress } = ctx.request.body;
 
 	try {
-		const data = await Module.pay(zelfName, network, signedDataPrice, paymentAddress);
+		const data = await Module.pay(`${zelfName}`.toLowerCase(), network, signedDataPrice, paymentAddress);
 
 		ctx.body = { data };
 	} catch (error) {

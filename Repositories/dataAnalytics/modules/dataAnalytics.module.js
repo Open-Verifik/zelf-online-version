@@ -63,7 +63,7 @@ const getAssetDetails = async (params) => {
 
 		response.chart = await getChart({
 			asset: symbol,
-			interval: params.interval || "1d",
+			interval: params.interval || "1h",
 			startDate: moment().subtract(1, "month").format("YYYY-MM-DD HH:mm:ss"),
 			endDate: moment().format("YYYY-MM-DD HH:mm:ss"),
 		});

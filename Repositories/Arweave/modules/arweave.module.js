@@ -7,8 +7,9 @@ const axios = require("axios");
 const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 const moment = require("moment");
-const holdOwner = config.arwave.hold.owner;
-const owner = config.arwave.owner;
+
+const owner = config.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
+
 const graphql = `${arweaveUrl}/graphql`;
 
 const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
@@ -70,27 +71,6 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 			value: hasPassword,
 		},
 	];
-
-	if (zelfNameObject.coinbaseCharge) {
-		tags.push(
-			{
-				name: "coinbase_id",
-				value: zelfNameObject.coinbaseCharge.id,
-			},
-			{
-				name: "coinbase_hosted_url",
-				value: zelfNameObject.coinbaseCharge.hosted_url,
-			},
-			{
-				name: "coinbase_expires_at",
-				value: zelfNameObject.coinbaseCharge.expires_at,
-			},
-			{
-				name: "coinbase_created_at",
-				value: zelfNameObject.coinbaseCharge.created_at,
-			}
-		);
-	}
 
 	const publicKeys = Object.keys(publicData);
 
@@ -251,7 +231,26 @@ const search = async (zelfName, extraConditions = {}) => {
 	return searchResults;
 };
 
+const arweaveIDToBase64 = async (id) => {
+	try {
+		const encryptedResponse = await axios.get(`${arweaveUrl}/${id}`, {
+			responseType: "arraybuffer",
+		});
+
+		if (encryptedResponse?.data) {
+			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
+
+			return `data:image/png;base64,${base64Image}`;
+		}
+	} catch (exception) {
+		console.error({ VWEx: exception });
+
+		return exception?.message;
+	}
+};
+
 module.exports = {
 	zelfNameRegistration,
 	search,
+	arweaveIDToBase64,
 };

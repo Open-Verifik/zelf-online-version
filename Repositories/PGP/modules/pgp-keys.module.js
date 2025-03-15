@@ -7,14 +7,13 @@ const MongoORM = require("../../../Core/mongo-orm");
 
 const generateKey = async (type = "session", identifier, name, email, password) => {
 	name = name || "Miguel T";
-
 	email = email || "miguel@zelf.world";
 
 	const { privateKey, publicKey } = await openpgp.generateKey({
 		type: "ecc",
 		curve: "curve25519",
 		userIDs: [{ name, email }],
-		passphrase: type === "session" ? passphrase : globalPassphrase,
+		passphrase: password || (type === "session" ? passphrase : globalPassphrase),
 	});
 
 	await _saveKey(type, identifier, privateKey, publicKey, { name, email });
