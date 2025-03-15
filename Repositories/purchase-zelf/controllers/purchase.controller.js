@@ -4,7 +4,7 @@ const searchZelfLease = async (ctx) => {
 	try {
 		const { zelfName } = ctx.request.body;
 
-		const data = await Module.searchZelfLease(zelfName);
+		const data = await Module.searchZelfLease(`${zelfName}`.toLowerCase());
 
 		ctx.body = { data };
 	} catch (error) {
