@@ -1061,4 +1061,5 @@ module.exports = {
 	leaseOffline,
 	createZelfPay,
 	leaseConfirmation,
+	previewZelfName,
 };

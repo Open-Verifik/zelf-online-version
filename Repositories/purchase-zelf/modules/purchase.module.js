@@ -5,7 +5,7 @@ const Model = require("../../Subscribers/models/subscriber.model");
 const MongoORM = require("../../../Core/mongo-orm");
 const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
 const { calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns-parts.module");
-const { createZelfPay } = require("../../ZelfNameService/modules/zns.v2.module");
+const { createZelfPay, previewZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
