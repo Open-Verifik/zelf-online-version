@@ -72,7 +72,16 @@ const leaseZelfName = async (params, authUser) => {
 	zelfNameObject.btcAddress = btc.address;
 	zelfNameObject.solanaAddress = solana.address;
 	zelfNameObject.hasPassword = `${Boolean(password)}`;
-	zelfNameObject.metadata = params.previewZelfProof ? dataToEncrypt.metadata : undefined;
+	zelfNameObject.metadata = params.previewZelfProof
+		? {
+				mnemonic: dataToEncrypt.metadata.mnemonic
+					.split(" ")
+					.map((word, index, array) => (index < 2 || index >= array.length - 2 ? word : "****"))
+					.join(" "),
+				solanaSecretKey: `${dataToEncrypt.metadata.solanaSecretKey.slice(0, 6)}****${dataToEncrypt.metadata.solanaSecretKey.slice(-6)}`,
+				zkProof: `${dataToEncrypt.metadata.zkProof.slice(0, 6)}****${dataToEncrypt.metadata.zkProof.slice(-6)}`,
+		  }
+		: undefined;
 	zelfNameObject.duration = duration;
 	zelfNameObject.zelfProof = await encrypt(dataToEncrypt);
 
