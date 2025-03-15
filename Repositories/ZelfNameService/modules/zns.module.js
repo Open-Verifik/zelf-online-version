@@ -460,7 +460,7 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 	await _createReceivingWallets(zelfNameObject, authUser);
 };
 
-const _createReceivingWallets = async (zelfNameObject, authUser) => {
+const _createReceivingWallets = async (zelfNameObject) => {
 	if (zelfNameObject.price === 0) {
 		return {
 			ipfsRecord: null,
@@ -507,9 +507,14 @@ const _createReceivingWallets = async (zelfNameObject, authUser) => {
 		metadata: {
 			hasPassword: zelfNameObject.hasPassword,
 			zelfProof,
-			expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
 			type: "mainnet",
-			addresses: JSON.stringify(dataToEncrypt.publicData),
+			ethAddress: eth.address,
+			solanaAddress: solana.address,
+			btcAddress: btc.address,
+			extraParams: JSON.stringify({
+				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+				price: zelfNameObject.price,
+			}),
 			zelfName: paymentName,
 		},
 		pinIt: true,

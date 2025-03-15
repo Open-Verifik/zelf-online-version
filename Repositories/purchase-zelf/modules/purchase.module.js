@@ -30,6 +30,10 @@ const templatesMap = {
 	},
 };
 
+/**
+ * search Zelf Lease
+ * @param {String} zelfName
+ */
 const searchZelfLease = async (zelfName) => {
 	const previewData = await searchZelfName({ zelfName: zelfName });
 
@@ -138,23 +142,18 @@ const selectMethod = async (network, price) => {
 };
 
 const pay = async (zelfName_, network, signedDataPrice) => {
-	const previewData2 = await searchZelfName({
-		zelfName: zelfName_,
-		environment: "hold",
+	const zelfNameRecords = await searchZelfName({
+		zelfName: zelfName_.replace(".zelf", ".zelfpay"),
+		environment: "mainnet",
 	});
-	try {
-		previewData2?.ipfs[0]?.publicData?.zelfName.split(".hold")[0];
-	} catch (e) {
-		const error = new Error("zelfName_not_found");
-		error.status = 404;
-		throw error;
-	}
 
-	const chargeID = previewData2.ipfs[0].publicData.coinbase_hosted_url.split("/pay/")[1];
+	const zelfPayObject = zelfNameRecords.ipfs[0] || zelfNameRecords.arweave[0];
 
-	const priceInIPFS = parseFloat(previewData2.ipfs[0].publicData.price);
+	// return { zelfPayObject: zelfPayObject.publicData, zelfName_ };
 
 	if (network === "CB") {
+		const chargeID = zelfPayObject.publicData.coinbase_hosted_url.split("/pay/")[1];
+
 		return await checkoutPayCoinbase(chargeID);
 	}
 
@@ -165,19 +164,17 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 		environment: "both",
 	});
 
-	const paymentAddressInIPFS = JSON.parse(previewData3.ipfs[0].publicData.addresses);
-
 	let selectedAddress = null;
 
 	switch (network.toUpperCase()) {
 		case "BTC":
-			selectedAddress = paymentAddressInIPFS.btcAddress;
+			selectedAddress = zelfPayObject.btcAddress;
 			break;
 		case "ETH":
-			selectedAddress = paymentAddressInIPFS.ethAddress;
+			selectedAddress = zelfPayObject.ethAddress;
 			break;
 		case "SOL":
-			selectedAddress = paymentAddressInIPFS.solanaAddress;
+			selectedAddress = zelfPayObject.solanaAddress;
 			break;
 		default:
 			break;
@@ -185,8 +182,11 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 
 	const { price, amountToSend } = verifyRecordData(signedDataPrice, secretKey);
 
+	const priceInIPFS = parseFloat(zelfPayObject.publicData.price);
+
 	if (price !== priceInIPFS) {
-		const error = new Error("Validation_failed");
+		console.log({ zelfPayObject: zelfPayObject.publicData, price, priceInIPFS });
+		const error = new Error(`Validation_failed:${price}!==${priceInIPFS}`);
 		error.status = 409;
 		throw error;
 	}

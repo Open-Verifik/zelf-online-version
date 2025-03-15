@@ -72,27 +72,6 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 		},
 	];
 
-	if (zelfNameObject.coinbaseCharge) {
-		tags.push(
-			{
-				name: "coinbase_id",
-				value: zelfNameObject.coinbaseCharge.id,
-			},
-			{
-				name: "coinbase_hosted_url",
-				value: zelfNameObject.coinbaseCharge.hosted_url,
-			},
-			{
-				name: "coinbase_expires_at",
-				value: zelfNameObject.coinbaseCharge.expires_at,
-			},
-			{
-				name: "coinbase_created_at",
-				value: zelfNameObject.coinbaseCharge.created_at,
-			}
-		);
-	}
-
 	const publicKeys = Object.keys(publicData);
 
 	for (let index = 0; index < publicKeys.length; index++) {

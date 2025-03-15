@@ -746,12 +746,17 @@ const createZelfPay = async (zelfNameObject) => {
 		metadata: {
 			hasPassword: zelfNameObject.hasPassword,
 			zelfProof,
-			expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
 			type: "mainnet",
-			addresses: JSON.stringify(dataToEncrypt.publicData),
+			ethAddress: eth.address,
+			solanaAddress: solana.address,
+			btcAddress: btc.address,
 			zelfName: paymentName,
-			coinbase_hosted_url: coinbaseCharge.hosted_url,
-			coinbase_expires_at: coinbaseCharge.expires_at,
+			extraParams: JSON.stringify({
+				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+				coinbase_hosted_url: coinbaseCharge.hosted_url,
+				coinbase_expires_at: coinbaseCharge.expires_at,
+				price: params.price,
+			}),
 		},
 		pinIt: true,
 	};
@@ -762,7 +767,9 @@ const createZelfPay = async (zelfNameObject) => {
 		hasPassword: "true",
 		zelfProof,
 		publicData: {
-			...dataToEncrypt.publicData,
+			ethAddress: params.ethAddress,
+			btcAddress: params.btcAddress,
+			solanaAddress: params.solanaAddress,
 			coinbase_hosted_url: coinbaseCharge.hosted_url,
 			coinbase_expires_at: `${coinbaseCharge.expires_at}`,
 			zelfName: paymentName,
