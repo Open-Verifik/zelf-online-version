@@ -91,7 +91,7 @@ const leaseZelfName_v2 = async (ctx) => {
 
 const leaseConfirmation = async (ctx) => {
 	try {
-		const data = await Module.leaseConfirmation(ctx.request.body, ctx.state.user);
+		const data = await Modulev2.leaseConfirmation(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
