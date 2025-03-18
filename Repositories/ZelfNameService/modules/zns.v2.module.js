@@ -681,7 +681,9 @@ const createZelfPay = async (zelfNameObject) => {
 	const params = zelfNameObject.publicData || zelfNameObject.metadata;
 
 	//extraParams
-	zelfNameObject.extraParams = JSON.parse(params.extraParams);
+	if (params.extraParams) {
+		zelfNameObject.extraParams = JSON.parse(params.extraParams);
+	}
 
 	const zelfName = params.zelfName.split(".hold")[0];
 
