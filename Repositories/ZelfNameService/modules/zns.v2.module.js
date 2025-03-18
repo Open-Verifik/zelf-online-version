@@ -648,8 +648,8 @@ const leaseOffline = async (params, authUser) => {
 			btcAddress: _preview.publicData.btcAddress,
 			solanaAddress: _preview.publicData.solanaAddress,
 		},
-		redirect_url: "https://name.zelf.world/#/coinbase-success",
-		cancel_url: "https://name.zelf.world/#/coinbase-cancel",
+		redirect_url: "https://payment.zelf.world/checkout",
+		cancel_url: "https://payment.zelf.world/checkout",
 	};
 
 	zelfNameObject.coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
@@ -734,8 +734,8 @@ const createZelfPay = async (zelfNameObject) => {
 			btcAddress: params.btcAddress,
 			solanaAddress: params.solanaAddress,
 		},
-		redirect_url: "https://payment.zelf.world/coinbase-success",
-		cancel_url: "https://payment.zelf.world/coinbase-cancel",
+		redirect_url: "https://payment.zelf.world/checkout",
+		cancel_url: "https://payment.zelf.world/checkout",
 	};
 
 	const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
