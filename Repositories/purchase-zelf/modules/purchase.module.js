@@ -7,7 +7,7 @@ const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
 const { calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns-parts.module");
 const { createZelfPay, previewZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
-
+const ZNSPartsModule = require("../../ZelfNameService/modules/zns-parts.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 const { getBalance } = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const jwt = require("jsonwebtoken");
@@ -155,13 +155,6 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 		return await checkoutPayCoinbase(chargeID);
 	}
 
-	const zelfNamePay = zelfName_.replace(".zelf", ".zelfpay");
-
-	const previewData3 = await searchZelfName({
-		zelfName: zelfNamePay,
-		environment: "both",
-	});
-
 	let selectedAddress = null;
 
 	switch (network.toUpperCase()) {
@@ -180,7 +173,8 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 
 	const { price, amountToSend } = verifyRecordData(signedDataPrice, secretKey);
 
-	const priceInIPFS = parseFloat(zelfPayObject.publicData.price);
+	const priceInIPFS =
+		parseFloat(zelfPayObject.publicData.price) || ZNSPartsModule.calculateZelfNamePrice(zelfName_.split(".zelf")[0].length, 1).price;
 
 	if (price !== priceInIPFS) {
 		console.log({ publicData: zelfPayObject.publicData });
