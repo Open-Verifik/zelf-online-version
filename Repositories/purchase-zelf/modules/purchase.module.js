@@ -147,7 +147,13 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 		environment: "mainnet",
 	});
 
-	const zelfPayObject = zelfNameRecords.ipfs[0] || zelfNameRecords.arweave[0];
+	if (!zelfNameRecords?.ipfs?.length && !zelfNameRecords?.arweave?.length) {
+		const error = new Error("zelfPayName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const zelfPayObject = zelfNameRecords?.ipfs[0] || zelfNameRecords?.arweave[0];
 
 	if (network === "CB") {
 		const chargeID = zelfPayObject.publicData.coinbase_hosted_url.split("/pay/")[1];
