@@ -202,7 +202,7 @@ const checkoutPayUniqueAddress = async (network, amountToSend, selectedAddress) 
 		return {
 			transactionStatus: false,
 			transactionDescription: "pending",
-			amountDetected,
+			amountDetected: 0,
 		};
 	}
 
