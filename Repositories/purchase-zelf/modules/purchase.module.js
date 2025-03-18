@@ -159,13 +159,13 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 
 	switch (network.toUpperCase()) {
 		case "BTC":
-			selectedAddress = zelfPayObject.btcAddress;
+			selectedAddress = zelfPayObject.publicData.btcAddress;
 			break;
 		case "ETH":
-			selectedAddress = zelfPayObject.ethAddress;
+			selectedAddress = zelfPayObject.publicData.ethAddress;
 			break;
 		case "SOL":
-			selectedAddress = zelfPayObject.solanaAddress;
+			selectedAddress = zelfPayObject.publicData.solanaAddress;
 			break;
 		default:
 			break;

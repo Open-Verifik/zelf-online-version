@@ -49,7 +49,7 @@ const calculateZelfNamePrice = (length, duration = 1, referralZelfName) => {
 	}
 
 	// Adjust price for development environment
-	price = config.env === "development" ? price / 30 : price;
+	price = config.token.priceEnv === "development" ? price / 30 : price;
 
 	const priceWithoutDiscount = Number(price);
 	let discount = 10;
