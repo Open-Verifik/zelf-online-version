@@ -48,6 +48,7 @@ const getAddress = async (params) => {
 		const _response = {
 			address: result.account,
 			balance: `${result.lamports / 1_000_000_000 || 0}`,
+			_balance: Number(`${result.lamports / 1_000_000_000 || 0}`),
 			fiatBalance: 0,
 			type: result.type,
 			account: {
@@ -96,7 +97,10 @@ const getAddress = async (params) => {
 		return null;
 	}
 };
-
+function contarDecimales(numero) {
+	const partes = numero.toString().split(".");
+	return partes[1] ? partes[1].length : 0;
+}
 const getTransactionsList = async (params, query) => {
 	const { data } = await instance.get(
 		`${endpoint}/account/transaction?address=${params.id}&limit=${query.show}`,
@@ -157,7 +161,7 @@ const getTokens = async (params) => {
 				},
 			}
 		);
-
+		console.log(data.data);
 		const tokenHoldings = {
 			total: data.data.tokens.length,
 			balance: 0,
@@ -173,17 +177,18 @@ const getTokens = async (params) => {
 
 				const tokenData = {
 					fiatBalance: token.value,
+					_fiatBalance: Number(token.value),
 					name: token.tokenName,
 					amount: token.balance,
+					_amount: token.balance.toString(),
 					price: token.priceUsdt,
+					_price: token.priceUsdt.toString(),
 					symbol: token.tokenSymbol,
 					image: token.tokenIcon,
 					address: token.address,
 					tokenAddress: token.tokenAddress,
 					tokenType: "token",
-					//reputation: token.reputation,
-					//quantity: token.amount,
-					//decimals: token.decimals,
+					decimals: token.decimals,
 					owner: token.owner,
 				};
 

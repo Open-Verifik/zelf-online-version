@@ -1,6 +1,7 @@
 const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const cheerio = require("cheerio");
+const { token } = require("../../../Core/config");
 
 const baseUrls = {
 	production: "https://etherscan.io",
@@ -12,123 +13,265 @@ const baseUrls = {
  */
 const environment = "production";
 const getAddress = async (params) => {
-	const baseUrl = baseUrls[params.env || environment];
-
 	try {
-		const address = params.address;
+		const baseUrl = baseUrls[params.env || environment];
 
-		const { data } = await instance.get(`${baseUrl}/address/${address}`, {
+		const html = await instance.get(`${baseUrl}/address/${params.address}`, {
 			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"user-agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
-		const $ = cheerio.load(data);
+		const $ = cheerio.load(html.data);
 
-		const fullName = $("#ensName > span > a > div > span").text().replace(/\n/g, "");
-
-		const balance = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(2) > div")
+		const fullName = $("#ensName > span > a > div > span")
 			.text()
-			.replace(/\n/g, "")
-			.replace(" ETH", "")
-			.trim();
+			.replace(/\n/g, "");
 
-		const accounts = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(3)")
-			.text()
-			.replace(/\n/g, "")
-			.split("@");
+		const address = $("#mainaddress").text().trim();
 
-		let account;
+		const { data } = await instance.get(
+			`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=ebexplorer7627Gsgp87`,
+			{}
+		);
+		console.log(data.tokens);
+		// 	const balance = $(
+		// 		"#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(2) > div"
+		// 	)
+		// 		.text()
+		// 		.replace(/\n/g, "")
+		// 		.replace(" ETH", "")
+		// 		.trim();
 
-		try {
-			account = {
-				asset: "ETH",
-				fiatBalance: accounts[0].replace("Eth Value", "").replace("(", "").replace(",", "").replace("$", "").trim(),
-				price: accounts[1].replace("$", "").replace("/ETH)", "").replace(",", "").trim(),
-			};
-		} catch (error) {
-			//si no tiene nada
-			account = {
-				asset: "ETH",
-				fiatBalance: "0.00",
-				price: "0.00",
-			};
-		}
+		// 	const accounts = $(
+		// 		"#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(3)"
+		// 	)
+		// 		.text()
+		// 		.replace(/\n/g, "")
+		// 		.split("@");
 
-		const totalTokens = $("#dropdownMenuBalance").text().trim().replace(/\n/g, "").split("(");
-		let tokensContracts;
+		// 	let account;
 
-		try {
-			tokensContracts = {
-				balance: totalTokens[0].replace("$", "").trim(),
-				total: Number(totalTokens[1].replace("Tokens)", "").trim()),
-			};
-		} catch (error) {
-			tokensContracts = {
-				balance: "0.00",
-				total: 0,
-			};
-		}
+		// 	try {
+		// 		account = {
+		// 			asset: "ETH",
+		// 			fiatBalance: accounts[0]
+		// 				.replace("Eth Value", "")
+		// 				.replace("(", "")
+		// 				.replace(",", "")
+		// 				.replace("$", "")
+		// 				.trim(),
+		// 			price: accounts[1]
+		// 				.replace("$", "")
+		// 				.replace("/ETH)", "")
+		// 				.replace(",", "")
+		// 				.trim(),
+		// 		};
+		// 	} catch (error) {
+		// 		//si no tiene nada
+		// 		account = {
+		// 			asset: "ETH",
+		// 			fiatBalance: "0.00",
+		// 			price: "0.00",
+		// 		};
+		// 	}
 
-		const tokens = [];
+		// 	const totalTokens = $("#dropdownMenuBalance")
+		// 		.text()
+		// 		.trim()
+		// 		.replace(/\n/g, "")
+		// 		.split("(");
+		// 	let tokensContracts;
 
-		let currentTokenType = "";
+		// 	try {
+		// 		tokensContracts = {
+		// 			balance: totalTokens[0].replace("$", "").trim(),
+		// 			total: Number(totalTokens[1].replace("Tokens)", "").trim()),
+		// 		};
+		// 	} catch (error) {
+		// 		tokensContracts = {
+		// 			balance: "0.00",
+		// 			total: 0,
+		// 		};
+		// 	}
 
-		$("ul.list li.nav-item").each((index, element) => {
-			const tokenTypeElement = $(element).find(".fw-medium").text().trim();
+		// 	const tokens = [];
 
-			if (tokenTypeElement) {
-				currentTokenType = tokenTypeElement.replace("Tokens", "").split("(")[0].trim();
-				return;
-			}
+		// 	let currentTokenType = "";
 
-			const tokenName = $(element).find(".list-name span").attr("data-bs-title") || $(element).find(".list-name").text().trim();
+		// 	$("ul.list li.nav-item").each((index, element) => {
+		// 		const tokenTypeElement = $(element).find(".fw-medium").text().trim();
 
-			const tokenAmount = $(element).find(".text-muted").text().trim();
+		// 		if (tokenTypeElement) {
+		// 			currentTokenType = tokenTypeElement
+		// 				.replace("Tokens", "")
+		// 				.split("(")[0]
+		// 				.trim();
+		// 			return;
+		// 		}
 
-			const [_amount, rest] = tokenAmount.split(" ");
+		// 		const tokenName =
+		// 			$(element).find(".list-name span").attr("data-bs-title") ||
+		// 			$(element).find(".list-name").text().trim();
 
-			// Then, split the second part on '@' to isolate the price
-			const [, _price] = tokenAmount.split("@");
+		// 		const tokenAmount = $(element).find(".text-muted").text().trim();
 
-			const tokenType = $(element).find(".badge").text().trim();
+		// 		const [_amount, rest] = tokenAmount.split(" ");
 
-			const tokenLink = $(element).find("a.nav-link").attr("href").replace("/token/", "");
+		// 		// Then, split the second part on '@' to isolate the price
+		// 		const [, _price] = tokenAmount.split("@");
 
-			const tokenImage = $(element).find("img").attr("src");
+		// 		const tokenType = $(element).find(".badge").text().trim();
 
-			let name = null;
+		// 		const tokenLink = $(element)
+		// 			.find("a.nav-link")
+		// 			.attr("href")
+		// 			.replace("/token/", "");
 
-			let symbol = null;
+		// 		const tokenImage = $(element).find("img").attr("src");
 
-			try {
-				name = tokenName.split("(")[0].trim();
-				symbol = tokenName.split("(")[1].replace(")", "").trim();
-			} catch (error) {}
+		// 		let name = null;
 
-			if (name && tokenImage) {
-				const token = {
-					tokenType: currentTokenType,
-					fiatBalance: Number(_price * _amount),
-					name: name,
-					symbol: symbol,
-					amount: _amount.replace(/,/g, ""),
-					price: _price,
-					type: tokenType,
-					address: tokenLink,
-					image: tokenImage.includes("https")
-						? tokenImage
-						: `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
+		// 		let symbol = null;
+
+		// 		try {
+		// 			name = tokenName.split("(")[0].trim();
+		// 			symbol = tokenName.split("(")[1].replace(")", "").trim();
+		// 		} catch (error) {}
+
+		// 		if (name && tokenImage) {
+		// 			const token = {
+		// 				tokenType: currentTokenType,
+		// 				fiatBalance: Number(_price * _amount),
+		// 				name: name,
+		// 				symbol: symbol,
+		// 				amount: _amount.replace(/,/g, ""),
+		// 				price: _price,
+		// 				type: tokenType,
+		// 				address: tokenLink,
+		// 				image: tokenImage.includes("https")
+		// 					? tokenImage
+		// 					: `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
+		// 			};
+
+		// 			tokens.push(token);
+		// 		}
+		// 	});
+
+		// 	const tokenHoldings = {
+		// 		...tokensContracts,
+		// 		tokens,
+		// 	};
+
+		// 	const transactions = [];
+
+		// 	try {
+		// 		const tabla = $("#transactions > div > div.table-responsive").html();
+
+		// 		const campos = cheerio.load(tabla);
+
+		// 		campos("tbody tr").each((index, element) => {
+		// 			const transaction = {};
+
+		// 			transaction.hash = campos(element)
+		// 				.find("td:nth-child(2) a")
+		// 				.text()
+		// 				.trim();
+
+		// 			transaction.method = campos(element)
+		// 				.find("td:nth-child(3) span")
+		// 				.attr("data-title");
+
+		// 			transaction.block = campos(element).find("td:nth-child(4) a").text();
+
+		// 			transaction.age = campos(element)
+		// 				.find("td:nth-child(5) span")
+		// 				.attr("data-bs-title");
+
+		// 			const divFrom = campos(element).find("td:nth-child(8)").html();
+
+		// 			if (!divFrom) return;
+
+		// 			const from = cheerio.load(divFrom);
+
+		// 			transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
+
+		// 			transaction.traffic = campos(element).find("td:nth-child(9)").text();
+
+		// 			const divTo = campos(element).find("td:nth-child(10)").html();
+
+		// 			const to = cheerio.load(divTo);
+
+		// 			transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
+
+		// 			let _amount = campos(element)
+		// 				.find("td:nth-child(11)")
+		// 				.text()
+		// 				.split("$")[0]
+		// 				.trim();
+
+		// 			_amount = _amount.split(" ");
+
+		// 			transaction.fiatAmount = campos(element)
+		// 				.find("td:nth-child(11)")
+		// 				.text()
+		// 				.split("$")[1]
+		// 				.replace(/\n/g, "");
+
+		// 			transaction.amount = _amount[0];
+
+		// 			transaction.asset = _amount[1];
+
+		// 			transaction.txnFee = campos(element)
+		// 				.find("td.small.text-muted.showTxnFee")
+		// 				.text();
+
+		// 			transactions.push(transaction);
+		// 		});
+		// 	} catch (error) {
+		// 		console.error({ error });
+		// 	}
+		let tokens = [];
+
+		function formatTokenData(tokens) {
+			return tokens.map((token) => {
+				const { tokenInfo, balance, rawBalance } = token;
+				const rate = tokenInfo.price?.rate || 0;
+				const decimals = parseInt(tokenInfo.decimals, 10);
+				const formattedAmount = parseFloat(rawBalance) / Math.pow(10, decimals);
+				const fiatBalance = formattedAmount * rate;
+
+				return {
+					tokenType: "ERC-20",
+					fiatBalance: parseFloat(fiatBalance.toFixed(7)),
+					_fiatBalance: fiatBalance.toFixed(7),
+					symbol: tokenInfo.symbol,
+					name: tokenInfo.name,
+					price: rate.toFixed(6),
+					_price: rate,
+					image: `https://images.ctfassets.net/gcj8jwzm6086/${tokenInfo.image
+						.split("/")
+						.pop()
+						.replace(".png", "")}.png`,
+					decimals: decimals,
+					amount: formattedAmount.toFixed(12),
+					_amount: formattedAmount,
+					address: tokenInfo.address,
 				};
-
-				tokens.push(token);
-			}
-		});
-
-		const tokenHoldings = {
-			...tokensContracts,
-			tokens,
-		};
+			});
+		}
+		tokens = formatTokenData(data.tokens);
+		// tokens.unshift({
+		// 	tokenType: "ETH",
+		// 	fiatBalance: "Number(account.fiatBalance)",
+		// 	symbol: "ETH",
+		// 	name: "Ethereum",
+		// 	price: "account.price",
+		// 	image:
+		// 		"https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
+		// 	amount: " balance",
+		// });
 
 		const transactions = [];
 
@@ -140,13 +283,20 @@ const getAddress = async (params) => {
 			campos("tbody tr").each((index, element) => {
 				const transaction = {};
 
-				transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
+				transaction.hash = campos(element)
+					.find("td:nth-child(2) a")
+					.text()
+					.trim();
 
-				transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
+				transaction.method = campos(element)
+					.find("td:nth-child(3) span")
+					.attr("data-title");
 
 				transaction.block = campos(element).find("td:nth-child(4) a").text();
 
-				transaction.age = campos(element).find("td:nth-child(5) span").attr("data-bs-title");
+				transaction.age = campos(element)
+					.find("td:nth-child(5) span")
+					.attr("data-bs-title");
 
 				const divFrom = campos(element).find("td:nth-child(8)").html();
 
@@ -164,17 +314,27 @@ const getAddress = async (params) => {
 
 				transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
 
-				let _amount = campos(element).find("td:nth-child(11)").text().split("$")[0].trim();
+				let _amount = campos(element)
+					.find("td:nth-child(11)")
+					.text()
+					.split("$")[0]
+					.trim();
 
 				_amount = _amount.split(" ");
 
-				transaction.fiatAmount = campos(element).find("td:nth-child(11)").text().split("$")[1].replace(/\n/g, "");
+				transaction.fiatAmount = campos(element)
+					.find("td:nth-child(11)")
+					.text()
+					.split("$")[1]
+					.replace(/\n/g, "");
 
 				transaction.amount = _amount[0];
 
 				transaction.asset = _amount[1];
 
-				transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
+				transaction.txnFee = campos(element)
+					.find("td.small.text-muted.showTxnFee")
+					.text();
 
 				transactions.push(transaction);
 			});
@@ -182,23 +342,23 @@ const getAddress = async (params) => {
 			console.error({ error });
 		}
 
-		tokenHoldings.tokens.unshift({
-			tokenType: "ETH",
-			fiatBalance: Number(account.fiatBalance),
-			symbol: "ETH",
-			name: "Ethereum",
-			price: account.price,
-			image: "https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
-			amount: balance,
-		});
-
 		const response = {
-			address,
+			address: data.address,
 			fullName,
-			balance,
-			fiatBalance: Number(account.fiatBalance),
-			account,
-			tokenHoldings,
+			balance: data.ETH.balance.toString(),
+			_balance: parseFloat(Number(data.ETH.balance).toFixed(12)),
+			fiatBalance: "Number(account.fiatBalance)",
+			decimals: contarDecimales(data.ETH.balance.toString()),
+			account: {
+				asset: "ETH",
+				fiatBalance: "0.06",
+				price: data.ETH.price.rate,
+			},
+			tokenHoldings: {
+				balance: "0.00",
+				total: 0,
+				tokens: tokens,
+			},
 			transactions,
 		};
 
@@ -208,13 +368,18 @@ const getAddress = async (params) => {
 	}
 };
 
+function contarDecimales(numero) {
+	const partes = numero.toString().split(".");
+	return partes[1] ? partes[1].length : 0;
+}
 const getGasTracker = async (params) => {
 	const baseUrl = baseUrls[params.env || environment];
 
 	try {
 		let { data } = await instance.get(`${baseUrl}/gastracker`, {
 			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"user-agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
@@ -229,7 +394,11 @@ const getGasTracker = async (params) => {
 		const highGwei = $("#spanHighPrice").text().replace(/\n/g, "").trim();
 
 		const lowPriorityAndBase = $("#spanLowPriorityAndBase").text().trim();
-		const lowTime = $('span[data-bs-trigger="hover"]').first().text().replace("~ ", "").trim();
+		const lowTime = $('span[data-bs-trigger="hover"]')
+			.first()
+			.text()
+			.replace("~ ", "")
+			.trim();
 		const priceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -239,7 +408,11 @@ const getGasTracker = async (params) => {
 		const lowPriority = parseFloat(lowNumbers[1]).toString();
 
 		const avgPriorityAndBase = $("#spanProposePriorityAndBase").text().trim();
-		const averageTime = $('span[data-bs-trigger="hover"]').eq(1).text().replace("~ ", "").trim();
+		const averageTime = $('span[data-bs-trigger="hover"]')
+			.eq(1)
+			.text()
+			.replace("~ ", "")
+			.trim();
 		const avgPriceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -248,7 +421,11 @@ const getGasTracker = async (params) => {
 		const avgPriority = parseFloat(avgNumbers[1]).toString();
 
 		const highPriorityAndBase = $("#spanHighPriorityAndBase").text().trim();
-		const highTime = $('span[data-bs-trigger="hover"]').eq(2).text().replace("~ ", "").trim();
+		const highTime = $('span[data-bs-trigger="hover"]')
+			.eq(2)
+			.text()
+			.replace("~ ", "")
+			.trim();
 		const highPriceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -257,23 +434,28 @@ const getGasTracker = async (params) => {
 		const highPriority = parseFloat(highNumbers[1]).toString();
 
 		const featuredActions = [];
-		$("#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr").each(
-			(index, element) => {
-				const action = $(element).find("td span").text().trim();
-				const low = $(element).find("td").eq(1).text().replace("$", "").trim();
-				const average = $(element).find("td").eq(2).text().replace("$", "").trim();
-				const high = $(element).find("td").eq(3).text().replace("$", "").trim();
+		$(
+			"#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr"
+		).each((index, element) => {
+			const action = $(element).find("td span").text().trim();
+			const low = $(element).find("td").eq(1).text().replace("$", "").trim();
+			const average = $(element)
+				.find("td")
+				.eq(2)
+				.text()
+				.replace("$", "")
+				.trim();
+			const high = $(element).find("td").eq(3).text().replace("$", "").trim();
 
-				if (action) {
-					featuredActions.push({
-						action,
-						low,
-						average,
-						high,
-					});
-				}
+			if (action) {
+				featuredActions.push({
+					action,
+					low,
+					average,
+					high,
+				});
 			}
-		);
+		});
 
 		// Formar el objeto de respuesta final.
 		const response = {
@@ -319,14 +501,17 @@ const getTransactionStatus = async (params) => {
 
 		const { data } = await instance.get(`${baseUrl}/tx/${id}`, {
 			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"user-agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
 
 		const $ = cheerio.load(data);
 
-		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div.row.align-items-center.mb-4 > div.col.col-md-9 > span")
+		const status = $(
+			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div.row.align-items-center.mb-4 > div.col.col-md-9 > span"
+		)
 			.text()
 			.split(" ")[0]
 			.trim();
@@ -335,35 +520,79 @@ const getTransactionStatus = async (params) => {
 			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
 		).text();
 
-		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0];
+		const timestamp = $(
+			"#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9"
+		)
+			.text()
+			.trim()
+			.replace(/\n/g, "")
+			.split("|")[0];
 
 		///en pruba 8
-		const from_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(10) > div.col-md-9").html();
+		const from_a = $(
+			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(10) > div.col-md-9"
+		).html();
 
 		const from_div = cheerio.load(from_a);
 
 		const from = from_div("a.js-clipboard").attr("data-clipboard-text");
 		///en pruba 9
-		const to_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(11) > div.col-md-9 > div").html();
+		const to_a = $(
+			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(11) > div.col-md-9 > div"
+		).html();
 
 		const to_div = cheerio.load(to_a);
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valueETH = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
+		const valueETH = $(
+			"#ContentPlaceHolder1_spanValue > div > span:nth-child(2)"
+		)
+			.text()
+			.replace("ETH", "")
+			.trim();
 
-		const valueDolar = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const valueDolar = $(
+			"#ContentPlaceHolder1_spanValue > div > span.text-muted"
+		)
+			.text()
+			.replace("($", "")
+			.replace(")", "")
+			.trim();
 
-		const transactionFeeETH = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
+		const transactionFeeETH = $(
+			"#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)"
+		)
+			.text()
+			.replace("ETH", "")
+			.trim();
 
-		const transactionFeeDolar = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const transactionFeeDolar = $(
+			"#ContentPlaceHolder1_spanTxFee > div > span.text-muted"
+		)
+			.text()
+			.replace("($", "")
+			.replace(")", "")
+			.trim();
 
-		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
+		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice")
+			.text()
+			.split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gweiETH = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
+		const gweiETH = gasPriceGwei[1]
+			.replace("(", "")
+			.replace(")", "")
+			.replace("ETH", "")
+			.trim();
 
-		const observation = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span").text().replace("[", "").replace("]", "").trim();
+		const observation = $(
+			"#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span"
+		)
+			.text()
+			.replace("[", "")
+			.replace("]", "")
+			.trim();
 
 		const response = {
 			id,
@@ -410,19 +639,33 @@ const getTransactionsList = async (params) => {
 	const baseUrl = baseUrls[params.env || environment];
 
 	try {
-		const { data } = await instance.get(`${baseUrl}/txs?a=${address}&ps=${show}&p=${page}`, {
-			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
-			},
-		});
+		const { data } = await instance.get(
+			`${baseUrl}/txs?a=${address}&ps=${show}&p=${page}`,
+			{
+				headers: {
+					"user-agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+					"Upgrade-Insecure-Requests": "1",
+				},
+			}
+		);
 		const $ = cheerio.load(data);
 
 		const transactions = [];
 
-		const records = $("#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span").text().match(/\d+/g).join("");
+		const records = $(
+			"#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span"
+		)
+			.text()
+			.match(/\d+/g)
+			.join("");
 
-		const nPage = $("#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)").text().replace("Page", "").split("of");
+		const nPage = $(
+			"#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)"
+		)
+			.text()
+			.replace("Page", "")
+			.split("of");
 
 		const pagination = {
 			records,
@@ -430,20 +673,29 @@ const getTransactionsList = async (params) => {
 			page: nPage ? nPage[0].trim() : 0,
 		};
 
-		const tabla = $("#ContentPlaceHolder1_divTransactions > div.table-responsive").html();
+		const tabla = $(
+			"#ContentPlaceHolder1_divTransactions > div.table-responsive"
+		).html();
 
 		const campos = cheerio.load(tabla);
 
 		campos("tbody tr").each((index, element) => {
 			const transaction = {};
 
-			transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
+			transaction.hash = campos(element)
+				.find("td:nth-child(2) a")
+				.text()
+				.trim();
 
-			transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
+			transaction.method = campos(element)
+				.find("td:nth-child(3) span")
+				.attr("data-title");
 
 			transaction.block = campos(element).find("td:nth-child(4) a").text();
 
-			transaction.age = campos(element).find("td:nth-child(5) span").attr("data-bs-title");
+			transaction.age = campos(element)
+				.find("td:nth-child(5) span")
+				.attr("data-bs-title");
 
 			const divFrom = campos(element).find("td:nth-child(8)").html();
 
@@ -459,17 +711,27 @@ const getTransactionsList = async (params) => {
 
 			transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
 
-			let _amount = campos(element).find("td:nth-child(11)").text().split("$")[0].trim();
+			let _amount = campos(element)
+				.find("td:nth-child(11)")
+				.text()
+				.split("$")[0]
+				.trim();
 
 			_amount = _amount.split(" ");
 
-			transaction.fiatAmount = campos(element).find("td:nth-child(11)").text().split("$")[1].replace(/\n/g, "");
+			transaction.fiatAmount = campos(element)
+				.find("td:nth-child(11)")
+				.text()
+				.split("$")[1]
+				.replace(/\n/g, "");
 
 			transaction.amount = _amount[0];
 
 			transaction.asset = _amount[1];
 
-			transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
+			transaction.txnFee = campos(element)
+				.find("td.small.text-muted.showTxnFee")
+				.text();
 
 			transactions.push(transaction);
 		});
