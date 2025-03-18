@@ -285,7 +285,7 @@ const checkoutBICOIN = async (address) => {
 const getReceiptEmail = async (body) => {
 	const { zelfName, transactionDate, price, expires, year, email } = body;
 
-	const subtotal = calculateZelfNamePrice(zelfName.split(".zelf")[0].length, year);
+	const calculatedPrice = calculateZelfNamePrice(zelfName.split(".zelf")[0].length, year);
 
 	const discount = Math.round((subtotal.price - price) * 100) / 100;
 
@@ -306,7 +306,7 @@ const getReceiptEmail = async (body) => {
 		zelfName,
 		transactionDate: formatDate(transactionDate),
 		price,
-		subtotal,
+		subtotal: calculatedPrice.price,
 		discount,
 		expires: formatDate(expires.replace(/-/g, "/")),
 		year,
