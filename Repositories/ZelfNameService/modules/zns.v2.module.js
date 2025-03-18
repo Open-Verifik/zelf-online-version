@@ -842,25 +842,22 @@ const _getZelfNameToConfirm = async (zelfName, authUser) => {
 
 		let zelfPayRecords = [];
 
-		try {
-			zelfPayRecords = await previewZelfName(
-				{
-					zelfName: zelfPay,
-					environment: "mainnet",
-				},
-				authUser
-			);
-		} catch (exception) {
-			console.error({ exception });
+		zelfPayRecords = await previewZelfName(
+			{
+				zelfName: zelfPay,
+				environment: "mainnet",
+			},
+			authUser
+		);
+
+		if (!zelfPayRecords.length) {
+			//throw exception
+			const error = new Error("zelfPay_not_found");
+			error.status = 404;
+			throw error;
 		}
 
-		if (zelfPayRecords.length) {
-			zelfPayNameObject = zelfPayRecords[0];
-		} else {
-			const createdZelfPay = await createZelfPay(zelfNameObject);
-
-			zelfPayNameObject = createdZelfPay.ipfs || createdZelfPay.arweave;
-		}
+		zelfPayNameObject = zelfPayRecords[0];
 	}
 
 	return {
