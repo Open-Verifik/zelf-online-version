@@ -686,6 +686,7 @@ const createZelfPay = async (zelfNameObject) => {
 	const zelfName = params.zelfName.split(".hold")[0];
 
 	const price = zelfNameObject.price || zelfNameObject.extraParams.price;
+	const duration = zelfNameObject.duration || zelfNameObject.extraParams.duration;
 
 	if (!zelfName) {
 		const error = new Error("zelfName_not_found");
@@ -761,6 +762,7 @@ const createZelfPay = async (zelfNameObject) => {
 				coinbase_hosted_url: coinbaseCharge.hosted_url,
 				coinbase_expires_at: coinbaseCharge.expires_at,
 				price,
+				duration,
 			}),
 		},
 		pinIt: true,
