@@ -680,15 +680,7 @@ const createZelfPay = async (zelfNameObject) => {
 	// create link for coinbase
 	const params = zelfNameObject.publicData || zelfNameObject.metadata;
 
-	//extraParams
-	if (params.extraParams) {
-		zelfNameObject.extraParams = JSON.parse(params.extraParams);
-	}
-
 	const zelfName = params.zelfName.split(".hold")[0];
-
-	const price = zelfNameObject.price || zelfNameObject.extraParams.price;
-	const duration = zelfNameObject.duration || zelfNameObject.extraParams.duration;
 
 	if (!zelfName) {
 		const error = new Error("zelfName_not_found");
@@ -733,7 +725,7 @@ const createZelfPay = async (zelfNameObject) => {
 		description: `Purchase of the Zelf Name > ${zelfName} for $${params.price}`,
 		pricing_type: "fixed_price",
 		local_price: {
-			amount: `${price}`,
+			amount: `${params.price}`,
 			currency: "USD",
 		},
 		metadata: {
@@ -763,8 +755,8 @@ const createZelfPay = async (zelfNameObject) => {
 				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
 				coinbase_hosted_url: coinbaseCharge.hosted_url,
 				coinbase_expires_at: coinbaseCharge.expires_at,
-				price,
-				duration,
+				price: params.price || 24,
+				duration: params.duration || 1,
 			}),
 		},
 		pinIt: true,
