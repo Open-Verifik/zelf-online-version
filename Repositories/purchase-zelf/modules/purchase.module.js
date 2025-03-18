@@ -183,6 +183,7 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 	const priceInIPFS = parseFloat(zelfPayObject.publicData.price);
 
 	if (price !== priceInIPFS) {
+		console.log({ publicData: zelfPayObject.publicData });
 		const error = new Error(`Validation_failed:${price}!==${priceInIPFS}`);
 		error.status = 409;
 		throw error;
