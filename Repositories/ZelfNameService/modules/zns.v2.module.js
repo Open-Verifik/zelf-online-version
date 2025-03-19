@@ -842,7 +842,7 @@ const _getZelfNameToConfirm = async (zelfName, authUser) => {
 
 		let zelfPayRecords = [];
 
-		zelfPayRecords = await previewZelfName(
+		zelfPayRecords = await searchZelfName(
 			{
 				zelfName: zelfPay,
 				environment: "mainnet",

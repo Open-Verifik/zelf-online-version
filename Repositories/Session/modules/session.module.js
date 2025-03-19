@@ -51,6 +51,7 @@ const insert = async (params, authUser) => {
 				},
 				config.JWT_SECRET
 			),
+			...existingSession.toJSON(),
 		};
 	}
 
@@ -81,6 +82,7 @@ const insert = async (params, authUser) => {
 			},
 			config.JWT_SECRET
 		),
+		...session.toJSON(),
 	};
 };
 

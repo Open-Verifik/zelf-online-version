@@ -62,7 +62,7 @@ const create = async (ctx) => {
 			X-Forwarded-For: ${forwardedFor}
 		`);
 
-		if (!origin || !clientIp) {
+		if (process.env.NODE_ENV === "production" && (!origin || !clientIp)) {
 			ctx.status = 403;
 
 			ctx.body = { error: "rejected" };
