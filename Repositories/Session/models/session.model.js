@@ -23,6 +23,7 @@ const SessionSchema = new Schema({
 		expires: "10m",
 		default: Date.now,
 	},
+	globalCount: defaultField(Number, 0),
 	searchCount: defaultField(Number, 0),
 	leaseCount: defaultField(Number, 0),
 	decryptCount: defaultField(Number, 0),

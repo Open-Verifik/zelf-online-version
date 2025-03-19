@@ -8,13 +8,13 @@ const base = "/ethereum";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.get(`${PATH}/address`, Middleware.validateAddress, Controller.address);
+	server.get(`${PATH}/address`, SessionMiddleware.validateJWT, Middleware.validateAddress, Controller.address);
 
-	server.get(`${PATH}/transactions`, Middleware.validateAddressTransactions, Controller.transactionsList);
+	server.get(`${PATH}/transactions`, SessionMiddleware.validateJWT, Middleware.validateAddressTransactions, Controller.transactionsList);
 
-	server.get(`${PATH}/transaction/:id`, Controller.transactionStatus);
+	server.get(`${PATH}/transaction/:id`, SessionMiddleware.validateJWT, Controller.transactionStatus);
 
-	server.get(`${PATH}/gas-tracker`, Controller.gasTracker);
+	server.get(`${PATH}/gas-tracker`, SessionMiddleware.validateJWT, Controller.gasTracker);
 
-	server.post(`${PATH}/gas-tracker`, Controller.gasTracker);
+	server.post(`${PATH}/gas-tracker`, SessionMiddleware.validateJWT, Controller.gasTracker);
 };
