@@ -12,6 +12,12 @@ const configuration = {
 	openai: {
 		key: process.env.OPENAI_API_KEY,
 	},
+	sessions: {
+		previewLimit: process.env.PREVIEW_LIMIT || 3 * 10,
+		searchLimit: process.env.SEARCH_LIMIT || 3 * 10,
+		leaseLimit: process.env.LEASE_LIMIT || 5,
+		decryptLimit: process.env.DECRYPT_LIMIT || 20,
+	},
 	email_providers: {
 		mailgun: {
 			proxyEmail: process.env.MAILGUN_PROXY_EMAIL,

@@ -93,7 +93,7 @@ const getValidation = async (ctx, next) => {
 			return;
 		}
 
-		if (session.searchCount >= 10) {
+		if (session.searchCount >= config.sessions.searchLimit) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Search limit exceeded" };
 			return;
@@ -163,7 +163,7 @@ const leaseValidation = async (ctx, next) => {
 			return;
 		}
 
-		if (session.leaseCount >= 4) {
+		if (session.leaseCount >= config.sessions.leaseLimit) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Search limit exceeded" };
 			return;
@@ -334,7 +334,7 @@ const previewZelfProofValidation = async (ctx, next) => {
 			return;
 		}
 
-		if (session.previewCount >= 10) {
+		if (session.previewCount >= config.sessions.previewLimit) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Decrypt limit exceeded" };
 			return;
@@ -382,7 +382,7 @@ const previewValidation = async (ctx, next) => {
 			return;
 		}
 
-		if (session.previewCount >= 10) {
+		if (session.previewCount >= config.sessions.previewLimit) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Decrypt limit exceeded" };
 			return;
@@ -441,7 +441,7 @@ const decryptValidation = async (ctx, next) => {
 			return;
 		}
 
-		if (session.decryptCount >= 10) {
+		if (session.decryptCount >= config.sessions.decryptLimit) {
 			ctx.status = 403;
 			ctx.body = { validationError: "Decrypt limit exceeded" };
 
