@@ -67,7 +67,14 @@ const insert = async (params, authUser) => {
 	try {
 		await session.save();
 	} catch (exception) {
-		console.log({ exception });
+		console.log({
+			exception,
+			identifier: params.identifier,
+			clientIP: params.clientIP,
+			type: params.type || "createWallet",
+			status: "active",
+			isWebExtension: params.isWebExtension || false,
+		});
 		const error = new Error("session_duplication");
 
 		error.status = 409;
