@@ -8,6 +8,7 @@ const jwt = require("jsonwebtoken");
 const config = require("../../../Core/config");
 const PGPKeyModule = require("../../PGP/modules/pgp-keys.module");
 const MongoORM = require("../../../Core/mongo-orm");
+const moment = require("moment");
 const populates = [];
 
 /**
@@ -35,8 +36,6 @@ const get = async (params, authUser = {}) => {
  * @param {*} authUser
  */
 const insert = async (params, authUser) => {
-	// get session by identifier
-
 	const existingSession = await get({
 		where_clientIP: params.clientIP,
 		findOne: true,
@@ -48,10 +47,12 @@ const insert = async (params, authUser) => {
 				{
 					session: existingSession._id,
 					identifier: existingSession.identifier,
+					ip: existingSession.clientIP,
 				},
 				config.JWT_SECRET
 			),
-			...existingSession.toJSON(),
+			activatedAt: moment(existingSession.activatedAt).format("YYYY-MM-DD HH:mm:ss"),
+			expiresAt: moment(existingSession.activatedAt).add(10, "minutes").format("YYYY-MM-DD HH:mm:ss"),
 		};
 	}
 
@@ -79,10 +80,12 @@ const insert = async (params, authUser) => {
 			{
 				session: session._id,
 				identifier: session.identifier,
+				ip: session.clientIP,
 			},
 			config.JWT_SECRET
 		),
-		...session.toJSON(),
+		activatedAt: session.activatedAt.format("YYYY-MM-DD HH:mm:ss"),
+		expiresAt: moment(session.activatedAt).add(10, "minutes").format("YYYY-MM-DD HH:mm:ss"),
 	};
 };
 

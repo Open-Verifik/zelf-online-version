@@ -13,6 +13,7 @@ const configuration = {
 		key: process.env.OPENAI_API_KEY,
 	},
 	sessions: {
+		version: 2,
 		previewLimit: process.env.PREVIEW_LIMIT || 3 * 10,
 		searchLimit: process.env.SEARCH_LIMIT || 3 * 10,
 		leaseLimit: process.env.LEASE_LIMIT || 5,
