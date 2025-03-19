@@ -84,7 +84,7 @@ const insert = async (params, authUser) => {
 			},
 			config.JWT_SECRET
 		),
-		activatedAt: session.activatedAt.format("YYYY-MM-DD HH:mm:ss"),
+		activatedAt: moment(session.activatedAt).format("YYYY-MM-DD HH:mm:ss"),
 		expiresAt: moment(session.activatedAt).add(10, "minutes").format("YYYY-MM-DD HH:mm:ss"),
 	};
 };

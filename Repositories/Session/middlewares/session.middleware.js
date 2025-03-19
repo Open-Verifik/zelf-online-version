@@ -76,6 +76,8 @@ const decryptValidation = async (ctx, next) => {
 	await next();
 };
 
+const validateJWT = async (ctx, next) => {};
+
 module.exports = {
 	getValidation,
 	showValidation,
@@ -84,4 +86,5 @@ module.exports = {
 	destroyValidation,
 	getPublicKeyValidation,
 	decryptValidation,
+	validateJWT,
 };

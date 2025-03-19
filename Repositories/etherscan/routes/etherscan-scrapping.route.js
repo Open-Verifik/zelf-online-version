@@ -1,6 +1,6 @@
 const config = require("../../../Core/config");
 const Controller = require("../controllers/etherscan-scrapping.controller");
-
+const SessionMiddleware = require("../../Session/middlewares/session.middleware");
 const Middleware = require("../middlewares/etherscan.middleware");
 
 const base = "/ethereum";
