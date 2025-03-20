@@ -205,6 +205,20 @@ const leaseOfflineZelfName = async (ctx) => {
 	}
 };
 
+const leaseOfflineZelfName_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.leaseOffline(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 const revenueCatWebhook = async (ctx) => {
 	try {
 		const data = await RevenueCatModule.webhookHandler(ctx.request.body);
@@ -288,6 +302,7 @@ module.exports = {
 	decryptZelfName,
 	decryptZelfName_v2,
 	leaseOfflineZelfName,
+	leaseOfflineZelfName_v2,
 	revenueCatWebhook,
 	referralRewards,
 	purchaseRewards,
