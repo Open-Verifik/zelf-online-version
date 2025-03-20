@@ -118,7 +118,10 @@ const destroy = async (request, response) => {
 
 const getPublicKey = async (ctx) => {
 	try {
-		const data = await Module.extractPublicKey(ctx.request.query);
+		const clientIP = ctx.request.ip;
+		const { identifier, name, email } = ctx.request.query;
+
+		const data = await Module.extractPublicKey({ identifier, clientIP, name, email });
 
 		ctx.body = { data };
 	} catch (error) {

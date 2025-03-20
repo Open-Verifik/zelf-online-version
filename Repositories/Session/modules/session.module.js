@@ -33,13 +33,21 @@ const get = async (params, authUser = {}) => {
 
 /**
  * @param {*} params
- * @param {*} authUser
  */
-const insert = async (params, authUser) => {
-	const existingSession = await get({
-		where_clientIP: params.clientIP,
+const insert = async (params) => {
+	const queryParams = {
 		findOne: true,
-	});
+	};
+
+	const identifier = config.env === "development" ? params.identifier : params.clientIP;
+
+	if (config.env === "development") {
+		queryParams.where_identifier = identifier;
+	} else {
+		queryParams.where_clientIP = identifier;
+	}
+
+	const existingSession = await get(queryParams);
 
 	if (existingSession) {
 		return {
@@ -57,8 +65,8 @@ const insert = async (params, authUser) => {
 	}
 
 	const session = new Model({
-		identifier: params.identifier,
-		clientIP: config.env === "development" ? params.identifier : params.clientIP,
+		identifier,
+		clientIP: params.clientIP,
 		type: params.type || "createWallet",
 		status: "active",
 		isWebExtension: params.isWebExtension || false,
@@ -94,11 +102,13 @@ const insert = async (params, authUser) => {
 };
 
 const extractPublicKey = async (params) => {
-	const storedKey = await PGPKeyModule.findKey(params.identifier); // uuid
+	const identifier = config.env === "development" ? params.identifier : params.clientIP;
+
+	const storedKey = await PGPKeyModule.findKey(identifier); // uuid
 
 	if (storedKey) return storedKey.publicKey;
 
-	const pgpRecord = await PGPKeyModule.generateKey("session", params.identifier, params.name, params.email, params.password);
+	const pgpRecord = await PGPKeyModule.generateKey("session", identifier, params.name, params.email, params.password);
 
 	return pgpRecord.publicKey;
 };
