@@ -51,13 +51,13 @@ const insert = async (params, authUser) => {
 				},
 				config.JWT_SECRET
 			),
-			activatedAt: moment(existingSession.activatedAt).format("YYYY-MM-DD HH:mm:ss"),
-			expiresAt: moment(existingSession.activatedAt).add(10, "minutes").format("YYYY-MM-DD HH:mm:ss"),
+			activatedAt: moment(existingSession.activatedAt).utc().unix(),
+			expiresAt: moment(existingSession.activatedAt).utc().add(10, "minutes").unix(),
 		};
 	}
 
 	const session = new Model({
-		identifier: params.identifier,
+		identifier: params.clientIP,
 		clientIP: params.clientIP,
 		type: params.type || "createWallet",
 		status: "active",
@@ -69,7 +69,7 @@ const insert = async (params, authUser) => {
 	} catch (exception) {
 		console.log({
 			exception,
-			identifier: params.identifier,
+			identifier: params.clientIP,
 			clientIP: params.clientIP,
 			type: params.type || "createWallet",
 			status: "active",
@@ -86,13 +86,13 @@ const insert = async (params, authUser) => {
 		token: jwt.sign(
 			{
 				session: session._id,
-				identifier: session.identifier,
+				identifier: session.clientIP,
 				ip: session.clientIP,
 			},
 			config.JWT_SECRET
 		),
-		activatedAt: moment(session.activatedAt).format("YYYY-MM-DD HH:mm:ss"),
-		expiresAt: moment(session.activatedAt).add(10, "minutes").format("YYYY-MM-DD HH:mm:ss"),
+		activatedAt: moment(session.activatedAt).utc().unix(),
+		expiresAt: moment(session.activatedAt).utc().add(10, "minutes").unix(),
 	};
 };
 

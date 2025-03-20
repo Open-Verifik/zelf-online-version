@@ -82,7 +82,11 @@ const decryptValidation = async (ctx, next) => {
 const validateJWT = async (ctx, next) => {
 	const authUser = ctx.state.user;
 
-	if (!authUser.session) await next();
+	if (!authUser.session) {
+		await next();
+
+		return;
+	}
 
 	const session = await MongoORM.buildQuery(
 		{
