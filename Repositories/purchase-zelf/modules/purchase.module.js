@@ -7,7 +7,7 @@ const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
 const { calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns-parts.module");
 const { createZelfPay, previewZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
-
+const ZNSPartsModule = require("../../ZelfNameService/modules/zns-parts.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 const { getBalance } = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const jwt = require("jsonwebtoken");
@@ -154,7 +154,13 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 		environment: "mainnet",
 	});
 
-	const zelfPayObject = zelfNameRecords.ipfs[0] || zelfNameRecords.arweave[0];
+	if (!zelfNameRecords?.ipfs?.length && !zelfNameRecords?.arweave?.length) {
+		const error = new Error("zelfPayName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const zelfPayObject = zelfNameRecords?.ipfs[0] || zelfNameRecords?.arweave[0];
 
 	if (network === "CB") {
 		const chargeID = zelfPayObject.publicData.coinbase_hosted_url.split("/pay/")[1];
@@ -162,24 +168,17 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 		return await checkoutPayCoinbase(chargeID);
 	}
 
-	const zelfNamePay = zelfName_.replace(".zelf", ".zelfpay");
-
-	const previewData3 = await searchZelfName({
-		zelfName: zelfNamePay,
-		environment: "both",
-	});
-
 	let selectedAddress = null;
 
 	switch (network.toUpperCase()) {
 		case "BTC":
-			selectedAddress = zelfPayObject.btcAddress;
+			selectedAddress = zelfPayObject.publicData.btcAddress;
 			break;
 		case "ETH":
-			selectedAddress = zelfPayObject.ethAddress;
+			selectedAddress = zelfPayObject.publicData.ethAddress;
 			break;
 		case "SOL":
-			selectedAddress = zelfPayObject.solanaAddress;
+			selectedAddress = zelfPayObject.publicData.solanaAddress;
 			break;
 		default:
 			break;
@@ -187,9 +186,11 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 
 	const { price, amountToSend } = verifyRecordData(signedDataPrice, secretKey);
 
-	const priceInIPFS = parseFloat(zelfPayObject.publicData.price);
+	const priceInIPFS =
+		parseFloat(zelfPayObject.publicData.price) || ZNSPartsModule.calculateZelfNamePrice(zelfName_.split(".zelf")[0].length, 1).price;
 
 	if (price !== priceInIPFS) {
+		console.log({ publicData: zelfPayObject.publicData });
 		const error = new Error(`Validation_failed:${price}!==${priceInIPFS}`);
 		error.status = 409;
 		throw error;
@@ -209,7 +210,7 @@ const checkoutPayUniqueAddress = async (network, amountToSend, selectedAddress) 
 		return {
 			transactionStatus: false,
 			transactionDescription: "pending",
-			amountDetected,
+			amountDetected: 0,
 		};
 	}
 
@@ -297,7 +298,7 @@ const checkoutBICOIN = async (address) => {
 const getReceiptEmail = async (body) => {
 	const { zelfName, transactionDate, price, expires, year, email } = body;
 
-	const subtotal = calculateZelfNamePrice(zelfName.split(".zelf")[0].length, year);
+	const calculatedPrice = calculateZelfNamePrice(zelfName.split(".zelf")[0].length, year);
 
 	const discount = Math.round((subtotal.price - price) * 100) / 100;
 
@@ -318,7 +319,7 @@ const getReceiptEmail = async (body) => {
 		zelfName,
 		transactionDate: formatDate(transactionDate),
 		price,
-		subtotal,
+		subtotal: calculatedPrice.price,
 		discount,
 		expires: formatDate(expires.replace(/-/g, "/")),
 		year,

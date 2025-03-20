@@ -8,6 +8,7 @@ const jwt = require("jsonwebtoken");
 const config = require("../../../Core/config");
 const PGPKeyModule = require("../../PGP/modules/pgp-keys.module");
 const MongoORM = require("../../../Core/mongo-orm");
+const moment = require("moment");
 const populates = [];
 
 /**
@@ -32,15 +33,21 @@ const get = async (params, authUser = {}) => {
 
 /**
  * @param {*} params
- * @param {*} authUser
  */
-const insert = async (params, authUser) => {
-	// get session by identifier
-
-	const existingSession = await get({
-		where_clientIP: params.clientIP,
+const insert = async (params) => {
+	const queryParams = {
 		findOne: true,
-	});
+	};
+
+	const identifier = config.env === "development" ? params.identifier : params.clientIP;
+
+	if (config.env === "development") {
+		queryParams.where_identifier = identifier;
+	} else {
+		queryParams.where_clientIP = identifier;
+	}
+
+	const existingSession = await get(queryParams);
 
 	if (existingSession) {
 		return {
@@ -48,14 +55,17 @@ const insert = async (params, authUser) => {
 				{
 					session: existingSession._id,
 					identifier: existingSession.identifier,
+					ip: existingSession.clientIP,
 				},
 				config.JWT_SECRET
 			),
+			activatedAt: moment(existingSession.activatedAt).utc().unix(),
+			expiresAt: moment(existingSession.activatedAt).utc().add(10, "minutes").unix(),
 		};
 	}
 
 	const session = new Model({
-		identifier: params.identifier,
+		identifier,
 		clientIP: params.clientIP,
 		type: params.type || "createWallet",
 		status: "active",
@@ -65,7 +75,11 @@ const insert = async (params, authUser) => {
 	try {
 		await session.save();
 	} catch (exception) {
-		console.log({ exception });
+		console.log({
+			exception,
+			identifier: params.clientIP,
+			...session,
+		});
 		const error = new Error("session_duplication");
 
 		error.status = 409;
@@ -78,18 +92,23 @@ const insert = async (params, authUser) => {
 			{
 				session: session._id,
 				identifier: session.identifier,
+				ip: session.clientIP,
 			},
 			config.JWT_SECRET
 		),
+		activatedAt: moment(session.activatedAt).utc().unix(),
+		expiresAt: moment(session.activatedAt).utc().add(10, "minutes").unix(),
 	};
 };
 
 const extractPublicKey = async (params) => {
-	const storedKey = await PGPKeyModule.findKey(params.identifier); // uuid
+	const identifier = config.env === "development" ? params.identifier : params.clientIP;
+
+	const storedKey = await PGPKeyModule.findKey(identifier); // uuid
 
 	if (storedKey) return storedKey.publicKey;
 
-	const pgpRecord = await PGPKeyModule.generateKey("session", params.identifier, params.name, params.email, params.password);
+	const pgpRecord = await PGPKeyModule.generateKey("session", identifier, params.name, params.email, params.password);
 
 	return pgpRecord.publicKey;
 };

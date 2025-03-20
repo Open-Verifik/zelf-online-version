@@ -1,4 +1,7 @@
+const config = require("../../../Core/config");
 const { validate, string } = require("../../../Core/JoiUtils");
+const MongoORM = require("../../../Core/mongo-orm");
+const Session = require("../models/session.model");
 
 const schema = {
 	publicKey: {
@@ -76,6 +79,38 @@ const decryptValidation = async (ctx, next) => {
 	await next();
 };
 
+const validateJWT = async (ctx, next) => {
+	const authUser = ctx.state.user;
+
+	if (!authUser.session) {
+		await next();
+
+		return;
+	}
+
+	const session = await MongoORM.buildQuery(
+		{
+			where__id: authUser.session,
+			findOne: true,
+		},
+		Session,
+		null,
+		[]
+	);
+
+	if (!session || session.globalCount > config.sessions.globalLimit) {
+		ctx.status = 401;
+		ctx.body = { error: "Invalid session" };
+		return;
+	}
+
+	session.globalCount += 1;
+
+	await session.save();
+
+	await next();
+};
+
 module.exports = {
 	getValidation,
 	showValidation,
@@ -84,4 +119,5 @@ module.exports = {
 	destroyValidation,
 	getPublicKeyValidation,
 	decryptValidation,
+	validateJWT,
 };

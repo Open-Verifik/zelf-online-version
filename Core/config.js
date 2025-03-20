@@ -12,6 +12,14 @@ const configuration = {
 	openai: {
 		key: process.env.OPENAI_API_KEY,
 	},
+	sessions: {
+		version: 2,
+		globalLimit: process.env.GLOBAL_LIMIT || 5 * 60 * 10, // 5 requests per second for 10 minutes
+		previewLimit: process.env.PREVIEW_LIMIT || 1 * 30 * 10, // 1 request per 2 seconds for 10 minutes
+		searchLimit: process.env.SEARCH_LIMIT || 1 * 30 * 10, // 1 request per 2 seconds for 10 minutes
+		leaseLimit: process.env.LEASE_LIMIT || 15, // 30 requests max per 10 minutes
+		decryptLimit: process.env.DECRYPT_LIMIT || 30, // 30 requests max per 10 minutes
+	},
 	email_providers: {
 		mailgun: {
 			proxyEmail: process.env.MAILGUN_PROXY_EMAIL,
@@ -60,6 +68,7 @@ const configuration = {
 	token: {
 		rewardPrice: process.env.REWARD_PRICE || 0.05,
 		whitelist: process.env.WHITELIST || "",
+		priceEnv: process.env.PRICE_ENV || "production",
 	},
 	pgp: {
 		secretKey: process.env.PGP_SECRET_KEY || "",

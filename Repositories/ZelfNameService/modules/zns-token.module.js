@@ -6,18 +6,23 @@ const PurchaseRewardModel = require("../models/purchase-rewards.model");
 const MongoORM = require("../../../Core/mongo-orm");
 
 let connection;
-(async () => {
+
+const initConnection = async () => {
+	if (connection) return connection;
+
 	const url = `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}/`;
 
 	connection = new solanaWeb3.Connection(url);
 	await connection.getSlot();
-})();
+};
 
 // Token mint address (ZNS token address)
 const tokenMintAddress = new solanaWeb3.PublicKey(config.solana.tokenMintAddress);
 
 const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 	try {
+		await initConnection();
+
 		const senderKey = Uint8Array.from(JSON.parse(config.solana.sender));
 		const senderWallet = solanaWeb3.Keypair.fromSecretKey(senderKey);
 

@@ -20,9 +20,10 @@ const SessionSchema = new Schema({
 	type: requiredEnumField(String, ["createWallet", "decryptWallet", "importWallet", "general"], "createWallet"),
 	activatedAt: {
 		type: Date,
-		expires: "10m",
+		expires: 600,
 		default: Date.now,
 	},
+	globalCount: defaultField(Number, 0),
 	searchCount: defaultField(Number, 0),
 	leaseCount: defaultField(Number, 0),
 	decryptCount: defaultField(Number, 0),
