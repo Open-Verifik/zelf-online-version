@@ -57,7 +57,7 @@ const insert = async (params, authUser) => {
 	}
 
 	const session = new Model({
-		identifier: params.identifier || params.clientIP,
+		identifier: params.identifier,
 		clientIP: config.env === "development" ? params.identifier : params.clientIP,
 		type: params.type || "createWallet",
 		status: "active",
@@ -83,7 +83,7 @@ const insert = async (params, authUser) => {
 		token: jwt.sign(
 			{
 				session: session._id,
-				identifier: session.clientIP,
+				identifier: session.identifier,
 				ip: session.clientIP,
 			},
 			config.JWT_SECRET
