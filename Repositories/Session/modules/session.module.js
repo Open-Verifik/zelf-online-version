@@ -57,8 +57,8 @@ const insert = async (params, authUser) => {
 	}
 
 	const session = new Model({
-		identifier: params.clientIP,
-		clientIP: params.clientIP,
+		identifier: params.identifier || params.clientIP,
+		clientIP: config.env === "development" ? params.identifier : params.clientIP,
 		type: params.type || "createWallet",
 		status: "active",
 		isWebExtension: params.isWebExtension || false,
@@ -70,10 +70,7 @@ const insert = async (params, authUser) => {
 		console.log({
 			exception,
 			identifier: params.clientIP,
-			clientIP: params.clientIP,
-			type: params.type || "createWallet",
-			status: "active",
-			isWebExtension: params.isWebExtension || false,
+			...session,
 		});
 		const error = new Error("session_duplication");
 
