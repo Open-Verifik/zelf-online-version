@@ -169,6 +169,13 @@ const decryptZelfName = async (params, authUser) => {
 			...zelfNameObject.publicData,
 			...decryptedZelfProof.publicData,
 		},
+		durationToken: jwt.sign(
+			{
+				zelfName: zelfNameObject.publicData.zelfName,
+				exp: moment().add(1, "month").unix(),
+			},
+			config.JWT_SECRET
+		),
 	};
 };
 
