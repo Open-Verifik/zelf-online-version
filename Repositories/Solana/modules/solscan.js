@@ -161,7 +161,7 @@ const getTokens = async (params) => {
 				},
 			}
 		);
-		console.log(data.data);
+
 		const tokenHoldings = {
 			total: data.data.tokens.length,
 			balance: 0,
@@ -182,7 +182,7 @@ const getTokens = async (params) => {
 					amount: token.balance,
 					_amount: token.balance.toString(),
 					price: token.priceUsdt,
-					_price: token.priceUsdt.toString(),
+					_price: token.priceUsdt?.toString(),
 					symbol: token.tokenSymbol,
 					image: token.tokenIcon,
 					address: token.address,
@@ -193,7 +193,7 @@ const getTokens = async (params) => {
 				};
 
 				tokenData.fiatBalance = parseFloat(tokenData.fiatBalance?.toFixed(4));
-				// do the same for amount
+
 				tokenData.amount = parseFloat(tokenData.amount.toFixed(4));
 
 				tokenHoldings.tokens.push(tokenData);

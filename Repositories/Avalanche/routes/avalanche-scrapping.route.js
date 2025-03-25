@@ -27,6 +27,4 @@ module.exports = (server) => {
 		//Middleware.validateAddressTransactions,
 		Controller.tokens
 	);
-
-	server.get(`${PATH}/transaction/:id`, SessionMiddleware.validateJWT, Middleware.validateToken, Controller.getTransactionDetail);
 };
