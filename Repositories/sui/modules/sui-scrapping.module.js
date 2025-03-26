@@ -18,25 +18,30 @@ const getAddress = async (params) => {
 	try {
 		const address = params.address;
 
-		const { data } = await cloudscraper.post(
-			`https://suiscan.xyz/api/sui/mainnet/`,
-			{
-				jsonrpc: "2.0",
-				id: 1,
-				method: "suix_getBalance",
-				params: {
-					owner: address,
-				},
+		let data = JSON.stringify({
+			jsonrpc: "2.0",
+			id: 1,
+			method: "suix_getBalance",
+			params: {
+				owner:
+					"0x011111bc1dab287a2f38683013aed01832aac2caf195a0bcaf7a49a768daa43",
 			},
+		});
 
-			{
-				headers: {
-					"user-agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-					"Upgrade-Insecure-Requests": "1",
-				},
-			}
-		);
+		let options = {
+			url: "https://www.suiscan.xyz/mainnet/account/0x011111bc1dab287a2f38683013aed01832aac2caf195a0bcaf7a49a768daa438/portfolio",
+			headers: {
+				"Content-type": "application/json",
+				// Accept: "application/json",
+				// "User-Agent": "PostmanRuntime/7.43.2",
+			},
+			// body: data,
+			// json: true,
+		};
+		console.log(options);
+		const contacts = await cloudscraper.get(options);
+
+		console.log({ contacts });
 
 		const response = {
 			address,
@@ -49,7 +54,7 @@ const getAddress = async (params) => {
 
 		return response;
 	} catch (error) {
-		console.error({ error });
+		console.error(error.error);
 	}
 };
 
