@@ -716,6 +716,12 @@ const createZelfPay = async (zelfNameObject) => {
 	// create link for coinbase
 	const params = zelfNameObject.publicData || zelfNameObject.metadata;
 
+	if (!params.price) {
+		params.duration = params.duration || 1;
+
+		params.price = ZNSPartsModule.calculateZelfNamePrice(zelfNameObject.zelfName.length - 5, params.duration).price;
+	}
+
 	const zelfName = params.zelfName.split(".hold")[0];
 
 	if (!zelfName) {
