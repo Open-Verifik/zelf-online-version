@@ -101,8 +101,11 @@ const getTokens = async (params, query) => {
  */
 const getTransactionsList = async (params, query) => {
 	const t = Date.now();
+
 	const { data } = await axios.get(
-		`https://www.oklink.com/api/explorer/v2/avaxc/addresses/${params.id}/transactionsByClassfy/condition?offset=${query.page}&limit=${query.show}&address=${params.id}&nonzeroValue=false&t=${t}`,
+		`https://www.oklink.com/api/explorer/v2/avaxc/addresses/${params.id}/transactionsByClassfy/condition?offset=${query.page || 1}&limit=${
+			query.show || 20
+		}&address=${params.id}&nonzeroValue=false&t=${t}`,
 		{
 			httpsAgent: agent,
 			headers: {

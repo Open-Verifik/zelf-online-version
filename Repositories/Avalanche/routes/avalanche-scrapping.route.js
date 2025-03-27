@@ -8,25 +8,11 @@ const base = "/avalanche";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.get(
-		`${PATH}/address/:id`,
-		SessionMiddleware.validateJWT,
-		//Middleware.validateAddress,
-		Controller.balance
-	);
+	server.get(`${PATH}/address/:id`, SessionMiddleware.validateJWT, Controller.balance);
 
-	server.get(
-		`${PATH}/transactions/:id`,
-		SessionMiddleware.validateJWT,
-		//Middleware.validateAddressTransactions,
-		Controller.transactionsList
-	);
-	server.get(
-		`${PATH}/tokens/:id`,
-		SessionMiddleware.validateJWT,
-		//Middleware.validateAddressTransactions,
-		Controller.tokens
-	);
+	server.get(`${PATH}/address/:id/transactions`, SessionMiddleware.validateJWT, Controller.transactionsList);
+
+	server.get(`${PATH}/address/:id/tokens`, SessionMiddleware.validateJWT, Controller.tokens);
 
 	server.get(`${PATH}/transaction/:id`, SessionMiddleware.validateJWT, Middleware.validateToken, Controller.getTransactionDetail);
 };
