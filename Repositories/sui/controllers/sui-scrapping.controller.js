@@ -1,22 +1,8 @@
 const Module = require("../modules/sui-scrapping.module");
-const HttpHandler = require("../../../Core/http-handler");
 
 const address = async (ctx) => {
 	try {
-		const data = await Module.getAddress(ctx.request.query);
-
-		ctx.body = { data };
-	} catch (error) {
-		console.error(error);
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
-	}
-};
-const gasTracker = async (ctx) => {
-	try {
-		const data = await Module.getGasTracker(ctx.request.query);
+		const data = await Module.getAddress(ctx.request.params);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -28,9 +14,12 @@ const gasTracker = async (ctx) => {
 	}
 };
 
-const transactionsList = async (ctx) => {
+const transactions = async (ctx) => {
 	try {
-		const data = await Module.getTransactionsList(ctx.request.query);
+		const data = await Module.getTransactions(
+			ctx.request.params,
+			ctx.request.query
+		);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -42,9 +31,23 @@ const transactionsList = async (ctx) => {
 	}
 };
 
-const transactionStatus = async (ctx) => {
+const transaction = async (ctx) => {
 	try {
-		const data = await Module.getTransactionStatus(ctx.request.params);
+		const data = await Module.getTransaction(ctx.request.params);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error(error);
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
+const tokens = async (ctx) => {
+	try {
+		const data = await Module.getTokens(ctx.request.params, ctx.request.query);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -57,7 +60,7 @@ const transactionStatus = async (ctx) => {
 };
 module.exports = {
 	address,
-	gasTracker,
-	transactionStatus,
-	transactionsList,
+	transactions,
+	transaction,
+	tokens,
 };

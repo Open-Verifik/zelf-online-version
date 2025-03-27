@@ -1,4 +1,4 @@
-const { string, validate, boolean, showRecords } = require("../../../Core/JoiUtils");
+const { string, validate, showRecords } = require("../../../Core/JoiUtils");
 
 const schemas = {
 	validateAddress: {
@@ -8,7 +8,6 @@ const schemas = {
 		transactionHash: string().required(),
 	},
 	validateAddressTransactions: {
-		address: string().required(),
 		page: string().required(),
 		show: showRecords().required(),
 	},
@@ -42,7 +41,10 @@ const validateTransactionHashs = async (ctx, next) => {
 };
 
 const validateAddressTransactions = async (ctx, next) => {
-	const valid = validate(schemas.validateAddressTransactions, ctx.request.query);
+	const valid = validate(
+		schemas.validateAddressTransactions,
+		ctx.request.query
+	);
 
 	if (valid.error) {
 		ctx.status = 409;

@@ -11,32 +11,26 @@ module.exports = (server) => {
 	server.get(
 		`${PATH}/address/:id`,
 		SessionMiddleware.validateJWT,
-		//Middleware.validateAddress,
 		Controller.address
 	);
 
 	server.get(
-		`${PATH}/transactions`,
+		`${PATH}/transactions/:id`,
 		SessionMiddleware.validateJWT,
 		Middleware.validateAddressTransactions,
-		Controller.transactionsList
+		Controller.transactions
 	);
 
 	server.get(
 		`${PATH}/transaction/:id`,
 		SessionMiddleware.validateJWT,
-		Controller.transactionStatus
+		Controller.transaction
 	);
 
 	server.get(
-		`${PATH}/gas-tracker`,
+		`${PATH}/tokens/:id`,
 		SessionMiddleware.validateJWT,
-		Controller.gasTracker
-	);
-
-	server.post(
-		`${PATH}/gas-tracker`,
-		SessionMiddleware.validateJWT,
-		Controller.gasTracker
+		Middleware.validateAddressTransactions,
+		Controller.tokens
 	);
 };

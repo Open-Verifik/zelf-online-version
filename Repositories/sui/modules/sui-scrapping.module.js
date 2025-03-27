@@ -1,313 +1,104 @@
-const { getCleanInstance } = require("../../../Core/axios");
-const instance = getCleanInstance(30000);
-const cheerio = require("cheerio");
+const axios = require("axios");
+const https = require("https");
+const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-const cloudscraper = require("cloudscraper");
-const baseUrls = {
-	production: "https://etherscan.io",
-	development: "https://sepolia.etherscan.io",
-};
+const { get_ApiKey } = require("../../Solana/modules/oklink");
+const agent = new https.Agent({
+	rejectUnauthorized: false,
+});
 
+const urlBase = "https://www.oklink.com";
 /**
  * @param {*} params
  */
-const environment = "production";
+
 const getAddress = async (params) => {
-	const baseUrl = baseUrls[params.env || environment];
-
+	const t = Date.now();
 	try {
-		const address = params.address;
+		const address = params.id;
 
-		let data = JSON.stringify({
-			jsonrpc: "2.0",
-			id: 1,
-			method: "suix_getBalance",
-			params: {
-				owner:
-					"0x011111bc1dab287a2f38683013aed01832aac2caf195a0bcaf7a49a768daa43",
-			},
-		});
+		const { data } = await axios.get(
+			`${urlBase}/api/explorer/v2/common/address/getHolderInfo?address=${address}&blockChain=SUI&t=${t}`,
 
-		let options = {
-			url: "https://www.suiscan.xyz/mainnet/account/0x011111bc1dab287a2f38683013aed01832aac2caf195a0bcaf7a49a768daa438/portfolio",
-			headers: {
-				"Content-type": "application/json",
-				// Accept: "application/json",
-				// "User-Agent": "PostmanRuntime/7.43.2",
-			},
-			// body: data,
-			// json: true,
-		};
-		console.log(options);
-		const contacts = await cloudscraper.get(options);
+			{
+				httpsAgent: agent,
+				headers: {
+					"X-Apikey": get_ApiKey().getApiKey(),
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				},
+			}
+		);
 
-		console.log({ contacts });
+		const { price } = await getTickerPrice({ symbol: "SUI" });
 
+		const { transactions } = await getTransactions(
+			{ id: address },
+			{ page: "0", show: "10" }
+		);
+
+		console.log({ data });
 		const response = {
 			address,
-			balance: data.result.totalBalance,
-			// fiatBalance: Number(account.fiatBalance),
-			// account,
-			// tokenHoldings,
-			// transactions,
+			fullName: "",
+			balance: data.data.balance.toString(),
+			_balance: data.data.balance,
+			fiatBalance: data.data.usdBalance,
+			_fiatBalance: data.data.usdBalance.toString(),
+			account: {
+				asset: "SUI",
+				fiatBalance: data.data.usdBalance,
+				price: price,
+			},
+			tokenHoldings: {
+				balance: data.data.tokenUsdValue.toString(),
+				total: data.data.tokenNum,
+				tokens: await getTokens({ id: address }, { page: "0", show: "10" }),
+			},
+			transactions: transactions,
 		};
 
 		return response;
 	} catch (error) {
-		console.error(error.error);
+		console.log(error);
 	}
 };
-
-const getGasTracker = async (params) => {
-	const baseUrl = baseUrls[params.env || environment];
-
-	try {
-		let { data } = await instance.get(`${baseUrl}/gastracker`, {
-			headers: {
-				"user-agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
-			},
-		});
-
-		const $ = cheerio.load(data);
-
-		data = data.split("const costTxActionData =")[1].trim();
-		data = data.split("$('#mytable3').DataTable({")[0].trim();
-
-		const lowGwei = $("#spanLowPrice").text().replace(/\n/g, "").trim();
-		const averageGwei = $("#spanAvgPrice").text().replace(/\n/g, "").trim();
-		const highGwei = $("#spanHighPrice").text().replace(/\n/g, "").trim();
-
-		const lowPriorityAndBase = $("#spanLowPriorityAndBase").text().trim();
-		const lowTime = $('span[data-bs-trigger="hover"]')
-			.first()
-			.text()
-			.replace("~ ", "")
-			.trim();
-		const priceInDollars = $("div.text-muted")
-			.text()
-			.match(/\$\d+\.\d+/)[0];
-
-		const lowNumbers = lowPriorityAndBase.match(/\d+(\.\d+)?/g);
-		const lowBase = parseFloat(lowNumbers[0]).toString();
-		const lowPriority = parseFloat(lowNumbers[1]).toString();
-
-		const avgPriorityAndBase = $("#spanProposePriorityAndBase").text().trim();
-		const averageTime = $('span[data-bs-trigger="hover"]')
-			.eq(1)
-			.text()
-			.replace("~ ", "")
-			.trim();
-		const avgPriceInDollars = $("div.text-muted")
-			.text()
-			.match(/\$\d+\.\d+/)[0];
-		const avgNumbers = avgPriorityAndBase.match(/\d+(\.\d+)?/g);
-		const avgBase = parseFloat(avgNumbers[0]).toString();
-		const avgPriority = parseFloat(avgNumbers[1]).toString();
-
-		const highPriorityAndBase = $("#spanHighPriorityAndBase").text().trim();
-		const highTime = $('span[data-bs-trigger="hover"]')
-			.eq(2)
-			.text()
-			.replace("~ ", "")
-			.trim();
-		const highPriceInDollars = $("div.text-muted")
-			.text()
-			.match(/\$\d+\.\d+/)[0];
-		const highNumbers = highPriorityAndBase.match(/\d+(\.\d+)?/g);
-		const highBase = parseFloat(highNumbers[0]).toString();
-		const highPriority = parseFloat(highNumbers[1]).toString();
-
-		const featuredActions = [];
-		$(
-			"#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr"
-		).each((index, element) => {
-			const action = $(element).find("td span").text().trim();
-			const low = $(element).find("td").eq(1).text().replace("$", "").trim();
-			const average = $(element)
-				.find("td")
-				.eq(2)
-				.text()
-				.replace("$", "")
-				.trim();
-			const high = $(element).find("td").eq(3).text().replace("$", "").trim();
-
-			if (action) {
-				featuredActions.push({
-					action,
-					low,
-					average,
-					high,
-				});
-			}
-		});
-
-		// Formar el objeto de respuesta final.
-		const response = {
-			low: {
-				gwei: lowGwei,
-				base: lowBase,
-				priority: lowPriority,
-				cost: priceInDollars,
-				time: lowTime,
-			},
-			average: {
-				gwei: averageGwei,
-				base: avgBase,
-				priority: avgPriority,
-				cost: avgPriceInDollars,
-				time: averageTime,
-			},
-			high: {
-				gwei: highGwei,
-				base: highBase,
-				priority: highPriority,
-				cost: highPriceInDollars,
-				time: highTime,
-			},
-			featuredActions,
-		};
-
-		return response;
-	} catch (error) {
-		console.error({ error: error });
-	}
-};
-
 /**
- * get transaction status
- * @param {Object} params
+ *
+ * @param {Object} params - Contiene el id (dirección)
+ * @param {Object} query - Parámetros adicionales
  */
-const getTransactionStatus = async (params) => {
-	try {
-		const id = params.id;
+const getTokens = async (params, query) => {
+	const t = Date.now();
+	const { data } = await axios.get(
+		`${urlBase}/api/explorer/v2/sui/addresses/${params.id}/holders/token?offset=${query.page}&limit=${query.show}&t=${t}`,
 
-		const baseUrl = baseUrls[params.env || environment];
-
-		const { data } = await instance.get(`${baseUrl}/tx/${id}`, {
+		{
+			httpsAgent: agent,
 			headers: {
-				"user-agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 			},
-		});
-
-		const $ = cheerio.load(data);
-
-		const status = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div.row.align-items-center.mb-4 > div.col.col-md-9 > span"
-		)
-			.text()
-			.split(" ")[0]
-			.trim();
-
-		const block = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
-		).text();
-
-		const timestamp = $(
-			"#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9"
-		)
-			.text()
-			.trim()
-			.replace(/\n/g, "")
-			.split("|")[0];
-
-		///en pruba 8
-		const from_a = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(10) > div.col-md-9"
-		).html();
-
-		const from_div = cheerio.load(from_a);
-
-		const from = from_div("a.js-clipboard").attr("data-clipboard-text");
-		///en pruba 9
-		const to_a = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(11) > div.col-md-9 > div"
-		).html();
-
-		const to_div = cheerio.load(to_a);
-
-		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
-
-		const valueETH = $(
-			"#ContentPlaceHolder1_spanValue > div > span:nth-child(2)"
-		)
-			.text()
-			.replace("ETH", "")
-			.trim();
-
-		const valueDolar = $(
-			"#ContentPlaceHolder1_spanValue > div > span.text-muted"
-		)
-			.text()
-			.replace("($", "")
-			.replace(")", "")
-			.trim();
-
-		const transactionFeeETH = $(
-			"#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)"
-		)
-			.text()
-			.replace("ETH", "")
-			.trim();
-
-		const transactionFeeDolar = $(
-			"#ContentPlaceHolder1_spanTxFee > div > span.text-muted"
-		)
-			.text()
-			.replace("($", "")
-			.replace(")", "")
-			.trim();
-
-		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice")
-			.text()
-			.split("Gwei");
-
-		const gasPrice = gasPriceGwei[0].trim();
-		const gweiETH = gasPriceGwei[1]
-			.replace("(", "")
-			.replace(")", "")
-			.replace("ETH", "")
-			.trim();
-
-		const observation = $(
-			"#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span"
-		)
-			.text()
-			.replace("[", "")
-			.replace("]", "")
-			.trim();
-
-		const response = {
-			id,
-			status,
-			block,
-			timestamp,
-			from,
-			to,
-			valueETH,
-			valueDolar,
-			transactionFeeETH,
-			transactionFeeDolar,
-			gasPrice,
-			gweiETH,
-			observation,
-		};
-
-		if (!id || !status || !to || !from) {
-			throw new Error("404");
 		}
+	);
 
-		return response;
-	} catch (exception) {
-		const error = new Error("transaction_not_found");
-
-		error.status = 404;
-
-		throw error;
+	function formatCryptoData(data) {
+		return data.map((item) => ({
+			tokenType: item.symbol,
+			address_token: item.tokenType.split("::")[0],
+			fiatBalance: item.usdValue || 0,
+			_fiatBalance: item.usdValue.toString(),
+			symbol: item.symbol || "Unknown",
+			name: item.coinName || "Unknown",
+			price: item.price ? item.price.toString() : "0",
+			image: item.logoUrl || "",
+			amount: item.value ? item.value.toString() : "0",
+		}));
 	}
+	console.log(data.data);
+
+	return formatCryptoData(data.data.hits);
 };
 
 /**
@@ -315,125 +106,101 @@ const getTransactionStatus = async (params) => {
  * @param {Object} params
  * @returns
  */
-const getTransactionsList = async (params) => {
-	const address = params.address;
+const getTransactions = async (params, query) => {
+	const address = params.id;
 
-	const page = params.page;
+	const page = query.page;
 
-	const show = params.show;
+	const show = query.show;
 
-	const baseUrl = baseUrls[params.env || environment];
+	const t = Date.now();
 
+	const { data } = await axios.get(
+		`${urlBase}/api/explorer/v2/sui/addresses/${address}/transactionsByClassfy/condition?offset=${query.page}&limit=${query.show}&address=${address}&nonzeroValue=false&t=${t}`,
+		{
+			httpsAgent: agent,
+			headers: {
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+			},
+		}
+	);
+
+	function formatCryptoData(data) {
+		return data.map((item) => ({
+			hash: item.hash,
+			age: moment(item.timestamp).fromNow(),
+			date: new Date(item.timestamp).toISOString().split("T")[0],
+			from: item.from,
+			to: item.to,
+			block: item.checkpoint.toString(),
+			method: item.method,
+			fiatBalance: item.usdValue || 0,
+			amount: Number(item.amount).toFixed(6),
+			txnFee: item.fee.toString(),
+			gas: item.gas.toString(),
+		}));
+	}
+
+	return {
+		pagination: { records: data.data.total.toString(), page, show },
+		transactions: formatCryptoData(data.data.hits),
+	};
+};
+
+/**
+ * get transaction status
+ * @param {Object} params
+ */
+const getTransaction = async (params) => {
 	try {
-		const { data } = await instance.get(
-			`${baseUrl}/txs?a=${address}&ps=${show}&p=${page}`,
+		const t = Date.now();
+		const { data } = await axios.get(
+			`${urlBase}/api/explorer/v1/sui/transactionDetail?txHash=${params.id}&t=${t}`,
 			{
+				httpsAgent: agent,
 				headers: {
-					"user-agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-					"Upgrade-Insecure-Requests": "1",
+					"X-Apikey": get_ApiKey().getApiKey(),
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 				},
 			}
 		);
-		const $ = cheerio.load(data);
 
-		const transactions = [];
-
-		const records = $(
-			"#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span"
-		)
-			.text()
-			.match(/\d+/g)
-			.join("");
-
-		const nPage = $(
-			"#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)"
-		)
-			.text()
-			.replace("Page", "")
-			.split("of");
-
-		const pagination = {
-			records,
-			pages: nPage ? nPage[1].trim() : 0,
-			page: nPage ? nPage[0].trim() : 0,
+		if (data.code == 404) {
+			const error = new Error("transaction_not_found");
+			error.status = 404;
+			throw error;
+		}
+		const response = {
+			hash: data.data.hash,
+			status: data.data.status,
+			block: data.data.height.toString(),
+			timestamp: moment(data.data.timestamp).fromNow(),
+			from: data.data.from,
+			to: data.data.to,
+			valueSUI: data.data.amount.toString(),
+			valueDolar: "",
+			transactionFeeDolar: data.data.computationCostFee.toString(),
+			gasPrice: data.data.gasPrice.toString(),
 		};
 
-		const tabla = $(
-			"#ContentPlaceHolder1_divTransactions > div.table-responsive"
-		).html();
-
-		const campos = cheerio.load(tabla);
-
-		campos("tbody tr").each((index, element) => {
-			const transaction = {};
-
-			transaction.hash = campos(element)
-				.find("td:nth-child(2) a")
-				.text()
-				.trim();
-
-			transaction.method = campos(element)
-				.find("td:nth-child(3) span")
-				.attr("data-title");
-
-			transaction.block = campos(element).find("td:nth-child(4) a").text();
-
-			transaction.age = campos(element)
-				.find("td:nth-child(5) span")
-				.attr("data-bs-title");
-
-			const divFrom = campos(element).find("td:nth-child(8)").html();
-
-			const from = cheerio.load(divFrom);
-
-			transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
-
-			transaction.traffic = campos(element).find("td:nth-child(9)").text();
-
-			const divTo = campos(element).find("td:nth-child(10)").html();
-
-			const to = cheerio.load(divTo);
-
-			transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
-
-			let _amount = campos(element)
-				.find("td:nth-child(11)")
-				.text()
-				.split("$")[0]
-				.trim();
-
-			_amount = _amount.split(" ");
-
-			transaction.fiatAmount = campos(element)
-				.find("td:nth-child(11)")
-				.text()
-				.split("$")[1]
-				.replace(/\n/g, "");
-
-			transaction.amount = _amount[0];
-
-			transaction.asset = _amount[1];
-
-			transaction.txnFee = campos(element)
-				.find("td.small.text-muted.showTxnFee")
-				.text();
-
-			transactions.push(transaction);
-		});
-
-		return { pagination, transactions };
-	} catch (error) {
-		return {
-			pagination: { records: "0", pages: "0", page: "0" },
-			transactions: [],
-		};
+		return response;
+	} catch (exception) {
+		console.log(exception);
+		const error = new Error("timeout_data_source");
+		error.status = 500;
+		throw error;
 	}
 };
 
+const getGasTracker = async (params) => {
+	return response;
+};
 module.exports = {
 	getAddress,
-	getGasTracker,
-	getTransactionsList,
-	getTransactionStatus,
+	getTransactions,
+	getTransaction,
+	getTokens,
 };
