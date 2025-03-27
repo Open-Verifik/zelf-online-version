@@ -36,8 +36,6 @@ const templatesMap = {
 const searchZelfLease = async (zelfName) => {
 	const previewData = await searchZelfName({ zelfName: zelfName });
 
-	console.log({ previewData });
-
 	const zelfNameObject = previewData.ipfs[0] || previewData.arweave[0];
 
 	if (!zelfNameObject?.publicData) {
@@ -48,9 +46,15 @@ const searchZelfLease = async (zelfName) => {
 		throw error;
 	}
 
+	if (!zelfNameObject.publicData.price) {
+		zelfNameObject.publicData.duration = zelfNameObject.publicData.duration || 1;
+
+		zelfNameObject.publicData.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, zelfNameObject.publicData.duration).price;
+	}
+
 	const { price, duration, expiresAt, referralZelfName, referralSolanaAddress } = zelfNameObject.publicData;
 
-	if (zelfNameObject.publicData.type !== "hold") {
+	if (zelfNameObject.publicData.type === "hold") {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
 		throw error;
@@ -88,6 +92,7 @@ const searchZelfLease = async (zelfName) => {
 	}
 
 	const cryptoValue = await calculateCryptoValue("ETH", price);
+
 	const network = cryptoValue.network;
 	const amountToSend = cryptoValue.amountToSend;
 	const ratePriceInUSD = cryptoValue.ratePriceInUSD;

@@ -72,7 +72,10 @@ const schemas = {
 
 const transferMyZelfName = async (ctx, next) => {};
 
-const renewMyZelfName = async (ctx, next) => {};
+const renewMyZelfName = async (ctx, next) => {
+	// required to pass zelfName
+	// duration
+};
 
 module.exports = {
 	transferMyZelfName,
