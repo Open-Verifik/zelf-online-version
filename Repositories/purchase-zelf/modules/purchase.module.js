@@ -48,7 +48,7 @@ const searchZelfLease = async (zelfName) => {
 
 	const { price, duration, expiresAt, referralZelfName, referralSolanaAddress } = zelfNameObject.publicData;
 
-	if (previewData.ipfs[0].publicData.type === "mainnet") {
+	if (zelfNameObject.publicData.type === "mainnet") {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
 		throw error;
