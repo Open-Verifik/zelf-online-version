@@ -58,7 +58,7 @@ const searchZelfLease = async (zelfName) => {
 	let zelfPayRecords = [];
 
 	try {
-		zelfPayRecords = await previewZelfName(
+		zelfPayRecords = await searchZelfName(
 			{
 				zelfName: zelfName.replace(".zelf", ".zelfpay"),
 				environment: "mainnet",
