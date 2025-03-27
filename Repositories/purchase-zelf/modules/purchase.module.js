@@ -3,9 +3,8 @@ const { getTickerPrice } = require("../../binance/modules/binance.module");
 const Mailgun = require("../../../Core/mailgun");
 const Model = require("../../Subscribers/models/subscriber.model");
 const MongoORM = require("../../../Core/mongo-orm");
-const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
 const { calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns-parts.module");
-const { createZelfPay, previewZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
+const { createZelfPay, previewZelfName, searchZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 const ZNSPartsModule = require("../../ZelfNameService/modules/zns-parts.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
@@ -37,17 +36,23 @@ const templatesMap = {
 const searchZelfLease = async (zelfName) => {
 	const previewData = await searchZelfName({ zelfName: zelfName });
 
-	if (!previewData?.ipfs?.[0]?.publicData) {
+	const zelfNameObject = previewData.ipfs?.[0] || previewData.arweave?.[0];
+
+	if (!zelfNameObject?.publicData) {
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
 		throw error;
 	}
 
-	const zelfNameObject = previewData.ipfs[0] || previewData.arweave[0];
+	if (!zelfNameObject.publicData.price) {
+		zelfNameObject.publicData.duration = zelfNameObject.publicData.duration || 1;
+
+		zelfNameObject.publicData.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, zelfNameObject.publicData.duration).price;
+	}
 
 	const { price, duration, expiresAt, referralZelfName, referralSolanaAddress } = zelfNameObject.publicData;
 
-	if (previewData.ipfs[0].publicData.type === "mainnet") {
+	if (zelfNameObject.publicData.type !== "hold") {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
 		throw error;
@@ -57,7 +62,7 @@ const searchZelfLease = async (zelfName) => {
 	let zelfPayRecords = [];
 
 	try {
-		zelfPayRecords = await previewZelfName(
+		zelfPayRecords = await searchZelfName(
 			{
 				zelfName: zelfName.replace(".zelf", ".zelfpay"),
 				environment: "mainnet",
@@ -68,10 +73,12 @@ const searchZelfLease = async (zelfName) => {
 		console.error({ exception });
 	}
 
-	if (zelfPayRecords.length) {
-		zelfPayNameObject = zelfPayRecords[0];
-	} else {
+	zelfPayNameObject = zelfPayRecords.ipfs?.[0] || zelfPayRecords.arweave?.[0];
+
+	if (!zelfPayNameObject) {
 		const createdZelfPay = await createZelfPay(zelfNameObject);
+
+		console.log({ createZelfPay: createdZelfPay });
 
 		zelfPayNameObject = createdZelfPay.ipfs || createdZelfPay.arweave;
 	}
@@ -83,6 +90,7 @@ const searchZelfLease = async (zelfName) => {
 	}
 
 	const cryptoValue = await calculateCryptoValue("ETH", price);
+
 	const network = cryptoValue.network;
 	const amountToSend = cryptoValue.amountToSend;
 	const ratePriceInUSD = cryptoValue.ratePriceInUSD;

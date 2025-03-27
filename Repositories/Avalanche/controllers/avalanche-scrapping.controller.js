@@ -34,7 +34,7 @@ const getTransactionDetail = async (ctx) => {
 
 const transactionsList = async (ctx) => {
 	try {
-		const data = await Module.getTransactionsList(ctx.request.params, ctx.request.query);
+		const data = await Module.getTransactionsList({ ...ctx.request.params, ...ctx.request.query });
 
 		ctx.body = { data };
 	} catch (error) {

@@ -23,7 +23,12 @@ const getBalance = async (params) => {
 
 		// Obtener tokens y transacciones
 		const tokenHoldings = await getTokens({ id: params.id }, { show: "200" });
-		const transactions = await getTransactionsList({ id: params.id }, { page: "0", show: "100" });
+
+		const transactions = await getTransactionsList({
+			id: params.id,
+			page: "0",
+			show: "100",
+		});
 
 		return {
 			address: params.id,
@@ -40,7 +45,7 @@ const getBalance = async (params) => {
 				price: data.nativeTokenBalance?.price?.value.toString(),
 			},
 			tokenHoldings,
-			...transactions,
+			transactions,
 		};
 	} catch (error) {
 		console.error({ error });
@@ -99,18 +104,22 @@ const getTokens = async (params, query) => {
  * @param {Object} params - Contiene el id (dirección)
  * @param {Object} query - Parámetros de paginación
  */
-const getTransactionsList = async (params, query) => {
+const getTransactionsList = async (params) => {
 	const t = Date.now();
-	const { data } = await axios.get(
-		`https://www.oklink.com/api/explorer/v2/avaxc/addresses/${params.id}/transactionsByClassfy/condition?offset=${query.page}&limit=${query.show}&address=${params.id}&nonzeroValue=false&t=${t}`,
-		{
-			httpsAgent: agent,
-			headers: {
-				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-			},
-		}
-	);
+
+	const { id, page, show } = params;
+
+	const url = `https://www.oklink.com/api/explorer/v2/avaxc/addresses/${id}/transactionsByClassfy/condition?offset=${page || "0"}&limit=${
+		show || "100"
+	}&address=${id}&nonzeroValue=false&t=${t}`;
+
+	const { data } = await axios.get(url, {
+		httpsAgent: agent,
+		headers: {
+			"X-Apikey": get_ApiKey().getApiKey(),
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+		},
+	});
 
 	// Determinar el activo basado en el método
 	const getAsset = (method) => (method.includes("AVAX") ? "AVAX" : "ETH");
@@ -129,7 +138,7 @@ const getTransactionsList = async (params, query) => {
 		txnFee: tx.fee.toFixed(4),
 	}));
 
-	return { transactions };
+	return transactions;
 };
 
 /**
