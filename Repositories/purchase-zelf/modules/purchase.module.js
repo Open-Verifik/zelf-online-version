@@ -36,6 +36,8 @@ const templatesMap = {
 const searchZelfLease = async (zelfName) => {
 	const previewData = await searchZelfName({ zelfName: zelfName });
 
+	console.log({ previewData });
+
 	const zelfNameObject = previewData.ipfs[0] || previewData.arweave[0];
 
 	if (!zelfNameObject?.publicData) {
@@ -48,7 +50,7 @@ const searchZelfLease = async (zelfName) => {
 
 	const { price, duration, expiresAt, referralZelfName, referralSolanaAddress } = zelfNameObject.publicData;
 
-	if (zelfNameObject.publicData.type === "mainnet") {
+	if (zelfNameObject.publicData.type !== "hold") {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
 		throw error;
@@ -69,10 +71,12 @@ const searchZelfLease = async (zelfName) => {
 		console.error({ exception });
 	}
 
-	if (zelfPayRecords.length) {
-		zelfPayNameObject = zelfPayRecords[0];
-	} else {
+	zelfPayNameObject = zelfPayRecords.ipfs?.[0] || zelfPayRecords.arweave?.[0];
+
+	if (!zelfPayNameObject) {
 		const createdZelfPay = await createZelfPay(zelfNameObject);
+
+		console.log({ createZelfPay: createdZelfPay });
 
 		zelfPayNameObject = createdZelfPay.ipfs || createdZelfPay.arweave;
 	}
