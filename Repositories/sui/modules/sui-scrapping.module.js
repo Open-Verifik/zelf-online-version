@@ -37,7 +37,6 @@ const getAddress = async (params) => {
 			{ page: "0", show: "10" }
 		);
 
-		console.log({ data });
 		const response = {
 			address,
 			fullName: "",
@@ -59,9 +58,7 @@ const getAddress = async (params) => {
 		};
 
 		return response;
-	} catch (error) {
-		console.log(error);
-	}
+	} catch (error) {}
 };
 /**
  *
@@ -96,7 +93,6 @@ const getTokens = async (params, query) => {
 			amount: item.value ? item.value.toString() : "0",
 		}));
 	}
-	console.log(data.data);
 
 	return formatCryptoData(data.data.hits);
 };
@@ -188,7 +184,6 @@ const getTransaction = async (params) => {
 
 		return response;
 	} catch (exception) {
-		console.log(exception);
 		const error = new Error("timeout_data_source");
 		error.status = 500;
 		throw error;
