@@ -36,13 +36,11 @@ const templatesMap = {
 const searchZelfLease = async (zelfName) => {
 	const previewData = await searchZelfName({ zelfName: zelfName });
 
-	const zelfNameObject = previewData.ipfs[0] || previewData.arweave[0];
+	const zelfNameObject = previewData.ipfs?.[0] || previewData.arweave?.[0];
 
 	if (!zelfNameObject?.publicData) {
 		const error = new Error("zelfName_not_found");
-
 		error.status = 404;
-
 		throw error;
 	}
 
@@ -54,7 +52,7 @@ const searchZelfLease = async (zelfName) => {
 
 	const { price, duration, expiresAt, referralZelfName, referralSolanaAddress } = zelfNameObject.publicData;
 
-	if (zelfNameObject.publicData.type === "hold") {
+	if (zelfNameObject.publicData.type !== "hold") {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
 		throw error;
