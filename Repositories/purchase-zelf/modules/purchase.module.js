@@ -3,9 +3,8 @@ const { getTickerPrice } = require("../../binance/modules/binance.module");
 const Mailgun = require("../../../Core/mailgun");
 const Model = require("../../Subscribers/models/subscriber.model");
 const MongoORM = require("../../../Core/mongo-orm");
-const { searchZelfName } = require("../../ZelfNameService/modules/zns.module");
 const { calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns-parts.module");
-const { createZelfPay, previewZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
+const { createZelfPay, previewZelfName, searchZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 const ZNSPartsModule = require("../../ZelfNameService/modules/zns-parts.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
@@ -37,13 +36,15 @@ const templatesMap = {
 const searchZelfLease = async (zelfName) => {
 	const previewData = await searchZelfName({ zelfName: zelfName });
 
-	if (!previewData?.ipfs?.[0]?.publicData) {
+	const zelfNameObject = previewData.ipfs[0] || previewData.arweave[0];
+
+	if (!zelfNameObject?.publicData) {
 		const error = new Error("zelfName_not_found");
+
 		error.status = 404;
+
 		throw error;
 	}
-
-	const zelfNameObject = previewData.ipfs[0] || previewData.arweave[0];
 
 	const { price, duration, expiresAt, referralZelfName, referralSolanaAddress } = zelfNameObject.publicData;
 
