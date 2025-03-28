@@ -23,6 +23,7 @@ const getAddress = async (params) => {
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
+
 		const $ = cheerio.load(data);
 
 		const fullName = $("#ensName > span > a > div > span").text().replace(/\n/g, "");
@@ -56,6 +57,7 @@ const getAddress = async (params) => {
 		}
 
 		const totalTokens = $("#dropdownMenuBalance").text().trim().replace(/\n/g, "").split("(");
+
 		let tokensContracts;
 
 		try {
@@ -83,7 +85,6 @@ const getAddress = async (params) => {
 			}
 
 			const tokenName = $(element).find(".list-name span").attr("data-bs-title") || $(element).find(".list-name").text().trim();
-
 			const tokenAmount = $(element).find(".text-muted").text().trim();
 
 			const [_amount, rest] = tokenAmount.split(" ");
@@ -92,13 +93,10 @@ const getAddress = async (params) => {
 			const [, _price] = tokenAmount.split("@");
 
 			const tokenType = $(element).find(".badge").text().trim();
-
 			const tokenLink = $(element).find("a.nav-link").attr("href").replace("/token/", "");
-
 			const tokenImage = $(element).find("img").attr("src");
 
 			let name = null;
-
 			let symbol = null;
 
 			try {
@@ -134,50 +132,9 @@ const getAddress = async (params) => {
 
 		try {
 			const tabla = $("#transactions > div > div.table-responsive").html();
-
 			const campos = cheerio.load(tabla);
 
-			campos("tbody tr").each((index, element) => {
-				const transaction = {};
-
-				transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
-
-				transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
-
-				transaction.block = campos(element).find("td:nth-child(4) a").text();
-
-				transaction.age = campos(element).find("td:nth-child(5) span").attr("data-bs-title");
-
-				const divFrom = campos(element).find("td:nth-child(8)").html();
-
-				if (!divFrom) return;
-
-				const from = cheerio.load(divFrom);
-
-				transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
-
-				transaction.traffic = campos(element).find("td:nth-child(9)").text();
-
-				const divTo = campos(element).find("td:nth-child(10)").html();
-
-				const to = cheerio.load(divTo);
-
-				transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
-
-				let _amount = campos(element).find("td:nth-child(11)").text().split("$")[0].trim();
-
-				_amount = _amount.split(" ");
-
-				transaction.fiatAmount = campos(element).find("td:nth-child(11)").text().split("$")[1].replace(/\n/g, "");
-
-				transaction.amount = _amount[0];
-
-				transaction.asset = _amount[1];
-
-				transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
-
-				transactions.push(transaction);
-			});
+			campos("tbody tr").each((_index, element) => _parseTransactionsContent(campos, element, transactions));
 		} catch (error) {
 			console.error({ error });
 		}
@@ -402,9 +359,7 @@ const getTransactionStatus = async (params) => {
  */
 const getTransactionsList = async (params) => {
 	const address = params.address;
-
 	const page = params.page;
-
 	const show = params.show;
 
 	const baseUrl = baseUrls[params.env || environment];
@@ -416,12 +371,12 @@ const getTransactionsList = async (params) => {
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
+
 		const $ = cheerio.load(data);
 
 		const transactions = [];
 
 		const records = $("#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span").text().match(/\d+/g).join("");
-
 		const nPage = $("#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)").text().replace("Page", "").split("of");
 
 		const pagination = {
@@ -431,59 +386,67 @@ const getTransactionsList = async (params) => {
 		};
 
 		const tabla = $("#ContentPlaceHolder1_divTransactions > div.table-responsive").html();
-
 		const campos = cheerio.load(tabla);
 
-		console.log({ campos });
-
-		campos("tbody tr").each((index, element) => {
-			const transaction = {};
-
-			transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
-
-			transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
-
-			transaction.block = campos(element).find("td:nth-child(4) a").text();
-
-			transaction.age = campos(element).find("td:nth-child(5) span").attr("data-bs-title");
-
-			const divFrom = campos(element).find("td:nth-child(8)").html();
-
-			const from = cheerio.load(divFrom);
-
-			transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
-
-			transaction.traffic = campos(element).find("td:nth-child(9)").text();
-
-			const divTo = campos(element).find("td:nth-child(10)").html();
-
-			const to = cheerio.load(divTo);
-
-			transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
-
-			let _amount = campos(element).find("td:nth-child(11)").text().split("$")[0].trim();
-
-			_amount = _amount.split(" ");
-
-			transaction.fiatAmount = campos(element).find("td:nth-child(11)").text().split("$")[1].replace(/\n/g, "");
-
-			transaction.amount = _amount[0];
-
-			transaction.asset = _amount[1];
-
-			transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
-
-			transactions.push(transaction);
-		});
+		campos("tbody tr").each((_index, element) => _parseTransactionsContent(campos, element, transactions));
 
 		return { pagination, transactions };
 	} catch (error) {
 		console.error({ error });
+
 		return {
 			pagination: { records: "0", pages: "0", page: "0" },
 			transactions: [],
 		};
 	}
+};
+
+const _parseTransactionsContent = (campos, element, transactions = []) => {
+	const transaction = {};
+
+	transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
+	transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
+	transaction.block = campos(element).find("td:nth-child(5) a").text();
+
+	const ageCol = campos(element).find("td:nth-child(6) span");
+
+	const age = ageCol.text().trim();
+	const date = ageCol.find("span").attr("data-bs-title").trim();
+
+	transaction.age = age;
+	transaction.date = date;
+
+	const divFrom = campos(element).find("td:nth-child(9)").html();
+
+	if (!divFrom) return;
+
+	const from = cheerio.load(divFrom);
+
+	transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
+	transaction.traffic = campos(element).find("td:nth-child(10)").text();
+
+	const divTo = campos(element).find("td:nth-child(11)").html();
+	const to = cheerio.load(divTo);
+
+	transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
+
+	const amountCol = campos(element).find("td:nth-child(12)");
+	const amountTooltipData = amountCol.find("span").attr("data-bs-title");
+
+	const fiatAndTokenAmount = amountTooltipData.split(" | ");
+	const tokenAmountAndAsset = fiatAndTokenAmount[0].split(" ");
+
+	const tokenAmount = tokenAmountAndAsset[0].trim();
+	const asset = tokenAmountAndAsset[1].trim();
+
+	const fiatAmount = fiatAndTokenAmount[1].replace("$", "").trim();
+
+	transaction.fiatAmount = fiatAmount;
+	transaction.amount = tokenAmount;
+	transaction.asset = asset;
+	transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
+
+	transactions.push(transaction);
 };
 
 module.exports = {
