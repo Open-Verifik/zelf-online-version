@@ -388,7 +388,38 @@ const getTransactionsList = async (params) => {
 		const tabla = $("#ContentPlaceHolder1_divTransactions > div.table-responsive").html();
 		const campos = cheerio.load(tabla);
 
-		campos("tbody tr").each((_index, element) => _parseTransactionsContent(campos, element, transactions));
+		campos("tbody tr").each((_index, element) => {
+			const transaction = {};
+
+			transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
+			transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
+			transaction.block = campos(element).find("td:nth-child(4) a").text();
+			transaction.age = campos(element).find("td:nth-child(5) span").attr("data-bs-title");
+
+			const divFrom = campos(element).find("td:nth-child(8)").html();
+
+			const from = cheerio.load(divFrom);
+
+			transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
+			transaction.traffic = campos(element).find("td:nth-child(9)").text();
+
+			const divTo = campos(element).find("td:nth-child(10)").html();
+
+			const to = cheerio.load(divTo);
+
+			transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
+
+			let _amount = campos(element).find("td:nth-child(11)").text().split("$")[0].trim();
+
+			_amount = _amount.split(" ");
+
+			transaction.fiatAmount = campos(element).find("td:nth-child(11)").text().split("$")[1].replace(/\n/g, "");
+			transaction.amount = _amount[0];
+			transaction.asset = _amount[1];
+			transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
+
+			transactions.push(transaction);
+		});
 
 		return { pagination, transactions };
 	} catch (error) {
