@@ -300,6 +300,8 @@ const searchZelfName = async (params, authUser) => {
 		for (let index = 0; index < searchResults.length; index++) {
 			const zelfNameObject = await ZNSPartsModule.formatArweaveSearchResult(searchResults[index]);
 
+			zelfNameObject.zelfProof = zelfNameObject.zelfProof.replace(/ /g, "+");
+
 			zelfNames.push(zelfNameObject);
 		}
 
