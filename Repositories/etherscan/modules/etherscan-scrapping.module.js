@@ -113,10 +113,11 @@ const getAddress = async (params) => {
 					amount: _amount.replace(/,/g, ""),
 					price: _price,
 					type: tokenType,
-					address: tokenLink,
-					image: tokenImage.includes("https")
+					address: tokenLink.split("?")[0],
+					image: tokenImage?.startsWith("https")
 						? tokenImage
-						: `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
+						: `https://etherscan.io${tokenImage}` ||
+						  `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
 				};
 
 				tokens.push(token);
