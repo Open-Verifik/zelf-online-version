@@ -4,80 +4,106 @@ const config = require("../../../Core/config");
 const Session = require("../../Session/models/session.model");
 
 const schemas = {
-	search: {
-		zelfName: string(),
-		key: string(),
-		value: string(),
-		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]),
-		captchaToken: string(),
-	},
-	leaseOffline: {
-		zelfName: string().required(),
-		zelfProof: string().required(),
-		zelfProofQRCode: string().required(),
-	},
-	leaseConfirmation: {
-		zelfName: string().required(),
-		coin: string().required(),
-		network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC"]).required(),
-	},
-	lease: {
+	transfer: {
 		zelfName: string().required(),
 		faceBase64: string().required(),
-		type: stringEnum(["create", "import"]).required(),
-		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string(),
+		password: string().required(),
 	},
-	create: {
-		password: string(),
-		addServerPassword: boolean(),
-		wordsCount: number().required(),
-	},
-	import: {
-		password: string(),
-		mnemonic: string().required(),
-	},
-	decrypt: {
-		faceBase64: string().required(),
-		password: string(),
+	renew: {
 		zelfName: string().required(),
-		addServerPassword: boolean(),
-		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string(),
 	},
-	preview: {
+	howToRenew: {
 		zelfName: string().required(),
-		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string(),
-	},
-	previewZelfProof: {
-		zelfProof: string().required(),
-		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string(),
-	},
-	revenueCatWebhook: {
-		product_id: string().required(),
-		period_type: string().required(),
-		currency: string().required(),
-		price: number().required(),
-		id: string().required(),
-		app_id: string().required(),
-		transaction_id: string().required(),
-		environment: string().required(),
-	},
-	update: {
-		duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
 	},
 };
 
-const transferMyZelfName = async (ctx, next) => {};
+const transferValidation = async (ctx, next) => {
+	const valid = validate(schemas.transfer, ctx.request.body);
 
-const renewMyZelfName = async (ctx, next) => {
-	// required to pass zelfName
-	// duration
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	const { zelfName } = ctx.request.body;
+
+	const failed = validateZelfName(zelfName, ctx);
+
+	if (failed) return;
+
+	await next();
+};
+
+/**
+ *
+ * @param {Object} ctx
+ * @param {Object} next
+ */
+const howToRenewValidation = async (ctx, next) => {
+	const valid = validate(schemas.howToRenew, {
+		...ctx.request.query,
+		...ctx.request.params,
+	});
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	const { zelfName } = { ...ctx.request.params, ...ctx.request.query };
+
+	const failed = validateZelfName(zelfName, ctx);
+
+	if (failed) return;
+
+	await next();
+};
+
+const validateZelfName = (zelfName, ctx) => {
+	// check that name includes .zelf
+	if (!zelfName.includes(".zelf")) {
+		ctx.status = 409;
+		ctx.body = { validationError: "Not a valid zelf name" };
+		return {
+			failed: true,
+		};
+	}
+
+	if (zelfName.length < 6) {
+		ctx.status = 409;
+		ctx.body = { validationError: "ZelfName should be 1 character or more." };
+		return {
+			failed: true,
+		};
+	}
+
+	return null;
+};
+
+const renewValidation = async (ctx, next) => {
+	const valid = validate(schemas.renew, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	const { zelfName } = ctx.request.body;
+
+	const failed = validateZelfName(zelfName, ctx);
+
+	if (failed) return;
+
+	await next();
 };
 
 module.exports = {
-	transferMyZelfName,
-	renewMyZelfName,
+	transferValidation,
+	howToRenewValidation,
+	renewValidation,
 };

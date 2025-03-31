@@ -439,10 +439,11 @@ const _parseTransactionsContent = (campos, element, transactions = []) => {
 	transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
 	transaction.block = campos(element).find("td:nth-child(5) a").text();
 
-	const ageCol = campos(element).find("td:nth-child(6) span");
+	const ageCol = campos(element).find("td:nth-child(7) span");
+	const dateCol = campos(element).find("td:nth-child(6) span");
 
 	const age = ageCol.text().trim();
-	const date = ageCol.find("span").attr("data-bs-title").trim();
+	const date = dateCol.text().trim();
 
 	transaction.age = age;
 	transaction.date = date;
