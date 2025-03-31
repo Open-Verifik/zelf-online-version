@@ -1,7 +1,6 @@
 const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const cheerio = require("cheerio");
-const { token } = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const baseUrls = {
 	production: "https://etherscan.io",
