@@ -8,29 +8,11 @@ const base = "/sui";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.get(
-		`${PATH}/address/:id`,
-		SessionMiddleware.validateJWT,
-		Controller.address
-	);
+	server.get(`${PATH}/address/:id`, SessionMiddleware.validateJWT, Controller.address);
 
-	server.get(
-		`${PATH}/transactions/:id`,
-		SessionMiddleware.validateJWT,
-		Middleware.validateAddressTransactions,
-		Controller.transactions
-	);
+	server.get(`${PATH}/transactions/:id`, SessionMiddleware.validateJWT, Middleware.validateAddressTransactions, Controller.transactions);
 
-	server.get(
-		`${PATH}/transaction/:id`,
-		SessionMiddleware.validateJWT,
-		Controller.transaction
-	);
+	server.get(`${PATH}/transaction/:id`, SessionMiddleware.validateJWT, Controller.transaction);
 
-	server.get(
-		`${PATH}/tokens/:id`,
-		SessionMiddleware.validateJWT,
-		Middleware.validateAddressTransactions,
-		Controller.tokens
-	);
+	server.get(`${PATH}/tokens/:id`, SessionMiddleware.validateJWT, Middleware.validateAddressTransactions, Controller.tokens);
 };
