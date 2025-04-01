@@ -1,7 +1,10 @@
+const moment = require("moment");
+
 const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const cheerio = require("cheerio");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
+
 const baseUrls = {
 	production: "https://etherscan.io",
 	development: "https://sepolia.etherscan.io",
@@ -447,7 +450,7 @@ const _parseTransactionsContent = (campos, element, transactions = []) => {
 	const date = dateCol.text().trim();
 
 	transaction.age = age;
-	transaction.date = date;
+	transaction.date = moment.utc(date).toISOString();
 
 	const divFrom = campos(element).find("td:nth-child(9)").html();
 
