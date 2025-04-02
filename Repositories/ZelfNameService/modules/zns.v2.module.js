@@ -8,6 +8,7 @@ const { generateMnemonic } = require("../../Wallet/modules/helpers");
 const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
+const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { decrypt, encrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
@@ -31,7 +32,7 @@ const leaseZelfName = async (params, authUser) => {
 
 	const referralZelfNameObject = await _validateReferral(referralZelfName, authUser);
 
-	const { eth, btc, solana, zkProof, mnemonic, face, password } = await _createWalletsFromPhrase(params, authUser);
+	const { eth, btc, solana, sui, zkProof, mnemonic, face, password } = await _createWalletsFromPhrase(params, authUser);
 
 	const zelfNameObject = {};
 
@@ -40,6 +41,7 @@ const leaseZelfName = async (params, authUser) => {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
+			suiAddress: sui.address,
 			zelfName,
 			origin: "online",
 		},
@@ -47,6 +49,7 @@ const leaseZelfName = async (params, authUser) => {
 			mnemonic,
 			solanaSecretKey: solana.secretKey,
 			zkProof,
+			suiSecretKey: sui.secretKey,
 		},
 		faceBase64: face,
 		password,
@@ -71,6 +74,7 @@ const leaseZelfName = async (params, authUser) => {
 	zelfNameObject.ethAddress = eth.address;
 	zelfNameObject.btcAddress = btc.address;
 	zelfNameObject.solanaAddress = solana.address;
+	zelfNameObject.suiAddress = sui.address;
 	zelfNameObject.hasPassword = `${Boolean(password)}`;
 	zelfNameObject.metadata = params.removePGP
 		? dataToEncrypt.metadata
@@ -82,6 +86,7 @@ const leaseZelfName = async (params, authUser) => {
 					.join(" "),
 				solanaSecretKey: `${dataToEncrypt.metadata.solanaSecretKey.slice(0, 6)}****${dataToEncrypt.metadata.solanaSecretKey.slice(-6)}`,
 				zkProof: `${dataToEncrypt.metadata.zkProof.slice(0, 6)}****${dataToEncrypt.metadata.zkProof.slice(-6)}`,
+				suiSecretKey: `${dataToEncrypt.metadata.suiSecretKey.slice(0, 6)}****${dataToEncrypt.metadata.suiSecretKey.slice(-6)}`,
 		  }
 		: undefined;
 	zelfNameObject.duration = duration;
@@ -92,6 +97,7 @@ const leaseZelfName = async (params, authUser) => {
 	zelfNameObject.image = await encryptQR(dataToEncrypt);
 
 	let encryptedMessage;
+
 	let privateKey;
 
 	if (!params.removePGP) {
@@ -103,7 +109,7 @@ const leaseZelfName = async (params, authUser) => {
 	if (zelfNameObject.price === 0) {
 		await _confirmFreeZelfName(zelfNameObject, referralZelfNameObject, authUser);
 	} else {
-		await _saveHoldZelfNameInIPFS(zelfNameObject, referralZelfNameObject, password, authUser);
+		await _saveHoldZelfNameInIPFS(zelfNameObject, referralZelfNameObject, authUser);
 	}
 
 	return {
@@ -188,6 +194,7 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 		solanaAddress: zelfNameObject.solanaAddress,
 		btcAddress: zelfNameObject.btcAddress,
 		extraParams: {
+			suiAddress: zelfNameObject.suiAddress,
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -228,7 +235,7 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 	});
 };
 
-const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, password, authUser) => {
+const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, authUser) => {
 	const holdName = `${zelfNameObject.zelfName}.hold`;
 
 	const metadata = {
@@ -239,6 +246,7 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, p
 		btcAddress: zelfNameObject.btcAddress,
 		solanaAddress: zelfNameObject.solanaAddress,
 		extraParams: {
+			suiAddress: zelfNameObject.suiAddress,
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -439,9 +447,10 @@ const _createWalletsFromPhrase = async (params, authUser) => {
 	const eth = createEthWallet(_mnemonic);
 	const btc = createBTCWallet(_mnemonic);
 	const solana = await createSolanaWallet(_mnemonic);
+	const sui = await generateSuiWalletFromMnemonic(_mnemonic);
 	const zkProof = await OfflineProofModule.createProof(_mnemonic);
 
-	return { eth, btc, solana, zkProof, mnemonic: _mnemonic, face, password };
+	return { eth, btc, solana, sui, zkProof, mnemonic: _mnemonic, face, password };
 };
 
 const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser, returnResults = false) => {
