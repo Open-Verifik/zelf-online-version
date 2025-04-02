@@ -1014,6 +1014,7 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 			solanaAddress: zelfNameObject.preview.publicData.solanaAddress,
 			btcAddress: zelfNameObject.preview.publicData.btcAddress,
 			extraParams: JSON.stringify({
+				suiAddress: zelfNameObject.preview.publicData.suiAddress,
 				origin: zelfNameObject.preview.publicData.origin || "online",
 				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 				expiresAt,
@@ -1023,12 +1024,14 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 		pinIt: true,
 	};
 
-	payload.metadata.expiresAt = expiresAt;
-
 	const masterArweaveRecord = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
 		hasPassword: payload.metadata.hasPassword,
 		zelfProof: payload.metadata.zelfProof,
-		publicData: payload.metadata,
+		publicData: {
+			...payload.metadata,
+			suiAddress: zelfNameObject.preview.publicData.suiAddress,
+			expiresAt,
+		},
 	});
 
 	await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
@@ -1069,7 +1072,7 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 
 	return {
 		masterArweaveRecord,
-		masterIPFSRecord,
+		masterIPFSRecord: await ZNSPartsModule.formatIPFSRecord(masterIPFSRecord, true),
 		reward,
 	};
 };
