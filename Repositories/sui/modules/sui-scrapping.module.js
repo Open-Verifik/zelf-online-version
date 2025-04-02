@@ -176,6 +176,7 @@ const getTransaction = async (params) => {
 			gasBudget: data.data.gasBudget,
 			gasPayment: data.data.gasPayment,
 			confirmedNumber: data.data.confirmedNumber,
+			_source: data.data,
 		};
 
 		return response;
