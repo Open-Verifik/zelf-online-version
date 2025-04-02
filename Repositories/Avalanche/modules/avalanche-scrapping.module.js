@@ -161,7 +161,7 @@ const getTransactionDetail = async (params) => {
 			},
 		});
 
-		const resp = {
+		const transaction = {
 			hash: id,
 			status: data.data.status === "0x1" ? "Success" : "fail",
 			block: data.data.blockHeigh,
@@ -174,9 +174,9 @@ const getTransactionDetail = async (params) => {
 			txnFee: data.data.fee.toString(),
 			gasPrice: data.data.gasPrice.toString(),
 		};
-		return { transaction: resp };
+		return transaction;
 	} catch (error) {
-		return { transaction: [] };
+		return transaction;
 	}
 };
 
