@@ -903,14 +903,13 @@ const _getZelfNameToConfirm = async (zelfName, authUser) => {
 			authUser
 		);
 
-		if (!zelfPayRecords.length) {
-			//throw exception
+		zelfPayNameObject = zelfPayRecords.ipfs?.length ? zelfPayRecords.ipfs[0] : zelfPayRecords.arweave[0];
+
+		if (!zelfPayNameObject) {
 			const error = new Error("zelfPay_not_found");
 			error.status = 404;
 			throw error;
 		}
-
-		zelfPayNameObject = zelfPayRecords[0];
 	}
 
 	return {
