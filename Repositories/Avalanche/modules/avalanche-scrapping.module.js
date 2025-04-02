@@ -8,6 +8,8 @@ const instance = axios.create({ timeout: 30000 });
 
 // Crear instancia https que ignora certificados SSL inválidos
 const https = require("https");
+const { hash } = require("crypto");
+const { fail } = require("assert");
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 /**
@@ -121,15 +123,13 @@ const getTransactionsList = async (params) => {
 		},
 	});
 
-	// Determinar el activo basado en el método
-	const getAsset = (method) => (method.includes("AVAX") ? "AVAX" : "ETH");
-
 	// Formatear transacciones
 	const transactions = data.data.hits.map((tx) => ({
 		hash: tx.hash,
 		method: tx.method === "swap" ? "Swap" : tx.method,
 		block: tx.blockHeight.toString(),
 		age: moment(tx.blocktime * 1000).fromNow(),
+		date: moment(tx.blocktime * 1000),
 		from: tx.from,
 		traffic: tx.realValue < 0 ? "OUT" : "IN",
 		to: tx.to,
@@ -146,11 +146,38 @@ const getTransactionsList = async (params) => {
  * @param {Object} params - Contiene el id (hash de la transacción)
  */
 const getTransactionDetail = async (params) => {
-	const { data } = await instance.get(`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`, {
-		headers: { "user-agent": generateRandomUserAgent() },
-	});
+	try {
+		const t = Date.now();
 
-	return { transactionDetail: data };
+		const { id } = params;
+
+		const url = `https://www.oklink.com/api/explorer/v1/avaxc/transactions/${id}?t=${t}`;
+
+		const { data } = await axios.get(url, {
+			httpsAgent: agent,
+			headers: {
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+			},
+		});
+
+		const transaction = {
+			hash: id,
+			status: data.data.status === "0x1" ? "Success" : "fail",
+			block: data.data.blockHeigh,
+			age: moment(data.data.blocktime * 1000).fromNow(),
+			date: moment(data.data.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
+			from: data.data.from,
+			to: data.data.to,
+			amount: data.data.value.toString(),
+			assetPrice: data.data.legalRate.toString(),
+			txnFee: data.data.fee.toString(),
+			gasPrice: data.data.gasPrice.toString(),
+		};
+		return transaction;
+	} catch (error) {
+		return transaction;
+	}
 };
 
 module.exports = {

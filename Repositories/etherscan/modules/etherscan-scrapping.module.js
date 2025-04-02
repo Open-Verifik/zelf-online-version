@@ -1,7 +1,10 @@
+const moment = require("moment");
+
 const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const cheerio = require("cheerio");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
+
 const baseUrls = {
 	production: "https://etherscan.io",
 	development: "https://sepolia.etherscan.io",
@@ -113,10 +116,11 @@ const getAddress = async (params) => {
 					amount: _amount.replace(/,/g, ""),
 					price: _price,
 					type: tokenType,
-					address: tokenLink,
-					image: tokenImage.includes("https")
+					address: tokenLink.split("?")[0],
+					image: tokenImage?.startsWith("https")
 						? tokenImage
-						: `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
+						: `https://etherscan.io${tokenImage}` ||
+						  `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
 				};
 
 				tokens.push(token);
@@ -446,7 +450,7 @@ const _parseTransactionsContent = (campos, element, transactions = []) => {
 	const date = dateCol.text().trim();
 
 	transaction.age = age;
-	transaction.date = date;
+	transaction.date = moment.utc(date).toISOString();
 
 	const divFrom = campos(element).find("td:nth-child(9)").html();
 
