@@ -125,6 +125,7 @@ const getTransactions = async (params, query) => {
 			timestamp: item.timestamp,
 			from: item.from,
 			to: item.to,
+			asset: "SUI",
 			block: item.checkpoint.toString(),
 			method: item.method,
 			fiatBalance: item.usdValue || 0,
