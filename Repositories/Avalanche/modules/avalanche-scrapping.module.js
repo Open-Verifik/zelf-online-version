@@ -147,6 +147,7 @@ const getTransactionsList = async (params) => {
 		method: tx.method === "swap" ? "Swap" : tx.method,
 		block: tx.blockHeight.toString(),
 		age: moment(tx.blocktime * 1000).fromNow(),
+		date: moment(tx.blocktime * 1000),
 		from: tx.from,
 		traffic: tx.realValue < 0 ? "OUT" : "IN",
 		to: tx.to,
