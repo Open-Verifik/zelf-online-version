@@ -99,8 +99,9 @@ const getBalance = async (params) => {
 			},
 			transactions: transactions,
 		};
-	} catch (error) {
-		console.error("Error getting balance:", error);
+	} catch (e) {
+		const error = new Error("not_found");
+		error.status = 404;
 		throw error;
 	}
 };

@@ -8,6 +8,8 @@ const instance = axios.create({ timeout: 30000 });
 
 // Crear instancia https que ignora certificados SSL inválidos
 const https = require("https");
+const { hash } = require("crypto");
+const { fail } = require("assert");
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 /**
@@ -17,9 +19,12 @@ const agent = new https.Agent({ rejectUnauthorized: false });
 const getBalance = async (params) => {
 	try {
 		// Obtener balance nativo
-		const { data } = await instance.get(`https://glacier-api.avax.network/v1/chains/43114/addresses/${params.id}/balances:getNative`, {
-			headers: { "user-agent": generateRandomUserAgent() },
-		});
+		const { data } = await instance.get(
+			`https://glacier-api.avax.network/v1/chains/43114/addresses/${params.id}/balances:getNative`,
+			{
+				headers: { "user-agent": generateRandomUserAgent() },
+			}
+		);
 
 		// Obtener tokens y transacciones
 		const tokenHoldings = await getTokens({ id: params.id }, { show: "200" });
@@ -33,9 +38,15 @@ const getBalance = async (params) => {
 		return {
 			address: params.id,
 			image: data.nativeTokenBalance.logoUri,
-			balance: (Number(data.nativeTokenBalance.balance) / 10 ** data.nativeTokenBalance.decimals).toFixed(data.nativeTokenBalance.decimals),
+			balance: (
+				Number(data.nativeTokenBalance.balance) /
+				10 ** data.nativeTokenBalance.decimals
+			).toFixed(data.nativeTokenBalance.decimals),
 			_balance: parseFloat(
-				(Number(data.nativeTokenBalance.balance) / 10 ** data.nativeTokenBalance.decimals).toFixed(data.nativeTokenBalance.decimals)
+				(
+					Number(data.nativeTokenBalance.balance) /
+					10 ** data.nativeTokenBalance.decimals
+				).toFixed(data.nativeTokenBalance.decimals)
 			),
 			fiatBalance: data.nativeTokenBalance?.balanceValue?.value || 0,
 			decimals: data.nativeTokenBalance.decimals,
@@ -65,9 +76,12 @@ const getTokens = async (params, query) => {
 	);
 
 	// Obtener conteo total de tokens
-	const total = await instance.get(`https://cdn.routescan.io/api/blockchain/all/address/${params.id}?ecosystem=avalanche`, {
-		headers: { "user-agent": generateRandomUserAgent() },
-	});
+	const total = await instance.get(
+		`https://cdn.routescan.io/api/blockchain/all/address/${params.id}?ecosystem=avalanche`,
+		{
+			headers: { "user-agent": generateRandomUserAgent() },
+		}
+	);
 
 	const erc20Count = total.data.erc20Count;
 	const erc721Count = total.data.erc721Count;
@@ -85,12 +99,17 @@ const getTokens = async (params, query) => {
 		image: token.logoUri,
 		decimals: token.decimals,
 		amount: (Number(token.balance) / 10 ** token.decimals).toFixed(12),
-		_amount: parseFloat((Number(token.balance) / 10 ** token.decimals).toFixed(12)),
+		_amount: parseFloat(
+			(Number(token.balance) / 10 ** token.decimals).toFixed(12)
+		),
 		address: token.address,
 	}));
 
 	// Calcular balance total en moneda fiat
-	const totalFiatBalance = formattedTokens.reduce((sum, token) => sum + parseFloat(token.fiatBalance), 0);
+	const totalFiatBalance = formattedTokens.reduce(
+		(sum, token) => sum + parseFloat(token.fiatBalance),
+		0
+	);
 
 	return {
 		balance: totalFiatBalance.toString(),
@@ -109,20 +128,18 @@ const getTransactionsList = async (params) => {
 
 	const { id, page, show } = params;
 
-	const url = `https://www.oklink.com/api/explorer/v2/avaxc/addresses/${id}/transactionsByClassfy/condition?offset=${page || "0"}&limit=${
-		show || "100"
-	}&address=${id}&nonzeroValue=false&t=${t}`;
+	const url = `https://www.oklink.com/api/explorer/v2/avaxc/addresses/${id}/transactionsByClassfy/condition?offset=${
+		page || "0"
+	}&limit=${show || "100"}&address=${id}&nonzeroValue=false&t=${t}`;
 
 	const { data } = await axios.get(url, {
 		httpsAgent: agent,
 		headers: {
 			"X-Apikey": get_ApiKey().getApiKey(),
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+			"User-Agent":
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 		},
 	});
-
-	// Determinar el activo basado en el método
-	const getAsset = (method) => (method.includes("AVAX") ? "AVAX" : "ETH");
 
 	// Formatear transacciones
 	const transactions = data.data.hits.map((tx) => ({
@@ -146,11 +163,38 @@ const getTransactionsList = async (params) => {
  * @param {Object} params - Contiene el id (hash de la transacción)
  */
 const getTransactionDetail = async (params) => {
-	const { data } = await instance.get(`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`, {
-		headers: { "user-agent": generateRandomUserAgent() },
-	});
+	try {
+		const t = Date.now();
 
-	return { transactionDetail: data };
+		const { id } = params;
+
+		const url = `https://www.oklink.com/api/explorer/v1/avaxc/transactions/${id}?t=${t}`;
+
+		const { data } = await axios.get(url, {
+			httpsAgent: agent,
+			headers: {
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+			},
+		});
+
+		const resp = {
+			hash: id,
+			status: data.data.status === "0x1" ? "Success" : "fail",
+			block: data.data.blockHeigh,
+			timestamp: moment(data.data.blocktime * 1000).fromNow(),
+			from: data.data.from,
+			to: data.data.to,
+			value: data.data.value.toString(),
+			valueDolar: data.data.legalRate.toString(),
+			transactionFeeETH: data.data.fee.toString(),
+			gasPrice: data.data.gasPrice.toString(),
+		};
+		return { transaction: resp };
+	} catch (error) {
+		return { transaction: [] };
+	}
 };
 
 module.exports = {

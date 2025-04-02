@@ -26,6 +26,7 @@ module.exports = (server) => {
 	//N
 	//O
 	//P
+	require("../Repositories/polygon/routes/polygon-scrapping.route")(server);
 	require("../Repositories/purchase-zelf/routes/purchase.route")(server);
 	//Q
 	//R
