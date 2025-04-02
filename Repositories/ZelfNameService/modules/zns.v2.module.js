@@ -1014,7 +1014,7 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 			solanaAddress: zelfNameObject.preview.publicData.solanaAddress,
 			btcAddress: zelfNameObject.preview.publicData.btcAddress,
 			extraParams: JSON.stringify({
-				suiAddress: zelfNameObject.preview.publicData.suiAddress,
+				...(zelfNameObject.preview.publicData.suiAddress && { suiAddress: zelfNameObject.preview.publicData.suiAddress }),
 				origin: zelfNameObject.preview.publicData.origin || "online",
 				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 				expiresAt,
@@ -1029,7 +1029,7 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 		zelfProof: payload.metadata.zelfProof,
 		publicData: {
 			...payload.metadata,
-			suiAddress: zelfNameObject.preview.publicData.suiAddress,
+			...(zelfNameObject.preview.publicData.suiAddress && { suiAddress: zelfNameObject.preview.publicData.suiAddress }),
 			expiresAt,
 		},
 	});
