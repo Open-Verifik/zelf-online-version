@@ -450,7 +450,7 @@ const _parseTransactionsContent = (campos, element, transactions = []) => {
 	const date = dateCol.text().trim();
 
 	transaction.age = age;
-	transaction.date = moment.utc(date).toISOString();
+	transaction.date = date ? moment.utc(date).format("YYYY-MM-DD HH:mm:ss") : null;
 
 	const divFrom = campos(element).find("td:nth-child(9)").html();
 
