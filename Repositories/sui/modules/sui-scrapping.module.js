@@ -121,15 +121,18 @@ const getTransactions = async (params, query) => {
 		return data.map((item) => ({
 			hash: item.hash,
 			age: moment(item.timestamp).fromNow(),
-			date: new Date(item.timestamp).toISOString().split("T")[0],
+			date: moment(item.timestamp).format("YYYY-MM-DD HH:mm:ss"),
+			timestamp: item.timestamp,
 			from: item.from,
 			to: item.to,
 			block: item.checkpoint.toString(),
 			method: item.method,
 			fiatBalance: item.usdValue || 0,
 			amount: Number(item.amount).toFixed(6),
+			_amount: item.amount,
 			txnFee: item.fee.toString(),
 			gas: item.gas.toString(),
+			_source: item,
 		}));
 	}
 
