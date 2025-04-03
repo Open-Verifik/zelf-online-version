@@ -726,17 +726,17 @@ const leaseOffline = async (params, authUser) => {
 	};
 };
 
-const createZelfPay = async (zelfNameObject) => {
+const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 	// create link for coinbase
 	const params = zelfNameObject.publicData || zelfNameObject.metadata;
+
+	const zelfName = params.zelfName.split(".hold")[0];
 
 	if (!params.price) {
 		params.duration = params.duration || 1;
 
-		params.price = ZNSPartsModule.calculateZelfNamePrice(zelfNameObject.zelfName.length - 5, params.duration).price;
+		params.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, params.duration).price;
 	}
-
-	const zelfName = params.zelfName.split(".hold")[0];
 
 	if (!zelfName) {
 		const error = new Error("zelfName_not_found");
@@ -760,6 +760,7 @@ const createZelfPay = async (zelfNameObject) => {
 			btcAddress: btc.address,
 			customerZelfName: zelfNameObject.zelfName,
 			zelfName: paymentName,
+			currentCount: `${currentCount}`,
 		},
 		metadata: {
 			mnemonic,
@@ -789,6 +790,7 @@ const createZelfPay = async (zelfNameObject) => {
 			ethAddress: params.ethAddress,
 			btcAddress: params.btcAddress,
 			solanaAddress: params.solanaAddress,
+			count: `${currentCount}`,
 		},
 		redirect_url: "https://payment.zelf.world/checkout",
 		cancel_url: "https://payment.zelf.world/checkout",
@@ -813,6 +815,7 @@ const createZelfPay = async (zelfNameObject) => {
 				coinbase_expires_at: coinbaseCharge.expires_at,
 				price: params.price || 24,
 				duration: params.duration || 1,
+				count: `${currentCount}`,
 			}),
 		},
 		pinIt: true,
@@ -832,6 +835,7 @@ const createZelfPay = async (zelfNameObject) => {
 			zelfName: paymentName,
 			type: "mainnet",
 			expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+			count: `${currentCount}`,
 		},
 	});
 

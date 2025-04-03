@@ -327,6 +327,7 @@ const getReceiptEmail = async (body) => {
 		email,
 	});
 };
+
 //calcular precio en la difrente redes
 const calculateCryptoValue = async (network, price_) => {
 	try {

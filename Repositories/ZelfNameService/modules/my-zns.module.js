@@ -1,7 +1,8 @@
 const config = require("../../../Core/config");
 const jwt = require("jsonwebtoken");
-const { searchZelfName } = require("./zns.v2.module");
+const { searchZelfName, createZelfPay } = require("./zns.v2.module");
 const moment = require("moment");
+const { getTickerPrice } = require("../../binance/modules/binance.module");
 
 // TODO
 // 1. expire zelfpay domains after the month
@@ -26,13 +27,52 @@ const transferMyZelfName = async (zelfName, newOwner) => {
 	};
 };
 
+const _fetchZelfPayRecord = async (zelfNameObject, currentCount) => {
+	const { zelfName } = zelfNameObject.publicData;
+
+	const zelfPayRecords = await searchZelfName({ zelfName: zelfName.replace("zelf", "zelfpay") });
+
+	const records = zelfPayRecords.ipfs?.length ? zelfPayRecords.ipfs : zelfPayRecords.arweave;
+
+	let renewZelfPayObject = null;
+
+	if (records.length < currentCount) {
+		// we need to create a new zelfPay record
+		const newZelfPayRecord = await createZelfPay(zelfNameObject, currentCount);
+
+		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
+	}
+
+	for (let index = 0; index < records.length; index++) {
+		const record = records[index];
+
+		if (record.publicData.type !== "mainnet") continue;
+
+		const count = parseInt(record.publicData.count);
+
+		if (!renewZelfPayObject || count > parseInt(renewZelfPayObject.publicData.count)) {
+			renewZelfPayObject = record;
+		}
+	}
+
+	if (!renewZelfPayObject || moment(renewZelfPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
+		const newZelfPayRecord = await createZelfPay(zelfNameObject, parseInt(renewZelfPayObject.publicData.count || "1") + 1);
+
+		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
+	}
+
+	return renewZelfPayObject;
+};
+
 const howToRenewMyZelfName = async (params) => {
-	const { zelfName } = params;
+	const { zelfName, duration, token } = params;
 	// 1. validate that the zelfName exists
 	// 2. return the renewal process
 	const publicKeys = await searchZelfName({ zelfName });
 
 	const zelfNameObject = publicKeys.ipfs?.length ? publicKeys.ipfs[0] : publicKeys.arweave[0];
+
+	const recordsWithSameName = publicKeys.ipfs?.length || publicKeys.arweave?.length;
 
 	const isMainnet = zelfNameObject.publicData.type !== "hold";
 
@@ -40,21 +80,63 @@ const howToRenewMyZelfName = async (params) => {
 		throw new Error("This zelfName is not on mainnet");
 	}
 
-	const zelfPayRecords = await searchZelfName({ zelfName: zelfName.replace("zelf", "zelfpay") });
+	const renewZelfPayObject = await _fetchZelfPayRecord(zelfNameObject, recordsWithSameName + 1);
 
-	const zelfPayObject = zelfPayRecords.ipfs?.length ? zelfPayRecords.ipfs[0] : zelfPayRecords.arweave[0];
+	const paymentAddress = {
+		ethAddress: renewZelfPayObject.publicData.ethAddress,
+		btcAddress: renewZelfPayObject.publicData.btcAddress,
+		solanaAddress: renewZelfPayObject.publicData.solanaAddress,
+	};
 
-	const isLatestZelfPay = moment(zelfNameObject.expiresAt).isAfter(zelfPayObject.expiresAt); // compare dates and return true if the latest zelfpay record is the one that is being used
+	const { amountToSend, price, ratePriceInUSD } = await calculateCryptoValue(token, renewZelfPayObject.publicData.price);
+
+	const returnData = {
+		paymentAddress,
+		zelfName,
+		price,
+		expiresAt: zelfNameObject.publicData.expiresAt,
+		duration: parseInt(duration || 1),
+		coinbase_hosted_url: renewZelfPayObject.publicData.coinbase_hosted_url,
+		token,
+		amountToSend,
+		ratePriceInUSD,
+		coinbase_expires_at: renewZelfPayObject.publicData.coinbase_expires_at,
+		count: parseInt(renewZelfPayObject.publicData.count),
+	};
+
+	const signedDataPrice = signRecordData(returnData);
 
 	return {
-		zelfName,
-		isLatestZelfPay,
-		expiresAt: zelfNameObject.expiresAt,
-		payExpiresAt: zelfPayObject.expiresAt,
-		zelfPayObject,
-		isMainnet,
-		howToRenew: true,
+		...returnData,
+		signedDataPrice,
 	};
+};
+
+const calculateCryptoValue = async (token = "ETH", price_) => {
+	try {
+		const { price } = await getTickerPrice({ symbol: `${token}` });
+
+		if (!price) throw new Error(`Unable to fetch ${token} price`);
+
+		const cryptoValue = price_ / price;
+
+		return {
+			amountToSend: cryptoValue.toFixed(7),
+			ratePriceInUSD: parseFloat(parseFloat(price).toFixed(5)),
+			price: price_,
+		};
+	} catch (error) {
+		throw error;
+	}
+};
+
+const signRecordData = (recordData) => {
+	try {
+		const token = jwt.sign(recordData, config.signedData.key);
+		return token;
+	} catch (error) {
+		return { success: false, error: error.message };
+	}
 };
 
 module.exports = {
