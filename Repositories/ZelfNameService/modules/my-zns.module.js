@@ -52,8 +52,6 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 
 		const recordDuration = parseInt(record.publicData.duration);
 
-		console.log({ recordDuration, duration });
-
 		if ((!renewZelfPayObject || count > parseInt(renewZelfPayObject.publicData.count)) && recordDuration === duration) {
 			renewZelfPayObject = record;
 		}
@@ -74,7 +72,7 @@ const howToRenewMyZelfName = async (params) => {
 	// 2. return the renewal process
 	const publicKeys = await searchZelfName({ zelfName });
 
-	const zelfNameObject = publicKeys.ipfs?.length ? publicKeys.ipfs[0] : publicKeys.arweave[0];
+	const zelfNameObject = publicKeys.ipfs?.length ? publicKeys.ipfs[0] : publicKeys.arweave?.length ? publicKeys.arweave[0] : null;
 
 	const recordsWithSameName = publicKeys.ipfs?.length || publicKeys.arweave?.length;
 
@@ -108,7 +106,16 @@ const howToRenewMyZelfName = async (params) => {
 		count: parseInt(renewZelfPayObject.publicData.count),
 	};
 
-	const signedDataPrice = signRecordData(returnData);
+	const signedDataPrice = signRecordData({
+		zelfName,
+		price,
+		duration: parseInt(duration || 1),
+		coinbase_hosted_url: renewZelfPayObject.publicData.coinbase_hosted_url,
+		token,
+		amountToSend,
+		ratePriceInUSD,
+		coinbase_expires_at: renewZelfPayObject.publicData.coinbase_expires_at,
+	});
 
 	return {
 		...returnData,
