@@ -27,7 +27,7 @@ const transferMyZelfName = async (zelfName, newOwner) => {
 	};
 };
 
-const _fetchZelfPayRecord = async (zelfNameObject, currentCount) => {
+const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) => {
 	const { zelfName } = zelfNameObject.publicData;
 
 	const zelfPayRecords = await searchZelfName({ zelfName: zelfName.replace("zelf", "zelfpay") });
@@ -36,9 +36,9 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount) => {
 
 	let renewZelfPayObject = null;
 
-	if (records.length < currentCount) {
+	if (records.length <= currentCount) {
 		// we need to create a new zelfPay record
-		const newZelfPayRecord = await createZelfPay(zelfNameObject, currentCount);
+		const newZelfPayRecord = await createZelfPay(zelfNameObject, currentCount + 1);
 
 		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
 	}
@@ -50,12 +50,16 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount) => {
 
 		const count = parseInt(record.publicData.count);
 
-		if (!renewZelfPayObject || count > parseInt(renewZelfPayObject.publicData.count)) {
+		const recordDuration = parseInt(record.publicData.duration);
+
+		console.log({ recordDuration, duration });
+
+		if ((!renewZelfPayObject || count > parseInt(renewZelfPayObject.publicData.count)) && recordDuration === duration) {
 			renewZelfPayObject = record;
 		}
 	}
 
-	if (!renewZelfPayObject || moment(renewZelfPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
+	if (moment(renewZelfPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
 		const newZelfPayRecord = await createZelfPay(zelfNameObject, parseInt(renewZelfPayObject.publicData.count || "1") + 1);
 
 		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
@@ -80,7 +84,7 @@ const howToRenewMyZelfName = async (params) => {
 		throw new Error("This zelfName is not on mainnet");
 	}
 
-	const renewZelfPayObject = await _fetchZelfPayRecord(zelfNameObject, recordsWithSameName + 1);
+	const renewZelfPayObject = await _fetchZelfPayRecord(zelfNameObject, recordsWithSameName, duration);
 
 	const paymentAddress = {
 		ethAddress: renewZelfPayObject.publicData.ethAddress,

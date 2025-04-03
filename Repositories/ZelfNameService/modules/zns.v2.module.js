@@ -732,16 +732,16 @@ const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 
 	const zelfName = params.zelfName.split(".hold")[0];
 
-	if (!params.price) {
-		params.duration = params.duration || 1;
-
-		params.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, params.duration).price;
-	}
-
 	if (!zelfName) {
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
 		throw error;
+	}
+
+	if (!params.price) {
+		params.duration = params.duration || 1;
+
+		params.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, params.duration).price;
 	}
 
 	const paymentName = `${zelfName}`.replace(".zelf", ".zelfpay");
@@ -843,6 +843,20 @@ const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 		ipfs: await ZNSPartsModule.formatIPFSRecord(ipfs, false),
 		arweave,
 	};
+};
+
+const updateZelfPay = async (zelfPayObject, newDuration = 1, currentCount) => {
+	const params = zelfPayObject.publicData;
+
+	const zelfName = params.zelfName.split(".hold")[0];
+
+	if (!zelfName) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	params.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, newDuration).price;
 };
 
 const _decryptParams = async (data, authUser) => {
