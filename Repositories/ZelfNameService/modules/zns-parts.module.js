@@ -229,10 +229,29 @@ const _IPFSToBase64 = async (url) => {
 	}
 };
 
+const urlToBase64 = async (url) => {
+	try {
+		const encryptedResponse = await axios.get(url, {
+			responseType: "arraybuffer",
+		});
+
+		if (encryptedResponse?.data) {
+			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
+
+			return `data:image/png;base64,${base64Image}`;
+		}
+	} catch (exception) {
+		console.error({ VWEx: exception });
+
+		return exception?.message;
+	}
+};
+
 module.exports = {
 	calculateZelfNamePrice,
 	decryptParams,
 	formatArweaveSearchResult,
 	removeExpiredRecords,
 	formatIPFSRecord,
+	urlToBase64,
 };

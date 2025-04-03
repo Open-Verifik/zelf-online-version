@@ -695,6 +695,7 @@ const leaseOffline = async (params, authUser) => {
 				zelfProof: zelfNameObject.zelfProof,
 				zelfName: zelfNameObject.zelfName,
 				extraParams: JSON.stringify({
+					registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 					hasPassword: _preview.passwordLayer === "WithPassword" ? "true" : "false",
 					duration: duration || 1,
 					price: zelfNameObject.price,
@@ -811,6 +812,7 @@ const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 			zelfName: paymentName,
 			extraParams: JSON.stringify({
 				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 				coinbase_hosted_url: coinbaseCharge.hosted_url,
 				coinbase_expires_at: coinbaseCharge.expires_at,
 				price: params.price || 24,
@@ -845,8 +847,10 @@ const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 	};
 };
 
-const updateZelfPay = async (zelfPayObject, newDuration = 1, currentCount) => {
+const updateZelfPay = async (zelfPayObject, updates = {}) => {
 	const params = zelfPayObject.publicData;
+
+	const { newDuration, newCoinbaseUrl } = updates;
 
 	const zelfName = params.zelfName.split(".hold")[0];
 
@@ -856,7 +860,83 @@ const updateZelfPay = async (zelfPayObject, newDuration = 1, currentCount) => {
 		throw error;
 	}
 
-	params.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, newDuration).price;
+	const price =
+		zelfPayObject.publicData.price ||
+		ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, newDuration || zelfPayObject.publicData.duration).price;
+
+	const newCount = parseInt(zelfPayObject.publicData.count || 0) + 1;
+
+	if (newCoinbaseUrl) {
+		// generate new coinbase charge
+		const coinbasePayload = {
+			name: zelfName,
+			description: `Purchase of the Zelf Name > ${zelfName} for $${price}`,
+			pricing_type: "fixed_price",
+			local_price: {
+				amount: `${price}`,
+				currency: "USD",
+			},
+			metadata: {
+				zelfName: zelfName,
+				ethAddress: zelfPayObject.publicData.ethAddress,
+				btcAddress: zelfPayObject.publicData.btcAddress,
+				solanaAddress: zelfPayObject.publicData.solanaAddress,
+				count: `${newCount}`,
+			},
+			redirect_url: "https://payment.zelf.world/checkout",
+			cancel_url: "https://payment.zelf.world/checkout",
+		};
+
+		const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
+
+		zelfPayObject.publicData.coinbase_hosted_url = coinbaseCharge.hosted_url;
+
+		zelfPayObject.publicData.coinbase_expires_at = coinbaseCharge.expires_at;
+	}
+
+	const base64 = await ZNSPartsModule.urlToBase64(zelfPayObject.url);
+
+	const payload = {
+		base64,
+		name: zelfPayObject.publicData.zelfName,
+		metadata: {
+			hasPassword: "true",
+			zelfProof: zelfPayObject.publicData.zelfProof,
+			type: "mainnet",
+			ethAddress: zelfPayObject.publicData.ethAddress,
+			solanaAddress: zelfPayObject.publicData.solanaAddress,
+			btcAddress: zelfPayObject.publicData.btcAddress,
+			zelfName: zelfPayObject.publicData.zelfName,
+			extraParams: JSON.stringify({
+				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+				coinbase_hosted_url: zelfPayObject.publicData.coinbase_hosted_url,
+				coinbase_expires_at: zelfPayObject.publicData.coinbase_expires_at,
+				price,
+				duration: newDuration || zelfPayObject.publicData.duration,
+				count: `${newCount}`,
+			}),
+		},
+		pinIt: true,
+	};
+
+	const arweave = await ArweaveModule.zelfNameRegistration(base64, {
+		zelfProof: zelfPayObject.publicData.zelfProof,
+		publicData: payload.metadata,
+	});
+
+	//remove the previous ipfs record
+	await IPFSModule.unPinFiles([zelfPayObject.ipfs_pin_hash || zelfPayObject.IpfsHash]);
+
+	const ipfs = await IPFSModule.insert(payload, { pro: true });
+
+	return {
+		price,
+		updates,
+		zelfName,
+		ipfs: await ZNSPartsModule.formatIPFSRecord(ipfs, true),
+		arweave,
+	};
 };
 
 const _decryptParams = async (data, authUser) => {
@@ -1141,6 +1221,7 @@ module.exports = {
 	leaseZelfName,
 	leaseOffline,
 	createZelfPay,
+	updateZelfPay,
 	leaseConfirmation,
 	previewZelfName,
 };
