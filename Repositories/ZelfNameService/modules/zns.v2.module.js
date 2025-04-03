@@ -154,8 +154,16 @@ const decryptZelfName = async (params, authUser) => {
 
 	const { mnemonic, zkProof, solanaSecretKey } = decryptedZelfProof.metadata;
 
+	let sui = {};
+
+	if (!zelfNameObject.publicData.suiAddress) {
+		sui = await generateSuiWalletFromMnemonic(mnemonic);
+
+		zelfNameObject.publicData.suiAddress = sui.address;
+	}
+
 	const { encryptedMessage, privateKey } = await SessionModule.walletEncrypt(
-		{ mnemonic, zkProof, solanaSecretKey },
+		{ mnemonic, zkProof, solanaSecretKey, suiSecretKey: sui.secretKey },
 		zelfNameObject.publicData.ethAddress,
 		password
 	);
@@ -166,11 +174,6 @@ const decryptZelfName = async (params, authUser) => {
 		pgp: { encryptedMessage, privateKey },
 		url: zelfNameObject.url,
 		zelfName: zelfNameObject.publicData.zelfName,
-		addresses: {
-			ethAddress: zelfNameObject.ethAddress,
-			btcAddress: zelfNameObject.btcAddress,
-			solanaAddress: zelfNameObject.solanaAddress,
-		},
 		publicData: {
 			...zelfNameObject.publicData,
 			...decryptedZelfProof.publicData,
