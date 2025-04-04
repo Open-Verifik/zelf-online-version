@@ -96,7 +96,7 @@ const howToRenewMyZelfName = async (params) => {
 		paymentAddress,
 		ethPrices,
 		solPrices,
-		zelfName,
+		zelfName: zelfNameObject.publicData.zelfName,
 		expiresAt: zelfNameObject.publicData.expiresAt,
 		duration: parseInt(duration || 1),
 		coinbase_hosted_url: renewZelfPayObject.publicData.coinbase_hosted_url,
