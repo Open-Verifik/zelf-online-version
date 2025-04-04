@@ -12,6 +12,7 @@ module.exports = (server) => {
 	// transfer zelf name
 	server.post(`${PATH}/transfer`, Middleware.transferValidation, Controller.transferZelfName);
 
+	// pay for a name (new or renew)
 	server.get(`${PATH}/pay`, Middleware.howToRenewValidation, Controller.howToRenewZelfName);
 
 	// renew zelf name

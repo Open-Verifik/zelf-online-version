@@ -22,13 +22,7 @@ const transferZelfName = async (ctx) => {
 
 const renewZelfName = async (ctx) => {
 	try {
-		const data = await Module.renewMyZelfName(
-			{
-				...ctx.request.body,
-				zelfName: `${ctx.request.body.zelfName}`.toLowerCase(),
-			},
-			ctx.state.user
-		);
+		const data = await Module.renewMyZelfName(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {

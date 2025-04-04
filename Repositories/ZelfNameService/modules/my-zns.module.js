@@ -3,17 +3,68 @@ const jwt = require("jsonwebtoken");
 const { searchZelfName, createZelfPay, updateZelfPay } = require("./zns.v2.module");
 const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
+const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 
 // TODO
 // 1. expire zelfpay domains after the month
 
-const renewMyZelfName = async (zelfName, years = 1) => {
+const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
+	const chargeID = coinbase_hosted_url?.split("/pay/")[1];
+
+	if (!chargeID) {
+		const error = new Error("coinbase_charge_id_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const charge = await getCoinbaseCharge(chargeID);
+
+	if (!charge) {
+		const error = new Error("coinbase_charge_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const timeline = charge.timeline;
+
+	let confirmed = false;
+
+	for (let index = 0; index < timeline.length; index++) {
+		const _timeline = timeline[index];
+
+		if (_timeline.status === "COMPLETED") {
+			confirmed = true;
+		}
+	}
+
+	return {
+		...charge,
+		confirmed: confirmed, // config.coinbase.forceApproval ||
+	};
+};
+
+const renewMyZelfName = async (params, authUser) => {
 	// 1. validate that the zelfName exists
 	// 2. validate that the payment has been done successfully
 	// 3. renew the zelfName
+	let payment;
+
+	switch (params.network) {
+		case "coinbase":
+		case "CB":
+			payment = await _confirmPaymentWithCoinbase(authUser.coinbase_hosted_url);
+
+			break;
+
+		default:
+			break;
+	}
 
 	return {
 		renew: true,
+		params,
+		authUser,
+		payment,
 	};
 };
 
@@ -90,6 +141,7 @@ const howToRenewMyZelfName = async (params) => {
 	};
 
 	const ethPrices = await calculateCryptoValue("ETH", renewZelfPayObject.publicData.price);
+
 	const solPrices = await calculateCryptoValue("SOL", renewZelfPayObject.publicData.price);
 
 	const returnData = {
@@ -98,6 +150,7 @@ const howToRenewMyZelfName = async (params) => {
 		solPrices,
 		zelfName: zelfNameObject.publicData.zelfName,
 		expiresAt: zelfNameObject.publicData.expiresAt,
+		ttl: moment().add("2", "hours").unix(),
 		duration: parseInt(duration || 1),
 		coinbase_hosted_url: renewZelfPayObject.publicData.coinbase_hosted_url,
 		coinbase_expires_at: renewZelfPayObject.publicData.coinbase_expires_at,
@@ -132,7 +185,8 @@ const calculateCryptoValue = async (token = "ETH", price_) => {
 
 const signRecordData = (recordData) => {
 	try {
-		const token = jwt.sign(recordData, config.signedData.key);
+		const token = jwt.sign(recordData, config.JWT_SECRET);
+
 		return token;
 	} catch (error) {
 		return { success: false, error: error.message };

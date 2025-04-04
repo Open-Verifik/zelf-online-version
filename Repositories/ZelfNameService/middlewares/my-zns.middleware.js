@@ -1,7 +1,6 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
-const captchaService = require("../../../Core/captcha");
-const config = require("../../../Core/config");
 const Session = require("../../Session/models/session.model");
+const moment = require("moment");
 
 const schemas = {
 	transfer: {
@@ -10,7 +9,8 @@ const schemas = {
 		password: string().required(),
 	},
 	renew: {
-		zelfName: string().required(),
+		network: string().required(),
+		token: string().required(),
 	},
 	howToRenew: {
 		zelfName: string().required(),
@@ -93,11 +93,19 @@ const renewValidation = async (ctx, next) => {
 		return;
 	}
 
-	const { zelfName } = ctx.request.body;
+	const { ttl, zelfName, ethPrices, solPrices, paymentAddress } = ctx.state.user;
 
-	const failed = validateZelfName(zelfName, ctx);
+	if (!ttl || !zelfName || !ethPrices || !solPrices || !paymentAddress) {
+		ctx.status = 409;
+		ctx.body = { validationError: "Prices expired, generate a new token" };
+		return;
+	}
 
-	if (failed) return;
+	if (moment.unix(ttl).isBefore(moment())) {
+		ctx.status = 409;
+		ctx.body = { validationError: "Prices expired, generate a new token" };
+		return;
+	}
 
 	await next();
 };
