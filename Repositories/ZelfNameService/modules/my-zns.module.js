@@ -4,6 +4,10 @@ const { searchZelfName, createZelfPay, updateZelfPay } = require("./zns.v2.modul
 const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
+const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
+const ArweaveModule = require("../../Arweave/modules/arweave.module");
+const IPFSModule = require("../../IPFS/modules/ipfs.module");
+const ZNSPartsModule = require("./zns-parts.module");
 
 // TODO
 // 1. expire zelfpay domains after the month
@@ -44,31 +48,31 @@ const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
 };
 
 const renewMyZelfName = async (params, authUser) => {
-	// 1. validate that the zelfName exists
-	// 2. validate that the payment has been done successfully
-	// 3. renew the zelfName
 	let payment;
 
 	switch (params.network) {
 		case "coinbase":
 		case "CB":
 			payment = await _confirmPaymentWithCoinbase(authUser.coinbase_hosted_url);
-
 			break;
-
+		case "ETH":
+			payment = await confirmPayUniqueAddress("ETH", authUser);
+			break;
+		case "SOL":
+			payment = await confirmPayUniqueAddress("SOL", authUser);
+			break;
+		case "BTC":
+			payment = await confirmPayUniqueAddress("BTC", authUser);
+			break;
 		default:
 			break;
 	}
 
 	if (payment?.confirmed) {
-		// const { masterIPFSRecord, masterArweaveRecord, reward } = await _addDurationToZelfName(zelfNameObject);
-		const testing = await _addDurationToZelfName(authUser);
-		("");
-
-		return testing;
+		const { masterArweaveRecord, masterIPFSRecord, reward } = await _addDurationToZelfName(authUser);
 
 		return {
-			ipfs: [masterIPFSRecord],
+			ipfs: masterIPFSRecord,
 			arweave: masterArweaveRecord,
 			reward,
 		};
@@ -83,20 +87,67 @@ const renewMyZelfName = async (params, authUser) => {
 };
 
 const _addDurationToZelfName = async (authUser) => {
-	const { zelfName } = authUser;
+	const { zelfName, duration } = authUser;
 	// 1. get the zelfName object
 	const publicKeys = await searchZelfName({ zelfName });
+
 	const zelfNameObject = publicKeys.ipfs?.length ? publicKeys.ipfs[0] : publicKeys.arweave?.length ? publicKeys.arweave[0] : null;
+
 	if (!zelfNameObject) {
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
 		throw error;
 	}
 
-	return {
-		zelfNameObject,
+	const base64 = await ZNSPartsModule.urlToBase64(zelfNameObject.url);
+
+	const payload = {
+		base64,
+		name: zelfName,
+		metadata: {
+			hasPassword: zelfNameObject.publicData.hasPassword,
+			zelfProof: zelfNameObject.publicData.zelfProof,
+			zelfName,
+			ethAddress: zelfNameObject.publicData.ethAddress,
+			solanaAddress: zelfNameObject.publicData.solanaAddress,
+			btcAddress: zelfNameObject.publicData.btcAddress,
+			extraParams: JSON.stringify({
+				...(zelfNameObject.publicData.suiAddress && { suiAddress: zelfNameObject.publicData.suiAddress }),
+				origin: zelfNameObject.publicData.origin || "online",
+				registeredAt: zelfNameObject.publicData.registeredAt || moment().format("YYYY-MM-DD HH:mm:ss"),
+				expiresAt: moment(zelfNameObject.publicData.expiresAt).add(duration, "year").format("YYYY-MM-DD HH:mm:ss"),
+				count: parseInt(zelfNameObject.publicData.count) + 1,
+			}),
+			type: "mainnet",
+		},
+		pinIt: true,
 	};
-	// 2. get the zelfPay record
+
+	const masterArweaveRecord = await ArweaveModule.zelfNameRegistration(base64, {
+		hasPassword: payload.metadata.hasPassword,
+		zelfProof: payload.metadata.zelfProof,
+		publicData: payload.metadata,
+	});
+
+	await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash || zelfNameObject.IpfsHash]);
+
+	const masterIPFSRecord = await IPFSModule.insert(payload, { pro: true });
+
+	if (zelfNameObject.publicData.type === "hold") {
+		reward = await addPurchaseReward({
+			ethAddress: masterIPFSRecord.metadata.ethAddress,
+			solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+			zelfName: masterIPFSRecord.metadata.zelfName,
+			zelfNamePrice: zelfNameObject.publicData.price,
+			ipfsHash: masterIPFSRecord.IpfsHash,
+			arweaveId: masterArweaveRecord.id,
+		});
+	}
+
+	return {
+		masterArweaveRecord,
+		masterIPFSRecord: await ZNSPartsModule.formatIPFSRecord(masterIPFSRecord, true),
+	};
 };
 
 const transferMyZelfName = async (zelfName, newOwner) => {
