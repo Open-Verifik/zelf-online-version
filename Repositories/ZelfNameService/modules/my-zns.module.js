@@ -108,8 +108,6 @@ const howToRenewMyZelfName = async (params) => {
 
 	return {
 		...returnData,
-		zelfNameObject,
-		renewZelfPayObject,
 		signedDataPrice,
 	};
 };
