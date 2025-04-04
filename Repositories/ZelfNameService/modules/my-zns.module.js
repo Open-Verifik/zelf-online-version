@@ -32,15 +32,15 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 
 	const _zelfName = zelfName.includes(".hold") ? zelfName.replace(".zelf.hold", ".zelfpay") : zelfName.replace(".zelf", ".zelfpay");
 
-	const zelfPayRecords = await searchZelfName({ zelfName: _zelfName });
+	let zelfPayRecords = await searchZelfName({ zelfName: _zelfName });
 
-	const records = zelfPayRecords.ipfs?.length
+	zelfPayRecords = zelfPayRecords.ipfs?.length
 		? zelfPayRecords.ipfs.filter((record) => moment(registeredAt).isBefore(record.publicData.registeredAt))
 		: zelfPayRecords.arweave?.filter((record) => moment(registeredAt).isBefore(record.publicData.registeredAt));
 
 	let renewZelfPayObject = null;
 
-	const recordsFound = records?.length || 0;
+	const recordsFound = zelfPayRecords?.length || 0;
 
 	if (recordsFound < currentCount || recordsFound === 0) {
 		// we need to create a new zelfPay record
@@ -49,8 +49,8 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
 	}
 
-	for (let index = 0; index < records.length; index++) {
-		const record = records[index];
+	for (let index = 0; index < zelfPayRecords.length; index++) {
+		const record = zelfPayRecords[index];
 
 		if (record.publicData.type !== "mainnet") continue;
 
