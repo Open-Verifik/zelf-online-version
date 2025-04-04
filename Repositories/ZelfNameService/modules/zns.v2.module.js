@@ -739,11 +739,11 @@ const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 		throw error;
 	}
 
-	if (!params.price) {
-		params.duration = params.duration || 1;
+	params.duration = params.duration || 1;
 
-		params.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, params.duration).price;
-	}
+	params.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.split(".")[0].length, params.duration).price;
+
+	console.log({ price: params.price, zelfName: zelfName, duration: params.duration });
 
 	const paymentName = `${zelfName}`.replace(".zelf", ".zelfpay");
 

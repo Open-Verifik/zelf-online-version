@@ -145,25 +145,25 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 		}
 	}
 
-	if (moment(renewZelfPayObject?.publicData.coinbase_expires_at).isBefore(moment())) {
+	if (renewZelfPayObject && moment(renewZelfPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
 		const newZelfPayRecord = await updateZelfPay(renewZelfPayObject, { newCoinbaseUrl: true });
 
 		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
+	} else if (!renewZelfPayObject) {
+		zelfNameObject.publicData.duration = duration;
+
+		const newZelfPayRecord = await createZelfPay(zelfNameObject, currentCount + 1);
+
+		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
 	}
-
-	// if (!renewZelfPayObject) {
-	// 	zelfNameObject.publicData.duration = duration;
-
-	// 	const newZelfPayRecord = await createZelfPay(zelfNameObject, currentCount + 1);
-
-	// 	return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
-	// }
 
 	return renewZelfPayObject;
 };
 
 const howToRenewMyZelfName = async (params) => {
-	const { zelfName, duration, lockedJWT } = params;
+	const { zelfName, lockedJWT } = params;
+
+	const duration = parseInt(params.duration || 1);
 
 	const publicKeys = await searchZelfName({ zelfName });
 
@@ -172,6 +172,12 @@ const howToRenewMyZelfName = async (params) => {
 	const recordsWithSameName = publicKeys.ipfs?.length || publicKeys.arweave?.length;
 
 	const renewZelfPayObject = await _fetchZelfPayRecord(zelfNameObject, recordsWithSameName, duration);
+
+	if (!renewZelfPayObject) {
+		const error = new Error("zelfPayRecord_not_found");
+		error.status = 404;
+		throw error;
+	}
 
 	const paymentAddress = {
 		ethAddress: renewZelfPayObject.publicData.ethAddress,
