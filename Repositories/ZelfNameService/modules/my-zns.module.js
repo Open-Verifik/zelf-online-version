@@ -39,7 +39,7 @@ const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
 
 	return {
 		...charge,
-		confirmed: confirmed, // config.coinbase.forceApproval ||
+		confirmed: config.coinbase.forceApproval || confirmed,
 	};
 };
 
@@ -60,12 +60,43 @@ const renewMyZelfName = async (params, authUser) => {
 			break;
 	}
 
+	if (payment?.confirmed) {
+		// const { masterIPFSRecord, masterArweaveRecord, reward } = await _addDurationToZelfName(zelfNameObject);
+		const testing = await _addDurationToZelfName(authUser);
+		("");
+
+		return testing;
+
+		return {
+			ipfs: [masterIPFSRecord],
+			arweave: masterArweaveRecord,
+			reward,
+		};
+	}
+
 	return {
 		renew: true,
 		params,
 		authUser,
 		payment,
 	};
+};
+
+const _addDurationToZelfName = async (authUser) => {
+	const { zelfName } = authUser;
+	// 1. get the zelfName object
+	const publicKeys = await searchZelfName({ zelfName });
+	const zelfNameObject = publicKeys.ipfs?.length ? publicKeys.ipfs[0] : publicKeys.arweave?.length ? publicKeys.arweave[0] : null;
+	if (!zelfNameObject) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	return {
+		zelfNameObject,
+	};
+	// 2. get the zelfPay record
 };
 
 const transferMyZelfName = async (zelfName, newOwner) => {
@@ -114,11 +145,19 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 		}
 	}
 
-	if (moment(renewZelfPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
+	if (moment(renewZelfPayObject?.publicData.coinbase_expires_at).isBefore(moment())) {
 		const newZelfPayRecord = await updateZelfPay(renewZelfPayObject, { newCoinbaseUrl: true });
 
 		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
 	}
+
+	// if (!renewZelfPayObject) {
+	// 	zelfNameObject.publicData.duration = duration;
+
+	// 	const newZelfPayRecord = await createZelfPay(zelfNameObject, currentCount + 1);
+
+	// 	return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
+	// }
 
 	return renewZelfPayObject;
 };
