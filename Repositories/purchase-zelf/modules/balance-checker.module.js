@@ -54,13 +54,13 @@ const isBTCPaymentConfirmed = async (address, amountDetected) => {
 	return false;
 };
 
-const isETHPaymentConfirmed = async (address, amountDetected) => {
+const isETHPaymentConfirmed = async (address, zelfNamePrice) => {
 	try {
 		const response = await ethModule.getAddress({ address });
 
 		const balance = Number(response.balance).toFixed(7);
 
-		return Number(balance) === Number(amountDetected);
+		return Number(balance) === Number(zelfNamePrice);
 	} catch (error) {
 		console.error(error);
 	}
@@ -68,13 +68,13 @@ const isETHPaymentConfirmed = async (address, amountDetected) => {
 	return false;
 };
 
-const isSolanaPaymentConfirmed = async (address, amountDetected) => {
+const isSolanaPaymentConfirmed = async (address, zelfNamePrice) => {
 	try {
 		const response = await solanaModule.getAddress({ id: address });
 
 		const balance = Number(response.balance).toFixed(7);
 
-		return Number(balance) === Number(amountDetected);
+		return Number(balance) === Number(zelfNamePrice);
 	} catch (error) {}
 
 	return false;
@@ -83,6 +83,7 @@ const isSolanaPaymentConfirmed = async (address, amountDetected) => {
 const verifyRecordData = (confirmationData, secretKey) => {
 	try {
 		const decodedData = jwt.verify(confirmationData, secretKey);
+
 		return decodedData;
 	} catch (error) {
 		error.status = 409;
