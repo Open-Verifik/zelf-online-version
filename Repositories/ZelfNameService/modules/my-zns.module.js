@@ -169,6 +169,12 @@ const howToRenewMyZelfName = async (params) => {
 
 	const zelfNameObject = publicKeys.ipfs?.length ? publicKeys.ipfs[0] : publicKeys.arweave?.length ? publicKeys.arweave[0] : null;
 
+	if (!zelfNameObject) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
 	const recordsWithSameName = publicKeys.ipfs?.length || publicKeys.arweave?.length;
 
 	const renewZelfPayObject = await _fetchZelfPayRecord(zelfNameObject, recordsWithSameName, duration);
