@@ -79,7 +79,8 @@ const renewMyZelfName = async (params, authUser) => {
 	}
 
 	return {
-		renew: true,
+		renew: authUser.zelfName.includes(".hold") ? false : true,
+		confirmed: payment.confirmed,
 		params,
 		authUser,
 		payment,
@@ -214,7 +215,7 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 const howToRenewMyZelfName = async (params) => {
 	const { zelfName, lockedJWT } = params;
 
-	const duration = parseInt(params.duration || 1);
+	const duration = params.duration === "lifetime" ? "lifetime" : parseInt(params.duration || 1);
 
 	const publicKeys = await searchZelfName({ zelfName });
 
