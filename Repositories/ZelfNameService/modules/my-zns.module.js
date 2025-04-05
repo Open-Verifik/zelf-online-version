@@ -8,9 +8,7 @@ const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const ZNSPartsModule = require("./zns-parts.module");
-
-// TODO
-// 1. expire zelfpay domains after the month
+const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 
 const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
 	const chargeID = coinbase_hosted_url?.split("/pay/")[1];
@@ -68,6 +66,43 @@ const renewMyZelfName = async (params, authUser) => {
 			break;
 	}
 
+	const publicKeys = await searchZelfName({ zelfName: authUser.zelfName });
+
+	if (!publicKeys.ipfs?.length && !publicKeys.arweave?.length) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	let zelfNameObject;
+
+	if (publicKeys.ipfs?.length === 1) {
+		zelfNameObject = publicKeys.ipfs[0];
+	} else if (publicKeys.ipfs?.length > 1) {
+		zelfNameObject = publicKeys.ipfs.reduce((latest, current) => {
+			return moment(current.publicData.expiresAt).isAfter(moment(latest.publicData.expiresAt)) ? current : latest;
+		});
+	} else if (publicKeys.arweave?.length === 1) {
+		zelfNameObject = publicKeys.arweave[0];
+	} else if (publicKeys.arweave?.length > 1) {
+		zelfNameObject = publicKeys.arweave.reduce((latest, current) => {
+			return moment(current.publicData.expiresAt).isAfter(moment(latest.publicData.expiresAt)) ? current : latest;
+		});
+	}
+
+	if (
+		(zelfNameObject.publicData.renewedAt &&
+			authUser.payment?.registeredAt &&
+			moment(zelfNameObject.publicData.renewedAt).isAfter(moment(authUser.payment.registeredAt))) ||
+		(!zelfNameObject.publicData.renewedAt &&
+			authUser.payment?.registeredAt &&
+			moment(zelfNameObject.publicData.registeredAt).isAfter(moment(authUser.payment.registeredAt)))
+	) {
+		const error = new Error("payment_already_made");
+		error.status = 400;
+		throw error;
+	}
+
 	if (payment?.confirmed) {
 		const { masterArweaveRecord, masterIPFSRecord, reward } = await _addDurationToZelfName(authUser);
 
@@ -104,18 +139,20 @@ const _addDurationToZelfName = async (authUser) => {
 
 	const payload = {
 		base64,
-		name: zelfName,
+		name: zelfName.replace(".hold", ""),
 		metadata: {
 			hasPassword: zelfNameObject.publicData.hasPassword,
 			zelfProof: zelfNameObject.publicData.zelfProof,
-			zelfName,
+			zelfName: zelfName.replace(".hold", ""),
 			ethAddress: zelfNameObject.publicData.ethAddress,
 			solanaAddress: zelfNameObject.publicData.solanaAddress,
 			btcAddress: zelfNameObject.publicData.btcAddress,
 			extraParams: JSON.stringify({
 				...(zelfNameObject.publicData.suiAddress && { suiAddress: zelfNameObject.publicData.suiAddress }),
 				origin: zelfNameObject.publicData.origin || "online",
-				registeredAt: zelfNameObject.publicData.registeredAt || moment().format("YYYY-MM-DD HH:mm:ss"),
+				registeredAt:
+					zelfNameObject.publicData.type === "mainnet" ? zelfNameObject.publicData.registeredAt : moment().format("YYYY-MM-DD HH:mm:ss"),
+				renewedAt: zelfNameObject.publicData.type === "mainnet" ? moment().format("YYYY-MM-DD HH:mm:ss") : undefined,
 				expiresAt: moment(zelfNameObject.publicData.expiresAt).add(duration, "year").format("YYYY-MM-DD HH:mm:ss"),
 				count: parseInt(zelfNameObject.publicData.count) + 1,
 			}),
@@ -258,6 +295,10 @@ const howToRenewMyZelfName = async (params) => {
 		coinbase_hosted_url: renewZelfPayObject.publicData.coinbase_hosted_url,
 		coinbase_expires_at: renewZelfPayObject.publicData.coinbase_expires_at,
 		count: parseInt(renewZelfPayObject.publicData.count),
+		payment: {
+			registeredAt: renewZelfPayObject.publicData.registeredAt,
+			expiresAt: renewZelfPayObject.publicData.expiresAt,
+		},
 	};
 
 	const signedDataPrice = signRecordData(returnData);
