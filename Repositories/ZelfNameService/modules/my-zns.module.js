@@ -199,15 +199,21 @@ const transferMyZelfName = async (zelfName, newOwner) => {
 };
 
 const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) => {
-	const { zelfName, registeredAt } = zelfNameObject.publicData;
+	const { zelfName, registeredAt, renewedAt } = zelfNameObject.publicData;
 
 	const _zelfName = zelfName.includes(".hold") ? zelfName.replace(".zelf.hold", ".zelfpay") : zelfName.replace(".zelf", ".zelfpay");
 
 	let zelfPayRecords = await searchZelfName({ zelfName: _zelfName });
 
 	zelfPayRecords = zelfPayRecords.ipfs?.length
-		? zelfPayRecords.ipfs.filter((record) => moment(registeredAt).isBefore(record.publicData.registeredAt))
-		: zelfPayRecords.arweave?.filter((record) => moment(registeredAt).isBefore(record.publicData.registeredAt));
+		? zelfPayRecords.ipfs.filter((record) => {
+				const comparisonDate = renewedAt ? moment(renewedAt) : moment(registeredAt);
+				return comparisonDate.isBefore(record.publicData.registeredAt);
+		  })
+		: zelfPayRecords.arweave?.filter((record) => {
+				const comparisonDate = renewedAt ? moment(renewedAt) : moment(registeredAt);
+				return comparisonDate.isBefore(record.publicData.registeredAt);
+		  });
 
 	let renewZelfPayObject = null;
 
