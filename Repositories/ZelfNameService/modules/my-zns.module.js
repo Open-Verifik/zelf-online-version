@@ -304,6 +304,8 @@ const howToRenewMyZelfName = async (params) => {
 		payment: {
 			registeredAt: renewZelfPayObject.publicData.registeredAt,
 			expiresAt: renewZelfPayObject.publicData.expiresAt,
+			referralZelfName: zelfNameObject.publicData.referralZelfName,
+			referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
 		},
 	};
 
