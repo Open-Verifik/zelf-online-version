@@ -111,6 +111,7 @@ const renewMyZelfName = async (params, authUser) => {
 		const { masterArweaveRecord, masterIPFSRecord, reward } = await _addDurationToZelfName(authUser);
 
 		return {
+			confirmed: true,
 			ipfs: masterIPFSRecord,
 			arweave: masterArweaveRecord,
 			reward,
