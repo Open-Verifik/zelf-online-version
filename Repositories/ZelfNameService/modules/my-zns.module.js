@@ -104,9 +104,7 @@ const renewMyZelfName = async (params, authUser) => {
 			authUser.payment?.registeredAt &&
 			moment(zelfNameObject.publicData.registeredAt).isAfter(moment(authUser.payment.registeredAt)))
 	) {
-		const error = new Error("payment_already_made");
-		error.status = 400;
-		throw error;
+		return { ...payment, publicData: zelfNameObject.publicData };
 	}
 
 	if (payment?.confirmed) {

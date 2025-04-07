@@ -76,7 +76,12 @@ const isETHPaymentConfirmed = async (address, zelfNamePrice) => {
 			.filter((transaction) => transaction.traffic === "IN")
 			.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
 
-		return { confirmed: Number(amountReceived) >= Number(zelfNamePrice), amountReceived, zelfNamePrice };
+		return {
+			address,
+			confirmed: amountReceived >= zelfNamePrice,
+			amountReceived,
+			zelfNamePrice,
+		};
 	} catch (error) {
 		console.error(error);
 	}
@@ -88,14 +93,15 @@ const isSolanaPaymentConfirmed = async (address, zelfNamePrice) => {
 	try {
 		const response = await solanaModule.getAddress({ id: address });
 
-		const amountReceived = Number(response.balance);
+		const amountReceived = response.transactions
+			.filter((transaction) => transaction.traffic === "IN")
+			.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
 
 		return {
-			confirmed: false,
-			amountReceived,
 			address,
+			confirmed: amountReceived >= zelfNamePrice,
+			amountReceived,
 			zelfNamePrice,
-			response,
 		};
 	} catch (error) {}
 
