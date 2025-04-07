@@ -68,10 +68,16 @@ const renewMyZelfName = async (params, authUser) => {
 
 	const publicKeys = await searchZelfName({ zelfName: authUser.zelfName });
 
-	if (!publicKeys.ipfs?.length && !publicKeys.arweave?.length) {
+	const zelfNameObjectFound = Boolean(publicKeys.ipfs?.length || publicKeys.arweave?.length);
+
+	if (!zelfNameObjectFound && !payment.confirmed) {
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
 		throw error;
+	}
+
+	if (payment.confirmed && !zelfNameObjectFound) {
+		return payment;
 	}
 
 	let zelfNameObject;
@@ -116,9 +122,6 @@ const renewMyZelfName = async (params, authUser) => {
 	return {
 		renew: authUser.zelfName.includes(".hold") ? false : true,
 		confirmed: payment.confirmed,
-		params,
-		authUser,
-		payment,
 	};
 };
 
