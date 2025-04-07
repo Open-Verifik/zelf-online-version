@@ -122,6 +122,7 @@ const renewMyZelfName = async (params, authUser) => {
 	return {
 		renew: authUser.zelfName.includes(".hold") ? false : true,
 		confirmed: payment.confirmed,
+		payment,
 	};
 };
 

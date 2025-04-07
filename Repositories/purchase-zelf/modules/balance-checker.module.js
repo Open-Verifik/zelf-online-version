@@ -2,8 +2,6 @@ const bitcoinModule = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const ethModule = require("../../etherscan/modules/etherscan-scrapping.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 const config = require("../../../Core/config");
-const jwt = require("jsonwebtoken");
-const secretKey = config.signedData.key;
 
 /**
  *  confirm Pay Single Address
@@ -90,12 +88,14 @@ const isSolanaPaymentConfirmed = async (address, zelfNamePrice) => {
 	try {
 		const response = await solanaModule.getAddress({ id: address });
 
-		const amountReceived = Number(response.balance).toFixed(7);
+		const amountReceived = Number(response.balance);
 
 		return {
-			confirmed: Number(amountReceived) >= Number(zelfNamePrice),
+			confirmed: false,
 			amountReceived,
+			address,
 			zelfNamePrice,
+			response,
 		};
 	} catch (error) {}
 
