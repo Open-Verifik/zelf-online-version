@@ -283,13 +283,18 @@ const releasePurchaseRewards = async (authUser) => {
 	}
 };
 
-const getPurchaseReward = async (zelfName) => {
-	if (!zelfName) {
-		return null;
-	}
+const getPurchaseReward = async (zelfName, afterDate) => {
+	if (!zelfName) return null;
+
+	const queryParams = {
+		where_zelfName: zelfName,
+		findOne: true,
+	};
+
+	if (afterDate) queryParams["where>=_createdAt"] = afterDate;
 
 	try {
-		const purchaseReward = await MongoORM.buildQuery({ where_zelfName: zelfName, findOne: true }, PurchaseRewardModel, null);
+		const purchaseReward = await MongoORM.buildQuery(queryParams, PurchaseRewardModel, null);
 
 		if (!purchaseReward) return null;
 

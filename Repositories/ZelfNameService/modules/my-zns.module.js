@@ -112,9 +112,10 @@ const renewMyZelfName = async (params, authUser) => {
 			moment(zelfNameObject.publicData.registeredAt).isAfter(moment(authUser.payment.registeredAt)))
 	) {
 		return {
+			cache: true,
 			payment,
 			publicData: zelfNameObject.publicData,
-			reward: await getPurchaseReward(zelfNameObject.publicData.zelfName),
+			reward: await getPurchaseReward(zelfNameObject.publicData.zelfName, moment(authUser.payment.registeredAt)),
 		};
 	}
 
