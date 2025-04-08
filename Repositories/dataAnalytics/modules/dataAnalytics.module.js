@@ -3,11 +3,12 @@ const instance = getCleanInstance(30000);
 const Model = require("../models/dataAnalytics.model");
 const moment = require("moment");
 const axios = require("axios");
+
 let _binanceInstance = null;
+
 /**
  * @param {*} params
  */
-
 const getAssetDetails = async (params) => {
 	try {
 		const { symbol, network, idAseet } = await idAseet_(params.asset);
@@ -61,12 +62,16 @@ const getAssetDetails = async (params) => {
 			},
 		};
 
-		response.chart = await getChart({
-			asset: symbol,
-			interval: params.interval || "1d",
-			startDate: moment().subtract(1, "month").format("YYYY-MM-DD HH:mm:ss"),
-			endDate: moment().format("YYYY-MM-DD HH:mm:ss"),
-		});
+		try {
+			response.chart = await getChart({
+				asset: symbol,
+				interval: params.interval || "1d",
+				startDate: moment().subtract(1, "month").format("YYYY-MM-DD HH:mm:ss"),
+				endDate: moment().format("YYYY-MM-DD HH:mm:ss"),
+			});
+		} catch (error) {
+			response.chart = [];
+		}
 
 		return response;
 	} catch (error) {
@@ -137,22 +142,23 @@ const _getExactLimit = (_startDate, interval) => {
 };
 
 const getChart = async (data) => {
-	const { asset, interval, limit, startDate, endDate } = data;
+	const { interval, limit, startDate, endDate } = data;
 
+	let { asset } = data;
 	let _limit = limit;
 	let _endDate = null;
 	let _startDate = null;
 
 	if (startDate && endDate) {
 		_startDate = moment(startDate).format("YYYY-MM-DD HH:mm:ss");
-
 		_endDate = endDate === "now" ? moment(new Date()).format("YYYY-MM-DD HH:mm:ss") : moment(endDate).format("YYYY-MM-DD HH:mm:ss");
 
 		_limit = _getExactLimit(_startDate, interval);
 	}
 
-	const klines = await getKLines(`${asset}USDT`, interval, _limit ? _limit : limit);
+	if (asset === "USDT") asset = "USDC";
 
+	const klines = await getKLines(`${asset}USDT`, interval, _limit ? _limit : limit);
 	const klinesMap = [];
 
 	for (let index = 0; index < klines.length; index++) {
@@ -160,13 +166,9 @@ const getChart = async (data) => {
 
 		const dateTime = moment.unix(kline[0] / 1000);
 
-		if (endDate && !dateTime.isBetween(_startDate, _endDate, "hours")) {
-			continue;
-		}
-
-		if (endDate && dateTime.isAfter(_endDate, "days")) {
-			break;
-		}
+		if (endDate && startDate && !dateTime.isBetween(_startDate, _endDate, "hours")) continue;
+		if (endDate && dateTime.isAfter(_endDate, "days")) continue;
+		if (startDate && dateTime.isBefore(_startDate, "days")) continue;
 
 		klinesMap.push({
 			index,
