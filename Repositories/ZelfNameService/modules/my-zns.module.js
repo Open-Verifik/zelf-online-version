@@ -112,7 +112,7 @@ const renewMyZelfName = async (params, authUser) => {
 			moment(zelfNameObject.publicData.registeredAt).isAfter(moment(authUser.payment.registeredAt)))
 	) {
 		return {
-			...payment,
+			payment,
 			publicData: zelfNameObject.publicData,
 			reward: await getPurchaseReward(zelfNameObject.publicData.zelfName),
 		};
@@ -189,6 +189,8 @@ const _addDurationToZelfName = async (authUser) => {
 	await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash || zelfNameObject.IpfsHash]);
 
 	const masterIPFSRecord = await IPFSModule.insert(payload, { pro: true });
+
+	let reward = null;
 
 	if (zelfNameObject.publicData.type === "hold") {
 		reward = await addPurchaseReward({
