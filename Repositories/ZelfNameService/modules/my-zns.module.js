@@ -115,6 +115,7 @@ const renewMyZelfName = async (params, authUser) => {
 			ipfs: masterIPFSRecord,
 			arweave: masterArweaveRecord,
 			reward,
+			payment,
 		};
 	}
 
