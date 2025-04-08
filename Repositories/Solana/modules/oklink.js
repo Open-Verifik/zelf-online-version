@@ -130,7 +130,9 @@ const getTokens = async (params, query) => {
 		return null;
 	}
 };
+
 let transactions = [];
+
 const getTransactions = async (params, query) => {
 	try {
 		const t = Date.now();

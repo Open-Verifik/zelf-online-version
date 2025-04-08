@@ -62,7 +62,7 @@ const transaction = async (ctx) => {
 
 const transfers = async (ctx) => {
 	try {
-		const data = await Module.getTransfers(ctx.request.params, ctx.request.query);
+		const data = await Module.getTransactions(ctx.request.params, ctx.request.query);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -73,9 +73,10 @@ const transfers = async (ctx) => {
 		ctx.body = { error: error.message };
 	}
 };
+
 const transfer = async (ctx) => {
 	try {
-		const data = await Module.getTransfer(ctx.request.params);
+		const data = await Module.getTransaction(ctx.request.params);
 
 		ctx.body = { data };
 	} catch (error) {

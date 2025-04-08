@@ -63,7 +63,5 @@ module.exports = {
 	getAddress,
 	getTokens,
 	getTransactions,
-	//getTransaction,
-	//getTransfers,
 	getGasTracker,
 };
