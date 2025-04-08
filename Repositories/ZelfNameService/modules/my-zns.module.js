@@ -108,9 +108,11 @@ const renewMyZelfName = async (params, authUser) => {
 	}
 
 	if (payment?.confirmed) {
-		const { masterArweaveRecord, masterIPFSRecord, reward } = await _addDurationToZelfName(authUser);
+		const { masterArweaveRecord, masterIPFSRecord, reward, referralSolanaAddress, referralZelfName } = await _addDurationToZelfName(authUser);
 
 		return {
+			referralSolanaAddress,
+			referralZelfName,
 			confirmed: true,
 			ipfs: masterIPFSRecord,
 			arweave: masterArweaveRecord,
@@ -123,6 +125,8 @@ const renewMyZelfName = async (params, authUser) => {
 		renew: authUser.zelfName.includes(".hold") ? false : true,
 		confirmed: payment.confirmed,
 		payment,
+		referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
+		referralZelfName: zelfNameObject.publicData.referralZelfName,
 	};
 };
 
@@ -186,9 +190,25 @@ const _addDurationToZelfName = async (authUser) => {
 		});
 	}
 
+	zelfNameObject.publicData.referralZelfName
+		? await addReferralReward({
+				ethAddress: masterIPFSRecord.metadata.ethAddress,
+				solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+				zelfName: masterIPFSRecord.metadata.zelfName,
+				zelfNamePrice: zelfNameObject.publicData.price,
+				referralZelfName: zelfNameObject.publicData.referralZelfName,
+				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
+				ipfsHash: masterIPFSRecord.IpfsHash,
+				arweaveId: masterArweaveRecord.id,
+		  })
+		: "no_referral";
+
 	return {
+		referralZelfName: zelfNameObject.publicData.referralZelfName,
+		referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
 		masterArweaveRecord,
 		masterIPFSRecord: await ZNSPartsModule.formatIPFSRecord(masterIPFSRecord, true),
+		reward,
 	};
 };
 
