@@ -8,7 +8,8 @@ const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const ZNSPartsModule = require("./zns-parts.module");
-const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
+const { addReferralReward, addPurchaseReward, getPurchaseReward } = require("./zns-token.module");
+const MongoORM = require("../../../Core/mongo-orm");
 
 const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
 	const chargeID = coinbase_hosted_url?.split("/pay/")[1];
@@ -77,7 +78,12 @@ const renewMyZelfName = async (params, authUser) => {
 	}
 
 	if (payment.confirmed && !zelfNameObjectFound) {
-		return payment;
+		return {
+			payment,
+			confirmed: true,
+			zelfName: authUser.zelfName,
+			reward: await getPurchaseReward(authUser.zelfName.replace(".hold", "")),
+		};
 	}
 
 	let zelfNameObject;
@@ -96,6 +102,7 @@ const renewMyZelfName = async (params, authUser) => {
 		});
 	}
 
+	// second + time
 	if (
 		(zelfNameObject.publicData.renewedAt &&
 			authUser.payment?.registeredAt &&
@@ -104,7 +111,11 @@ const renewMyZelfName = async (params, authUser) => {
 			authUser.payment?.registeredAt &&
 			moment(zelfNameObject.publicData.registeredAt).isAfter(moment(authUser.payment.registeredAt)))
 	) {
-		return { ...payment, publicData: zelfNameObject.publicData };
+		return {
+			...payment,
+			publicData: zelfNameObject.publicData,
+			reward: await getPurchaseReward(zelfNameObject.publicData.zelfName),
+		};
 	}
 
 	if (payment?.confirmed) {

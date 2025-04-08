@@ -283,7 +283,25 @@ const releasePurchaseRewards = async (authUser) => {
 	}
 };
 
+const getPurchaseReward = async (zelfName) => {
+	if (!zelfName) {
+		return null;
+	}
+
+	try {
+		const purchaseReward = await MongoORM.buildQuery({ where_zelfName: zelfName, findOne: true }, PurchaseRewardModel, null);
+
+		if (!purchaseReward) return null;
+
+		return purchaseReward;
+	} catch (error) {
+		console.error("Error getting purchase reward:", error);
+		throw error; // Re-throw for higher-level error handling if needed
+	}
+};
+
 module.exports = {
+	getPurchaseReward,
 	addReferralReward,
 	addPurchaseReward,
 	releaseReferralRewards,
