@@ -287,25 +287,22 @@ const getTransactionStatus = async (params) => {
 
 		const $ = cheerio.load(data);
 
-		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div.row.align-items-center.mb-4 > div.col.col-md-9 > span")
-			.text()
-			.split(" ")[0]
-			.trim();
+		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge").text().split(" ")[0].trim();
 
 		const block = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
+			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
 		).text();
 
 		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0];
 
 		///en pruba 8
-		const from_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(10) > div.col-md-9").html();
+		const from_a = $("#ContentPlaceHolder1_maintable div.from-address-col").html();
 
 		const from_div = cheerio.load(from_a);
 
 		const from = from_div("a.js-clipboard").attr("data-clipboard-text");
 		///en pruba 9
-		const to_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(11) > div.col-md-9 > div").html();
+		const to_a = $("#ContentPlaceHolder1_maintable div.to-address-col").html();
 
 		const to_div = cheerio.load(to_a);
 
