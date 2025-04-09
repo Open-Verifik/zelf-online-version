@@ -237,7 +237,7 @@ const transferMyZelfName = async (zelfName, newOwner) => {
 };
 
 const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) => {
-	const { zelfName, registeredAt, renewedAt } = zelfNameObject.publicData;
+	const { zelfName, registeredAt, renewedAt, referralZelfName } = zelfNameObject.publicData;
 
 	const _zelfName = zelfName.includes(".hold") ? zelfName.replace(".zelf.hold", ".zelfpay") : zelfName.replace(".zelf", ".zelfpay");
 
@@ -279,7 +279,10 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 	}
 
 	if (renewZelfPayObject && moment(renewZelfPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
-		const newZelfPayRecord = await updateZelfPay(renewZelfPayObject, { newCoinbaseUrl: true });
+		const newZelfPayRecord = await updateZelfPay(renewZelfPayObject, {
+			newCoinbaseUrl: true,
+			referralZelfName,
+		});
 
 		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
 	} else if (!renewZelfPayObject) {

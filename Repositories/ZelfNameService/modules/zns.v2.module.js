@@ -742,9 +742,7 @@ const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 
 	params.duration = params.duration || 1;
 
-	params.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.split(".")[0].length, params.duration).price;
-
-	console.log({ price: params.price, zelfName: zelfName, duration: params.duration });
+	params.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.split(".")[0].length, params.duration, params.referralZelfName).price;
 
 	const paymentName = `${zelfName}`.replace(".zelf", ".zelfpay");
 
@@ -863,7 +861,7 @@ const updateZelfPay = async (zelfPayObject, updates = {}) => {
 
 	const price =
 		zelfPayObject.publicData.price ||
-		ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, newDuration || zelfPayObject.publicData.duration).price;
+		ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, newDuration || zelfPayObject.publicData.duration, updates.referralZelfName).price;
 
 	const newCount = parseInt(zelfPayObject.publicData.count || 0) + 1;
 
