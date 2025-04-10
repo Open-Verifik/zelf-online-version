@@ -258,6 +258,7 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 	const recordsFound = zelfPayRecords?.length || 0;
 
 	if (recordsFound < currentCount || recordsFound === 0) {
+		zelfNameObject.publicData.duration = duration || 1;
 		// we need to create a new zelfPay record
 		const newZelfPayRecord = await createZelfPay(zelfNameObject, currentCount + 1);
 
@@ -286,7 +287,7 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 
 		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
 	} else if (!renewZelfPayObject) {
-		zelfNameObject.publicData.duration = duration;
+		zelfNameObject.publicData.duration = duration || 1;
 
 		const newZelfPayRecord = await createZelfPay(zelfNameObject, currentCount + 1);
 
