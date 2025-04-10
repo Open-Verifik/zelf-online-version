@@ -42,7 +42,7 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 		const tokenBalance = await connection.getTokenAccountBalance(senderTokenAccount.address);
 
 		// Ensure sender has enough tokens to send
-		const amountToSend = Math.round(amount * 10 ** 8);
+		const amountToSend = Math.round(250 * 10 ** 8);
 
 		if (tokenBalance.value.amount < amountToSend) {
 			throw new Error("Insufficient balance in sender's token account.");
