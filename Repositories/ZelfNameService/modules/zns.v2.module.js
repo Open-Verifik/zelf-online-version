@@ -1097,7 +1097,7 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 
 	const expiresAt = moment().add(duration, "year").format("YYYY-MM-DD HH:mm:ss");
 
-	const zelfName = zelfNameObject.preview?.publicData.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", "");
+	const zelfName = zelfNameObject.preview?.publicData?.zelfName || zelfNameObject.publicData.zelfName.replace(".hold", "");
 
 	const payload = {
 		base64: zelfNameObject.zelfProofQRCode,

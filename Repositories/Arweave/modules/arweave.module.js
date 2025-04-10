@@ -54,7 +54,6 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 
 	const tempFilePath = path.join(__dirname, `${zelfNameObject.zelfName}.png`);
 
-	// Write buffer to a temporary file
 	fs.writeFileSync(tempFilePath, buffer);
 
 	const tags = [
@@ -80,9 +79,13 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 	for (let index = 0; index < publicKeys.length; index++) {
 		const publicKey = publicKeys[index];
 
+		if (publicKey === "zelfProof" || publicKey === "hasPassword") {
+			continue;
+		}
+
 		tags.push({
 			name: publicKey,
-			value: publicData[publicKey],
+			value: `${publicData[publicKey]}`,
 		});
 	}
 

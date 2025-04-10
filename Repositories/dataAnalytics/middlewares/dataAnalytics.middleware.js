@@ -1,4 +1,4 @@
-const { string, validate, stringEnum } = require("../../../Core/JoiUtils");
+const { string, validate } = require("../../../Core/JoiUtils");
 
 const schemas = {
 	asset: {

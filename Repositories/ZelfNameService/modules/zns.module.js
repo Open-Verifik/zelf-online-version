@@ -635,11 +635,8 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 	const chargeID = zelfNameObject.publicData?.coinbase_id || zelfNameObject.publicData?.coinbase_hosted_url?.split("/pay/")[1];
 
 	if (!chargeID) {
-		console.log({ publicData: zelfNameObject.publicData });
 		const error = new Error("coinbase_charge_id_not_found");
-
 		error.status = 404;
-
 		throw error;
 	}
 
@@ -782,8 +779,6 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
 	if (searchResult.available) return null;
 
 	if (returnResults) return searchResult;
-
-	console.log({ searchResult, zelfName });
 
 	const error = new Error("zelfName_is_taken");
 
