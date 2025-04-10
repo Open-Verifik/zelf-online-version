@@ -249,6 +249,7 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, a
 		btcAddress: zelfNameObject.btcAddress,
 		solanaAddress: zelfNameObject.solanaAddress,
 		extraParams: {
+			origin: zelfNameObject.origin || "online",
 			suiAddress: zelfNameObject.suiAddress,
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,

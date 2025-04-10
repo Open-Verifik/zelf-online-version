@@ -297,6 +297,60 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 	return renewZelfPayObject;
 };
 
+const _updateOldZelfNameObject = async (zelfNameObject) => {
+	const duration = zelfNameObject.publicData.duration || 1;
+
+	const calculation =
+		zelfNameObject.publicData.price ||
+		ZNSPartsModule.calculateZelfNamePrice(
+			zelfNameObject.publicData.zelfName.split(".")[0].length,
+			duration,
+			zelfNameObject.publicData.referralZelfName
+		);
+
+	const expiresAt = zelfNameObject.publicData.expiresAt || zelfNameObject.publicData.leaseExpiresAt;
+
+	const payload = {
+		base64: await ZNSPartsModule.urlToBase64(zelfNameObject.url),
+		name: zelfNameObject.publicData.zelfName,
+		pinIt: true,
+		metadata: {
+			zelfProof: zelfNameObject.publicData.zelfProof,
+			zelfName: zelfNameObject.publicData.zelfName,
+			hasPassword: zelfNameObject.publicData.hasPassword,
+			ethAddress: zelfNameObject.publicData.ethAddress,
+			btcAddress: zelfNameObject.publicData.btcAddress,
+			solanaAddress: zelfNameObject.publicData.solanaAddress,
+			extraParams: JSON.stringify({
+				origin: zelfNameObject.publicData.origin,
+				suiAddress: zelfNameObject.publicData.suiAddress,
+				price: calculation.price,
+				duration,
+				registeredAt: expiresAt
+					? moment(expiresAt).isAfter("2026-01-01")
+						? moment(expiresAt).subtract(1, "year").format("YYYY-MM-DD HH:mm:ss")
+						: moment(expiresAt).subtract(1, "month").format("YYYY-MM-DD HH:mm:ss")
+					: moment().format("YYYY-MM-DD HH:mm:ss"),
+				expiresAt: expiresAt || moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
+				referralZelfName: zelfNameObject.publicData.referralZelfName,
+				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
+			}),
+			type: zelfNameObject.publicData.type || "hold",
+		},
+	};
+
+	//remove the previous ipfs record
+	const deletedRecord = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash || zelfNameObject.IpfsHash]);
+
+	console.log({ deletedRecord, array: [zelfNameObject.ipfs_pin_hash || zelfNameObject.IpfsHash] });
+
+	const ipfs = await IPFSModule.insert(payload, { pro: true });
+
+	const formattedIPFS = await ZNSPartsModule.formatIPFSRecord(ipfs, true);
+
+	zelfNameObject.publicData = formattedIPFS.publicData;
+};
+
 const howToRenewMyZelfName = async (params) => {
 	const { zelfName, lockedJWT } = params;
 
@@ -310,6 +364,10 @@ const howToRenewMyZelfName = async (params) => {
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
 		throw error;
+	}
+
+	if (!zelfNameObject.publicData.registeredAt) {
+		await _updateOldZelfNameObject(zelfNameObject);
 	}
 
 	const recordsWithSameName = publicKeys.ipfs?.length || publicKeys.arweave?.length;
