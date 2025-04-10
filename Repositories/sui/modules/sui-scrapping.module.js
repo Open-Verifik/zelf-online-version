@@ -133,6 +133,7 @@ const getTransactions = async (params, query) => {
 			_amount: item.amount,
 			txnFee: item.fee.toString(),
 			gas: item.gas.toString(),
+			traffic: item.from === address ? "OUT" : "IN",
 			_source: item,
 		}));
 	}
