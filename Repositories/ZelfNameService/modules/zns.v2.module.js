@@ -259,9 +259,10 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, a
 	};
 
 	if (referralZelfNameObject) {
-		metadata.payment.referralZelfName = referralZelfNameObject.publicData?.zelfName || referralZelfNameObject.metadata?.zelfName;
+		metadata.extraParams.referralZelfName = referralZelfNameObject.publicData?.zelfName || referralZelfNameObject.metadata?.zelfName;
 
-		metadata.payment.referralSolanaAddress = referralZelfNameObject.publicData?.solanaAddress || referralZelfNameObject.metadata?.solanaAddress;
+		metadata.extraParams.referralSolanaAddress =
+			referralZelfNameObject.publicData?.solanaAddress || referralZelfNameObject.metadata?.solanaAddress;
 	}
 
 	metadata.extraParams = JSON.stringify(metadata.extraParams);
@@ -281,6 +282,17 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, a
 	delete zelfNameObject.ipfs.publicData.zelfProof;
 
 	zelfNameObject.publicData = Object.assign(zelfNameObject.publicData, zelfNameObject.ipfs.publicData);
+
+	reward = await addPurchaseReward({
+		ethAddress: zelfNameObject.ipfs.publicData.ethAddress,
+		solanaAddress: zelfNameObject.ipfs.publicData.solanaAddress,
+		zelfName: zelfNameObject.ipfs.publicData.zelfName,
+		zelfNamePrice: zelfNameObject.ipfs.publicData.price,
+		ipfsHash: zelfNameObject.ipfs.ipfs_pin_hash || zelfNameObject.ipfs.IpfsHash,
+		arweaveId: null,
+	});
+
+	console.log({ reward });
 };
 
 /**

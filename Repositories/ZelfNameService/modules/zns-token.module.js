@@ -154,22 +154,20 @@ const addPurchaseReward = async (zelfNameObject) => {
 	if (!zelfNameObject) return null;
 
 	try {
-		const referralReward = new PurchaseRewardModel({
+		const purchaseReward = new PurchaseRewardModel({
 			zelfName: zelfNameObject.zelfName,
 			ethAddress: zelfNameObject.ethAddress,
 			solanaAddress: zelfNameObject.solanaAddress,
 			zelfNamePrice: zelfNameObject.zelfNamePrice,
-			tokenAmount: Math.round(zelfNameObject.zelfNamePrice / config.token.rewardPrice),
+			tokenAmount: 250, //Math.round(zelfNameObject.zelfNamePrice / config.token.rewardPrice),
 			status: "pending",
 			attempts: 0,
 			payload: {},
 			ipfsHash: zelfNameObject.ipfsHash,
-			arweaveId: zelfNameObject.arweaveId,
+			arweaveId: zelfNameObject.arweaveId || "not_set",
 		});
 
-		await referralReward.save();
-
-		return referralReward;
+		return await purchaseReward.save();
 	} catch (error) {
 		console.error("Error adding purchase:", error);
 		throw error; // Re-throw for higher-level error handling if needed
@@ -260,7 +258,7 @@ const releasePurchaseRewards = async (authUser) => {
 	try {
 		console.log("Processing purchase reward:", purchaseReward);
 
-		const signature = await giveTokensAfterPurchase(purchaseReward.zelfNamePrice / config.token.rewardPrice, purchaseReward.solanaAddress);
+		const signature = await giveTokensAfterPurchase(250, purchaseReward.solanaAddress);
 
 		purchaseReward.status = "completed";
 		purchaseReward.completedAt = new Date();
