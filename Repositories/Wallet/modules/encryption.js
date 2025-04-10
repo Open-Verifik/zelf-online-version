@@ -95,7 +95,6 @@ const decrypt = async (data) => {
 	} catch (exception) {
 		const _error = exception.response?.data;
 
-		console.log({ _error, senseprint_base_64: data.zelfProof });
 		let error = new Error(_error.code);
 
 		switch (_error.code) {
