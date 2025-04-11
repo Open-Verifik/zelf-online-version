@@ -106,7 +106,7 @@ const _getBinanceInstance = () => {
 const getKLines = async (symbol = "BTCUSDT", interval = "1m", limit = 1000) => {
 	const instance = _getBinanceInstance();
 
-	const response = await instance.get(`/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+	const response = await instance.get(`/v3/klines?symbol=${symbol}&interval=${interval}&limit=${parseInt(limit)}`);
 
 	return response.data ? response.data : [];
 };

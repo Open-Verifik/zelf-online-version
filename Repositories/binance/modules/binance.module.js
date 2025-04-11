@@ -23,7 +23,7 @@ const getTickerPrice = async (params) => {
 const getKlines = async (params) => {
 	try {
 		const { data } = await instance.get(
-			`${config.binance.urlBinance}api/v3/klines?symbol=${params.symbol}&interval=${params.interval}&limit=${params.limit}`
+			`${config.binance.urlBinance}api/v3/klines?symbol=${params.symbol}&interval=${params.interval}&limit=${parseInt(params.limit)}`
 		);
 
 		return data;
