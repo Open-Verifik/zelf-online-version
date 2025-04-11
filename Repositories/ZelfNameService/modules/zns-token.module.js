@@ -281,7 +281,30 @@ const releasePurchaseRewards = async (authUser) => {
 	}
 };
 
+const getPurchaseReward = async (zelfName, afterDate) => {
+	if (!zelfName) return null;
+
+	const queryParams = {
+		where_zelfName: zelfName,
+		findOne: true,
+	};
+
+	if (afterDate) queryParams["where>=_createdAt"] = afterDate;
+
+	try {
+		const purchaseReward = await MongoORM.buildQuery(queryParams, PurchaseRewardModel, null);
+
+		if (!purchaseReward) return null;
+
+		return purchaseReward;
+	} catch (error) {
+		console.error("Error getting purchase reward:", error);
+		throw error; // Re-throw for higher-level error handling if needed
+	}
+};
+
 module.exports = {
+	getPurchaseReward,
 	addReferralReward,
 	addPurchaseReward,
 	releaseReferralRewards,

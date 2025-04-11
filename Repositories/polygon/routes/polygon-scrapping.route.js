@@ -12,9 +12,5 @@ module.exports = (server) => {
 
 	server.get(`${PATH}/transaction/:id`, Middleware.validateToken, Controller.transactionStatus);
 
-	server.get(
-		`${PATH}/gas-tracker`,
-		//SessionMiddleware.validateJWT,
-		Controller.gasTracker
-	);
+	server.get(`${PATH}/gas-tracker`, Controller.gasTracker);
 };

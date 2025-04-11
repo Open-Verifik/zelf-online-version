@@ -13,6 +13,7 @@ const graphql = `${arweaveUrl}/graphql`;
 
 const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 	const { zelfProof, hasPassword, publicData } = zelfNameObject;
+
 	/**
 	 * Generate a key from the arweave wallet.
 	 */
@@ -64,11 +65,14 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 			name: "zelfProof",
 			value: zelfProof,
 		},
-		{
+	];
+
+	if (hasPassword) {
+		tags.push({
 			name: "hasPassword",
 			value: hasPassword,
-		},
-	];
+		});
+	}
 
 	const publicKeys = Object.keys(publicData);
 

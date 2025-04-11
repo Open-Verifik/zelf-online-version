@@ -249,6 +249,7 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, a
 		btcAddress: zelfNameObject.btcAddress,
 		solanaAddress: zelfNameObject.solanaAddress,
 		extraParams: {
+			origin: zelfNameObject.origin || "online",
 			suiAddress: zelfNameObject.suiAddress,
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
@@ -676,6 +677,7 @@ const leaseOffline = async (params, authUser) => {
 				zelfProof: zelfNameObject.zelfProof,
 				zelfName: zelfNameObject.zelfName,
 				extraParams: JSON.stringify({
+					registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 					hasPassword: _preview.passwordLayer === "WithPassword" ? "true" : "false",
 					duration: duration || 1,
 					price: zelfNameObject.price,
@@ -707,15 +709,9 @@ const leaseOffline = async (params, authUser) => {
 	};
 };
 
-const createZelfPay = async (zelfNameObject) => {
+const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 	// create link for coinbase
 	const params = zelfNameObject.publicData || zelfNameObject.metadata;
-
-	if (!params.price) {
-		params.duration = params.duration || 1;
-
-		params.price = ZNSPartsModule.calculateZelfNamePrice(zelfNameObject.zelfName.length - 5, params.duration).price;
-	}
 
 	const zelfName = params.zelfName.split(".hold")[0];
 
@@ -724,6 +720,10 @@ const createZelfPay = async (zelfNameObject) => {
 		error.status = 404;
 		throw error;
 	}
+
+	params.duration = params.duration || 1;
+
+	params.price = ZNSPartsModule.calculateZelfNamePrice(zelfName.split(".")[0].length, params.duration, params.referralZelfName).price;
 
 	const paymentName = `${zelfName}`.replace(".zelf", ".zelfpay");
 
@@ -741,6 +741,7 @@ const createZelfPay = async (zelfNameObject) => {
 			btcAddress: btc.address,
 			customerZelfName: zelfNameObject.zelfName,
 			zelfName: paymentName,
+			currentCount: `${currentCount}`,
 		},
 		metadata: {
 			mnemonic,
@@ -770,6 +771,7 @@ const createZelfPay = async (zelfNameObject) => {
 			ethAddress: params.ethAddress,
 			btcAddress: params.btcAddress,
 			solanaAddress: params.solanaAddress,
+			count: `${currentCount}`,
 		},
 		redirect_url: "https://payment.zelf.world/checkout",
 		cancel_url: "https://payment.zelf.world/checkout",
@@ -790,10 +792,12 @@ const createZelfPay = async (zelfNameObject) => {
 			zelfName: paymentName,
 			extraParams: JSON.stringify({
 				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 				coinbase_hosted_url: coinbaseCharge.hosted_url,
 				coinbase_expires_at: coinbaseCharge.expires_at,
 				price: params.price || 24,
 				duration: params.duration || 1,
+				count: `${currentCount}`,
 			}),
 		},
 		pinIt: true,
@@ -813,11 +817,104 @@ const createZelfPay = async (zelfNameObject) => {
 			zelfName: paymentName,
 			type: "mainnet",
 			expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+			count: `${currentCount}`,
 		},
 	});
 
 	return {
 		ipfs: await ZNSPartsModule.formatIPFSRecord(ipfs, false),
+		arweave,
+	};
+};
+
+const updateZelfPay = async (zelfPayObject, updates = {}) => {
+	const params = zelfPayObject.publicData;
+
+	const { newDuration, newCoinbaseUrl } = updates;
+
+	const zelfName = params.zelfName.split(".hold")[0];
+
+	if (!zelfName) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const price =
+		zelfPayObject.publicData.price ||
+		ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, newDuration || zelfPayObject.publicData.duration, updates.referralZelfName).price;
+
+	const newCount = parseInt(zelfPayObject.publicData.count || 0) + 1;
+
+	if (newCoinbaseUrl) {
+		// generate new coinbase charge
+		const coinbasePayload = {
+			name: zelfName,
+			description: `Purchase of the Zelf Name > ${zelfName} for $${price}`,
+			pricing_type: "fixed_price",
+			local_price: {
+				amount: `${price}`,
+				currency: "USD",
+			},
+			metadata: {
+				zelfName: zelfName,
+				ethAddress: zelfPayObject.publicData.ethAddress,
+				btcAddress: zelfPayObject.publicData.btcAddress,
+				solanaAddress: zelfPayObject.publicData.solanaAddress,
+				count: `${newCount}`,
+			},
+			redirect_url: "https://payment.zelf.world/checkout",
+			cancel_url: "https://payment.zelf.world/checkout",
+		};
+
+		const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
+
+		zelfPayObject.publicData.coinbase_hosted_url = coinbaseCharge.hosted_url;
+
+		zelfPayObject.publicData.coinbase_expires_at = coinbaseCharge.expires_at;
+	}
+
+	const base64 = await ZNSPartsModule.urlToBase64(zelfPayObject.url);
+
+	const payload = {
+		base64,
+		name: zelfPayObject.publicData.zelfName,
+		metadata: {
+			hasPassword: "true",
+			zelfProof: zelfPayObject.publicData.zelfProof,
+			type: "mainnet",
+			ethAddress: zelfPayObject.publicData.ethAddress,
+			solanaAddress: zelfPayObject.publicData.solanaAddress,
+			btcAddress: zelfPayObject.publicData.btcAddress,
+			zelfName: zelfPayObject.publicData.zelfName,
+			extraParams: JSON.stringify({
+				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+				coinbase_hosted_url: zelfPayObject.publicData.coinbase_hosted_url,
+				coinbase_expires_at: zelfPayObject.publicData.coinbase_expires_at,
+				price,
+				duration: newDuration || zelfPayObject.publicData.duration,
+				count: `${newCount}`,
+			}),
+		},
+		pinIt: true,
+	};
+
+	const arweave = await ArweaveModule.zelfNameRegistration(base64, {
+		zelfProof: zelfPayObject.publicData.zelfProof,
+		publicData: payload.metadata,
+	});
+
+	//remove the previous ipfs record
+	await IPFSModule.unPinFiles([zelfPayObject.ipfs_pin_hash || zelfPayObject.IpfsHash]);
+
+	const ipfs = await IPFSModule.insert(payload, { pro: true });
+
+	return {
+		price,
+		updates,
+		zelfName,
+		ipfs: await ZNSPartsModule.formatIPFSRecord(ipfs, true),
 		arweave,
 	};
 };
@@ -1104,6 +1201,7 @@ module.exports = {
 	leaseZelfName,
 	leaseOffline,
 	createZelfPay,
+	updateZelfPay,
 	leaseConfirmation,
 	previewZelfName,
 };
