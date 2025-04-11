@@ -668,26 +668,6 @@ const leaseOffline = async (params, authUser) => {
 			),
 		};
 
-	const coinbasePayload = {
-		name: `${zelfName}`,
-		description: `Purchase of the Zelf Name > ${zelfName} for $${zelfNameObject.price}`,
-		pricing_type: "fixed_price",
-		local_price: {
-			amount: `${zelfNameObject.price}`,
-			currency: "USD",
-		},
-		metadata: {
-			zelfName,
-			ethAddress: _preview.publicData.ethAddress,
-			btcAddress: _preview.publicData.btcAddress,
-			solanaAddress: _preview.publicData.solanaAddress,
-		},
-		redirect_url: "https://payment.zelf.world/checkout",
-		cancel_url: "https://payment.zelf.world/checkout",
-	};
-
-	zelfNameObject.coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
-
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{
 			base64: zelfNameObject.image,
@@ -699,9 +679,9 @@ const leaseOffline = async (params, authUser) => {
 					hasPassword: _preview.passwordLayer === "WithPassword" ? "true" : "false",
 					duration: duration || 1,
 					price: zelfNameObject.price,
-					coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
-					coinbase_expires_at: zelfNameObject.coinbaseCharge.expires_at,
+					registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 					expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
+					suiAddress: _preview.publicData.suiAddress,
 				}),
 				type: "hold",
 				ethAddress: _preview.publicData.ethAddress,
