@@ -34,6 +34,24 @@ const getTokens = async (params, query) => {
 	return response;
 };
 
+const getTransaction = async (params, query) => {
+	const response = await solscan.getTransaction(params, query);
+
+	if (!response || !response.transaction) return null;
+
+	return {
+		amount: response.transaction.parsed_instructions[0].data_raw.info.lamports,
+		block: response.transaction.block_id,
+		fee: response.transaction.fee,
+		from: response.transaction.parsed_instructions[0].data_raw.info.source,
+		id: response.transaction.trans_id,
+		status: response.transaction.status ? "success" : "pending",
+		timestamp: response.transaction.trans_time,
+		to: response.transaction.parsed_instructions[0].data_raw.info.destination,
+		_source: response.transaction,
+	};
+};
+
 const getTransactions = async (params, query) => {
 	const response = (await solscan.getTransfers(params, query)) || (await oklink.getTransactions(params, query));
 	return response;
@@ -62,6 +80,7 @@ const getGasTracker = async () => {
 module.exports = {
 	getAddress,
 	getTokens,
+	getTransaction,
 	getTransactions,
 	getGasTracker,
 };
