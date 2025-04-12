@@ -677,6 +677,7 @@ const leaseOffline = async (params, authUser) => {
 				zelfProof: zelfNameObject.zelfProof,
 				zelfName: zelfNameObject.zelfName,
 				extraParams: JSON.stringify({
+					origin: "offline",
 					registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 					hasPassword: _preview.passwordLayer === "WithPassword" ? "true" : "false",
 					duration: duration || 1,

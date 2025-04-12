@@ -352,7 +352,7 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 };
 
 const howToRenewMyZelfName = async (params) => {
-	const { zelfName, lockedJWT } = params;
+	const zelfName = params.zelfName.toLowerCase();
 
 	const duration = params.duration === "lifetime" ? "lifetime" : parseInt(params.duration || 1);
 
