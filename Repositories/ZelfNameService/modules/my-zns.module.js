@@ -310,6 +310,8 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 
 	const expiresAt = zelfNameObject.publicData.expiresAt || zelfNameObject.publicData.leaseExpiresAt;
 
+	const type = zelfNameObject.publicData.type || (zelfNameObject.publicData.zelfName.includes(".hold") ? "hold" : "mainnet");
+
 	const payload = {
 		base64: await ZNSPartsModule.urlToBase64(zelfNameObject.url),
 		name: zelfNameObject.publicData.zelfName,
@@ -331,11 +333,15 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 						? moment(expiresAt).subtract(1, "year").format("YYYY-MM-DD HH:mm:ss")
 						: moment(expiresAt).subtract(1, "month").format("YYYY-MM-DD HH:mm:ss")
 					: moment().format("YYYY-MM-DD HH:mm:ss"),
-				expiresAt: expiresAt || moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
+				expiresAt:
+					expiresAt ||
+					(type === "hold"
+						? moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss")
+						: moment().add(duration, "year").format("YYYY-MM-DD HH:mm:ss")),
 				referralZelfName: zelfNameObject.publicData.referralZelfName,
 				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
 			}),
-			type: zelfNameObject.publicData.type || "hold",
+			type,
 		},
 	};
 
