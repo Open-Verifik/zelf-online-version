@@ -308,9 +308,18 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 			zelfNameObject.publicData.referralZelfName
 		);
 
-	const expiresAt = zelfNameObject.publicData.expiresAt || zelfNameObject.publicData.leaseExpiresAt;
-
 	const type = zelfNameObject.publicData.type || (zelfNameObject.publicData.zelfName.includes(".hold") ? "hold" : "mainnet");
+
+	const expiresAt =
+		zelfNameObject.publicData.expiresAt ||
+		zelfNameObject.publicData.leaseExpiresAt ||
+		(type === "hold" ? moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss") : moment().add(duration, "year").format("YYYY-MM-DD HH:mm:ss"));
+
+	const registeredAt = expiresAt
+		? moment(expiresAt).isAfter("2026-01-01")
+			? moment(expiresAt).subtract(1, "year").format("YYYY-MM-DD HH:mm:ss")
+			: moment(expiresAt).subtract(1, "month").format("YYYY-MM-DD HH:mm:ss")
+		: moment().format("YYYY-MM-DD HH:mm:ss");
 
 	const payload = {
 		base64: await ZNSPartsModule.urlToBase64(zelfNameObject.url),
@@ -327,17 +336,9 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 				origin: zelfNameObject.publicData.origin,
 				suiAddress: zelfNameObject.publicData.suiAddress,
 				price: calculation.price,
-				duration,
-				registeredAt: expiresAt
-					? moment(expiresAt).isAfter("2026-01-01")
-						? moment(expiresAt).subtract(1, "year").format("YYYY-MM-DD HH:mm:ss")
-						: moment(expiresAt).subtract(1, "month").format("YYYY-MM-DD HH:mm:ss")
-					: moment().format("YYYY-MM-DD HH:mm:ss"),
-				expiresAt:
-					expiresAt ||
-					(type === "hold"
-						? moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss")
-						: moment().add(duration, "year").format("YYYY-MM-DD HH:mm:ss")),
+				duration: type === "hold" ? duration : undefined,
+				registeredAt: moment(registeredAt).isAfter(moment()) ? moment().format("YYYY-MM-DD HH:mm:ss") : registeredAt,
+				expiresAt,
 				referralZelfName: zelfNameObject.publicData.referralZelfName,
 				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
 			}),
