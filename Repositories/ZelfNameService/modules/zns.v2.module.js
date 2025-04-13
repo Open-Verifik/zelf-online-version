@@ -763,12 +763,14 @@ const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 
 	const image = await encryptQR(dataToEncrypt);
 
+	const adjustedPrice = params.price < 0.001 ? 0.01 : params.price;
+
 	const coinbasePayload = {
 		name: zelfName,
-		description: `Purchase of the Zelf Name > ${zelfName} for $${params.price}`,
+		description: `Purchase of the Zelf Name > ${zelfName} for $${adjustedPrice}`,
 		pricing_type: "fixed_price",
 		local_price: {
-			amount: `${params.price}`,
+			amount: `${adjustedPrice}`,
 			currency: "USD",
 		},
 		metadata: {
