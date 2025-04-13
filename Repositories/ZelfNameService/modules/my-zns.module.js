@@ -321,6 +321,23 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 			: moment(expiresAt).subtract(1, "month").format("YYYY-MM-DD HH:mm:ss")
 		: moment().format("YYYY-MM-DD HH:mm:ss");
 
+	if (zelfNameObject.publicData.addresses) {
+		// remove the addresses from the object (it is in a string format, we need to do JSON.parse)
+		zelfNameObject.publicData.addresses = JSON.parse(zelfNameObject.publicData.addresses);
+
+		zelfNameObject.publicData.ethAddress = zelfNameObject.publicData.addresses?.ethAddress;
+		zelfNameObject.publicData.btcAddress = zelfNameObject.publicData.addresses?.btcAddress;
+		zelfNameObject.publicData.solanaAddress = zelfNameObject.publicData.addresses?.solanaAddress;
+	}
+
+	if (zelfNameObject.publicData.payment) {
+		// remove the payment from the object (it is in a string format, we need to do JSON.parse)
+		zelfNameObject.publicData.payment = JSON.parse(zelfNameObject.publicData.payment);
+
+		zelfNameObject.publicData.referralZelfName = zelfNameObject.publicData.payment?.referralZelfName;
+		zelfNameObject.publicData.referralSolanaAddress = zelfNameObject.publicData.payment?.referralSolanaAddress;
+	}
+
 	const payload = {
 		base64: await ZNSPartsModule.urlToBase64(zelfNameObject.url),
 		name: zelfNameObject.publicData.zelfName,
