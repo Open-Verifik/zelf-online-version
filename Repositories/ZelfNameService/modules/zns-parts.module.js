@@ -137,6 +137,15 @@ const formatArweaveSearchResult = async (transactionRecord) => {
 
 	zelfNameObject.zelfProofQRCode = await ArweaveModule.arweaveIDToBase64(zelfNameObject.id);
 
+	if (zelfNameObject.publicData.extraParams) {
+		const extraParams = JSON.parse(zelfNameObject.publicData.extraParams);
+
+		// assign all extraParams properties to the publicData
+		Object.assign(zelfNameObject.publicData, extraParams);
+
+		delete zelfNameObject.publicData.extraParams;
+	}
+
 	return zelfNameObject;
 };
 

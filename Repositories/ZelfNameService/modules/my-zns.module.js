@@ -342,13 +342,28 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 	//remove the previous ipfs record
 	const deletedRecord = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash || zelfNameObject.IpfsHash]);
 
-	console.log({ deletedRecord, array: [zelfNameObject.ipfs_pin_hash || zelfNameObject.IpfsHash] });
+	console.log({ deletedRecord });
 
 	const ipfs = await IPFSModule.insert(payload, { pro: true });
 
 	const formattedIPFS = await ZNSPartsModule.formatIPFSRecord(ipfs, true);
 
+	let formattedArweave = null;
+
+	if (payload.metadata.type !== "hold") {
+		// save the record also in Arweave
+		formattedArweave = await ArweaveModule.zelfNameRegistration(payload.base64, {
+			zelfProof: payload.metadata.zelfProof,
+			publicData: payload.metadata,
+		});
+	}
+
 	zelfNameObject.publicData = formattedIPFS.publicData;
+
+	return {
+		ipfs: [formattedIPFS],
+		arweave: [formattedArweave],
+	};
 };
 
 const howToRenewMyZelfName = async (params) => {
@@ -449,4 +464,5 @@ module.exports = {
 	renewMyZelfName,
 	transferMyZelfName,
 	howToRenewMyZelfName,
+	updateOldZelfNameObject: _updateOldZelfNameObject,
 };
