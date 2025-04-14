@@ -293,6 +293,8 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, a
 const searchZelfName = async (params, authUser) => {
 	const query = params.zelfName ? { key: "zelfName", value: params.zelfName } : { key: params.key, value: params.value };
 
+	query.value = query.key === "zelfName" ? query.value.toLowerCase() : query.value;
+
 	if (params.duration) query.duration = params.duration;
 
 	let finalResult = null;
