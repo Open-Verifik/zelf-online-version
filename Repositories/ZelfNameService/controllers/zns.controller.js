@@ -214,6 +214,8 @@ const leaseOfflineZelfName = async (ctx) => {
 
 const leaseOfflineZelfName_v2 = async (ctx) => {
 	try {
+		ctx.request.body.zelfName = `${ctx.request.body.zelfName}`.toLowerCase();
+
 		const data = await Modulev2.leaseOffline(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
