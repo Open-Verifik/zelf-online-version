@@ -130,19 +130,19 @@ const getTokens = async (params) => {
 				tokenHoldings.fiatBalance += token.value || 0;
 
 				const tokenData = {
-					fiatBalance: token.value,
-					name: token.tokenName,
+					address: token.address,
 					amount: token.balance,
+					fiatBalance: token.value,
+					image: token.tokenIcon,
+					name: token.tokenName,
+					owner: token.owner,
 					price: token.priceUsdt,
 					symbol: token.tokenSymbol,
-					image: token.tokenIcon,
-					address: token.address,
 					tokenAddress: token.tokenAddress,
-					tokenType: "token",
+					tokenType: "SPL",
 					//reputation: token.reputation,
 					//quantity: token.amount,
 					//decimals: token.decimals,
-					owner: token.owner,
 				};
 
 				tokenData.fiatBalance = parseFloat(tokenData.fiatBalance?.toFixed(4));
