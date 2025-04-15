@@ -96,6 +96,20 @@ const leaseZelfName_v2 = async (ctx) => {
 	}
 };
 
+const leaseRecovery = async (ctx) => {
+	try {
+		const data = await Modulev2.leaseRecovery({ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() }, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 const leaseConfirmation = async (ctx) => {
 	try {
 		const data = await Modulev2.leaseConfirmation(ctx.request.body, ctx.state.user);
@@ -321,4 +335,5 @@ module.exports = {
 	purchaseRewards,
 	update,
 	zelfPay,
+	leaseRecovery,
 };

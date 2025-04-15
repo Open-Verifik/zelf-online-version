@@ -28,6 +28,15 @@ const schemas = {
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string(),
 	},
+	leaseRecovery: {
+		zelfProof: string().required(),
+		newZelfName: string().required(),
+		faceBase64: string().required(),
+		password: string().required(),
+		type: stringEnum(["create", "import"]).required(),
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
+		captchaToken: string(),
+	},
 	create: {
 		password: string(),
 		addServerPassword: boolean(),
@@ -150,6 +159,88 @@ const getValidation = async (ctx, next) => {
  */
 const leaseValidation = async (ctx, next) => {
 	const valid = validate(schemas.lease, ctx.request.body);
+
+	const authUser = ctx.state.user;
+
+	if (authUser.session) {
+		// we will now check if the session is active
+		const session = await Session.findOne({ _id: authUser.session });
+
+		if (session?.status !== "active" || !session?.clientIP) {
+			ctx.status = 403;
+			ctx.body = { validationError: "Session is not active" };
+			return;
+		}
+
+		if (session.leaseCount >= config.sessions.leaseLimit) {
+			ctx.status = 403;
+			ctx.body = { validationError: "Search limit exceeded" };
+			return;
+		}
+
+		// then after is that we will increment searchCount
+		await Session.updateOne({ _id: authUser.session }, { $inc: { leaseCount: 1 } });
+	}
+
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	ctx.request.body.zelfName = ctx.request.body.zelfName.toLowerCase();
+
+	const { type, zelfName, captchaToken, os, skipIt } = ctx.request.body;
+
+	const typeValid = validate(schemas[type], ctx.request.body);
+
+	if (typeValid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: typeValid.error.message };
+		return;
+	}
+
+	if (!zelfName.includes(".zelf")) {
+		ctx.status = 409;
+		ctx.body = { validationError: "Not a valid zelf name" };
+		return;
+	}
+
+	if (zelfName.length < 6) {
+		ctx.status = 409;
+		ctx.body = { validationError: "ZelfName should be 1 character or more." };
+		return;
+	}
+
+	const captchaZelfName = _getZelfNameForCaptcha(`${zelfName}`);
+
+	const captchaScore =
+		(authUser.session && !captchaToken) || config.google.captchaApproval
+			? 1
+			: await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
+
+	if (captchaScore < 0.79) {
+		_consoleLogSuspicious(ctx, captchaScore, zelfName);
+
+		ctx.status = 409;
+
+		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+
+		return;
+	}
+
+	await next();
+};
+
+/**
+ * lease recovery Validation
+ * @param {*} ctx
+ * @param {*} next
+ */
+const leaseRecoveryValidation = async (ctx, next) => {
+	const valid = validate(schemas.leaseRecovery, ctx.request.body);
 
 	const authUser = ctx.state.user;
 
@@ -552,6 +643,7 @@ const zelfPayValidation = async (ctx, next) => {
 module.exports = {
 	getValidation,
 	leaseValidation,
+	leaseRecoveryValidation,
 	leaseConfirmationValidation,
 	previewValidation,
 	previewZelfProofValidation,
