@@ -61,6 +61,7 @@ const _handleWebhook = async (event) => {
 
 	if (preview.publicData.ethAddress !== attributes.ethAddress) {
 		const error = new Error("zelfProof_does_not_match");
+		console.log({ ethAddress: preview.publicData.ethAddress, attributes });
 		error.status = 409;
 		throw error;
 	}

@@ -204,12 +204,20 @@ const _addDurationToZelfName = async (authUser, preview = {}, passedZelfNameObje
 
 	let reward = null;
 
+	const price =
+		zelfNameObject.publicData.price ||
+		ZNSPartsModule.calculateZelfNamePrice(
+			zelfNameObject.publicData.zelfName.split(".")[0].length,
+			duration,
+			zelfNameObject.publicData.referralZelfName
+		).price;
+
 	if (zelfNameObject.publicData.type === "hold") {
 		reward = await addPurchaseReward({
 			ethAddress: masterIPFSRecord.metadata.ethAddress,
 			solanaAddress: masterIPFSRecord.metadata.solanaAddress,
 			zelfName: masterIPFSRecord.metadata.zelfName,
-			zelfNamePrice: zelfNameObject.publicData.price,
+			zelfNamePrice: price,
 			ipfsHash: masterIPFSRecord.IpfsHash,
 			arweaveId: masterArweaveRecord.id,
 		});
@@ -220,7 +228,7 @@ const _addDurationToZelfName = async (authUser, preview = {}, passedZelfNameObje
 				ethAddress: masterIPFSRecord.metadata.ethAddress,
 				solanaAddress: masterIPFSRecord.metadata.solanaAddress,
 				zelfName: masterIPFSRecord.metadata.zelfName,
-				zelfNamePrice: zelfNameObject.publicData.price,
+				zelfNamePrice: price,
 				referralZelfName: zelfNameObject.publicData.referralZelfName,
 				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
 				ipfsHash: masterIPFSRecord.IpfsHash,
