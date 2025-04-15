@@ -40,8 +40,6 @@ const leaseZelfName = async (params, authUser) => {
 		mnemonic: decryptedParams.mnemonic,
 	});
 
-	const zelfNameObject = {};
-
 	const dataToEncrypt = {
 		publicData: {
 			ethAddress: eth.address,
@@ -61,42 +59,14 @@ const leaseZelfName = async (params, authUser) => {
 		addServerPassword: Boolean(params.addServerPassword),
 	};
 
-	zelfNameObject.zelfName = zelfName;
-
-	const { price, reward, priceWithoutDiscount, discount, discountType } = ZNSPartsModule.calculateZelfNamePrice(
-		zelfName.length - 5,
+	const zelfNameObject = {
+		zelfName,
 		duration,
-		referralZelfName
-	);
+	};
 
-	zelfNameObject.price = price;
-	zelfNameObject.reward = reward;
-	zelfNameObject.discount = discount;
-	zelfNameObject.discountType = discountType;
-	zelfNameObject.publicData = dataToEncrypt.publicData;
-	zelfNameObject.ethAddress = eth.address;
-	zelfNameObject.btcAddress = btc.address;
-	zelfNameObject.solanaAddress = solana.address;
-	zelfNameObject.suiAddress = sui.address;
-	zelfNameObject.hasPassword = `${Boolean(password)}`;
-	zelfNameObject.metadata = params.removePGP
-		? dataToEncrypt.metadata
-		: params.previewZelfProof
-		? {
-				mnemonic: dataToEncrypt.metadata.mnemonic
-					.split(" ")
-					.map((word, index, array) => (index < 2 || index >= array.length - 2 ? word : "****"))
-					.join(" "),
-				solanaSecretKey: `${dataToEncrypt.metadata.solanaSecretKey.slice(0, 6)}****${dataToEncrypt.metadata.solanaSecretKey.slice(-6)}`,
-				suiSecretKey: `${sui.secretKey.slice(0, 6)}****${sui.secretKey.slice(-6)}`,
-		  }
-		: undefined;
-	zelfNameObject.duration = duration;
-	zelfNameObject.zelfProof = await encrypt(dataToEncrypt);
+	ZNSPartsModule.assignProperties(zelfNameObject, dataToEncrypt, { eth, btc, solana, sui }, { ...params, password });
 
-	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
-
-	zelfNameObject.image = await encryptQR(dataToEncrypt);
+	await ZNSPartsModule.generateZelfProof(dataToEncrypt, zelfNameObject);
 
 	if (zelfNameObject.price === 0) {
 		await _confirmFreeZelfName(zelfNameObject, referralZelfNameObject, authUser);

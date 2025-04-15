@@ -6,6 +6,7 @@ const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 const moment = require("moment");
 const axios = require("axios");
+const { encrypt, encryptQR } = require("../../Wallet/modules/encryption");
 
 const zelfNamePricing = {
 	1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
@@ -285,6 +286,48 @@ const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
 	};
 };
 
+const assignProperties = (zelfNameObject, dataToEncrypt, addresses, payload) => {
+	const { price, reward, priceWithoutDiscount, discount, discountType } = calculateZelfNamePrice(
+		zelfNameObject.zelfName.split(".")[0].length,
+		zelfNameObject.duration,
+		payload.referralZelfName
+	);
+
+	const { eth, btc, solana, sui } = addresses;
+
+	zelfNameObject.price = price;
+	zelfNameObject.reward = reward;
+	zelfNameObject.discount = discount;
+	zelfNameObject.discountType = discountType;
+	zelfNameObject.publicData = dataToEncrypt.publicData;
+	zelfNameObject.ethAddress = eth.address;
+	zelfNameObject.btcAddress = btc.address;
+	zelfNameObject.solanaAddress = solana.address;
+	zelfNameObject.suiAddress = sui.address;
+	zelfNameObject.hasPassword = `${Boolean(payload.password)}`;
+
+	zelfNameObject.metadata = payload.removePGP
+		? dataToEncrypt.metadata
+		: payload.previewZelfProof
+		? {
+				mnemonic: dataToEncrypt.metadata.mnemonic
+					.split(" ")
+					.map((word, index, array) => (index < 2 || index >= array.length - 2 ? word : "****"))
+					.join(" "),
+				solanaSecretKey: `${dataToEncrypt.metadata.solanaSecretKey.slice(0, 6)}****${dataToEncrypt.metadata.solanaSecretKey.slice(-6)}`,
+				suiSecretKey: `${sui.secretKey.slice(0, 6)}****${sui.secretKey.slice(-6)}`,
+		  }
+		: undefined;
+};
+
+const _generateZelfProof = async (dataToEncrypt, zelfNameObject) => {
+	zelfNameObject.zelfProof = await encrypt(dataToEncrypt);
+
+	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
+
+	zelfNameObject.image = await encryptQR(dataToEncrypt);
+};
+
 module.exports = {
 	calculateZelfNamePrice,
 	decryptParams,
@@ -293,4 +336,6 @@ module.exports = {
 	formatIPFSRecord,
 	urlToBase64,
 	generatePGPKeys,
+	assignProperties,
+	generateZelfProof: _generateZelfProof,
 };

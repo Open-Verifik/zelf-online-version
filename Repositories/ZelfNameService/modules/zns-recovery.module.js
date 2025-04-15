@@ -1,51 +1,7 @@
 const ZNSModulev2 = require("./zns.v2.module");
-const { decrypt, encrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const ZNSPartsModule = require("./zns-parts.module");
 const SessionModule = require("../../Session/modules/session.module");
-const jwt = require("jsonwebtoken");
-const config = require("../../../Core/config");
-
-const _assignPropertiesToZelfNameObject = (zelfNameObject, dataToEncrypt, addresses, payload) => {
-	const { price, reward, priceWithoutDiscount, discount, discountType } = ZNSPartsModule.calculateZelfNamePrice(
-		zelfNameObject.zelfName.split(".")[0].length,
-		zelfNameObject.duration,
-		payload.referralZelfName
-	);
-
-	const { eth, btc, solana, sui } = addresses;
-
-	zelfNameObject.price = price;
-	zelfNameObject.reward = reward;
-	zelfNameObject.discount = discount;
-	zelfNameObject.discountType = discountType;
-	zelfNameObject.publicData = dataToEncrypt.publicData;
-	zelfNameObject.ethAddress = eth.address;
-	zelfNameObject.btcAddress = btc.address;
-	zelfNameObject.solanaAddress = solana.address;
-	zelfNameObject.suiAddress = sui.address;
-	zelfNameObject.hasPassword = `${Boolean(payload.password)}`;
-
-	zelfNameObject.metadata = payload.removePGP
-		? dataToEncrypt.metadata
-		: payload.previewZelfProof
-		? {
-				mnemonic: dataToEncrypt.metadata.mnemonic
-					.split(" ")
-					.map((word, index, array) => (index < 2 || index >= array.length - 2 ? word : "****"))
-					.join(" "),
-				solanaSecretKey: `${dataToEncrypt.metadata.solanaSecretKey.slice(0, 6)}****${dataToEncrypt.metadata.solanaSecretKey.slice(-6)}`,
-				suiSecretKey: `${sui.secretKey.slice(0, 6)}****${sui.secretKey.slice(-6)}`,
-		  }
-		: undefined;
-};
-
-const _generateZelfProof = async (dataToEncrypt, zelfNameObject) => {
-	zelfNameObject.zelfProof = await encrypt(dataToEncrypt);
-
-	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
-
-	zelfNameObject.image = await encryptQR(dataToEncrypt);
-};
+const { decrypt } = require("../../Wallet/modules/encryption");
 
 /**
  * Lease recovery
@@ -104,9 +60,9 @@ const leaseRecovery = async (payload, authUser) => {
 		duration,
 	};
 
-	_assignPropertiesToZelfNameObject(zelfNameObject, dataToEncrypt, { eth, btc, solana, sui }, { ...payload, password });
+	ZNSPartsModule.assignProperties(zelfNameObject, dataToEncrypt, { eth, btc, solana, sui }, { ...payload, password });
 
-	await _generateZelfProof(dataToEncrypt, zelfNameObject);
+	await ZNSPartsModule.generateZelfProof(dataToEncrypt, zelfNameObject);
 
 	if (zelfNameObject.price === 0) {
 		await ZNSModulev2.confirmFreeZelfName(zelfNameObject, referralZelfNameObject, authUser);
