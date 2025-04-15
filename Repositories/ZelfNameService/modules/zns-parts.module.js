@@ -1,4 +1,4 @@
-const sessionModule = require("../../Session/modules/session.module");
+const SessionModule = require("../../Session/modules/session.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const config = require("../../../Core/config");
@@ -102,11 +102,11 @@ const decryptParams = async (data, authUser) => {
 		};
 	}
 
-	const password = await sessionModule.sessionDecrypt(data.password || null, authUser);
+	const password = await SessionModule.sessionDecrypt(data.password || null, authUser);
 
-	const mnemonic = await sessionModule.sessionDecrypt(data.mnemonic || null, authUser);
+	const mnemonic = await SessionModule.sessionDecrypt(data.mnemonic || null, authUser);
 
-	const face = await sessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
+	const face = await SessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
 
 	return { password, mnemonic, face };
 };
@@ -256,6 +256,35 @@ const urlToBase64 = async (url) => {
 	}
 };
 
+const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
+	const { eth, solana, sui } = addresses;
+	const { mnemonic, zkProof } = dataToEncrypt.metadata;
+
+	let encryptedMessage;
+
+	let privateKey;
+
+	const pgpKeys = await SessionModule.walletEncrypt(
+		{
+			mnemonic,
+			zkProof,
+			solanaPrivateKey: solana.secretKey,
+			suiSecretKey: sui.secretKey,
+		},
+		eth.address,
+		password
+	);
+
+	encryptedMessage = pgpKeys.encryptedMessage;
+
+	privateKey = pgpKeys.privateKey;
+
+	return {
+		encryptedMessage,
+		privateKey,
+	};
+};
+
 module.exports = {
 	calculateZelfNamePrice,
 	decryptParams,
@@ -263,4 +292,5 @@ module.exports = {
 	removeExpiredRecords,
 	formatIPFSRecord,
 	urlToBase64,
+	generatePGPKeys,
 };

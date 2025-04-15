@@ -117,7 +117,7 @@ const leaseRecovery = async (payload, authUser) => {
 	return {
 		...zelfNameObject,
 		hasPassword: Boolean(password),
-		pgp: await _generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui }, password),
+		pgp: await ZNSPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui }, password),
 	};
 };
 

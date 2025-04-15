@@ -98,20 +98,6 @@ const leaseZelfName = async (params, authUser) => {
 
 	zelfNameObject.image = await encryptQR(dataToEncrypt);
 
-	let encryptedMessage;
-
-	let privateKey;
-
-	if (!params.removePGP) {
-		const pgpKeys = await SessionModule.walletEncrypt(
-			{ mnemonic, zkProof, solanaPrivateKey: solana.secretKey, suiSecretKey: sui.secretKey },
-			eth.address,
-			password
-		);
-		encryptedMessage = pgpKeys.encryptedMessage;
-		privateKey = pgpKeys.privateKey;
-	}
-
 	if (zelfNameObject.price === 0) {
 		await _confirmFreeZelfName(zelfNameObject, referralZelfNameObject, authUser);
 	} else {
@@ -121,13 +107,15 @@ const leaseZelfName = async (params, authUser) => {
 	return {
 		...zelfNameObject,
 		hasPassword: Boolean(password),
-		pgp: { encryptedMessage, privateKey },
-		durationToken: jwt.sign(
+		pgp: await ZNSPartsModule.generatePGPKeys(
+			dataToEncrypt,
 			{
-				zelfName,
-				exp: moment().add(12, "hour").unix(),
+				eth,
+				btc,
+				solana,
+				sui,
 			},
-			config.JWT_SECRET
+			password
 		),
 	};
 };
