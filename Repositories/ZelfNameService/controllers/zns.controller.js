@@ -3,6 +3,7 @@ const Modulev2 = require("../modules/zns.v2.module");
 const ZNSTokenModule = require("../modules/zns-token.module");
 const RevenueCatModule = require("../modules/revenue-cat.module");
 const { updateOldZelfNameObject } = require("../modules/my-zns.module");
+const ZNSRecoveryModule = require("../modules/zns-recovery.module");
 
 const searchZelfName = async (ctx) => {
 	try {
@@ -98,7 +99,10 @@ const leaseZelfName_v2 = async (ctx) => {
 
 const leaseRecovery = async (ctx) => {
 	try {
-		const data = await Modulev2.leaseRecovery({ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() }, ctx.state.user);
+		const data = await ZNSRecoveryModule.leaseRecovery(
+			{ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() },
+			ctx.state.user
+		);
 
 		ctx.body = { data };
 	} catch (error) {

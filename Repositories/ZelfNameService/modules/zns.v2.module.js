@@ -31,7 +31,14 @@ const leaseZelfName = async (params, authUser) => {
 
 	const referralZelfNameObject = await _validateReferral(referralZelfName, authUser);
 
-	const { eth, btc, solana, sui, zkProof, mnemonic, face, password } = await _createWalletsFromPhrase(params, authUser);
+	const decryptedParams = await ZNSPartsModule.decryptParams(params, authUser);
+
+	const { face, password } = decryptedParams;
+
+	const { eth, btc, solana, sui, zkProof, mnemonic } = await _createWalletsFromPhrase({
+		...params,
+		mnemonic: decryptedParams.mnemonic,
+	});
 
 	const zelfNameObject = {};
 
@@ -447,11 +454,11 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 	}
 };
 
-const _createWalletsFromPhrase = async (params, authUser) => {
-	const { face, password, mnemonic } = await ZNSPartsModule.decryptParams(params, authUser);
+const _createWalletsFromPhrase = async (params) => {
+	const _mnemonic = params.type === "import" ? params.mnemonic : generateMnemonic(params.wordsCount);
 
-	const _mnemonic = params.type === "import" ? mnemonic : generateMnemonic(params.wordsCount);
 	const wordsArray = _mnemonic.split(" ");
+
 	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
 
 	const eth = createEthWallet(_mnemonic);
@@ -460,7 +467,14 @@ const _createWalletsFromPhrase = async (params, authUser) => {
 	const sui = await generateSuiWalletFromMnemonic(_mnemonic);
 	const zkProof = await OfflineProofModule.createProof(_mnemonic);
 
-	return { eth, btc, solana, sui, zkProof, mnemonic: _mnemonic, face, password };
+	return {
+		eth,
+		btc,
+		solana,
+		sui,
+		zkProof,
+		mnemonic: _mnemonic,
+	};
 };
 
 const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser, returnResults = false) => {
@@ -484,7 +498,7 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
 };
 
 const _validateReferral = async (referralZelfName, authUser) => {
-	if (!referralZelfName) return;
+	if (!referralZelfName) return null;
 
 	const searchResult = await searchZelfName(
 		{
@@ -1213,4 +1227,9 @@ module.exports = {
 	leaseConfirmation,
 	previewZelfName,
 	saveInProduction: _cloneZelfNameToProduction,
+	findDuplicatedZelfName: _findDuplicatedZelfName,
+	createWalletsFromPhrase: _createWalletsFromPhrase,
+	confirmFreeZelfName: _confirmFreeZelfName,
+	saveHoldZelfNameInIPFS: _saveHoldZelfNameInIPFS,
+	validateReferral: _validateReferral,
 };

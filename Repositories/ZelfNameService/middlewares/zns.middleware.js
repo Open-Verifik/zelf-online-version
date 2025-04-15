@@ -33,7 +33,6 @@ const schemas = {
 		newZelfName: string().required(),
 		faceBase64: string().required(),
 		password: string().required(),
-		type: stringEnum(["create", "import"]).required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string(),
 	},
@@ -272,9 +271,9 @@ const leaseRecoveryValidation = async (ctx, next) => {
 		return;
 	}
 
-	ctx.request.body.zelfName = ctx.request.body.zelfName.toLowerCase();
+	ctx.request.body.newZelfName = ctx.request.body.newZelfName.toLowerCase();
 
-	const { type, zelfName, captchaToken, os, skipIt } = ctx.request.body;
+	const { type, newZelfName, captchaToken, os, skipIt } = ctx.request.body;
 
 	const typeValid = validate(schemas[type], ctx.request.body);
 
@@ -284,19 +283,19 @@ const leaseRecoveryValidation = async (ctx, next) => {
 		return;
 	}
 
-	if (!zelfName.includes(".zelf")) {
+	if (!newZelfName.includes(".zelf")) {
 		ctx.status = 409;
 		ctx.body = { validationError: "Not a valid zelf name" };
 		return;
 	}
 
-	if (zelfName.length < 6) {
+	if (newZelfName.length < 6) {
 		ctx.status = 409;
 		ctx.body = { validationError: "ZelfName should be 1 character or more." };
 		return;
 	}
 
-	const captchaZelfName = _getZelfNameForCaptcha(`${zelfName}`);
+	const captchaZelfName = _getZelfNameForCaptcha(`${newZelfName}`);
 
 	const captchaScore =
 		(authUser.session && !captchaToken) || config.google.captchaApproval
