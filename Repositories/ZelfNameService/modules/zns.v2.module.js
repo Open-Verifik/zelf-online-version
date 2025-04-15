@@ -40,15 +40,12 @@ const leaseZelfName = async (params, authUser) => {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
-			suiAddress: sui.address,
 			zelfName,
 			origin: "online",
 		},
 		metadata: {
 			mnemonic,
 			solanaSecretKey: solana.secretKey,
-			zkProof,
-			suiSecretKey: sui.secretKey,
 		},
 		faceBase64: face,
 		password,
@@ -84,8 +81,7 @@ const leaseZelfName = async (params, authUser) => {
 					.map((word, index, array) => (index < 2 || index >= array.length - 2 ? word : "****"))
 					.join(" "),
 				solanaSecretKey: `${dataToEncrypt.metadata.solanaSecretKey.slice(0, 6)}****${dataToEncrypt.metadata.solanaSecretKey.slice(-6)}`,
-				zkProof: `${dataToEncrypt.metadata.zkProof.slice(0, 6)}****${dataToEncrypt.metadata.zkProof.slice(-6)}`,
-				suiSecretKey: `${dataToEncrypt.metadata.suiSecretKey.slice(0, 6)}****${dataToEncrypt.metadata.suiSecretKey.slice(-6)}`,
+				suiSecretKey: `${sui.secretKey.slice(0, 6)}****${sui.secretKey.slice(-6)}`,
 		  }
 		: undefined;
 	zelfNameObject.duration = duration;
@@ -100,7 +96,11 @@ const leaseZelfName = async (params, authUser) => {
 	let privateKey;
 
 	if (!params.removePGP) {
-		const pgpKeys = await SessionModule.walletEncrypt({ mnemonic, zkProof, solanaPrivateKey: solana.secretKey }, eth.address, password);
+		const pgpKeys = await SessionModule.walletEncrypt(
+			{ mnemonic, zkProof, solanaPrivateKey: solana.secretKey, suiSecretKey: sui.secretKey },
+			eth.address,
+			password
+		);
 		encryptedMessage = pgpKeys.encryptedMessage;
 		privateKey = pgpKeys.privateKey;
 	}
