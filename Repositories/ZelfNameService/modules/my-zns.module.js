@@ -143,7 +143,7 @@ const renewMyZelfName = async (params, authUser) => {
 };
 
 const _addDurationToZelfName = async (authUser, preview = {}, passedZelfNameObject) => {
-	const { zelfName, duration, eventID } = authUser;
+	const { zelfName, duration, eventID, eventPrice } = authUser;
 	// 1. get the zelfName object
 	let zelfNameObject = passedZelfNameObject;
 
@@ -205,6 +205,7 @@ const _addDurationToZelfName = async (authUser, preview = {}, passedZelfNameObje
 	let reward = null;
 
 	const price =
+		eventPrice ||
 		zelfNameObject.publicData.price ||
 		ZNSPartsModule.calculateZelfNamePrice(
 			zelfNameObject.publicData.zelfName.split(".")[0].length,
