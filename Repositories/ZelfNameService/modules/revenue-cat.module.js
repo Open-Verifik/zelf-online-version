@@ -29,7 +29,6 @@ const webhookHandler = async (payload) => {
 
 const _handleWebhook = async (event) => {
 	const attributes = {};
-	let inMainnet = false;
 
 	const attributeKeys = Object.keys(event.subscriber_attributes);
 
@@ -41,12 +40,6 @@ const _handleWebhook = async (event) => {
 
 	const zelfNameRecords = await ZelfNameServiceModule.previewZelfName({ zelfName: attributes.zelfName, environment: "both" }, {});
 
-	for (let index = 0; index < zelfNameRecords.length; index++) {
-		const record = zelfNameRecords[index];
-
-		inMainnet = Boolean(record.publicData?.type === "mainnet" || !record.publicData?.zelfName.includes(".hold"));
-	}
-
 	if (!zelfNameRecords.length) {
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
@@ -54,6 +47,12 @@ const _handleWebhook = async (event) => {
 	}
 
 	const zelfNameObject = zelfNameRecords[0];
+
+	if (zelfNameObject.publicData.eventID === event.id) {
+		const error = new Error("webhook_already_processed");
+		error.status = 409;
+		throw error;
+	}
 
 	const preview = zelfNameObject.preview;
 
@@ -65,8 +64,6 @@ const _handleWebhook = async (event) => {
 		error.status = 409;
 		throw error;
 	}
-
-	// unpinResult = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
 
 	const { masterArweaveRecord, masterIPFSRecord } = await myZnsModule.addDurationToZelfName(
 		{

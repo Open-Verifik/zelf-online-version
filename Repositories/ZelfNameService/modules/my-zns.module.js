@@ -144,7 +144,7 @@ const renewMyZelfName = async (params, authUser) => {
 
 const _addDurationToZelfName = async (authUser, preview = {}, passedZelfNameObject) => {
 	const { zelfName, duration, eventID, eventPrice } = authUser;
-	// 1. get the zelfName object
+
 	let zelfNameObject = passedZelfNameObject;
 
 	if (!zelfNameObject) {
