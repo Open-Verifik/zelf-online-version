@@ -9,7 +9,6 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
-const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { decrypt, encrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
@@ -535,7 +534,7 @@ const previewZelfName = async (params, authUser) => {
 
 				zelfNameObject.explorerUrl = `${explorerUrl}/${zelfNameObject.publicData.arweaveId}`;
 			}
-			getTickerPrice;
+
 			zelfNameObject.source = zelfNameObject.ipfs_pin_hash ? "ipfs" : "arweave";
 
 			zelfNameObject.preview = await preview({

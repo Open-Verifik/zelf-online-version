@@ -142,20 +142,30 @@ const renewMyZelfName = async (params, authUser) => {
 	};
 };
 
-const _addDurationToZelfName = async (authUser) => {
-	const { zelfName, duration } = authUser;
+const _addDurationToZelfName = async (authUser, preview = {}, passedZelfNameObject) => {
+	const { zelfName, duration, eventID } = authUser;
 	// 1. get the zelfName object
-	const publicKeys = await searchZelfName({ zelfName });
-
-	const zelfNameObject = publicKeys.ipfs?.length ? publicKeys.ipfs[0] : publicKeys.arweave?.length ? publicKeys.arweave[0] : null;
+	let zelfNameObject = passedZelfNameObject;
 
 	if (!zelfNameObject) {
-		const error = new Error("zelfName_not_found");
-		error.status = 404;
-		throw error;
+		const publicKeys = await searchZelfName({ zelfName });
+
+		zelfNameObject = publicKeys.ipfs?.length ? publicKeys.ipfs[0] : publicKeys.arweave?.length ? publicKeys.arweave[0] : null;
+
+		if (!zelfNameObject) {
+			const error = new Error("zelfName_not_found");
+			error.status = 404;
+			throw error;
+		}
 	}
 
 	const base64 = await ZNSPartsModule.urlToBase64(zelfNameObject.url);
+
+	const ethAddress = preview.publicData?.ethAddress || zelfNameObject.publicData.ethAddress;
+	const solanaAddress = preview.publicData?.solanaAddress || zelfNameObject.publicData.solanaAddress;
+	const btcAddress = preview.publicData?.btcAddress || zelfNameObject.publicData.btcAddress;
+	const suiAddress = preview.publicData?.suiAddress || zelfNameObject.publicData.suiAddress || "";
+	const origin = preview.publicData?.origin || zelfNameObject.publicData.origin || "online";
 
 	const payload = {
 		base64,
@@ -164,17 +174,18 @@ const _addDurationToZelfName = async (authUser) => {
 			hasPassword: zelfNameObject.publicData.hasPassword,
 			zelfProof: zelfNameObject.publicData.zelfProof,
 			zelfName: zelfName.replace(".hold", ""),
-			ethAddress: zelfNameObject.publicData.ethAddress,
-			solanaAddress: zelfNameObject.publicData.solanaAddress,
-			btcAddress: zelfNameObject.publicData.btcAddress,
+			ethAddress,
+			solanaAddress,
+			btcAddress,
 			extraParams: JSON.stringify({
-				...(zelfNameObject.publicData.suiAddress && { suiAddress: zelfNameObject.publicData.suiAddress }),
-				origin: zelfNameObject.publicData.origin || "online",
+				suiAddress,
+				origin,
 				registeredAt:
 					zelfNameObject.publicData.type === "mainnet" ? zelfNameObject.publicData.registeredAt : moment().format("YYYY-MM-DD HH:mm:ss"),
 				renewedAt: zelfNameObject.publicData.type === "mainnet" ? moment().format("YYYY-MM-DD HH:mm:ss") : undefined,
 				expiresAt: moment(zelfNameObject.publicData.expiresAt).add(duration, "year").format("YYYY-MM-DD HH:mm:ss"),
 				count: parseInt(zelfNameObject.publicData.count) + 1,
+				eventID,
 			}),
 			type: "mainnet",
 		},
@@ -489,4 +500,5 @@ module.exports = {
 	transferMyZelfName,
 	howToRenewMyZelfName,
 	updateOldZelfNameObject: _updateOldZelfNameObject,
+	addDurationToZelfName: _addDurationToZelfName,
 };
