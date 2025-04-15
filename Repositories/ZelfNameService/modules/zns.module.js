@@ -81,8 +81,14 @@ const searchZelfName = async (params, authUser) => {
 
 		const zelfNames = [];
 
+		const hideRecordsWithoutRegisteredAt = Boolean(searchResults.length >= 2);
+
 		for (let index = 0; index < searchResults.length; index++) {
 			const zelfNameObject = await _formatArweaveSearchResult(searchResults[index]);
+
+			if (hideRecordsWithoutRegisteredAt && !zelfNameObject.publicData.registeredAt) continue;
+
+			zelfNameObject.zelfProof = zelfNameObject.zelfProof.replace(/ /g, "+");
 
 			zelfNames.push(zelfNameObject);
 		}
