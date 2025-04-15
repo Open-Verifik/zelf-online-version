@@ -1213,4 +1213,5 @@ module.exports = {
 	updateZelfPay,
 	leaseConfirmation,
 	previewZelfName,
+	saveInProduction: _cloneZelfNameToProduction,
 };

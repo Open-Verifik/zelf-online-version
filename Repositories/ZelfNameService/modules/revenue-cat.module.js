@@ -1,5 +1,5 @@
 const config = require("../../../Core/config");
-const ZelfNameServiceModule = require("./zns.module");
+const ZelfNameServiceModule = require("./zns.v2.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 
 const webhookHandler = async (payload) => {
@@ -51,17 +51,19 @@ const _handleWebhook = async (event) => {
 		throw error;
 	}
 
-	if (zelfNameRecords.length === 2 || inMainnet) {
+	if (inMainnet) {
 		const error = new Error("zelfName_purchased_already");
 		error.status = 409;
 		throw error;
 	}
 
 	const zelfNameObject = zelfNameRecords[0];
-	const matchDuration = Boolean(zelfNameObject.publicData.duration == attributes.duration);
+
 	const preview = zelfNameObject.preview;
 
-	if (preview.publicData.ethAddress !== attributes.ethAddress || !matchDuration) {
+	zelfNameObject.publicData.duration = attributes.duration || zelfNameObject.publicData.duration || "1";
+
+	if (preview.publicData.ethAddress !== attributes.ethAddress) {
 		const error = new Error("zelfProof_does_not_match");
 		error.status = 409;
 		throw error;
