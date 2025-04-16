@@ -386,8 +386,6 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 	//remove the previous ipfs record
 	const deletedRecord = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash || zelfNameObject.IpfsHash]);
 
-	console.log({ deletedRecord });
-
 	const ipfs = await IPFSModule.insert(payload, { pro: true });
 
 	const formattedIPFS = await ZNSPartsModule.formatIPFSRecord(ipfs, true);

@@ -361,7 +361,7 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 				: null;
 		}
 
-		const zelfNamesInIPFS = await _returnFormattedIPFSRecords(ipfsRecords, foundInArweave);
+		const zelfNamesInIPFS = await _returnFormattedIPFSRecords(ipfsRecords, environment, foundInArweave);
 
 		return foundInArweave ? zelfNamesInIPFS : { ipfs: zelfNamesInIPFS };
 	} catch (exception) {
@@ -408,7 +408,7 @@ const _returnFormattedArweaveRecords = async (searchResults) => {
 	return zelfNames;
 };
 
-const _returnFormattedIPFSRecords = async (ipfsRecords, foundInArweave) => {
+const _returnFormattedIPFSRecords = async (ipfsRecords, environment, foundInArweave) => {
 	const zelfNamesInIPFS = [];
 
 	const now = moment();
@@ -441,6 +441,8 @@ const _returnFormattedIPFSRecords = async (ipfsRecords, foundInArweave) => {
 			zelfNamesInIPFS.push(formattedIPFS);
 		}
 	}
+
+	return zelfNamesInIPFS;
 };
 
 const _createWalletsFromPhrase = async (params) => {
