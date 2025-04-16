@@ -135,6 +135,7 @@ const decryptZelfName = async (params, authUser) => {
 	return {
 		hasPassword: Boolean(password),
 		image: zelfNameObject.zelfProofQRCode,
+		priv: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey } : undefined,
 		pgp: { encryptedMessage, privateKey },
 		url: zelfNameObject.url,
 		zelfName: zelfNameObject.publicData.zelfName,
@@ -266,26 +267,12 @@ const searchZelfName = async (params, authUser) => {
 	try {
 		const searchResults = await ArweaveModule.search(params.zelfName || params.key === "zelfName" ? params.value : null, query);
 
-		if (searchResults?.available) {
+		const zelfNames = await _returnFormattedArweaveRecords(searchResults);
+
+		if (!zelfNames.length) {
 			const error = new Error("not_found_in_arweave");
-
 			error.status = 404;
-
 			throw error;
-		}
-
-		const zelfNames = [];
-
-		const hideRecordsWithoutRegisteredAt = Boolean(searchResults.length >= 2);
-
-		for (let index = 0; index < searchResults.length; index++) {
-			const zelfNameObject = await ZNSPartsModule.formatArweaveSearchResult(searchResults[index]);
-
-			if (hideRecordsWithoutRegisteredAt && !zelfNameObject.publicData.registeredAt) continue;
-
-			zelfNameObject.zelfProof = zelfNameObject.zelfProof.replace(/ /g, "+");
-
-			zelfNames.push(zelfNameObject);
 		}
 
 		finalResult = {
@@ -341,8 +328,6 @@ const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, au
 
 			break;
 	}
-
-	await ZNSPartsModule.removeExpiredRecords(ipfsRecords);
 };
 
 /**
@@ -376,24 +361,7 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 				: null;
 		}
 
-		const zelfNamesInIPFS = [];
-
-		for (let index = 0; index < ipfsRecords.length; index++) {
-			const ipfsRecord = ipfsRecords[index];
-
-			if (environment === "both") {
-				zelfNamesInIPFS.push(await ZNSPartsModule.formatIPFSRecord(ipfsRecord, foundInArweave));
-
-				continue;
-			}
-
-			if (
-				(environment === "hold" && ipfsRecord.metadata.keyvalues.type === "hold") ||
-				(environment === "mainnet" && (!ipfsRecord.metadata.keyvalues.type || ipfsRecord.metadata.keyvalues.type === "mainnet"))
-			) {
-				zelfNamesInIPFS.push(await ZNSPartsModule.formatIPFSRecord(ipfsRecord, foundInArweave));
-			}
-		}
+		const zelfNamesInIPFS = await _returnFormattedIPFSRecords(ipfsRecords, foundInArweave);
 
 		return foundInArweave ? zelfNamesInIPFS : { ipfs: zelfNamesInIPFS };
 	} catch (exception) {
@@ -409,6 +377,69 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 					available: true,
 			  }
 			: null;
+	}
+};
+
+const _returnFormattedArweaveRecords = async (searchResults) => {
+	if (searchResults?.available) return [];
+
+	const zelfNames = [];
+
+	const now = moment();
+
+	const hideRecordsWithoutRegisteredAt = Boolean(searchResults.length >= 2);
+
+	for (let index = 0; index < searchResults.length; index++) {
+		const zelfNameObject = await ZNSPartsModule.formatArweaveSearchResult(searchResults[index]);
+
+		if (hideRecordsWithoutRegisteredAt && !zelfNameObject.publicData.registeredAt) continue;
+
+		const expiresAt = moment(zelfNameObject.publicData.expiresAt).add(45, "day");
+
+		const isExpired = now.isAfter(expiresAt);
+
+		if (isExpired) continue;
+
+		zelfNameObject.zelfProof = zelfNameObject.zelfProof.replace(/ /g, "+");
+
+		zelfNames.push(zelfNameObject);
+	}
+
+	return zelfNames;
+};
+
+const _returnFormattedIPFSRecords = async (ipfsRecords, foundInArweave) => {
+	const zelfNamesInIPFS = [];
+
+	const now = moment();
+
+	for (let index = 0; index < ipfsRecords.length; index++) {
+		const ipfsRecord = ipfsRecords[index];
+
+		const formattedIPFS = await ZNSPartsModule.formatIPFSRecord(ipfsRecord, foundInArweave);
+
+		const expiresAt = moment(formattedIPFS.publicData.expiresAt).add(formattedIPFS.publicData.type === "mainnet" ? 45 : 0, "day");
+
+		const isExpired = now.isAfter(expiresAt);
+
+		if (isExpired) {
+			ipfsRecord.ipfs_pin_hash ? await IPFSModule.unPinFiles([ipfsRecord.ipfs_pin_hash]) : "do nothing";
+
+			continue;
+		}
+
+		if (environment === "both") {
+			zelfNamesInIPFS.push(formattedIPFS);
+
+			continue;
+		}
+
+		if (
+			(environment === "hold" && ipfsRecord.metadata.keyvalues.type === "hold") ||
+			(environment === "mainnet" && (!ipfsRecord.metadata.keyvalues.type || ipfsRecord.metadata.keyvalues.type === "mainnet"))
+		) {
+			zelfNamesInIPFS.push(formattedIPFS);
+		}
 	}
 };
 
@@ -618,7 +649,7 @@ const leaseOffline = async (params, authUser) => {
 	if (!_preview) _preview = await preview({ zelfProof: zelfNameObject.zelfProof });
 
 	if (!zelfName.includes(_preview.publicData.zelfName.toLowerCase())) {
-		console.log({ _preview, zelfName, zelfNameObject });
+		console.log({ _preview: _preview.publicData.zelfName.toLowerCase(), zelfName, zelfNameObject });
 		const error = new Error("zelfName_does_not_match_in_zelfProof");
 		error.status = 409;
 		throw error;
