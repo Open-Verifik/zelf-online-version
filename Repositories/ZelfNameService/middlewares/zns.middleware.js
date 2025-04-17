@@ -121,6 +121,8 @@ const getValidation = async (ctx, next) => {
 
 	if (payload.zelfName) payload.zelfName = payload.zelfName.toLowerCase();
 
+	if (payload.key === "zelfName" && payload.value) payload.zelfName = payload.value.toLowerCase();
+
 	const { zelfName, key, value, captchaToken, os } = payload;
 
 	if (!zelfName && (!key || !value)) {
