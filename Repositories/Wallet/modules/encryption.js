@@ -82,6 +82,9 @@ async function getPngAsBase64(url) {
 }
 
 const decrypt = async (data) => {
+	// check spaces in between data.zelfProof > and replace them with `+`
+	data.zelfProof = data.zelfProof.replace(/ /g, "+");
+
 	try {
 		const encryptedResponse = await axios.post("/vw/decrypt-wallet", {
 			face_base_64: data.faceBase64,
