@@ -87,6 +87,8 @@ const schemas = {
 const getValidation = async (ctx, next) => {
 	const payload = Object.assign(ctx.request.query, ctx.request.body);
 
+	console.log({ payload });
+
 	const valid = validate(schemas.search, payload);
 
 	const authUser = ctx.state.user;

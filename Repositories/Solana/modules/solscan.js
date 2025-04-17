@@ -204,7 +204,6 @@ function formatData(transactions) {
 }
 
 function formatTransactions(transactions, token) {
-	console.log({ transactions });
 	return transactions.map((tx) => ({
 		hash: tx.trans_id,
 		block: tx.block_id.toString(),
