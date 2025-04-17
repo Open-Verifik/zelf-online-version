@@ -82,7 +82,6 @@ async function getPngAsBase64(url) {
 }
 
 const decrypt = async (data) => {
-	// check spaces in between data.zelfProof > and replace them with `+`
 	data.zelfProof = data.zelfProof.replace(/ /g, "+");
 
 	try {

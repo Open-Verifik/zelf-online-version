@@ -648,7 +648,7 @@ const leaseOffline = async (params, authUser) => {
 		reward,
 	};
 
-	if (!_preview) _preview = await preview({ zelfProof: zelfNameObject.zelfProof });
+	if (!_preview) _preview = await preview({ zelfProof });
 
 	if (!zelfName.includes(_preview.publicData.zelfName.toLowerCase())) {
 		console.log({ _preview: _preview.publicData.zelfName.toLowerCase(), zelfName, zelfNameObject });
