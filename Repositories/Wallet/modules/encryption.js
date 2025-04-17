@@ -95,7 +95,7 @@ const decrypt = async (data) => {
 	} catch (exception) {
 		const _error = exception.response?.data;
 
-		console.log({ exception: exception.response?.data });
+		console.log({ exception: exception.response?.data, zelfProof: data.zelfProof });
 
 		let error = new Error(_error.code);
 
