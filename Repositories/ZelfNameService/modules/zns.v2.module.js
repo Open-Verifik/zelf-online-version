@@ -264,6 +264,8 @@ const searchZelfName = async (params, authUser) => {
 
 	let finalResult = null;
 
+	console.log({ query });
+
 	try {
 		const searchResults = await ArweaveModule.search(params.zelfName || params.key === "zelfName" ? params.value : null, query);
 

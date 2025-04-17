@@ -87,9 +87,15 @@ const schemas = {
 const getValidation = async (ctx, next) => {
 	const payload = Object.assign(ctx.request.query, ctx.request.body);
 
-	console.log({ payload });
+	const { zelfName, key, value, captchaToken, os } = payload;
 
-	const valid = validate(schemas.search, payload);
+	const valid = validate(schemas.search, {
+		zelfName,
+		key,
+		value,
+		captchaToken,
+		os,
+	});
 
 	const authUser = ctx.state.user;
 
@@ -120,12 +126,6 @@ const getValidation = async (ctx, next) => {
 
 		return;
 	}
-
-	if (payload.zelfName) payload.zelfName = payload.zelfName.toLowerCase();
-
-	if (payload.key === "zelfName" && payload.value) payload.zelfName = payload.value.toLowerCase();
-
-	const { zelfName, key, value, captchaToken, os } = payload;
 
 	if (!zelfName && (!key || !value)) {
 		ctx.status = 409;
