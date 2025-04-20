@@ -110,9 +110,7 @@ const decryptZelfName = async (params, authUser) => {
 
 	if (decryptedZelfProof.error) {
 		const error = new Error(decryptedZelfProof.error.code);
-
 		error.status = 409;
-
 		throw error;
 	}
 
@@ -264,8 +262,6 @@ const searchZelfName = async (params, authUser) => {
 
 	let finalResult = null;
 
-	console.log({ query });
-
 	try {
 		const searchResults = await ArweaveModule.search(params.zelfName || params.key === "zelfName" ? params.value : null, query);
 
@@ -363,9 +359,15 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 				: null;
 		}
 
-		const zelfNamesInIPFS = await _returnFormattedIPFSRecords(ipfsRecords, environment, foundInArweave);
+		const zelfNames = await _returnFormattedIPFSRecords(ipfsRecords, environment, foundInArweave);
 
-		return foundInArweave ? zelfNamesInIPFS : { ipfs: zelfNamesInIPFS };
+		if (!zelfNames.length) {
+			const error = new Error("not_found_in_arweave");
+			error.status = 404;
+			throw error;
+		}
+
+		return foundInArweave ? zelfNames : { ipfs: zelfNames };
 	} catch (exception) {
 		console.error({ _searchInIPFS_exception: exception });
 
@@ -1000,7 +1002,7 @@ const _getZelfNameToConfirm = async (zelfName, authUser) => {
 			authUser
 		);
 
-		zelfPayNameObject = zelfPayRecords.ipfs?.length ? zelfPayRecords.ipfs[0] : zelfPayRecords.arweave[0];
+		zelfPayNameObject = zelfPayRecords.ipfs?.length ? zelfPayRecords.ipfs[0] : zelfPayRecords.arweave?.length ? zelfPayRecords.arweave[0] : null;
 
 		if (!zelfPayNameObject) {
 			const error = new Error("zelfPay_not_found");
@@ -1103,7 +1105,8 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 			hasPassword: `${
 				Boolean(zelfNameObject.preview?.passwordLayer === "Password") ||
 				Boolean(zelfNameObject.hasPassword) ||
-				zelfNameObject.publicData.hasPassword
+				zelfNameObject.publicData.hasPassword ||
+				true
 			}`,
 			zelfProof: zelfNameObject.publicData.zelfProof,
 			zelfName,
@@ -1121,15 +1124,16 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 		pinIt: true,
 	};
 
-	const masterArweaveRecord = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
-		hasPassword: payload.metadata.hasPassword,
-		zelfProof: payload.metadata.zelfProof,
-		publicData: {
-			...payload.metadata,
-			...(zelfNameObject.preview.publicData.suiAddress && { suiAddress: zelfNameObject.preview.publicData.suiAddress }),
-			expiresAt,
-		},
-	});
+	const masterArweaveRecord = {};
+	// const masterArweaveRecord = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
+	// 	hasPassword: payload.metadata.hasPassword,
+	// 	zelfProof: payload.metadata.zelfProof,
+	// 	publicData: {
+	// 		...payload.metadata,
+	// 		...(zelfNameObject.preview.publicData.suiAddress && { suiAddress: zelfNameObject.preview.publicData.suiAddress }),
+	// 		expiresAt,
+	// 	},
+	// });
 
 	await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
 
@@ -1146,7 +1150,7 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 				referralZelfName: zelfNameObject.publicData.referralZelfName,
 				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
 				ipfsHash: masterIPFSRecord.IpfsHash,
-				arweaveId: masterArweaveRecord.id,
+				arweaveId: masterArweaveRecord?.id,
 		  })
 		: "no_referral";
 
@@ -1156,7 +1160,7 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 		zelfName: masterIPFSRecord.metadata.zelfName,
 		zelfNamePrice: zelfNameObject.publicData.price,
 		ipfsHash: masterIPFSRecord.IpfsHash,
-		arweaveId: masterArweaveRecord.id,
+		arweaveId: masterArweaveRecord?.id,
 	});
 
 	if (config.env === "production") {
