@@ -431,8 +431,10 @@ const getTransactionStatus = async (params) => {
 
 		const response = {
 			hash: id,
+			id,
 			status,
 			block,
+			timestamp,
 			age: timestamp,
 			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
