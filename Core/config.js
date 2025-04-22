@@ -64,6 +64,7 @@ const configuration = {
 	zelfProof: {
 		url: process.env.ZELF_PROOF_URL || "https://api.zelf.world",
 		apiKey: process.env.ZELF_PROOF_API_KEY || "password",
+		skipArweave: process.env.SKIP_ARWEAVE || false,
 	},
 	token: {
 		rewardPrice: process.env.REWARD_PRICE || 0.05,

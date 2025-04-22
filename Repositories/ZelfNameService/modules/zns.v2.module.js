@@ -1027,7 +1027,7 @@ const _getZelfNameToConfirm = async (zelfName, authUser) => {
 const leaseConfirmation = async (data, authUser) => {
 	const { network, zelfName, confirmationData } = data;
 
-	const { zelfNameObject, isMainnet, zelfPayNameObject } = await _getZelfNameToConfirm(zelfName, authUser);
+	const { zelfNameObject, zelfPayNameObject } = await _getZelfNameToConfirm(zelfName, authUser);
 
 	let payment = false;
 
@@ -1124,16 +1124,17 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 		pinIt: true,
 	};
 
-	const masterArweaveRecord = {};
-	// const masterArweaveRecord = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
-	// 	hasPassword: payload.metadata.hasPassword,
-	// 	zelfProof: payload.metadata.zelfProof,
-	// 	publicData: {
-	// 		...payload.metadata,
-	// 		...(zelfNameObject.preview.publicData.suiAddress && { suiAddress: zelfNameObject.preview.publicData.suiAddress }),
-	// 		expiresAt,
-	// 	},
-	// });
+	const masterArweaveRecord = config.zelfProof.skipArweave
+		? {}
+		: await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
+				hasPassword: payload.metadata.hasPassword,
+				zelfProof: payload.metadata.zelfProof,
+				publicData: {
+					...payload.metadata,
+					...(zelfNameObject.preview.publicData.suiAddress && { suiAddress: zelfNameObject.preview.publicData.suiAddress }),
+					expiresAt,
+				},
+		  });
 
 	await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash]);
 
