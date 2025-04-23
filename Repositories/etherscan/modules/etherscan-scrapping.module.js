@@ -1,6 +1,8 @@
 require("dotenv").config();
 const moment = require("moment");
-
+const {
+	idAseet_,
+} = require("../../dataAnalytics/modules/dataAnalytics.module");
 const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const cheerio = require("cheerio");
@@ -28,35 +30,55 @@ const getAddress = async (params) => {
 
 		const { price: price } = await getTickerPrice({ symbol: "ETH" });
 
-		function formatTokenData(tokens) {
-			return tokens.map((token) => {
-				const { tokenInfo, balance, rawBalance } = token;
-				const rate = tokenInfo.price?.rate || 0;
-				const decimals = parseInt(tokenInfo.decimals, 10);
-				const formattedAmount = parseFloat(rawBalance) / Math.pow(10, decimals);
-				const fiatBalance = formattedAmount * rate;
+		async function formatTokenData(tokens, params) {
+			const formattedTokens = await Promise.all(
+				tokens.map(async (token) => {
+					const { tokenInfo, balance, rawBalance } = token;
+					const rate = tokenInfo.price?.rate || 0;
+					const decimals = parseInt(tokenInfo.decimals, 10);
+					const formattedAmount =
+						parseFloat(rawBalance) / Math.pow(10, decimals);
+					const fiatBalance = formattedAmount * rate;
+					let idAseet;
+					try {
+						idAseet = await idAseet_(tokenInfo.symbol);
+					} catch (error) {
+						idAseet = {};
+					}
 
-				return {
-					tokenType: "ERC-20",
-					fiatBalance: parseFloat(fiatBalance.toFixed(7)),
-					_fiatBalance: fiatBalance.toFixed(7),
-					symbol: tokenInfo.symbol,
-					name: tokenInfo.name,
-					price: rate.toFixed(6),
-					_price: rate,
-					image: `https://images.ctfassets.net/gcj8jwzm6086/${tokenInfo.image
-						.split("/")
-						.pop()
-						.replace(".png", "")}.png`,
-					decimals: decimals,
-					amount: formattedAmount.toFixed(12),
-					_amount: formattedAmount,
-					address: tokenInfo.address,
-				};
-			});
+					return {
+						tokenType: "ERC-20",
+						fiatBalance: parseFloat(fiatBalance.toFixed(7)),
+						_fiatBalance: fiatBalance.toFixed(7),
+						symbol: tokenInfo.symbol,
+						name: tokenInfo.name,
+						price: rate.toFixed(6),
+						_price: rate,
+						image: `https://s2.coinmarketcap.com/static/img/coins/64x64/${idAseet.idAseet}.png`,
+						decimals: decimals,
+						amount: formattedAmount.toFixed(12),
+						_amount: formattedAmount,
+						address: tokenInfo.address,
+					};
+				})
+			);
+
+			return formattedTokens;
 		}
 
-		const tokens = formatTokenData(data.tokens);
+		const tokens = await formatTokenData(data.tokens);
+
+		tokens.push({
+			tokenType: "ETH",
+			fiatBalance: data.ETH.balance * price,
+			symbol: "ETH",
+			name: "Ethereum",
+			price: price,
+			image:
+				"https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
+			amount: data.ETH.balance.toString(),
+		});
+
 		function sumFiatBalance(tokens) {
 			return tokens.reduce((total, token) => total + token.fiatBalance, 0);
 		}
@@ -79,7 +101,7 @@ const getAddress = async (params) => {
 			},
 			tokenHoldings: {
 				total: tokens.length,
-				balance: sumFiatBalance(formatTokenData(data.tokens)).toString(),
+				balance: sumFiatBalance(tokens).toString(),
 				tokens,
 			},
 			transactions,
