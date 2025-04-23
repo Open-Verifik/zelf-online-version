@@ -127,29 +127,37 @@ const getValidation = async (ctx, next) => {
 		return;
 	}
 
-	if (!zelfName && (!key || !value)) {
-		ctx.status = 409;
+	try {
+		if (!zelfName && (!key || !value)) {
+			ctx.status = 409;
 
-		ctx.body = { validationError: "missing zelfName or search by key|value" };
+			ctx.body = { validationError: "missing zelfName or search by key|value" };
 
-		return;
-	}
+			return;
+		}
 
-	const _zelfName = zelfName || value;
+		const _zelfName = zelfName || value;
 
-	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
+		const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
 
-	const captchaScore =
-		(authUser.session && !captchaToken) || config.google.captchaApproval
-			? 1
-			: await captchaService.createAssessment(captchaToken, os, captchaZelfName);
+		console.log({ _zelfName, captchaZelfName });
 
-	if (captchaScore < 0.79) {
-		ctx.status = 409;
+		const captchaScore =
+			(authUser.session && !captchaToken) || config.google.captchaApproval
+				? 1
+				: await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
-		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+		console.log({ _zelfName, captchaZelfName, captchaScore });
 
-		return;
+		if (captchaScore < 0.79) {
+			ctx.status = 409;
+
+			ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+
+			return;
+		}
+	} catch (exception) {
+		console.log({ exception });
 	}
 
 	await next();
