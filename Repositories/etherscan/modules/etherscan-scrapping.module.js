@@ -76,7 +76,7 @@ const getAddress = async (params) => {
 			price: price,
 			image:
 				"https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
-			amount: data.ETH.balance,
+			amount: data.ETH.balance.toString(),
 		});
 
 		function sumFiatBalance(tokens) {
