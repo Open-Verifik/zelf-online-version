@@ -35,7 +35,10 @@ const getAddress = async (params) => {
 				tokens.map(async (token) => {
 					const { tokenInfo, balance, rawBalance } = token;
 					const rate = tokenInfo.price?.rate || 0;
-					const decimals = parseInt(tokenInfo.decimals, 10);
+					const decimals =
+						parseInt(tokenInfo.decimals).toString().length > 3
+							? Number(String(parseInt(tokenInfo.decimals)).slice(0, 2))
+							: parseInt(tokenInfo.decimals);
 					const formattedAmount =
 						parseFloat(rawBalance) / Math.pow(10, decimals);
 					const fiatBalance = formattedAmount * rate;
@@ -487,7 +490,7 @@ const getTransactionsList = async (params) => {
 
 		return { pagination, transactions };
 	} catch (error) {
-		console.error({ error });
+		console.error({ error, address });
 
 		return {
 			pagination: { records: "0", pages: "0", page: "0" },
