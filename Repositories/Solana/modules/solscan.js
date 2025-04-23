@@ -138,10 +138,8 @@ const getTokens = async (params) => {
 					image: token.tokenIcon,
 					address: token.address,
 					tokenAddress: token.tokenAddress,
-					tokenType: "token",
-					//reputation: token.reputation,
-					//quantity: token.amount,
-					//decimals: token.decimals,
+					tokenType: "SPL",
+
 					owner: token.owner,
 				};
 
