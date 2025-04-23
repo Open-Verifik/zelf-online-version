@@ -115,7 +115,7 @@ const getTokens = async (params, query) => {
 					image: token.tokenSymbolUrl,
 					address: token.tokenAccount,
 					tokenAddress: token.mintAccount,
-					tokenType: token.tokenType,
+					tokenType: token.tokenType === "token" ? "SPL" : "NFT",
 					//blockTimestamp: new Date(token.blockTimestamp * 1000),
 					owner: params.id,
 				});
