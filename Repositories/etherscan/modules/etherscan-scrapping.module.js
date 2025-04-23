@@ -1,9 +1,12 @@
+require("dotenv").config();
 const moment = require("moment");
 
 const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const cheerio = require("cheerio");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
+
+const apiKey = process.env.API_KEY_ETH;
 
 const baseUrls = {
 	production: "https://etherscan.io",
@@ -19,12 +22,44 @@ const getAddress = async (params) => {
 		const address = params.address;
 
 		const { data } = await instance.get(
-			`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=ebexplorer7627Gsgp87`,
+			`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=${apiKey}`,
 			{}
 		);
-		console.log(data);
+
 		const { price: price } = await getTickerPrice({ symbol: "ETH" });
 
+		function formatTokenData(tokens) {
+			return tokens.map((token) => {
+				const { tokenInfo, balance, rawBalance } = token;
+				const rate = tokenInfo.price?.rate || 0;
+				const decimals = parseInt(tokenInfo.decimals, 10);
+				const formattedAmount = parseFloat(rawBalance) / Math.pow(10, decimals);
+				const fiatBalance = formattedAmount * rate;
+
+				return {
+					tokenType: "ERC-20",
+					fiatBalance: parseFloat(fiatBalance.toFixed(7)),
+					_fiatBalance: fiatBalance.toFixed(7),
+					symbol: tokenInfo.symbol,
+					name: tokenInfo.name,
+					price: rate.toFixed(6),
+					_price: rate,
+					image: `https://images.ctfassets.net/gcj8jwzm6086/${tokenInfo.image
+						.split("/")
+						.pop()
+						.replace(".png", "")}.png`,
+					decimals: decimals,
+					amount: formattedAmount.toFixed(12),
+					_amount: formattedAmount,
+					address: tokenInfo.address,
+				};
+			});
+		}
+
+		const tokens = formatTokenData(data.tokens);
+		function sumFiatBalance(tokens) {
+			return tokens.reduce((total, token) => total + token.fiatBalance, 0);
+		}
 		const { transactions } = await getTransactionsList({
 			address,
 			page: "1",
@@ -43,17 +78,16 @@ const getAddress = async (params) => {
 				price,
 			},
 			tokenHoldings: {
-				total: 3,
-				balance: 0,
-				fiatBalance: 4.144893410796658,
-				tokens: data.tokens,
+				total: tokens.length,
+				balance: sumFiatBalance(formatTokenData(data.tokens)).toString(),
+				tokens,
 			},
 			transactions,
 		};
 
 		return response;
 	} catch (error) {
-		//console.error({ error });
+		console.error({ error });
 	}
 };
 
