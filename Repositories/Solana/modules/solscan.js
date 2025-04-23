@@ -139,7 +139,6 @@ const getTokens = async (params) => {
 					address: token.address,
 					tokenAddress: token.tokenAddress,
 					tokenType: "SPL",
-
 					owner: token.owner,
 				};
 

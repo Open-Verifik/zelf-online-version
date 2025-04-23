@@ -140,7 +140,7 @@ const getValidation = async (ctx, next) => {
 	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
 
 	const captchaScore =
-		(authUser.session && !captchaToken) || config.google.captchaApproval
+		authUser.session || !captchaToken || config.google.captchaApproval
 			? 1
 			: await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 

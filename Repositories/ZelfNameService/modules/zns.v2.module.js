@@ -661,14 +661,6 @@ const leaseOffline = async (params, authUser) => {
 		throw error;
 	}
 
-	const _zelfProof = holdRecord?.publicData?.zelfProof || mainnetRecord?.publicData?.zelfProof;
-
-	if (_zelfProof && zelfProof !== _zelfProof) {
-		const error = new Error("zelfProof_does_not_match_in_hold");
-		error.status = 409;
-		throw error;
-	}
-
 	if (holdRecord)
 		return {
 			existed: true,
@@ -683,6 +675,14 @@ const leaseOffline = async (params, authUser) => {
 				config.JWT_SECRET
 			),
 		};
+
+	const _zelfProof = holdRecord?.publicData?.zelfProof || mainnetRecord?.publicData?.zelfProof;
+
+	if (_zelfProof && zelfProof !== _zelfProof) {
+		const error = new Error("zelfProof_does_not_match_in_hold");
+		error.status = 409;
+		throw error;
+	}
 
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{
