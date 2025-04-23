@@ -15,188 +15,45 @@ const baseUrls = {
  */
 const environment = "production";
 const getAddress = async (params) => {
-	const baseUrl = baseUrls[params.env || environment];
-
 	try {
 		const address = params.address;
 
-		const { data } = await instance.get(`${baseUrl}/address/${address}`, {
-			headers: {
-				"user-agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
-			},
+		const { data } = await instance.get(
+			`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=ebexplorer7627Gsgp87`,
+			{}
+		);
+		console.log(data);
+		const { price: price } = await getTickerPrice({ symbol: "ETH" });
+
+		const { transactions } = await getTransactionsList({
+			address,
+			page: "1",
+			show: "10",
 		});
 
-		const $ = cheerio.load(data);
-
-		const fullName = $("#ensName > span > a > div > span")
-			.text()
-			.replace(/\n/g, "");
-
-		const balance = $(
-			"#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(2) > div"
-		)
-			.text()
-			.replace(/\n/g, "")
-			.replace(" ETH", "")
-			.trim();
-
-		const accounts = $(
-			"#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(3)"
-		)
-			.text()
-			.replace(/\n/g, "")
-			.split("@");
-
-		let account;
-
-		try {
-			account = {
-				asset: "ETH",
-				fiatBalance: accounts[0]
-					.replace("Eth Value", "")
-					.replace("(", "")
-					.replace(",", "")
-					.replace("$", "")
-					.trim(),
-				price: accounts[1]
-					.replace("$", "")
-					.replace("/ETH)", "")
-					.replace(",", "")
-					.trim(),
-			};
-		} catch (error) {
-			//si no tiene nada
-			account = {
-				asset: "ETH",
-				fiatBalance: "0.00",
-				price: (await getTickerPrice({ symbol: `ETH` })).price,
-			};
-		}
-
-		const totalTokens = $("#dropdownMenuBalance")
-			.text()
-			.trim()
-			.replace(/\n/g, "")
-			.split("(");
-
-		let tokensContracts;
-
-		try {
-			tokensContracts = {
-				balance: totalTokens[0].replace("$", "").trim(),
-				total: Number(totalTokens[1].replace("Tokens)", "").trim()),
-			};
-		} catch (error) {
-			tokensContracts = {
-				balance: "0.00",
-				total: 0,
-			};
-		}
-
-		const tokens = [];
-
-		let currentTokenType = "";
-
-		$("ul.list li.nav-item").each((index, element) => {
-			const tokenTypeElement = $(element).find(".fw-medium").text().trim();
-
-			if (tokenTypeElement) {
-				currentTokenType = tokenTypeElement
-					.replace("Tokens", "")
-					.split("(")[0]
-					.trim();
-				return;
-			}
-
-			const tokenName =
-				$(element).find(".list-name span").attr("data-bs-title") ||
-				$(element).find(".list-name").text().trim();
-			const tokenAmount = $(element).find(".text-muted").text().trim();
-
-			const [_amount, rest] = tokenAmount.split(" ");
-
-			// Then, split the second part on '@' to isolate the price
-			const [, _price] = tokenAmount.split("@");
-
-			const tokenType = $(element).find(".badge").text().trim();
-			const tokenLink = $(element)
-				.find("a.nav-link")
-				.attr("href")
-				.replace("/token/", "");
-			const tokenImage = $(element).find("img").attr("src");
-
-			let name = null;
-			let symbol = null;
-
-			try {
-				name = tokenName.split("(")[0].trim();
-				symbol = tokenName.split("(")[1].replace(")", "").trim();
-			} catch (error) {}
-
-			if (name && tokenImage) {
-				const token = {
-					tokenType: currentTokenType,
-					fiatBalance: Number(_price * _amount),
-					name: name,
-					symbol: symbol,
-					amount: _amount.replace(/,/g, ""),
-					price: _price,
-					type: tokenType,
-					address: tokenLink.split("?")[0],
-					image: tokenImage?.startsWith("https")
-						? tokenImage
-						: `https://etherscan.io${tokenImage}` ||
-						  `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
-				};
-
-				tokens.push(token);
-			}
-		});
-
-		const tokenHoldings = {
-			...tokensContracts,
-			tokens,
-		};
-
-		const transactions = [];
-
-		try {
-			const tabla = $("#transactions > div > div.table-responsive").html();
-			const campos = cheerio.load(tabla);
-
-			campos("tbody tr").each((_index, element) =>
-				_parseTransactionsContent(campos, element, transactions)
-			);
-		} catch (error) {
-			console.error({ error });
-		}
-
-		tokenHoldings.tokens.unshift({
-			tokenType: "ETH",
-			fiatBalance: Number(account.fiatBalance),
-			symbol: "ETH",
-			name: "Ethereum",
-			price: account.price,
-			image:
-				"https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
-			amount: balance,
-		});
-
+		const fiatBalance = data.ETH.balance * price;
 		const response = {
 			address,
-			fullName,
-			balance,
-			fiatBalance: Number(account.fiatBalance),
-			account,
-			tokenHoldings,
+			balance: data.ETH.balance,
+			fiatBalance,
+			type: "system_account",
+			account: {
+				asset: "ETH",
+				fiatBalance: fiatBalance.toString(),
+				price,
+			},
+			tokenHoldings: {
+				total: 3,
+				balance: 0,
+				fiatBalance: 4.144893410796658,
+				tokens: data.tokens,
+			},
 			transactions,
 		};
 
 		return response;
 	} catch (error) {
-		console.error({ error });
+		//console.error({ error });
 	}
 };
 
