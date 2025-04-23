@@ -69,14 +69,14 @@ const getAddress = async (params) => {
 		const tokens = await formatTokenData(data.tokens);
 
 		tokens.push({
-			tokenType: "SOL",
-			fiatBalance: 10.20787,
-			symbol: "SOL",
-			name: "Solana",
-			price: "151.13",
-			amount: 0.067543626,
+			tokenType: "ETH",
+			fiatBalance: data.ETH.balance * price,
+			symbol: "ETH",
+			name: "Ethereum",
+			price: price,
 			image:
-				"https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+				"https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
+			amount: data.ETH.balance,
 		});
 
 		function sumFiatBalance(tokens) {
