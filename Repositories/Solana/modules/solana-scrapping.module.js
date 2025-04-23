@@ -40,14 +40,15 @@ const getTransaction = async (params, query) => {
 	if (!response || !response.transaction) return null;
 
 	return {
-		amount: response.transaction.parsed_instructions[0].data_raw.info.lamports,
+		parsed_instructions: response.transaction.parsed_instructions,
+		amount: response.transaction.parsed_instructions[0].data_raw.info?.lamports,
 		block: response.transaction.block_id,
 		fee: response.transaction.fee,
-		from: response.transaction.parsed_instructions[0].data_raw.info.source,
+		from: response.transaction.parsed_instructions[0].data_raw.info?.source,
 		id: response.transaction.trans_id,
 		status: response.transaction.status ? "success" : "pending",
 		timestamp: response.transaction.trans_time,
-		to: response.transaction.parsed_instructions[0].data_raw.info.destination,
+		to: response.transaction.parsed_instructions[0].data_raw.info?.destination,
 		_source: response.transaction,
 	};
 };
