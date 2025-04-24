@@ -39,16 +39,19 @@ const getTransaction = async (params, query) => {
 
 	if (!response || !response.transaction) return null;
 
+	const rawTransactionData = response.transaction.parsed_instructions.find((instruction) => instruction.type === "transfer");
+
 	return {
 		parsed_instructions: response.transaction.parsed_instructions,
-		amount: response.transaction.parsed_instructions[0].data_raw.info?.lamports,
+		amount: rawTransactionData?.data_raw.info?.lamports,
+		priorityFee: response.transaction.priorityFee,
 		block: response.transaction.block_id,
 		fee: response.transaction.fee,
-		from: response.transaction.parsed_instructions[0].data_raw.info?.source,
+		from: rawTransactionData?.data_raw.info?.source,
 		id: response.transaction.trans_id,
 		status: response.transaction.status ? "success" : "pending",
 		timestamp: response.transaction.trans_time,
-		to: response.transaction.parsed_instructions[0].data_raw.info?.destination,
+		to: rawTransactionData?.data_raw.info?.destination,
 		_source: response.transaction,
 	};
 };
