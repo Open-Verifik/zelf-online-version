@@ -135,22 +135,22 @@ const getValidation = async (ctx, next) => {
 		return;
 	}
 
-	const _zelfName = zelfName || value;
+	// const _zelfName = zelfName || value;
 
-	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
+	// const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
 
-	const captchaScore =
-		authUser.session || !captchaToken || config.google.captchaApproval
-			? 1
-			: await captchaService.createAssessment(captchaToken, os, captchaZelfName);
+	// const captchaScore =
+	// 	authUser.session || !captchaToken || config.google.captchaApproval
+	// 		? 1
+	// 		: await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
-	if (captchaScore < 0.79) {
-		ctx.status = 409;
+	// if (captchaScore < 0.79) {
+	// 	ctx.status = 409;
 
-		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+	// 	ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
 
-		return;
-	}
+	// 	return;
+	// }
 
 	await next();
 };
