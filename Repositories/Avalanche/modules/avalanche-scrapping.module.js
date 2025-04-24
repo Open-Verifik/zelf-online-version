@@ -162,7 +162,7 @@ const getTransactionDetail = async (params) => {
 			},
 		});
 
-		const details = data?.data = {};
+		const details = data?.data;
 
 		if (!details) return null;
 
