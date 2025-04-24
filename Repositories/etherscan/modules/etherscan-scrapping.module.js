@@ -264,7 +264,7 @@ const getTransactionStatus = async (params) => {
 			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
 		).text();
 
-		const timestamp = $(
+		const timestamp2 = $(
 			"#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9"
 		)
 			.text()
@@ -272,6 +272,13 @@ const getTransactionStatus = async (params) => {
 			.replace(/\n/g, "")
 			.split("|")[0]
 			.split(" (")[0];
+
+		const timestamp = $(
+			"#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9"
+		)
+			.text()
+			.trim()
+			.split("|")[0];
 
 		const date = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9")
 			.text()
@@ -351,7 +358,7 @@ const getTransactionStatus = async (params) => {
 			status,
 			block,
 			timestamp,
-			age: timestamp,
+			age: timestamp2,
 			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
 			to,
