@@ -146,6 +146,7 @@ const getTransactionsList = async (params) => {
  * @param {Object} params - Contiene el id (hash de la transacción)
  */
 const getTransactionDetail = async (params) => {
+	let transaction = null;
 	try {
 		const t = Date.now();
 
@@ -161,7 +162,7 @@ const getTransactionDetail = async (params) => {
 			},
 		});
 
-		const transaction = {
+		transaction = {
 			hash: id,
 			status: data.data.status === "0x1" ? "Success" : "fail",
 			block: data.data.blockHeigh,
@@ -174,10 +175,13 @@ const getTransactionDetail = async (params) => {
 			txnFee: data.data.fee.toString(),
 			gasPrice: data.data.gasPrice.toString(),
 		};
+
 		return transaction;
 	} catch (error) {
-		return transaction;
+		console.log({ error });
 	}
+
+	return transaction;
 };
 
 module.exports = {
