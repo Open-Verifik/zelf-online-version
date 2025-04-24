@@ -162,18 +162,22 @@ const getTransactionDetail = async (params) => {
 			},
 		});
 
+		const details = data?.data = {};
+
+		if (!details) return null;
+
 		transaction = {
 			hash: id,
-			status: data.data.status === "0x1" ? "Success" : "fail",
-			block: data.data.blockHeigh,
-			age: moment(data.data.blocktime * 1000).fromNow(),
-			date: moment(data.data.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
-			from: data.data.from,
-			to: data.data.to,
-			amount: data.data.value.toString(),
-			assetPrice: data.data.legalRate.toString(),
-			txnFee: data.data.fee.toString(),
-			gasPrice: data.data.gasPrice.toString(),
+			status: details.status === "0x1" ? "Success" : "fail",
+			block: details.blockHeigh,
+			age: moment(details.blocktime * 1000).fromNow(),
+			date: moment(details.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
+			from: details.from,
+			to: details.to,
+			amount: details.value.toString(),
+			assetPrice: details.legalRate.toString(),
+			txnFee: details.fee.toString(),
+			gasPrice: details.gasPrice.toString(),
 		};
 
 		return transaction;
