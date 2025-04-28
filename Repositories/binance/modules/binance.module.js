@@ -7,7 +7,8 @@ const instance = getCleanInstance(30000);
  */
 const getTickerPrice = async (params) => {
 	try {
-		let url = `https://api.exchange.coinbase.com/products/${params.symbol}-USD/ticker`;
+		//https://api.exchange.coinbase.com/products/${params.symbol}-USD/ticker
+		let url = `https://api.binance.us/api/v3/ticker/price?symbol=${params.symbol}USDT`;
 
 		const { data } = await instance.get(url);
 
@@ -23,7 +24,9 @@ const getTickerPrice = async (params) => {
 const getKlines = async (params) => {
 	try {
 		const { data } = await instance.get(
-			`${config.binance.urlBinance}api/v3/klines?symbol=${params.symbol}&interval=${params.interval}&limit=${parseInt(params.limit)}`
+			`${config.binance.urlBinance}api/v3/klines?symbol=${
+				params.symbol
+			}&interval=${params.interval}&limit=${parseInt(params.limit)}`
 		);
 
 		return data;

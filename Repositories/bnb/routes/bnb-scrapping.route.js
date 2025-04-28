@@ -8,17 +8,23 @@ const base = "/bnb";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.get(`${PATH}/address/:id`, Controller.getAddress);
+	server.get(`${PATH}/address/:id`, Controller.address);
 
 	server.get(
-		`${PATH}/transactions/:id`,
+		`${PATH}/address/:id/transactions`,
 		Middleware.validateAddressTransactions,
 		Controller.transactionsList
 	);
 
 	server.get(
-		`${PATH}/token/:id`,
+		`${PATH}/gas-tracker`,
 		Middleware.validateToken,
-		Controller.getToken
+		Controller.gasTracker
+	);
+
+	server.get(
+		`${PATH}/transaction/:id`,
+		Middleware.validateToken,
+		Controller.transactionStatus
 	);
 };
