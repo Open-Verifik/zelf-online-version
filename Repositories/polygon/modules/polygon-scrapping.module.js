@@ -4,6 +4,7 @@ const cheerio = require("cheerio");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const baseUrl = "https://polygonscan.com";
 const moment = require("moment");
+
 /**
  * @param {*} params
  */
@@ -277,64 +278,78 @@ const getTransactionStatus = async (params) => {
 
 		const $ = cheerio.load(data);
 
-		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div.row.align-items-center.mb-4 > div.col.col-md-9 > span")
-			.text()
-			.split(" ")[0]
-			.trim();
+		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge").text().split(" ")[0].trim();
 
 		const block = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
+			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
 		).text();
 
-		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0];
+		const timestamp2 = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0].split(" (")[0];
 
-		///en pruba 8
-		const from_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(10) > div.col-md-9").html();
+		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().split("|")[0];
+
+		const date = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9")
+			.text()
+			.trim()
+			.replace(/\n/g, "")
+			.split("|")[0]
+			.split(" (")[1]
+			.replace(" AM UTC)", "")
+			.replace(" PM UTC)", "");
+
+		const from_a = $("#ContentPlaceHolder1_maintable div.from-address-col").html();
 
 		const from_div = cheerio.load(from_a);
 
 		const from = from_div("a.js-clipboard").attr("data-clipboard-text");
 		///en pruba 9
-		const to_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(11) > div.col-md-9 > div").html();
+		const to_a = $("#ContentPlaceHolder1_maintable div.to-address-col").html();
 
 		const to_div = cheerio.load(to_a);
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valuePOL = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
+		const valueETH = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
 
 		const valueDolar = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
-		const transactionFeePOL = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
+		const transactionFeeETH = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
 
 		const transactionFeeDolar = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
 		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gweiPOL = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
+		const gweiETH = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
+
+		const observation = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span").text().replace("[", "").replace("]", "").trim();
 
 		const response = {
+			hash: id,
 			id,
 			status,
 			block,
 			timestamp,
+			age: timestamp2,
+			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
 			to,
-			valuePOL,
+			valueETH,
 			valueDolar,
-			transactionFeePOL,
+			transactionFeeETH,
 			transactionFeeDolar,
 			gasPrice,
-			gweiPOL,
+			gweiETH,
+			observation,
 		};
 
 		if (!id || !status || !to || !from) {
-			throw new Error("404");
+			throw new Error("404:transaction_not_found");
 		}
 
 		return response;
 	} catch (exception) {
+		console.log(exception);
 		const error = new Error("transaction_not_found");
 
 		error.status = 404;
