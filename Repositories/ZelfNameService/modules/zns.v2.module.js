@@ -130,6 +130,11 @@ const decryptZelfName = async (params, authUser) => {
 		password
 	);
 
+	if (!zelfNameObject.publicData.btcAddress.startsWith("bc1")) {
+		zelfNameObject.publicData.btcAddress = createBTCWallet(mnemonic).address;
+		decryptedZelfProof.publicData.btcAddress = zelfNameObject.publicData.btcAddress;
+	}
+
 	return {
 		hasPassword: Boolean(password),
 		image: zelfNameObject.zelfProofQRCode,
