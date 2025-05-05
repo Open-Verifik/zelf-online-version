@@ -14,6 +14,8 @@ module.exports = (server) => {
 
 	server.get(`${PATH}/transaction/:id`, SessionMiddleware.validateJWT, Controller.transactionStatus);
 
+	server.get(`${PATH}/v2/transaction/:id`, SessionMiddleware.validateJWT, Controller.transactionStatusV2);
+
 	server.get(`${PATH}/gas-tracker`, SessionMiddleware.validateJWT, Controller.gasTracker);
 
 	server.post(`${PATH}/gas-tracker`, SessionMiddleware.validateJWT, Controller.gasTracker);

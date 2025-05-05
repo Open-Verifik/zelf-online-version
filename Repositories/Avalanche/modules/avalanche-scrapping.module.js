@@ -126,7 +126,7 @@ const getTransactionsList = async (params) => {
 	// Formatear transacciones
 	const transactions = data.data.hits.map((tx) => ({
 		hash: tx.hash,
-		method: tx.method === "swap" ? "Swap" : tx.method,
+		method: tx.method.startsWith("swap") ? "Swap" : tx.method,
 		block: tx.blockHeight.toString(),
 		age: moment(tx.blocktime * 1000).fromNow(),
 		date: moment(tx.blocktime * 1000),
@@ -147,6 +147,7 @@ const getTransactionsList = async (params) => {
  */
 const getTransactionDetail = async (params) => {
 	let transaction = null;
+
 	try {
 		const t = Date.now();
 
@@ -166,19 +167,51 @@ const getTransactionDetail = async (params) => {
 
 		if (!details) return null;
 
+		const type = details.inputHex === "0x" ? "transfer" : "swap";
+
 		transaction = {
-			hash: id,
-			status: details.status === "0x1" ? "Success" : "fail",
-			block: details.blockHeigh,
 			age: moment(details.blocktime * 1000).fromNow(),
-			date: moment(details.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
-			from: details.from,
-			to: details.to,
 			amount: details.value.toString(),
 			assetPrice: details.legalRate.toString(),
-			txnFee: details.fee.toString(),
+			block: details.blockHeigh,
+			confirmations: details.confirm,
+			date: moment(details.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
+			from: details.from,
 			gasPrice: details.gasPrice.toString(),
+			hash: id,
+			image: details.logoUrl,
+			status: details.status === "0x1" ? "Success" : "fail",
+			to: details.to,
+			txnFee: details.fee.toString(),
+			type,
 		};
+
+		if (type === "swap") {
+			const transfersUrl = `https://www.oklink.com/api/explorer/v1/avaxc/transfers?limit=9999&offset=0&tokenType=ERC20&tranHash=${id}&t=${t}`;
+
+			const response = await axios.get(transfersUrl, {
+				httpsAgent: agent,
+				headers: {
+					"X-Apikey": get_ApiKey().getApiKey(),
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				},
+			});
+
+			if (!response.data?.data?.hits) return transaction;
+
+			for (let index = response.data.data.hits.length - 1; index >= 0; index--) {
+				const hit = response.data.data.hits[index];
+
+				if (hit.from !== details.to || hit.to !== details.from) continue;
+
+				transaction.swapAmount = hit.valueRaw;
+				transaction.swapSymbol = hit.symbol;
+				transaction.swapLogo = hit.logoUrl;
+				transaction.swapContractAddress = hit.tokenContractAddress;
+
+				break;
+			}
+		}
 
 		return transaction;
 	} catch (error) {
