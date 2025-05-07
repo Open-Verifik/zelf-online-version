@@ -2,7 +2,7 @@ const { string, validate, boolean, showRecords } = require("../../../Core/JoiUti
 
 const schemas = {
 	validateAddress: {
-		address: string().required(),
+		id: string().required(),
 	},
 	validateTransactionHashs: {
 		transactionHash: string().required(),
@@ -18,11 +18,10 @@ const schemas = {
 };
 
 const validateAddress = async (ctx, next) => {
-	const valid = validate(schemas.validateAddress, ctx.request.query);
+	const valid = validate(schemas.validateAddress, ctx.request.params);
 
 	if (valid.error) {
 		ctx.status = 409;
-
 		ctx.body = { validationError: valid.error.message };
 
 		return;
@@ -30,12 +29,12 @@ const validateAddress = async (ctx, next) => {
 
 	await next();
 };
+
 const validateTransactionHashs = async (ctx, next) => {
 	const valid = validate(schemas.validateTransactionHashs, ctx.request.query);
 
 	if (valid.error) {
 		ctx.status = 409;
-
 		ctx.body = { validationError: valid.error.message };
 
 		return;
@@ -43,12 +42,12 @@ const validateTransactionHashs = async (ctx, next) => {
 
 	await next();
 };
+
 const validateToken = async (ctx, next) => {
 	const valid = validate(schemas.validateToken, ctx.request.query);
 
 	if (valid.error) {
 		ctx.status = 409;
-
 		ctx.body = { validationError: valid.error.message };
 
 		return;
@@ -56,12 +55,12 @@ const validateToken = async (ctx, next) => {
 
 	await next();
 };
+
 const validateAddressTransactions = async (ctx, next) => {
 	const valid = validate(schemas.validateAddressTransactions, ctx.request.query);
 
 	if (valid.error) {
 		ctx.status = 409;
-
 		ctx.body = { validationError: valid.error.message };
 
 		return;

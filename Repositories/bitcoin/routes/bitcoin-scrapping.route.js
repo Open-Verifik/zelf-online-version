@@ -8,21 +8,13 @@ const base = "/bitcoin";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.get(
-		`${PATH}/address/:id`,
-		//Middleware.validateAddress,
-		Controller.balance
-	);
+	server.get(`${PATH}/address/:id`, Middleware.validateAddress, Controller.balance);
 
-	server.get(
-		`${PATH}/transactions/:id`,
-		Middleware.validateAddressTransactions,
-		Controller.transactionsList
-	);
+	server.get(`${PATH}/transactions/:id`, Middleware.validateAddressTransactions, Controller.transactionsList);
 
-	server.get(
-		`${PATH}/transaction/:id`,
-		Middleware.validateToken,
-		Controller.getTransactionDetail
-	);
+	server.get(`${PATH}/transaction/:id`, Middleware.validateToken, Controller.getTransactionDetail);
+
+	server.get(`${PATH}/testnet/address/:id`, Middleware.validateAddress, Controller.getTestnetBalance);
+
+	server.get(`${PATH}/testnet/transactions/:id`, Middleware.validateAddressTransactions, Controller.testnetTransactionsList);
 };
