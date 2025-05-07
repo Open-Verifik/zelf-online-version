@@ -41,9 +41,9 @@ const getBalance = async (addresses) => {
 	const results = [];
 	const exceptions = [];
 
-	for (const { address, networks } of addresses) {
+	for (const { address, network } of addresses) {
 		let response;
-		switch (networks) {
+		switch (network) {
 			case "solana":
 				response = await solana_mainnet(address);
 				if (!response) exceptions.push({ network: "solana", address });
@@ -82,9 +82,9 @@ const getTransactions = async (addresses) => {
 	const results = [];
 	const exceptions = [];
 
-	for (const { address, networks } of addresses) {
+	for (const { address, network } of addresses) {
 		let response;
-		switch (networks) {
+		switch (network) {
 			case "solana":
 				// response = await solana_mainnet(address);
 				// if (!response) errors.push({ network: "solana", address });
@@ -239,6 +239,8 @@ const solana_mainnet = async (address) => {
 				includeNativeTokens: true,
 			}
 		);
+
+		if (!data.data.tokens.length) return null;
 
 		return formatTokens(data.data, address);
 	} catch (error) {
