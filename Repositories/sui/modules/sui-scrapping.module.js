@@ -17,6 +17,8 @@ const getAddress = async (params) => {
 	try {
 		const address = params.id;
 
+		const not_transactions = params.transactions;
+
 		const { data } = await axios.get(
 			`${urlBase}/api/explorer/v2/common/address/getHolderInfo?address=${address}&blockChain=SUI&t=${t}`,
 
@@ -24,14 +26,23 @@ const getAddress = async (params) => {
 				httpsAgent: agent,
 				headers: {
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 				},
 			}
 		);
 
 		const { price } = await getTickerPrice({ symbol: "SUI" });
 
-		const { transactions } = await getTransactions({ id: address }, { page: "0", show: "10" });
+		let transactions = [];
+
+		if (!not_transactions) {
+			transactions = await getTransactions(
+				{ id: address },
+				{ page: "0", show: "10" }
+			);
+			transactions = transactions.transactions;
+		}
 
 		const response = {
 			address,
@@ -70,7 +81,8 @@ const getTokens = async (params, query) => {
 			httpsAgent: agent,
 			headers: {
 				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 			},
 		}
 	);
@@ -78,7 +90,7 @@ const getTokens = async (params, query) => {
 	function formatCryptoData(data) {
 		return data.map((item) => ({
 			tokenType: item.symbol,
-			address_token: item.tokenType.split("::")[0],
+			address_token: item.tokenType,
 			fiatBalance: item.usdValue || 0,
 			_fiatBalance: item.usdValue.toString(),
 			symbol: item.symbol || "Unknown",
@@ -112,7 +124,8 @@ const getTransactions = async (params, query) => {
 			httpsAgent: agent,
 			headers: {
 				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 			},
 		}
 	);
@@ -151,13 +164,17 @@ const getTransactions = async (params, query) => {
 const getTransaction = async (params) => {
 	try {
 		const t = Date.now();
-		const { data } = await axios.get(`${urlBase}/api/explorer/v1/sui/transactionDetail?txHash=${params.id}&t=${t}`, {
-			httpsAgent: agent,
-			headers: {
-				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-			},
-		});
+		const { data } = await axios.get(
+			`${urlBase}/api/explorer/v1/sui/transactionDetail?txHash=${params.id}&t=${t}`,
+			{
+				httpsAgent: agent,
+				headers: {
+					"X-Apikey": get_ApiKey().getApiKey(),
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				},
+			}
+		);
 
 		if (data.code == 404) {
 			const error = new Error("transaction_not_found");

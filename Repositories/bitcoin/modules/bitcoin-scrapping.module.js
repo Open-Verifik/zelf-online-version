@@ -100,6 +100,7 @@ const getBalance = async (params) => {
 			transactions: transactions,
 		};
 	} catch (e) {
+		console.log({ e });
 		const error = new Error("not_found");
 		error.status = 404;
 		throw error;

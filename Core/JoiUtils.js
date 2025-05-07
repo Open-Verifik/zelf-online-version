@@ -5,6 +5,18 @@ const recordShow = ["10", "25", "50", "100"];
 
 const crypto = ["ETH", "SOL", "BTC", "CB"];
 
+const networks = [
+	"bitcoin",
+	"ethereum",
+	"solana",
+	"avalanche",
+	"polygon",
+	"bnb",
+	"sui",
+	"tron",
+	"ton",
+];
+
 const zelfNameDuration = ["1"]; //, "2", "3", "4", "5", "lifetime"
 
 const _customErrors = (errors) => {
@@ -45,7 +57,9 @@ const _customErrors = (errors) => {
 				break;
 
 			case "any.only":
-				err.message = `${err.local.key} must be one of: [${err.local.valids.join(",")}]`;
+				err.message = `${
+					err.local.key
+				} must be one of: [${err.local.valids.join(",")}]`;
 				break;
 
 			default:
@@ -56,9 +70,11 @@ const _customErrors = (errors) => {
 	return errors;
 };
 
-const dateWithFormat = () => Joi.date().raw().format("DD/MM/YYYY").error(_customErrors);
+const dateWithFormat = () =>
+	Joi.date().raw().format("DD/MM/YYYY").error(_customErrors);
 
-const dateOfBirth = () => Joi.date().raw().format("DD/MM/YYYY").error(_customErrors);
+const dateOfBirth = () =>
+	Joi.date().raw().format("DD/MM/YYYY").error(_customErrors);
 
 const firstName = () => Joi.string().min(2).error(_customErrors);
 
@@ -75,6 +91,10 @@ const line = () => Joi.string().min(1).error(_customErrors);
 const string = () => Joi.string().error(_customErrors);
 
 const boolean = () => Joi.boolean().error(_customErrors);
+const network = () =>
+	Joi.string()
+		.valid(...networks)
+		.error(_customErrors);
 
 const zelfNameDuration_ = () =>
 	Joi.string()
@@ -109,9 +129,11 @@ const array = () => Joi.array();
 
 const objectId = () => Joi.string().hex().length(24).error(_customErrors);
 
-const base64ImageRegExp = /^data:image\/(png|jpeg|jpg|gif|bmp);base64,([A-Za-z0-9+/=]+)$/;
+const base64ImageRegExp =
+	/^data:image\/(png|jpeg|jpg|gif|bmp);base64,([A-Za-z0-9+/=]+)$/;
 
-const imageBase64WithType = () => Joi.string().regex(base64ImageRegExp).error(_customErrors);
+const imageBase64WithType = () =>
+	Joi.string().regex(base64ImageRegExp).error(_customErrors);
 
 const urlSecure = () =>
 	Joi.string()
@@ -181,4 +203,5 @@ module.exports = {
 	jsonObjectWithMinKeys,
 	zelfNameDuration_,
 	crypto_,
+	network,
 };

@@ -1,5 +1,6 @@
 module.exports = (server) => {
 	//A
+	require("../Repositories/alchemy/routes/alchemy-scrapping.route")(server);
 	require("../Repositories/Avalanche/routes/avalanche-scrapping.route")(server);
 	require("../Repositories/api-mina/routes/mina-scrapping.route")(server);
 	require("../Repositories/dataAnalytics/routes/dataAnalytics.route")(server);
