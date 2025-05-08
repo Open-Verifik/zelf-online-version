@@ -11,9 +11,7 @@ const {
 	formatTokensSUI,
 	formatTokensBTC,
 } = require("../modules/formatToken");
-const {
-	getTransactionsList,
-} = require("../../etherscan/modules/etherscan-scrapping.module");
+
 const {
 	gasAvalanche,
 	gasBnb,
@@ -31,7 +29,7 @@ const {
 	suiTokens,
 	tokenOklin,
 } = require("../modules/tokens.module");
-const { transactions } = require("../controllers/alchemy-scrapping.controller");
+const { evm_transactions } = require("../modules/transactions.module");
 
 /**
  * Obtiene detalles de un address
@@ -201,19 +199,6 @@ const evm_mainnet = async (address) => {
 		);
 
 		return formatTokens(data.data, address);
-	} catch (error) {
-		return null;
-	}
-};
-const evm_transactions = async (address) => {
-	try {
-		const { transactions } = await getTransactionsList({
-			address: address,
-			page: "0",
-			show: "10",
-		});
-
-		return transactions;
 	} catch (error) {
 		return null;
 	}
