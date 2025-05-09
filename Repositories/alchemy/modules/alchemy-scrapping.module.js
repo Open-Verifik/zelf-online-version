@@ -1,11 +1,14 @@
-const { Message } = require("@solana/web3.js");
 const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const urlBase = "https://api.g.alchemy.com";
 const api_key = "TB4BTdgdhcoC7ZefWWg4Te-DmQIuYFVG";
+
 const modelTokens = require("../models/tokens.model");
+
 const moduleSui = require("../../sui/modules/sui-scrapping.module");
+
 const moduleBtc = require("../../bitcoin/modules/bitcoin-scrapping.module");
+
 const {
 	formatTokens,
 	formatTokensSUI,
@@ -13,12 +16,12 @@ const {
 } = require("../modules/formatToken");
 
 const {
-	gasAvalanche,
-	gasBnb,
-	gasEthereum,
-	gasSolana,
-	gasPolygon,
-} = require("../modules/gas.module");
+	feeAvalanche,
+	feeBnb,
+	feeEthereum,
+	feeSolana,
+	feePolygon,
+} = require("../modules/fee.module");
 
 const {
 	solanaTokens,
@@ -29,17 +32,20 @@ const {
 	suiTokens,
 	tokenOklin,
 } = require("../modules/tokens.module");
-const { evm_transactions } = require("../modules/transactions.module");
+const {
+	evm_transactions,
+	solana_transactions,
+} = require("../modules/transactions.module");
 
 /**
  * Obtiene detalles de un address
  * @param {Array} addresses
  */
-const getBalance = async (addresses) => {
+const getBalance = async (accounts) => {
 	const results = [];
 	const exceptions = [];
 
-	for (const { address, network } of addresses) {
+	for (const { address, network } of accounts) {
 		let response;
 		switch (network) {
 			case "solana":
@@ -76,19 +82,21 @@ const getBalance = async (addresses) => {
  * Obtiene detalles de una transacción
  * @param {Array} addresses
  */
-const getTransactions = async (addresses) => {
+const getTransactions = async (addresses, limit) => {
 	const results = [];
 	const exceptions = [];
 
 	for (const { address, network } of addresses) {
+		const limit_ = limit.toString();
+
 		let response;
 		switch (network) {
 			case "solana":
-				// response = await solana_mainnet(address);
-				// if (!response) errors.push({ network: "solana", address });
+				response = await solana_transactions(address, limit_);
+				if (!response) exceptions.push({ network: "solana", address });
 				break;
 			case "evm":
-				response = await evm_transactions(address);
+				response = await evm_transactions(address, limit_);
 				if (!response) exceptions.push({ network: "evm", address });
 				break;
 			case "bitcoin":
@@ -150,23 +158,23 @@ const getTokens = async (network, name, explore = false) => {
 	return [];
 };
 
-const gas_pricing = async (network) => {
+const networkFee = async (network) => {
 	let response;
 	switch (network) {
 		case "ethereum":
-			response = await gasEthereum(network);
+			response = await feeEthereum(network);
 			break;
 		case "solana":
-			response = await gasSolana(network);
+			response = await feeSolana(network);
 			break;
 		case "polygon":
-			response = await gasPolygon(network);
+			response = await feePolygon(network);
 			break;
 		case "avalanche":
-			response = await gasAvalanche(network);
+			response = await feeAvalanche(network);
 			break;
 		case "bnb":
-			response = await gasBnb(network);
+			response = await feeBnb(network);
 			break;
 	}
 
@@ -271,7 +279,7 @@ const sui_mainnet = async (address) => {
 module.exports = {
 	getBalance,
 	getTransactions,
-	gas_pricing,
+	networkFee,
 	getTokens,
 	tokenOklin,
 };

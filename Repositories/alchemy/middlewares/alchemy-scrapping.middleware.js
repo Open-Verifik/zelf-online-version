@@ -3,6 +3,7 @@ const {
 	validate,
 	showRecords,
 	network,
+	stringEnum,
 	array,
 } = require("../../../Core/JoiUtils");
 
@@ -20,8 +21,12 @@ const schemas = {
 		page: string(),
 		show: showRecords(),
 	},
-	address: {
-		addresses: array().required(),
+	balance: {
+		accounts: array().required(),
+	},
+	transactions: {
+		accounts: array().required(),
+		limit: stringEnum([10, 100]).required(),
 	},
 	token: {
 		network: network().required(),
@@ -31,10 +36,11 @@ const schemas = {
 		network: network().required(),
 		name: string().required(),
 	},
-	gas: {
+	fee: {
 		network: network().required(),
 	},
 };
+
 const validateTokens = async (ctx, next) => {
 	const valid = validate(schemas.token, ctx.request.query);
 
@@ -48,6 +54,7 @@ const validateTokens = async (ctx, next) => {
 
 	await next();
 };
+
 const validateAddress = async (ctx, next) => {
 	const valid = validate(schemas.validateAddress, ctx.request.query);
 
@@ -76,8 +83,22 @@ const validateTransactionHashs = async (ctx, next) => {
 };
 /////******************************************************************** */
 
-const address = async (ctx, next) => {
-	const valid = validate(schemas.address, ctx.request.body);
+const balance = async (ctx, next) => {
+	const valid = validate(schemas.balance, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	await next();
+};
+
+const transactions = async (ctx, next) => {
+	const valid = validate(schemas.transactions, ctx.request.body);
 
 	if (valid.error) {
 		ctx.status = 409;
@@ -116,8 +137,8 @@ const tokens = async (ctx, next) => {
 	await next();
 };
 
-const gas_tracker = async (ctx, next) => {
-	const valid = validate(schemas.gas, ctx.request.query);
+const networkFee = async (ctx, next) => {
+	const valid = validate(schemas.fee, ctx.request.query);
 
 	if (valid.error) {
 		ctx.status = 409;
@@ -151,8 +172,9 @@ module.exports = {
 	validateAddress,
 	validateTransactionHashs,
 	validateAddressTransactions,
-	address,
-	gas_tracker,
-	tokens,
+	balance,
 	token,
+	tokens,
+	transactions,
+	networkFee,
 };

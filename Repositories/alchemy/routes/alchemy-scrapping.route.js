@@ -8,11 +8,11 @@ const base = "/";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.post(`${PATH}account/balance`, Middleware.address, Controller.balance);
+	server.post(`${PATH}account/balance`, Middleware.balance, Controller.balance);
 
 	server.post(
 		`${PATH}account/transactions`,
-		Middleware.address,
+		Middleware.transactions,
 		Controller.transactions
 	);
 
@@ -24,13 +24,13 @@ module.exports = (server) => {
 
 	server.get(
 		`${PATH}fee-network`,
-		Middleware.gas_tracker,
-		Controller.gas_pricing
+		Middleware.networkFee,
+		Controller.networkFee
 	);
 
 	// server.post(
-	// 	`${PATH}collectibles`,
-	// 	Middleware.gas_tracker,
-	// 	Controller.gas_tracker
+	// 	`${PATH}account/collectibles`,
+	// 	Middleware.balance,
+	// 	Controller.collectibles
 	// );
 };

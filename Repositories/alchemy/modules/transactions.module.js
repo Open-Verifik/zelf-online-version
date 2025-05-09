@@ -4,7 +4,6 @@ const modelTokens = require("../models/tokens.model");
 const instance = getCleanInstance(30000);
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 const https = require("https");
-const MongoORM = require("../../../Core/mongo-orm");
 const urlBaseOklin = "https://www.oklink.com";
 const agent = new https.Agent({
 	rejectUnauthorized: false,
@@ -12,70 +11,71 @@ const agent = new https.Agent({
 
 const etherscanModule = require("../../etherscan/modules/etherscan-scrapping.module");
 const polygoModule = require("../../polygon/modules/polygon-scrapping.module");
+const bnbModule = require("../../bnb/modules/bnb-scrapping.module");
+const avaxModule = require("../../Avalanche/modules/avalanche-scrapping.module");
+const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 
-const evm_transactions = async (address) => {
+const evm_transactions = async (address, limit) => {
 	try {
-		// Obtener transacciones de Ethereum
 		const txEth = await etherscanModule.getTransactionsList({
 			address: address,
 			page: "0",
-			show: "10",
+			show: limit,
 		});
+
 		const formattedEth = formatTransactions(txEth.transactions, "ethereum");
 
-		// Obtener transacciones de Polygon
 		const txPol = await polygoModule.getTransactionsList(
 			{
-				address: address,
-				page: "0",
+				id: address,
 			},
-			{ show: "10" }
+			{ show: limit, page: "1" }
 		);
+
 		const formattedPol = formatTransactions(txPol.transactions, "polygon");
 
-		// Combinar ambas listas y devolver
-		const formatted = [...formattedEth, ...formattedPol];
+		const txBnb = await bnbModule.getTransactionsList(
+			{
+				id: address,
+			},
+			{ show: limit, page: "1" }
+		);
+
+		const formattedBnb = formatTransactions(txBnb.transactions, "bnb");
+
+		const txAvax = await avaxModule.getTransactionsList({
+			id: address,
+			show: limit,
+			page: "1",
+		});
+
+		const formattedAvax = formatTransactions(txAvax, "avalanche");
+
+		const formatted = [
+			...formattedEth,
+			...formattedPol,
+			...formattedBnb,
+			...formattedAvax,
+		];
 		return formatted;
 	} catch (error) {
 		console.error("Error fetching transactions:", error);
 		return null;
 	}
-
-	// Función auxiliar para formatear transacciones
-	function formatTransactions(transactions, network) {
-		if (!transactions || !Array.isArray(transactions)) return [];
-
-		return transactions.map((tx) => {
-			const amountInWei = (parseFloat(tx.amount) * 1e18).toString();
-			const feeInWei = (parseFloat(tx.txnFee) * 1e18).toString();
-
-			return {
-				timestamp: tx.date,
-				transactionId: tx.hash,
-				traffic: tx.traffic?.toLowerCase() || "unknown",
-				owner: tx.to?.toLowerCase() || "",
-				amount: amountInWei,
-				to: tx.to?.toLowerCase() || "",
-				from: tx.from?.toLowerCase() || "",
-				networkFee: feeInWei,
-				networkFeePayer: tx.from?.toLowerCase() || "",
-				status: "success",
-				blockNumber: tx.block,
-				network: network,
-			};
-		});
-	}
 };
 
-const solana_transactions = async (address) => {
+const solana_transactions = async (address, limit) => {
 	try {
-		const { transactions } = await getTransactionsList({
-			address: address,
-			page: "0",
-			show: "10",
-		});
+		const txSolana = await solanaModule.getTransactions(
+			{
+				id: address,
+			},
+			{ show: limit, page: "1" }
+		);
 
-		return transactions;
+		const formattedSolana = formatTransactions(txSolana.transactions, "solana");
+
+		return [...formattedSolana];
 	} catch (error) {
 		return null;
 	}
@@ -106,6 +106,90 @@ const sui_transactions = async (address) => {
 		return null;
 	}
 };
+
+// function formatTransactions(transactions, network) {
+// 	if (!transactions || !Array.isArray(transactions)) return [];
+// 	try {
+// 		return transactions.map((tx) => {
+// 			const amountInWei = (parseFloat(tx.amount) * 1e18).toString();
+// 			const feeInWei = (parseFloat(tx.txnFee) * 1e18).toString();
+// 			console.log(network);
+// 			console.log(tx.date);
+
+// 			return {
+// 				timestamp: tx.date || tx.age,
+// 				transactionId: tx.hash,
+// 				traffic: tx.traffic?.toLowerCase() || "unknown",
+// 				owner: tx.to?.toLowerCase() || "",
+// 				amount: amountInWei,
+// 				to: tx.to?.toLowerCase() || "",
+// 				from: tx.from?.toLowerCase() || "",
+// 				networkFee: feeInWei,
+// 				networkFeePayer: tx.from?.toLowerCase() || "",
+// 				status: "success",
+// 				blockNumber: tx.block,
+// 				network: network,
+// 			};
+// 		});
+// 	} catch (error) {
+// 		console.log(error);
+// 	}
+// }
+function formatTransactions(transactions, network) {
+	if (!transactions || !Array.isArray(transactions)) return [];
+
+	const explorerMap = {
+		ethereum: "https://etherscan.io/tx/",
+		bnb: "https://bscscan.com/tx/",
+		polygon: "https://polygonscan.com/tx/",
+		avalanche: "https://snowtrace.io/tx/",
+		solana: "https://solscan.io/tx/",
+	};
+
+	try {
+		return transactions.map((tx) => {
+			const amountInWei = (parseFloat(tx.amount) * 1e18).toString();
+			const feeInWei = (parseFloat(tx.txnFee) * 1e18).toString();
+
+			let rawDate = tx.date || tx.age;
+			let parsedDate;
+
+			if (typeof rawDate === "string" || typeof rawDate === "number") {
+				parsedDate = new Date(rawDate);
+			} else if (
+				typeof rawDate === "object" &&
+				typeof rawDate.toDate === "function"
+			) {
+				parsedDate = rawDate.toDate();
+			} else {
+				parsedDate = new Date();
+			}
+
+			const isoTimestamp = parsedDate.toISOString();
+
+			const explorerBase = explorerMap[network?.toLowerCase()] || "";
+
+			return {
+				timestamp: isoTimestamp,
+				transactionId: tx.hash,
+				traffic: tx.traffic?.toLowerCase() || "unknown",
+				owner: tx.to?.toLowerCase() || "",
+				amount: amountInWei,
+				to: tx.to?.toLowerCase() || "",
+				from: tx.from?.toLowerCase() || "",
+				networkFee: feeInWei,
+				networkFeePayer: tx.from?.toLowerCase() || "",
+				status: "success",
+				blockNumber: tx.block,
+				network: network,
+				viewExplorer: `${explorerBase}${tx.hash}`,
+			};
+		});
+	} catch (error) {
+		console.log(error);
+		return [];
+	}
+}
 
 module.exports = {
 	evm_transactions,

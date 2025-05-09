@@ -1,9 +1,9 @@
 const Module = require("../modules/alchemy-scrapping.module");
 
 const balance = async (ctx) => {
-	const { addresses } = ctx.request.body;
+	const { accounts } = ctx.request.body;
 	try {
-		const data = await Module.getBalance(addresses);
+		const data = await Module.getBalance(accounts);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -14,11 +14,12 @@ const balance = async (ctx) => {
 		ctx.body = { error: error.message };
 	}
 };
+
 const transactions = async (ctx) => {
-	const { addresses } = ctx.request.body;
+	const { accounts, limit } = ctx.request.body;
 
 	try {
-		const data = await Module.getTransactions(addresses);
+		const data = await Module.getTransactions(accounts, limit);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -30,10 +31,10 @@ const transactions = async (ctx) => {
 	}
 };
 
-const gas_pricing = async (ctx) => {
+const networkFee = async (ctx) => {
 	const { network } = ctx.request.query;
 	try {
-		const data = await Module.gas_pricing(network);
+		const data = await Module.networkFee(network);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -79,7 +80,7 @@ const token = async (ctx) => {
 module.exports = {
 	balance,
 	transactions,
-	gas_pricing,
+	networkFee,
 	tokens,
 	token,
 };

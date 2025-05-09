@@ -216,7 +216,7 @@ const tokenOklin = async (tokenContractAddress, network) => {
 	const path = networkPaths[network];
 	if (!path) {
 		const error = new Error("unsupported_network");
-		error.status = 400;
+		error.status = 409;
 		throw error;
 	}
 
