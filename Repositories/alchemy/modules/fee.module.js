@@ -151,7 +151,7 @@ const feePolygon = async (network) => {
 	}
 };
 const feeAvalanche = async (network) => {};
-const feeBnb = async (network) => {
+const feeBnbSmartChain = async (network) => {
 	try {
 		const { data } = await instance.get(
 			"https://gbsc.blockscan.com/gasapi.ashx?apikey=key&method=gasoracle",
@@ -201,5 +201,5 @@ module.exports = {
 	feeSolana,
 	feePolygon,
 	feeAvalanche,
-	feeBnb,
+	feeBnbSmartChain,
 };

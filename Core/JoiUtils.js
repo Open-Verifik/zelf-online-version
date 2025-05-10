@@ -11,7 +11,7 @@ const networks = [
 	"solana",
 	"avalanche",
 	"polygon",
-	"bnb",
+	"bnbSmartChain",
 	"sui",
 	"tron",
 	"ton",
@@ -121,6 +121,11 @@ const stringEnum = (enumArray) =>
 		.valid(...enumArray)
 		.error(_customErrors);
 
+const arrayAddress = (enumArray) =>
+	Joi.string()
+		.valid(...enumArray)
+		.error(_customErrors);
+
 const number = () => Joi.number().error(_customErrors);
 
 const object = (schema) => Joi.object(schema);
@@ -204,4 +209,5 @@ module.exports = {
 	zelfNameDuration_,
 	crypto_,
 	network,
+	arrayAddress,
 };

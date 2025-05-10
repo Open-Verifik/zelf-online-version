@@ -10,7 +10,7 @@ const agent = new https.Agent({
 	rejectUnauthorized: false,
 });
 
-const solanaTokens = async (network, name) => {
+const tokensSolana = async (network, name) => {
 	try {
 		const { data } = await instance.get(
 			`https://api-v2.solscan.io/v2/search?keyword=${name}`,
@@ -41,7 +41,7 @@ const solanaTokens = async (network, name) => {
 	}
 };
 
-const ethereumTokens = async (network, name) => {
+const tokensEthereum = async (network, name) => {
 	try {
 		const { data } = await instance.get(
 			`https://etherscan.io/searchHandler?term=${name}&filterby=0&curPath=%3Fps%3D100&i=0`,
@@ -68,7 +68,7 @@ const ethereumTokens = async (network, name) => {
 	}
 };
 
-const avalancheTokens = async (network, name) => {
+const tokensAvalanche = async (network, name) => {
 	try {
 		const { data } = await instance.get(
 			`https://cdn.routescan.io/api/search?query=${name}&limit=10&chainId=all&ecosystem=avalanche&filter=erc20&filter=erc721&filter=addresses`,
@@ -96,7 +96,7 @@ const avalancheTokens = async (network, name) => {
 	}
 };
 
-const polygonTokens = async (network, name) => {
+const tokensPolygon = async (network, name) => {
 	try {
 		const { data } = await instance.get(
 			`https://polygonscan.com/searchHandler?term=${name}&filterby=0`,
@@ -124,7 +124,7 @@ const polygonTokens = async (network, name) => {
 	}
 };
 
-const bnbTokens = async (network, name) => {
+const tokensBnbSmartChain = async (network, name) => {
 	try {
 		const { data } = await instance.get(
 			`https://bscscan.com/searchHandler?term=${name}&filterby=0`,
@@ -153,7 +153,7 @@ const bnbTokens = async (network, name) => {
 	}
 };
 
-const suiTokens = async (network, name) => {
+const tokensSui = async (network, name) => {
 	try {
 		const { data } = await instance.get(
 			`https://internal.suivision.xyz/mainnet/api/coinsList?search=${name}&sortBy=volume`,
@@ -209,7 +209,7 @@ const tokenOklin = async (tokenContractAddress, network) => {
 		ethereum: `eth/tokens`,
 		avalanche: `avaxc/tokens`,
 		polygon: `polygon/tokens`,
-		bnb: `bsc/tokens`,
+		bnbSmartChain: `bsc/tokens`,
 		sui: `sui/tokens`,
 	};
 
@@ -270,11 +270,11 @@ const formatLogoBase64 = async (url) => {
 	}
 };
 module.exports = {
-	solanaTokens,
-	ethereumTokens,
-	avalancheTokens,
-	polygonTokens,
-	bnbTokens,
-	suiTokens,
+	tokensSolana,
+	tokensEthereum,
+	tokensAvalanche,
+	tokensPolygon,
+	tokensBnbSmartChain,
+	tokensSui,
 	tokenOklin,
 };

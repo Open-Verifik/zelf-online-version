@@ -30,6 +30,8 @@ async function formatTokens(input) {
 
 	for (const token of input.tokens) {
 		const network = token.network;
+
+		console.log({ network });
 		let symbol = "",
 			name = "",
 			logo = "";
@@ -87,7 +89,7 @@ async function formatTokens(input) {
 					.select(
 						"name symbol tokenContractAddress network logo tokenType decimals -_id"
 					);
-
+				//console.log(tokens[0].symbol);
 				groupedByNetwork[network].account.assets.push({
 					tokenType: tokens?.[0]?.tokenType || "",
 					fiatBalance: parseFloat(amountFormatted) * price,

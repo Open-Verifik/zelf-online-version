@@ -5,8 +5,9 @@ const {
 	network,
 	stringEnum,
 	array,
+	arrayAddress,
 } = require("../../../Core/JoiUtils");
-
+const Joi = require("joi");
 const schemas = {
 	validateAddress: {
 		address: string().required(),
@@ -24,10 +25,10 @@ const schemas = {
 	balance: {
 		accounts: array().required(),
 	},
-	transactions: {
-		accounts: array().required(),
-		limit: stringEnum([10, 100]).required(),
-	},
+	// transactions: {
+	// 	accounts: array().required(),
+	// 	limit: stringEnum([10, 100]).required(),
+	// },
 	token: {
 		network: network().required(),
 		tokenContractAddress: string().required(),
@@ -38,6 +39,15 @@ const schemas = {
 	},
 	fee: {
 		network: network().required(),
+	},
+	network_: {
+		network: stringEnum(["evm", "solana", "sui", "bitcoin"]).required(),
+	},
+	address_: {
+		address: string().required(),
+	},
+	limit_: {
+		limit: stringEnum([10, 100]).required(),
 	},
 };
 
@@ -84,13 +94,48 @@ const validateTransactionHashs = async (ctx, next) => {
 /////******************************************************************** */
 
 const balance = async (ctx, next) => {
-	const valid = validate(schemas.balance, ctx.request.body);
+	let valid = validate(schemas.balance, ctx.request.body);
+
+	const { accounts } = ctx.request.body;
 
 	if (valid.error) {
 		ctx.status = 409;
-
 		ctx.body = { validationError: valid.error.message };
+		return;
+	}
 
+	const errores = [];
+
+	for (let i = 0; i < accounts.length; i++) {
+		const account = accounts[i];
+		const result = validate(schemas.network_, account);
+
+		if (result.error) {
+			errores.push({
+				index: i,
+				account,
+				error: result.error.message,
+			});
+		}
+	}
+	for (let i = 0; i < accounts.length; i++) {
+		const account = accounts[i];
+		const result = validate(schemas.address_, account);
+
+		if (result.error) {
+			errores.push({
+				index: i,
+				account,
+				error: result.error.message,
+			});
+		}
+	}
+	if (errores.length > 0) {
+		ctx.status = 409;
+		ctx.body = {
+			validationError: "Some items failed validation",
+			message: errores,
+		};
 		return;
 	}
 
@@ -98,18 +143,69 @@ const balance = async (ctx, next) => {
 };
 
 const transactions = async (ctx, next) => {
-	const valid = validate(schemas.transactions, ctx.request.body);
+	let valid = validate(schemas.balance, ctx.request.body);
 
-	if (valid.error) {
+	// Validar limit_
+	let limitValid = validate(schemas.limit_, ctx.request.body);
+	if (limitValid.error) {
 		ctx.status = 409;
-
-		ctx.body = { validationError: valid.error.message };
-
+		ctx.body = { validationError: limitValid.error.message };
 		return;
 	}
 
-	await next();
+	// Validar balance después de limit_
+	valid = validate(schemas.balance, ctx.request.body);
+	const { accounts } = ctx.request.body;
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	const errores = [];
+
+	// Validación de network_ en cada cuenta
+	for (let i = 0; i < accounts.length; i++) {
+		const account = accounts[i];
+		const result = validate(schemas.network_, account);
+
+		if (result.error) {
+			errores.push({
+				index: i,
+				account,
+				error: result.error.message,
+			});
+		}
+	}
+
+	// Validación de address_ en cada cuenta
+	for (let i = 0; i < accounts.length; i++) {
+		const account = accounts[i];
+		const result = validate(schemas.address_, account);
+
+		if (result.error) {
+			errores.push({
+				index: i,
+				account,
+				error: result.error.message,
+			});
+		}
+	}
+
+	// Si hay errores en las validaciones
+	if (errores.length > 0) {
+		ctx.status = 409;
+		ctx.body = {
+			validationError: "Some items failed validation",
+			message: errores,
+		};
+		return;
+	}
+
+	await next(); // solo se llama si todas las validaciones son correctas
 };
+
 const token = async (ctx, next) => {
 	const valid = validate(schemas.token, ctx.request.query);
 

@@ -2,11 +2,8 @@ const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const urlBase = "https://api.g.alchemy.com";
 const api_key = "TB4BTdgdhcoC7ZefWWg4Te-DmQIuYFVG";
-
 const modelTokens = require("../models/tokens.model");
-
 const moduleSui = require("../../sui/modules/sui-scrapping.module");
-
 const moduleBtc = require("../../bitcoin/modules/bitcoin-scrapping.module");
 
 const {
@@ -17,24 +14,26 @@ const {
 
 const {
 	feeAvalanche,
-	feeBnb,
+	feeBnbSmartChain,
 	feeEthereum,
 	feeSolana,
 	feePolygon,
 } = require("../modules/fee.module");
 
 const {
-	solanaTokens,
-	ethereumTokens,
-	avalancheTokens,
-	polygonTokens,
-	bnbTokens,
-	suiTokens,
+	tokensSolana,
+	tokensEthereum,
+	tokensAvalanche,
+	tokensPolygon,
+	tokensBnbSmartChain,
+	tokensSui,
 	tokenOklin,
 } = require("../modules/tokens.module");
 const {
-	evm_transactions,
-	solana_transactions,
+	transactionsEvm,
+	transactionsSolana,
+	transactionsBitcoin,
+	transactionsSui,
 } = require("../modules/transactions.module");
 
 /**
@@ -50,20 +49,40 @@ const getBalance = async (accounts) => {
 		switch (network) {
 			case "solana":
 				response = await solana_mainnet(address);
-				if (!response) exceptions.push({ network: "solana", address });
+				if (!response)
+					exceptions.push({
+						network: "solana",
+						address,
+						message: "An internal error occurred",
+					});
 				break;
 			case "evm":
 				response = await evm_mainnet(address);
-				if (!response) exceptions.push({ network: "evm", address });
+				if (!response)
+					exceptions.push({
+						network: "evm",
+						address,
+						message: "An internal error occurred",
+					});
 				break;
 			case "bitcoin":
 				response = await bitcoin_mainnet(address);
-				if (!response) exceptions.push({ network: "bitcoin", address });
+				if (!response)
+					exceptions.push({
+						network: "bitcoin",
+						address,
+						message: "An internal error occurred",
+					});
 				break;
 			case "sui":
 				response = await sui_mainnet(address);
 
-				if (!response) exceptions.push({ network: "sui", address });
+				if (!response)
+					exceptions.push({
+						network: "sui",
+						address,
+						message: "An internal error occurred",
+					});
 				break;
 		}
 
@@ -92,20 +111,40 @@ const getTransactions = async (addresses, limit) => {
 		let response;
 		switch (network) {
 			case "solana":
-				response = await solana_transactions(address, limit_);
-				if (!response) exceptions.push({ network: "solana", address });
+				response = await transactionsSolana(address, limit_);
+				if (!response)
+					exceptions.push({
+						network: "solana",
+						address,
+						message: "An internal error occurred",
+					});
 				break;
 			case "evm":
-				response = await evm_transactions(address, limit_);
-				if (!response) exceptions.push({ network: "evm", address });
+				response = await transactionsEvm(address, limit_);
+				if (!response)
+					exceptions.push({
+						network: "evm",
+						address,
+						message: "An internal error occurred",
+					});
 				break;
 			case "bitcoin":
-				// response = await bitcoin_mainnet(address);
-				// if (!response) errors.push({ network: "bitcoin", address });
+				response = await transactionsBitcoin(address, limit_);
+				if (!response)
+					exceptions.push({
+						network: "bitcoin",
+						address,
+						message: "An internal error occurred",
+					});
 				break;
 			case "sui":
-				// response = await sui_mainnet(address);
-				// if (!response) errors.push({ network: "sui", address });
+				response = await transactionsSui(address, limit_);
+				if (!response)
+					exceptions.push({
+						network: "sui",
+						address,
+						message: "An internal error occurred",
+					});
 				break;
 		}
 
@@ -141,12 +180,12 @@ const getTokens = async (network, name, explore = false) => {
 	}
 
 	const fetchers = {
-		ethereum: ethereumTokens,
-		solana: solanaTokens,
-		avalanche: avalancheTokens,
-		polygon: polygonTokens,
-		bnb: bnbTokens,
-		sui: suiTokens,
+		ethereum: tokensEthereum,
+		solana: tokensSolana,
+		avalanche: tokensAvalanche,
+		polygon: tokensPolygon,
+		bnbSmartChain: tokensBnbSmartChain,
+		sui: tokensSui,
 	};
 
 	const fetcher = fetchers[network];
@@ -158,7 +197,7 @@ const getTokens = async (network, name, explore = false) => {
 	return [];
 };
 
-const networkFee = async (network) => {
+const getNetworkFee = async (network) => {
 	let response;
 	switch (network) {
 		case "ethereum":
@@ -173,8 +212,8 @@ const networkFee = async (network) => {
 		case "avalanche":
 			response = await feeAvalanche(network);
 			break;
-		case "bnb":
-			response = await feeBnb(network);
+		case "bnbSmartChain":
+			response = await feeBnbSmartChain(network);
 			break;
 	}
 
@@ -279,7 +318,7 @@ const sui_mainnet = async (address) => {
 module.exports = {
 	getBalance,
 	getTransactions,
-	networkFee,
+	getNetworkFee,
 	getTokens,
 	tokenOklin,
 };

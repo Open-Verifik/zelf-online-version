@@ -34,7 +34,7 @@ const transactions = async (ctx) => {
 const networkFee = async (ctx) => {
 	const { network } = ctx.request.query;
 	try {
-		const data = await Module.networkFee(network);
+		const data = await Module.getNetworkFee(network);
 
 		ctx.body = { data };
 	} catch (error) {
