@@ -1,7 +1,6 @@
 const axios = require("../../../Core/axios").getEncryptionInstance();
 const config = require("../../../Core/config");
 const QRCode = require("qrcode");
-const IPFSModule = require("../../IPFS/modules/ipfs.module");
 
 const encrypt = async (data) => {
 	try {

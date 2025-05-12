@@ -1,12 +1,10 @@
 const SessionModule = require("../../Session/modules/session.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
-const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const config = require("../../../Core/config");
 const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
-const moment = require("moment");
 const axios = require("axios");
-const { encrypt, encryptQR } = require("../../Wallet/modules/encryption");
+const { encrypt, encryptQR } = require("../../ZelfProof/modules/core");
 
 const zelfNamePricing = {
 	1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
