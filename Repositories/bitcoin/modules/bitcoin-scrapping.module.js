@@ -145,7 +145,7 @@ const convertTestnetTransactionValues = (transactions) => {
 };
 
 const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
-	const txsData = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}/txs`);
+	const txsData = await makeApiRequest(`https://mempool.space/testnet/api/address/${params.id}/txs`);
 
 	const txids = txsData.map((tx) => tx.txid).join(",");
 
@@ -156,7 +156,7 @@ const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
 
 const getTestnetBalance = async (params) => {
 	try {
-		const data = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}`);
+		const data = await makeApiRequest(`https://mempool.space/testnet/api/address/${params.id}`);
 
 		const { price } = await getTickerPrice({ symbol: "BTC" });
 		const formatBTC = convertSatoshiToBTC(data.chain_stats.funded_txo_sum);
