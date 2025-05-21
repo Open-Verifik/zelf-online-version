@@ -215,7 +215,7 @@ const getTransactionDetail = async (params) => {
 
 		return transaction;
 	} catch (error) {
-		console.log({ error });
+		console.error({ error });
 	}
 
 	return transaction;
