@@ -11,7 +11,6 @@ const {
 const { getCleanInstance } = require("../../../Core/axios");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
-const { text } = require("stream/consumers");
 
 const instance = getCleanInstance(30000);
 const agent = new https.Agent({ rejectUnauthorized: false });
@@ -288,19 +287,26 @@ const getTransactionStatus = async (params) => {
 					.first()
 					.text()
 					.trim();
+
+				const symbol = tokenElement
+					.find("span > span.text-muted > span")
+					.first()
+					.text()
+					.trim();
+
 				const icon = tokenElement.find("img").attr("src");
 
 				tokensTransferred.push({
 					from,
 					to,
 					amount,
+					symbol,
+					network: "ethereum",
 					token: tokenName,
 					icon: icon ? `https://etherscan.io${icon}` : null,
 				});
 			});
-		} catch (error) {
-			console.log(error);
-		}
+		} catch (error) {}
 
 		const status = $(
 			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge"
@@ -401,6 +407,14 @@ const getTransactionStatus = async (params) => {
 			.replace("]", "")
 			.trim();
 
+		let network, symbol, imge;
+
+		// if (!tokensTransferred.length) {
+		// 	symbol = "ETH";
+		// 	network = "ethereum";
+		// 	imge = "https://etherscan.io/assets/svg/logos/ether-default-logo.svg";
+		// }
+
 		const response = {
 			transactionType,
 			hash: id,
@@ -408,6 +422,9 @@ const getTransactionStatus = async (params) => {
 			status,
 			block,
 			timestamp,
+			network: "ethereum",
+			symbol: "ETH",
+			imge: "https://etherscan.io/assets/svg/logos/ether-default-logo.svg",
 			age: timestamp2,
 			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
