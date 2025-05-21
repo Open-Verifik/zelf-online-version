@@ -407,14 +407,6 @@ const getTransactionStatus = async (params) => {
 			.replace("]", "")
 			.trim();
 
-		let network, symbol, imge;
-
-		// if (!tokensTransferred.length) {
-		// 	symbol = "ETH";
-		// 	network = "ethereum";
-		// 	imge = "https://etherscan.io/assets/svg/logos/ether-default-logo.svg";
-		// }
-
 		const response = {
 			transactionType,
 			hash: id,
