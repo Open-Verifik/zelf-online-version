@@ -60,7 +60,7 @@ const getTransactionsList = async (params, query = { show: "25" }) => {
 		`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`
 	);
 
-	return { transactions: convertTransactionValues(response) };
+	return { transactions: extractTransactionData(response) };
 };
 
 // Obtener detalles de una transacción específica
@@ -68,11 +68,8 @@ const getTransactionDetail = async (params) => {
 	const data = await makeApiRequest(
 		`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`
 	);
-	console.log(
-		analizarTransaccion(convertTransactionValues(data)[0]),
-		"bc1qnwrhw47ynkcrk5z205txsqz8ms9dq70rz097v4"
-	);
-	return convertTransactionValues(data)[0];
+
+	return extractTransactionData(data)[0];
 };
 
 // Obtener balance de una dirección
@@ -259,6 +256,35 @@ function analizarTransaccion(tx, direccionPropia) {
 	}
 
 	return resultado;
+}
+function extractTransactionData(transactions) {
+	console.log(transactions);
+	return transactions.map((tx) => {
+		const fromInput = tx.inputs.find((input) => input.address);
+		const toOutputs = tx.outputs.filter(
+			(output) => output.address && output.address !== fromInput?.address
+		);
+
+		const amountSats = toOutputs.reduce((sum, output) => sum + output.value, 0);
+		const amountBTC = amountSats / 1e8;
+
+		return {
+			hash: tx.txid,
+			amount: amountBTC,
+			amountSats: amountSats,
+			from: fromInput?.address || null,
+			to: toOutputs.map((output) => output.address),
+			txnFee: tx.fee / 1e8,
+			txnFeeSats: tx.fee,
+			networkFeePayer: fromInput?.address || null,
+			status: tx.block ? "Success" : "Pending",
+			block: tx.block?.height.toString() || null,
+			logoURI: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
+			tokenType: "coin",
+			asset: "BTC",
+			decimals: 8,
+		};
+	});
 }
 
 module.exports = {
