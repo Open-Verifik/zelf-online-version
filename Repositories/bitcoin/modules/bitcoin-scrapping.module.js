@@ -56,18 +56,14 @@ const getTransactionsList = async (params, query = { show: "25" }) => {
 
 	if (!txids.length) return { transactions: [] };
 
-	const response = await makeApiRequest(
-		`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`
-	);
+	const response = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`);
 
 	return { transactions: extractTransactionData(response) };
 };
 
 // Obtener detalles de una transacción específica
 const getTransactionDetail = async (params) => {
-	const data = await makeApiRequest(
-		`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`
-	);
+	const data = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`);
 
 	return extractTransactionData(data)[0];
 };
@@ -75,9 +71,7 @@ const getTransactionDetail = async (params) => {
 // Obtener balance de una dirección
 const getBalance = async (params) => {
 	try {
-		const data = await makeApiRequest(
-			`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`
-		);
+		const data = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`);
 
 		const { price } = await getTickerPrice({ symbol: "BTC" });
 		const formatBTC = convertSatoshiToBTC(data.confirmed);
@@ -151,9 +145,7 @@ const convertTestnetTransactionValues = (transactions) => {
 };
 
 const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
-	const txsData = await makeApiRequest(
-		`https://blockstream.info/testnet/api/address/${params.id}/txs`
-	);
+	const txsData = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}/txs`);
 
 	const txids = txsData.map((tx) => tx.txid).join(",");
 
@@ -164,11 +156,10 @@ const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
 
 const getTestnetBalance = async (params) => {
 	try {
-		const data = await makeApiRequest(
-			`https://blockstream.info/testnet/api/address/${params.id}`
-		);
+		const data = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}`);
 
 		const { price } = await getTickerPrice({ symbol: "BTC" });
+
 		const formatBTC = convertSatoshiToBTC(data.chain_stats.funded_txo_sum);
 
 		const { transactions } = await getTestnetTransactionsList(params);
@@ -261,9 +252,7 @@ function extractTransactionData(transactions) {
 	console.log(transactions);
 	return transactions.map((tx) => {
 		const fromInput = tx.inputs.find((input) => input.address);
-		const toOutputs = tx.outputs.filter(
-			(output) => output.address && output.address !== fromInput?.address
-		);
+		const toOutputs = tx.outputs.filter((output) => output.address && output.address !== fromInput?.address);
 
 		const amountSats = toOutputs.reduce((sum, output) => sum + output.value, 0);
 		const amountBTC = amountSats / 1e8;
