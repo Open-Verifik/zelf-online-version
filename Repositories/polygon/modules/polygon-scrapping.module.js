@@ -14,29 +14,22 @@ const getBalance = async (params) => {
 
 		const { data } = await instance.get(`${baseUrl}/address/${params.id}`, {
 			headers: {
-				"user-agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
 
 		const $ = cheerio.load(data);
 
-		const fullName = $("#ensName > span > a > div > span")
-			.text()
-			.replace(/\n/g, "");
+		const fullName = $("#ensName > span > a > div > span").text().replace(/\n/g, "");
 
-		const balance = $(
-			"#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(2) > div"
-		)
+		const balance = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(2) > div")
 			.text()
 			.replace(/\n/g, "")
 			.replace(" POL", "")
 			.trim();
 
-		const accounts = $(
-			"#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(3)"
-		)
+		const accounts = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(3)")
 			.text()
 			.replace(/\n/g, "")
 			.split("@");
@@ -46,13 +39,7 @@ const getBalance = async (params) => {
 		try {
 			account = {
 				asset: "POL",
-				fiatBalance: accounts[0]
-					.replace("Less Than", "")
-					.replace("POL Value", "")
-					.replace("(", "")
-					.replace(",", "")
-					.replace("$", "")
-					.trim(),
+				fiatBalance: accounts[0].replace("Less Than", "").replace("POL Value", "").replace("(", "").replace(",", "").replace("$", "").trim(),
 				price: (await getTickerPrice({ symbol: `POL` })).price,
 			};
 		} catch (error) {
@@ -64,17 +51,9 @@ const getBalance = async (params) => {
 			};
 		}
 
-		const totalTokens = $("#dropdownMenuBalance")
-			.text()
-			.trim()
-			.replace(/\n/g, "")
-			.split("(")[0];
+		const totalTokens = $("#dropdownMenuBalance").text().trim().replace(/\n/g, "").split("(")[0];
 
-		const balanceTokens = $("#dropdownMenuBalance")
-			.text()
-			.trim()
-			.replace(/\n/g, "")
-			.split("(")[1];
+		const balanceTokens = $("#dropdownMenuBalance").text().trim().replace(/\n/g, "").split("(")[1];
 
 		let tokensContracts;
 
@@ -84,7 +63,8 @@ const getBalance = async (params) => {
 				total: balanceTokens.replace(">", "").replace("Tokens)", "").trim(),
 			};
 		} catch (error) {
-			console.log(error);
+			console.error(error);
+
 			tokensContracts = {
 				balance: "0.00",
 				total: 0,
@@ -99,16 +79,11 @@ const getBalance = async (params) => {
 			const tokenTypeElement = $(element).find(".fw-medium").text().trim();
 
 			if (tokenTypeElement) {
-				currentTokenType = tokenTypeElement
-					.replace("Tokens", "")
-					.split("(")[0]
-					.trim();
+				currentTokenType = tokenTypeElement.replace("Tokens", "").split("(")[0].trim();
 				return;
 			}
 
-			const tokenName =
-				$(element).find(".list-name span").attr("data-bs-title") ||
-				$(element).find(".list-name").text().trim();
+			const tokenName = $(element).find(".list-name span").attr("data-bs-title") || $(element).find(".list-name").text().trim();
 			const tokenAmount = $(element).find(".text-muted").text().trim();
 
 			const [_amount, rest] = tokenAmount.split(" ");
@@ -117,10 +92,7 @@ const getBalance = async (params) => {
 			const [, _price] = tokenAmount.split("@");
 
 			const tokenType = $(element).find(".badge").text().trim();
-			const tokenLink = $(element)
-				.find("a.nav-link")
-				.attr("href")
-				.replace("/token/", "");
+			const tokenLink = $(element).find("a.nav-link").attr("href").replace("/token/", "");
 			const tokenImage = $(element).find("img").attr("src");
 
 			let name = null;
@@ -162,9 +134,7 @@ const getBalance = async (params) => {
 			const tabla = $("#transactions > div > div.table-responsive").html();
 			const campos = cheerio.load(tabla);
 
-			campos("tbody tr").each((_index, element) =>
-				_parseTransactionsContent(campos, element, transactions)
-			);
+			campos("tbody tr").each((_index, element) => _parseTransactionsContent(campos, element, transactions));
 		} catch (error) {
 			console.error({ error });
 		}
@@ -175,8 +145,7 @@ const getBalance = async (params) => {
 			symbol: "POL",
 			name: "polygon",
 			price: account.price,
-			image:
-				"https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
+			image: "https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
 			amount: balance,
 		});
 
@@ -200,8 +169,7 @@ const getGasTracker = async (params) => {
 	try {
 		let { data } = await instance.get(`${baseUrl}/gastracker`, {
 			headers: {
-				"user-agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
@@ -212,16 +180,9 @@ const getGasTracker = async (params) => {
 		const averageGwei = $("#spanAvgPrice").text().replace(/\n/g, "").trim();
 		const highGwei = $("#spanHighPrice").text().replace(/\n/g, "").trim();
 
-		const lowPriorityAndBase = $("#spanDynamicLowPriorityAndBase")
-			.text()
-			.trim();
+		const lowPriorityAndBase = $("#spanDynamicLowPriorityAndBase").text().trim();
 
-		const lowTime = $("#divLowPrice > div.text-muted")
-			.first()
-			.text()
-			.replace(/\n/g, "")
-			.trim()
-			.trim();
+		const lowTime = $("#divLowPrice > div.text-muted").first().text().replace(/\n/g, "").trim().trim();
 		const priceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -230,14 +191,8 @@ const getGasTracker = async (params) => {
 		const lowBase = parseFloat(lowNumbers[0]).toString();
 		const lowPriority = parseFloat(lowNumbers[1]).toString();
 
-		const avgPriorityAndBase = $("#spanDynamicProposePriorityAndBase")
-			.text()
-			.trim();
-		const averageTime = $("#divAvgPrice > div.text-muted")
-			.text()
-			.replace(/\n/g, "")
-			.trim()
-			.trim();
+		const avgPriorityAndBase = $("#spanDynamicProposePriorityAndBase").text().trim();
+		const averageTime = $("#divAvgPrice > div.text-muted").text().replace(/\n/g, "").trim().trim();
 		const avgPriceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -245,14 +200,8 @@ const getGasTracker = async (params) => {
 		const avgBase = parseFloat(avgNumbers[0]).toString();
 		const avgPriority = parseFloat(avgNumbers[1]).toString();
 
-		const highPriorityAndBase = $("#spanDynamicHighPriorityAndBase")
-			.text()
-			.trim();
-		const highTime = $("#divHighPrice > div.text-muted")
-			.text()
-			.replace(/\n/g, "")
-			.trim()
-			.trim();
+		const highPriorityAndBase = $("#spanDynamicHighPriorityAndBase").text().trim();
+		const highTime = $("#divHighPrice > div.text-muted").text().replace(/\n/g, "").trim().trim();
 		const highPriceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -261,28 +210,23 @@ const getGasTracker = async (params) => {
 		const highPriority = parseFloat(highNumbers[1]).toString();
 
 		const featuredActions = [];
-		$(
-			"#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr"
-		).each((index, element) => {
-			const action = $(element).find("td span").text().trim();
-			const low = $(element).find("td").eq(1).text().replace("$", "").trim();
-			const average = $(element)
-				.find("td")
-				.eq(2)
-				.text()
-				.replace("$", "")
-				.trim();
-			const high = $(element).find("td").eq(3).text().replace("$", "").trim();
+		$("#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr").each(
+			(index, element) => {
+				const action = $(element).find("td span").text().trim();
+				const low = $(element).find("td").eq(1).text().replace("$", "").trim();
+				const average = $(element).find("td").eq(2).text().replace("$", "").trim();
+				const high = $(element).find("td").eq(3).text().replace("$", "").trim();
 
-			if (action) {
-				featuredActions.push({
-					action,
-					low,
-					average,
-					high,
-				});
+				if (action) {
+					featuredActions.push({
+						action,
+						low,
+						average,
+						high,
+					});
+				}
 			}
-		});
+		);
 
 		// Formar el objeto de respuesta final.
 		const response = {
@@ -326,17 +270,14 @@ const getTransactionStatus = async (params) => {
 
 		const { data } = await instance.get(`${baseUrl}/tx/${id}`, {
 			headers: {
-				"user-agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
 
 		const $ = cheerio.load(data);
 
-		const status = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div.row.align-items-center.mb-4 > div.col.col-md-9 > span"
-		)
+		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div.row.align-items-center.mb-4 > div.col.col-md-9 > span")
 			.text()
 			.split(" ")[0]
 			.trim();
@@ -345,71 +286,33 @@ const getTransactionStatus = async (params) => {
 			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
 		).text();
 
-		const timestamp = $(
-			"#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9"
-		)
-			.text()
-			.trim()
-			.replace(/\n/g, "")
-			.split("|")[0];
+		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0];
 
 		///en pruba 8
-		const from_a = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(10) > div.col-md-9"
-		).html();
+		const from_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(10) > div.col-md-9").html();
 
 		const from_div = cheerio.load(from_a);
 
 		const from = from_div("a.js-clipboard").attr("data-clipboard-text");
 		///en pruba 9
-		const to_a = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(11) > div.col-md-9 > div"
-		).html();
+		const to_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(11) > div.col-md-9 > div").html();
 
 		const to_div = cheerio.load(to_a);
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valuePOL = $(
-			"#ContentPlaceHolder1_spanValue > div > span:nth-child(2)"
-		)
-			.text()
-			.replace("ETH", "")
-			.trim();
+		const valuePOL = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
 
-		const valueDolar = $(
-			"#ContentPlaceHolder1_spanValue > div > span.text-muted"
-		)
-			.text()
-			.replace("($", "")
-			.replace(")", "")
-			.trim();
+		const valueDolar = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
-		const transactionFeePOL = $(
-			"#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)"
-		)
-			.text()
-			.replace("ETH", "")
-			.trim();
+		const transactionFeePOL = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
 
-		const transactionFeeDolar = $(
-			"#ContentPlaceHolder1_spanTxFee > div > span.text-muted"
-		)
-			.text()
-			.replace("($", "")
-			.replace(")", "")
-			.trim();
+		const transactionFeeDolar = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
-		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice")
-			.text()
-			.split("Gwei");
+		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gweiPOL = gasPriceGwei[1]
-			.replace("(", "")
-			.replace(")", "")
-			.replace("ETH", "")
-			.trim();
+		const gweiPOL = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
 
 		const response = {
 			id,
@@ -450,22 +353,16 @@ const getTransactionsList = async (params, query) => {
 	const show = query.show;
 
 	try {
-		const { data } = await instance.get(
-			`${baseUrl}/txs?a=${address}&ps=${show}`,
-			{
-				headers: {
-					"user-agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-					"Upgrade-Insecure-Requests": "1",
-				},
-			}
-		);
+		const { data } = await instance.get(`${baseUrl}/txs?a=${address}&ps=${show}`, {
+			headers: {
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"Upgrade-Insecure-Requests": "1",
+			},
+		});
 
 		const $ = cheerio.load(data);
 
-		const transactions = JSON.parse(
-			data.split("quickExportTransactionListData = '")[1].split("';")[0]
-		);
+		const transactions = JSON.parse(data.split("quickExportTransactionListData = '")[1].split("';")[0]);
 
 		const formatTransactions = (address, transactions) => {
 			return transactions.map((tx) => {
@@ -495,18 +392,8 @@ const getTransactionsList = async (params, query) => {
 				return "UNKNOWN";
 			}
 		}
-		const records = $(
-			"#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span"
-		)
-			.text()
-			.match(/\d+/g)
-			.join("");
-		const nPage = $(
-			"#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)"
-		)
-			.text()
-			.replace("Page", "")
-			.split("of");
+		const records = $("#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span").text().match(/\d+/g).join("");
+		const nPage = $("#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)").text().replace("Page", "").split("of");
 
 		const pagination = {
 			records,
@@ -541,9 +428,7 @@ const _parseTransactionsContent = (campos, element, transactions = []) => {
 	const transaction = {};
 
 	transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
-	transaction.method = campos(element)
-		.find("td:nth-child(3) span")
-		.attr("data-title");
+	transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
 	transaction.block = campos(element).find("td:nth-child(4) a").text();
 
 	const ageCol = campos(element).find("td:nth-child(6) span");
@@ -584,9 +469,7 @@ const _parseTransactionsContent = (campos, element, transactions = []) => {
 	transaction.fiatAmount = fiatAmount;
 	transaction.amount = tokenAmount;
 	transaction.asset = asset;
-	transaction.txnFee = campos(element)
-		.find("td.small.text-muted.showTxnFee")
-		.text();
+	transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
 
 	transactions.push(transaction);
 };
