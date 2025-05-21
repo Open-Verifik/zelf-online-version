@@ -23,29 +23,6 @@ const makeApiRequest = async (url) => {
 // Convertir valores de satoshis a BTC
 const convertSatoshiToBTC = (satoshi) => satoshi / SATOSHI_TO_BTC;
 
-// Convertir valores en transacciones a formato extendido
-const convertTransactionValues = (transactions) => {
-	if (!Array.isArray(transactions)) {
-		transactions = [transactions];
-	}
-
-	return transactions.map((tx) => ({
-		...tx,
-		fee_satoshis: tx.fee,
-		fee_btc: convertSatoshiToBTC(tx.fee),
-		inputs: tx.inputs.map((input) => ({
-			...input,
-			value_satoshis: input.value,
-			value_btc: convertSatoshiToBTC(input.value),
-		})),
-		outputs: tx.outputs.map((output) => ({
-			...output,
-			value_satoshis: output.value,
-			value_btc: convertSatoshiToBTC(output.value),
-		})),
-	}));
-};
-
 // Obtener lista de transacciones
 const getTransactionsList = async (params, query = { show: "25" }) => {
 	const txsData = await makeApiRequest(
@@ -56,22 +33,28 @@ const getTransactionsList = async (params, query = { show: "25" }) => {
 
 	if (!txids.length) return { transactions: [] };
 
-	const response = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`);
+	const response = await makeApiRequest(
+		`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`
+	);
 
-	return { transactions: convertTransactionValues(response) };
+	return { transactions: extractTransactionData(response) };
 };
 
 // Obtener detalles de una transacción específica
 const getTransactionDetail = async (params) => {
-	const data = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`);
+	const data = await makeApiRequest(
+		`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`
+	);
 
-	return convertTransactionValues(data)[0];
+	return extractTransactionData(data);
 };
 
 // Obtener balance de una dirección
 const getBalance = async (params) => {
 	try {
-		const data = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`);
+		const data = await makeApiRequest(
+			`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`
+		);
 
 		const { price } = await getTickerPrice({ symbol: "BTC" });
 		const formatBTC = convertSatoshiToBTC(data.confirmed);
@@ -115,48 +98,52 @@ const getBalance = async (params) => {
 	}
 };
 
-const convertTestnetTransactionValues = (transactions) => {
-	if (!Array.isArray(transactions)) {
-		transactions = [transactions];
-	}
+function extractTransactionData(transactions) {
+	return transactions.map((tx) => {
+		const fromInput = tx.inputs.find((input) => input.address);
+		const toOutputs = tx.outputs.filter(
+			(output) => output.address && output.address !== fromInput?.address
+		);
 
-	return transactions.map((tx) => ({
-		fee_btc: convertSatoshiToBTC(tx.fee),
-		fee_satoshis: tx.fee,
-		fee: tx.fee,
-		locktime: tx.locktime,
-		size: tx.size,
-		status: tx.status.confirmed ? "success" : "pending",
-		version: tx.version,
-		weight: tx.weight,
-		inputs: tx.vin.map((input) => ({
-			address: input?.prevout?.scriptpubkey_address,
-			value: input?.prevout?.value,
-			value_btc: convertSatoshiToBTC(input?.prevout?.value),
-			value_satoshis: input?.prevout?.value,
-		})),
-		outputs: tx.vout.map((output) => ({
-			address: output.scriptpubkey_address,
-			value: output.value,
-			value_btc: convertSatoshiToBTC(output.value),
-			value_satoshis: output.value,
-		})),
-	}));
-};
+		const amountSats = toOutputs.reduce((sum, output) => sum + output.value, 0);
+		const amountBTC = amountSats / 1e8;
+
+		return {
+			hash: tx.txid,
+			amount: amountBTC,
+			amountSats: amountSats,
+			from: fromInput?.address || null,
+			to: toOutputs.map((output) => output.address),
+			networkFee: tx.fee / 1e8,
+			networkFeeSats: tx.fee,
+			networkFeePayer: fromInput?.address || null,
+			status: tx.block ? "confirmed" : "pending",
+			blockNumber: tx.block?.height || null,
+			logoURI: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
+			tokenType: "coin",
+			symbol: "BTC",
+			decimals: 8,
+		};
+	});
+}
 
 const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
-	const txsData = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}/txs`);
+	const txsData = await makeApiRequest(
+		`https://blockstream.info/testnet/api/address/${params.id}/txs`
+	);
 
 	const txids = txsData.map((tx) => tx.txid).join(",");
 
 	if (!txids.length) return { transactions: [] };
 
-	return { transactions: convertTestnetTransactionValues(txsData) };
+	return { transactions: extractTransactionData(txsData) };
 };
 
 const getTestnetBalance = async (params) => {
 	try {
-		const data = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}`);
+		const data = await makeApiRequest(
+			`https://blockstream.info/testnet/api/address/${params.id}`
+		);
 
 		const { price } = await getTickerPrice({ symbol: "BTC" });
 		const formatBTC = convertSatoshiToBTC(data.chain_stats.funded_txo_sum);
