@@ -416,7 +416,7 @@ const getTransactionStatus = async (params) => {
 			timestamp,
 			network: "ethereum",
 			symbol: "ETH",
-			imge: "https://etherscan.io/assets/svg/logos/ether-default-logo.svg",
+			image: "https://etherscan.io/assets/svg/logos/ether-default-logo.svg",
 			age: timestamp2,
 			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
