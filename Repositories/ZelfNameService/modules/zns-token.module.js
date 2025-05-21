@@ -71,14 +71,14 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 			// Use sendWithRetry for reliable account creation
 			const createSignature = await sendWithRetry(createTransaction, [senderWallet], 3);
 
-			console.log("Receiver Token Account created successfully:", createSignature);
+			// console.log("Receiver Token Account created successfully:", createSignature);
 
 			// Confirm the creation before proceeding
 			await connection.confirmTransaction(createSignature, "finalized");
 		}
 
 		// Proceed with the token transfer
-		console.log("PRE - > Creating Transfer Instruction");
+		// console.log("PRE - > Creating Transfer Instruction");
 
 		const transferInstruction = splToken.createTransferCheckedInstruction(
 			senderTokenAccount.address, // Sender's token account
@@ -94,7 +94,7 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 		// Use sendWithRetry for reliable token transfer
 		const transferSignature = await sendWithRetry(transferTransaction, [senderWallet]);
 
-		console.log("Transaction successful, signature:", transferSignature, { transferTransaction });
+		// console.log("Transaction successful, signature:", transferSignature, { transferTransaction });
 
 		return transferSignature;
 	} catch (error) {
@@ -256,7 +256,7 @@ const releasePurchaseRewards = async (authUser) => {
 	}
 
 	try {
-		console.log("Processing purchase reward:", purchaseReward);
+		// console.log("Processing purchase reward:", purchaseReward);
 
 		const signature = await giveTokensAfterPurchase(250, purchaseReward.solanaAddress);
 
