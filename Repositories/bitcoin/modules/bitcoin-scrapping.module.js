@@ -1,7 +1,7 @@
 const { getCleanInstance } = require("../../../Core/axios");
 const { generateRandomUserAgent } = require("../../../Core/helpers");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-
+const moment = require("moment");
 const instance = getCleanInstance(30000);
 const SATOSHI_TO_BTC = 100000000;
 
@@ -59,8 +59,8 @@ const getTransactionsList = async (params, query = { show: "25" }) => {
 	const response = await makeApiRequest(
 		`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`
 	);
-
-	return { transactions: extractTransactionData(response) };
+	const userAddress = params.id;
+	return { transactions: await extractTransactionData(response, userAddress) };
 };
 
 // Obtener detalles de una transacción específica
@@ -69,7 +69,7 @@ const getTransactionDetail = async (params) => {
 		`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`
 	);
 
-	return extractTransactionData(data)[0];
+	return extractTransactionData([data]);
 };
 
 // Obtener balance de una dirección
@@ -102,7 +102,7 @@ const getBalance = async (params) => {
 						address: params.id,
 						amount: formatBTC.toString(),
 						decimals: 8,
-						fiatBalance: (formatBTC * price).toString(),
+						fiatBalance: formatBTC * price,
 						image: "https://static.okx.com/cdn/wallet/logo/BTC.png",
 						name: "Bitcoin",
 						network: "Bitcoin",
@@ -115,6 +115,7 @@ const getBalance = async (params) => {
 			transactions,
 		};
 	} catch (e) {
+		console.log(e);
 		const error = new Error("not_found");
 		error.status = 404;
 		throw error;
@@ -196,7 +197,7 @@ const getTestnetBalance = async (params) => {
 						name: "Testnet Bitcoin",
 						network: "Bitcoin",
 						price: price,
-						symbol: "tBTC",
+						symbol: "BTC",
 						tokenType: "BTC",
 					},
 				],
@@ -257,8 +258,12 @@ function analizarTransaccion(tx, direccionPropia) {
 
 	return resultado;
 }
-function extractTransactionData(transactions) {
-	console.log(transactions);
+
+async function extractTransactionData(transactions, userAddress) {
+	const { price: btcPrice } = await getTickerPrice({ symbol: "BTC" });
+
+	if (!btcPrice) throw new Error("Could not retrieve BTC price");
+
 	return transactions.map((tx) => {
 		const fromInput = tx.inputs.find((input) => input.address);
 		const toOutputs = tx.outputs.filter(
@@ -267,22 +272,36 @@ function extractTransactionData(transactions) {
 
 		const amountSats = toOutputs.reduce((sum, output) => sum + output.value, 0);
 		const amountBTC = amountSats / 1e8;
+		const fiatAmount = amountBTC * btcPrice;
+
+		const txMoment = moment.unix(tx.time);
+		const isOutgoing = tx.inputs.some((input) => input.address === userAddress);
+		const isIncoming = tx.outputs.some(
+			(output) => output.address === userAddress
+		);
+
+		let traffic = "OUT";
+		if (!isOutgoing && isIncoming) traffic = "IN";
+		if (isOutgoing && isIncoming) traffic = "OUT";
 
 		return {
 			hash: tx.txid,
-			amount: amountBTC,
+			amount: amountBTC.toString(),
 			amountSats: amountSats,
-			from: fromInput?.address || null,
+			fiatAmount: fiatAmount.toFixed(2),
+			from: fromInput?.address || "",
 			to: toOutputs.map((output) => output.address),
-			txnFee: tx.fee / 1e8,
-			txnFeeSats: tx.fee,
-			networkFeePayer: fromInput?.address || null,
-			status: tx.block ? "Success" : "Pending",
-			block: tx.block?.height.toString() || null,
+			txnFee: (tx.fee / 1e8).toString(),
+			txnFeeSats: tx.fee.toString(),
+			networkFeePayer: fromInput?.address || "",
+			status: tx.block.height ? "Success" : "Pending",
+			block: tx.block?.height?.toString() || "",
 			logoURI: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
-			tokenType: "coin",
 			asset: "BTC",
 			decimals: 8,
+			date: txMoment.format("YYYY-MM-DD HH:mm:ss"),
+			age: txMoment.fromNow(),
+			traffic,
 		};
 	});
 }
