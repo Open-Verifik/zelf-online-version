@@ -260,7 +260,7 @@ const getTransactionStatus = async (params) => {
 		const $ = cheerio.load(data);
 		const tokensTransferred = [];
 		const transactionType =
-			$("#wrapperContent > div > div > span:nth-child(1)").text() || "Call";
+			$("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
 
 		try {
 			const transactionDetailsHtml = $("#nav_tabcontent_erc20_transfer").html();
