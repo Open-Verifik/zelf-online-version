@@ -56,22 +56,31 @@ const getTransactionsList = async (params, query = { show: "25" }) => {
 
 	if (!txids.length) return { transactions: [] };
 
-	const response = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`);
+	const response = await makeApiRequest(
+		`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`
+	);
 
 	return { transactions: convertTransactionValues(response) };
 };
 
 // Obtener detalles de una transacción específica
 const getTransactionDetail = async (params) => {
-	const data = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`);
-
+	const data = await makeApiRequest(
+		`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`
+	);
+	console.log(
+		analizarTransaccion(convertTransactionValues(data)[0]),
+		"bc1qnwrhw47ynkcrk5z205txsqz8ms9dq70rz097v4"
+	);
 	return convertTransactionValues(data)[0];
 };
 
 // Obtener balance de una dirección
 const getBalance = async (params) => {
 	try {
-		const data = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`);
+		const data = await makeApiRequest(
+			`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`
+		);
 
 		const { price } = await getTickerPrice({ symbol: "BTC" });
 		const formatBTC = convertSatoshiToBTC(data.confirmed);
@@ -145,7 +154,9 @@ const convertTestnetTransactionValues = (transactions) => {
 };
 
 const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
-	const txsData = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}/txs`);
+	const txsData = await makeApiRequest(
+		`https://blockstream.info/testnet/api/address/${params.id}/txs`
+	);
 
 	const txids = txsData.map((tx) => tx.txid).join(",");
 
@@ -156,7 +167,9 @@ const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
 
 const getTestnetBalance = async (params) => {
 	try {
-		const data = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}`);
+		const data = await makeApiRequest(
+			`https://blockstream.info/testnet/api/address/${params.id}`
+		);
 
 		const { price } = await getTickerPrice({ symbol: "BTC" });
 		const formatBTC = convertSatoshiToBTC(data.chain_stats.funded_txo_sum);
@@ -199,6 +212,54 @@ const getTestnetBalance = async (params) => {
 		throw error;
 	}
 };
+function analizarTransaccion(tx, direccionPropia) {
+	let totalEntrada = 0;
+	let totalSalida = 0;
+	let salidaPropia = 0;
+	let entradaPropia = 0;
+
+	// Entradas (inputs)
+	tx.inputs.forEach((input) => {
+		if (input.address === direccionPropia) {
+			entradaPropia += input.value_satoshis;
+		}
+		totalEntrada += input.value_satoshis;
+	});
+
+	// Salidas (outputs)
+	tx.outputs.forEach((output) => {
+		// Algunos outputs como OP_RETURN no tienen dirección
+		if (output.address === direccionPropia) {
+			salidaPropia += output.value_satoshis;
+		}
+		totalSalida += output.value_satoshis;
+	});
+
+	const fueEnviada = entradaPropia > 0;
+	const fueRecibida = salidaPropia > entradaPropia;
+
+	const resultado = {
+		direccion: direccionPropia,
+		tipo: "",
+		enviado: entradaPropia,
+		recibido: salidaPropia,
+		totalEntrada,
+		totalSalida,
+		fee: tx.fee_satoshis || totalEntrada - totalSalida,
+	};
+
+	if (fueEnviada && !fueRecibida) {
+		resultado.tipo = "enviada";
+	} else if (!fueEnviada && fueRecibida) {
+		resultado.tipo = "recibida";
+	} else if (fueEnviada && fueRecibida) {
+		resultado.tipo = "mixta";
+	} else {
+		resultado.tipo = "irrelevante";
+	}
+
+	return resultado;
+}
 
 module.exports = {
 	getBalance,
