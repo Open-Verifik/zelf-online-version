@@ -11,6 +11,9 @@ const schemas = {
 		page: string().required(),
 		show: showRecords().required(),
 	},
+	validateTransactionId: {
+		id: string().required(),
+	},
 	validateToken: {
 		page: string(),
 		show: showRecords(),
@@ -69,9 +72,23 @@ const validateAddressTransactions = async (ctx, next) => {
 	await next();
 };
 
+const validateTransactionId = async (ctx, next) => {
+	const valid = validate(schemas.validateTransactionId, ctx.request.params);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	validateAddress,
 	validateTransactionHashs,
 	validateAddressTransactions,
 	validateToken,
+	validateTransactionId,
 };

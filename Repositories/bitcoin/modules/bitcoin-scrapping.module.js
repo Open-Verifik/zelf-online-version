@@ -31,6 +31,9 @@ const convertTransactionValues = (transactions) => {
 
 	return transactions.map((tx) => ({
 		...tx,
+		date: tx.time,
+		hash: tx.txid,
+		network: "bitcoin",
 		fee_satoshis: tx.fee,
 		fee_btc: convertSatoshiToBTC(tx.fee),
 		inputs: tx.inputs.map((input) => ({
