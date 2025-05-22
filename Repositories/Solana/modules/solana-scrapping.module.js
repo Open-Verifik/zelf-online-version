@@ -3,8 +3,8 @@ const instance = getCleanInstance(30000);
 const { generateRandomUserAgent } = require("../../../Core/helpers");
 const oklink = require("./oklink");
 const solscan = require("./solscan");
-const cheerio = require("cheerio");
 const moment = require("moment");
+const { getTickerPrice } = require("../../binance/modules/binance.module");
 /**
  * @param {*} params
  */
@@ -44,47 +44,58 @@ const getTransaction = async (params, query) => {
 		const [txData] = await oklink.getTransaction(params, query);
 		const tokens = txData?.innerMainAction?.innerMainAction || [];
 
-		const { data: html } = await instance.get(
-			`https://www.oklink.com/solana/tx/${params.id}`,
-			{},
+		let body = JSON.stringify({
+			method: "getTransaction",
+			jsonrpc: "2.0",
+			params: [
+				params.id,
+				{
+					encoding: "jsonParsed",
+					commitment: "confirmed",
+					maxSupportedTransactionVersion: 0,
+				},
+			],
+			id: "57cfb101-62b9-4ab0-b33e-0914f9121075",
+		});
+
+		const { data } = await instance.post(
+			`https://explorer-api.mainnet-beta.solana.com`,
+			body,
 			{
 				headers: {
-					"user-agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-					"x-cdn": "https://static.oklink.com",
+					origin: "https://explorer.solana.com",
+					"Content-Type": "application/json",
 				},
 			}
 		);
-
-		const $ = cheerio.load(html);
-
-		const status = $("div.index_content__fCFMK > div > div > div")
-			.first()
-			.text();
-		const block = $("div.index_content__fCFMK > div > a").first().text();
-		const timestamp = $("div.index_content__fCFMK > div > div").eq(1).text();
-
-		const solValue = $(".text-ellipsis").first().text().trim();
-		const valueDolar = $(".text-ellipsis").eq(1).text().trim();
-
-		const fecha = moment(timestamp, "MM/DD/YYYY, HH:mm:ss");
+		const { price: price } = await getTickerPrice({ symbol: "SOL" });
+		const status = data.result.meta.status.Ok == null ? "Success" : "Failed";
+		const block = data.result.slot.toString();
+		const timestamp = data.result.blockTime.toString();
+		const transactionFeeNetwork = data.result.meta.fee.toString();
+		const date = moment.unix(timestamp);
 
 		return {
 			transactionType: tokens.length ? "swap" : "transfer",
 			hash: params.id,
+			id: params.id,
 			status,
 			block,
 			timestamp,
 			network: "solana",
-			symbol: txData.symbol,
-			imge: txData.logoUrl,
-			age: fecha.fromNow(),
-			data: fecha.format("YYYY-MM-DD HH:mm:ss"),
-			from: txData.from,
-			to: txData.to,
-			amount: txData.lamports,
-			transactionFeeSOL: solValue,
-			transactionFeeDolar: valueDolar,
+			symbol: txData?.symbol,
+			image: txData?.logoUrl,
+			age: date.fromNow(),
+			data: date.format("YYYY-MM-DD HH:mm:ss"),
+			from: txData?.from,
+			to: txData?.to,
+			amount: txData?.lamports,
+			valueDolar: (txData?.lamports * price).toString(),
+			transactionFeeNetwork: (transactionFeeNetwork / 1000000000).toString(),
+			transactionFeeDolar: (
+				(transactionFeeNetwork / 1000000000) *
+				price
+			).toString(),
 			tokensTransferred: formatSolanaTransfers(tokens),
 		};
 	} catch (error) {

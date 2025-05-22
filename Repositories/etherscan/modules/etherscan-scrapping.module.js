@@ -358,7 +358,7 @@ const getTransactionStatus = async (params) => {
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valueETH = $(
+		const valueNetwork = $(
 			"#ContentPlaceHolder1_spanValue > div > span:nth-child(2)"
 		)
 			.text()
@@ -373,7 +373,7 @@ const getTransactionStatus = async (params) => {
 			.replace(")", "")
 			.trim();
 
-		const transactionFeeETH = $(
+		const transactionFeeNetwork = $(
 			"#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)"
 		)
 			.text()
@@ -393,7 +393,7 @@ const getTransactionStatus = async (params) => {
 			.split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gweiETH = gasPriceGwei[1]
+		const gwei = gasPriceGwei[1]
 			.replace("(", "")
 			.replace(")", "")
 			.replace("ETH", "")
@@ -421,12 +421,12 @@ const getTransactionStatus = async (params) => {
 			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
 			to,
-			valueETH,
+			valueNetwork,
 			valueDolar,
-			transactionFeeETH,
+			transactionFeeNetwork,
 			transactionFeeDolar,
 			gasPrice,
-			gweiETH,
+			gwei,
 			observation,
 			tokensTransferred,
 		};

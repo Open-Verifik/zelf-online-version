@@ -278,32 +278,31 @@ const getTransactionDetail = async (params) => {
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valueAVAX = $("#ContentPlaceHolder1_spanValue > div > ")
+		const valueNetwork = $("#ContentPlaceHolder1_spanValue > div > ")
 			.text()
 			.replace("AVAX", "")
+			.split("$")[0]
 			.trim();
 
-		const valueDolar = $(
-			"#ContentPlaceHolder1_spanValue > div > span.text-muted"
-		)
-			.text()
-			.replace("($", "")
-			.replace(")", "")
-			.trim();
-
-		const transactionFeeAVAX = $(
+		const valueDolar =
+			$("#ContentPlaceHolder1_spanValue > div > span.text-muted")
+				.text()
+				.trim() ||
+			$("#ContentPlaceHolder1_spanValue > div > ")
+				.text()
+				.replace("AVAX", "")
+				.split("$")[1]
+				.trim();
+		const transactionFeeNetwork = $(
 			"#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)"
 		)
 			.text()
 			.replace("AVAX", "")
 			.trim();
 
-		const transactionFeeDolar = $(
-			"#ContentPlaceHolder1_spanTxFee > div > span.text-muted"
-		)
+		const transactionFeeDolar = $("#data-tfprice")
 			.text()
-			.replace("($", "")
-			.replace(")", "")
+			.replace("$", "")
 			.trim();
 
 		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice")
@@ -311,7 +310,7 @@ const getTransactionDetail = async (params) => {
 			.split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gweiAVAX = gasPriceGwei[1]
+		const gwei = gasPriceGwei[1]
 			.replace("(", "")
 			.replace(")", "")
 			.replace("AVAX", "")
@@ -339,12 +338,12 @@ const getTransactionDetail = async (params) => {
 			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
 			to,
-			valueAVAX,
+			valueNetwork,
 			valueDolar,
-			transactionFeeAVAX,
+			transactionFeeNetwork,
 			transactionFeeDolar,
 			gasPrice,
-			gweiAVAX,
+			gwei,
 			observation,
 			tokensTransferred,
 		};
