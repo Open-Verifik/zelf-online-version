@@ -295,13 +295,13 @@ const getTransactionStatus = async (params) => {
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valueNetwork = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
+		const amount = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
 
-		const valueDolar = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const fiatAmount = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
 		const transactionFeeNetwork = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
 
-		const transactionFeeDolar = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const transactionFeeFiat = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
 		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
 
@@ -324,10 +324,10 @@ const getTransactionStatus = async (params) => {
 			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
 			to,
-			valueNetwork,
-			valueDolar,
+			amount: Number(amount),
+			fiatAmount: Number(fiatAmount),
 			transactionFeeNetwork,
-			transactionFeeDolar,
+			transactionFeeFiat: Number(transactionFeeFiat),
 			gasPrice,
 			gwei,
 			observation,
