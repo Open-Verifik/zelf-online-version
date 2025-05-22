@@ -75,7 +75,7 @@ const insert = async (params) => {
 	try {
 		await session.save();
 	} catch (exception) {
-		console.log({
+		console.error({
 			exception,
 			identifier: params.clientIP,
 			...session,
