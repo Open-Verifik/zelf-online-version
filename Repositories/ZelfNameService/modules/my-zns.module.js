@@ -9,7 +9,6 @@ const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const ZNSPartsModule = require("./zns-parts.module");
 const { addReferralReward, addPurchaseReward, getPurchaseReward } = require("./zns-token.module");
-const MongoORM = require("../../../Core/mongo-orm");
 
 const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
 	const chargeID = coinbase_hosted_url?.split("/pay/")[1];
