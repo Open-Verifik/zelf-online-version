@@ -86,16 +86,13 @@ const getTransaction = async (params, query) => {
 			symbol: txData?.symbol,
 			image: txData?.logoUrl,
 			age: date.fromNow(),
-			data: date.format("YYYY-MM-DD HH:mm:ss"),
+			date: date.format("YYYY-MM-DD HH:mm:ss"),
 			from: txData?.from,
 			to: txData?.to,
 			amount: txData?.lamports,
 			valueDolar: (txData?.lamports * price).toString(),
 			transactionFeeNetwork: (transactionFeeNetwork / 1000000000).toString(),
-			transactionFeeDolar: (
-				(transactionFeeNetwork / 1000000000) *
-				price
-			).toString(),
+			transactionFeeDolar: ((transactionFeeNetwork / 1000000000) * price).toString(),
 			tokensTransferred: formatSolanaTransfers(tokens),
 		};
 	} catch (error) {
