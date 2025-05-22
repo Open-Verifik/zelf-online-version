@@ -104,7 +104,6 @@ const getTransactions = async (params, query) => {
 };
 
 function formatSolanaTransfers(transfers) {
-	console.log({ transfers });
 	return transfers.map((tx) => ({
 		from: tx.from,
 		to: tx.to,
