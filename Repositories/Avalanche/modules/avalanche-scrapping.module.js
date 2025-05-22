@@ -8,8 +8,7 @@ const instance = axios.create({ timeout: 30000 });
 
 // Crear instancia https que ignora certificados SSL inválidos
 const https = require("https");
-const { hash } = require("crypto");
-const { fail } = require("assert");
+
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 /**
