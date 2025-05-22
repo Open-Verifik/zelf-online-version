@@ -18,6 +18,7 @@ const jwt = require("jsonwebtoken");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
 const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const { createUnderName } = require("./undernames.module");
+const { initTagUpdates, updateTags } = require("./sync-zelf-name-records.module");
 
 /**
  * lease zelfName
@@ -97,6 +98,7 @@ const leaseZelfName = async (params, authUser) => {
  */
 const decryptZelfName = async (params, authUser) => {
 	const zelfNameObjects = await _findZelfName({ zelfName: params.zelfName }, "both", authUser);
+
 	const zelfNameObject = zelfNameObjects[0];
 
 	const { face, password } = await _decryptParams(params, authUser);
@@ -116,23 +118,10 @@ const decryptZelfName = async (params, authUser) => {
 
 	const { mnemonic, zkProof, solanaSecretKey } = decryptedZelfProof.metadata;
 
-	let sui = {};
+	const { encryptedMessage, privateKey, requiresUpdate } = await initTagUpdates(zelfNameObject, mnemonic);
 
-	if (!zelfNameObject.publicData.suiAddress) {
-		sui = await generateSuiWalletFromMnemonic(mnemonic);
-
-		zelfNameObject.publicData.suiAddress = sui.address;
-	}
-
-	const { encryptedMessage, privateKey } = await SessionModule.walletEncrypt(
-		{ mnemonic, zkProof, solanaSecretKey, suiSecretKey: sui.secretKey },
-		zelfNameObject.publicData.ethAddress,
-		password
-	);
-
-	if (!zelfNameObject.publicData.btcAddress.startsWith("bc1")) {
-		zelfNameObject.publicData.btcAddress = createBTCWallet(mnemonic).address;
-		decryptedZelfProof.publicData.btcAddress = zelfNameObject.publicData.btcAddress;
+	if (requiresUpdate) {
+		await updateTags(zelfNameObject, sui);
 	}
 
 	return {
@@ -658,8 +647,6 @@ const leaseOffline = async (params, authUser) => {
 	};
 
 	if (!_preview) _preview = await preview({ zelfProof });
-
-	console.log({ _preview, zelfProof });
 
 	if (!zelfName.includes(_preview.publicData.zelfName.toLowerCase())) {
 		const error = new Error("zelfName_does_not_match_in_zelfProof");
