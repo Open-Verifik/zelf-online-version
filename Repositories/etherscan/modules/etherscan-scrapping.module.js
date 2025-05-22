@@ -5,9 +5,7 @@ const moment = require("moment");
 const https = require("https");
 const cheerio = require("cheerio");
 
-const {
-	idAseet_,
-} = require("../../dataAnalytics/modules/dataAnalytics.module");
+const { idAseet_ } = require("../../dataAnalytics/modules/dataAnalytics.module");
 const { getCleanInstance } = require("../../../Core/axios");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
@@ -29,10 +27,7 @@ const getAddress = async (params) => {
 	try {
 		const address = params.address;
 
-		const { data } = await instance.get(
-			`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=${apiKey}`,
-			{}
-		);
+		const { data } = await instance.get(`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=${apiKey}`, {});
 
 		const { price: price } = await getTickerPrice({ symbol: "ETH" });
 
@@ -45,8 +40,7 @@ const getAddress = async (params) => {
 						parseInt(tokenInfo.decimals).toString().length > 3
 							? Number(String(parseInt(tokenInfo.decimals)).slice(0, 2))
 							: parseInt(tokenInfo.decimals);
-					const formattedAmount =
-						parseFloat(rawBalance) / Math.pow(10, decimals);
+					const formattedAmount = parseFloat(rawBalance) / Math.pow(10, decimals);
 					const fiatBalance = formattedAmount * rate;
 					let idAseet;
 					try {
@@ -83,8 +77,7 @@ const getAddress = async (params) => {
 			symbol: "ETH",
 			name: "Ethereum",
 			price: price,
-			image:
-				"https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+			image: "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
 			amount: data.ETH.balance.toString(),
 		});
 
@@ -128,8 +121,7 @@ const getGasTracker = async (params) => {
 	try {
 		let { data } = await instance.get(`${baseUrl}/gastracker`, {
 			headers: {
-				"user-agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
@@ -144,11 +136,7 @@ const getGasTracker = async (params) => {
 		const highGwei = $("#spanHighPrice").text().replace(/\n/g, "").trim();
 
 		const lowPriorityAndBase = $("#spanLowPriorityAndBase").text().trim();
-		const lowTime = $('span[data-bs-trigger="hover"]')
-			.first()
-			.text()
-			.replace("~ ", "")
-			.trim();
+		const lowTime = $('span[data-bs-trigger="hover"]').first().text().replace("~ ", "").trim();
 		const priceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -158,11 +146,7 @@ const getGasTracker = async (params) => {
 		const lowPriority = parseFloat(lowNumbers[1]).toString();
 
 		const avgPriorityAndBase = $("#spanProposePriorityAndBase").text().trim();
-		const averageTime = $('span[data-bs-trigger="hover"]')
-			.eq(1)
-			.text()
-			.replace("~ ", "")
-			.trim();
+		const averageTime = $('span[data-bs-trigger="hover"]').eq(1).text().replace("~ ", "").trim();
 		const avgPriceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -171,11 +155,7 @@ const getGasTracker = async (params) => {
 		const avgPriority = parseFloat(avgNumbers[1]).toString();
 
 		const highPriorityAndBase = $("#spanHighPriorityAndBase").text().trim();
-		const highTime = $('span[data-bs-trigger="hover"]')
-			.eq(2)
-			.text()
-			.replace("~ ", "")
-			.trim();
+		const highTime = $('span[data-bs-trigger="hover"]').eq(2).text().replace("~ ", "").trim();
 		const highPriceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -184,28 +164,23 @@ const getGasTracker = async (params) => {
 		const highPriority = parseFloat(highNumbers[1]).toString();
 
 		const featuredActions = [];
-		$(
-			"#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr"
-		).each((index, element) => {
-			const action = $(element).find("td span").text().trim();
-			const low = $(element).find("td").eq(1).text().replace("$", "").trim();
-			const average = $(element)
-				.find("td")
-				.eq(2)
-				.text()
-				.replace("$", "")
-				.trim();
-			const high = $(element).find("td").eq(3).text().replace("$", "").trim();
+		$("#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr").each(
+			(index, element) => {
+				const action = $(element).find("td span").text().trim();
+				const low = $(element).find("td").eq(1).text().replace("$", "").trim();
+				const average = $(element).find("td").eq(2).text().replace("$", "").trim();
+				const high = $(element).find("td").eq(3).text().replace("$", "").trim();
 
-			if (action) {
-				featuredActions.push({
-					action,
-					low,
-					average,
-					high,
-				});
+				if (action) {
+					featuredActions.push({
+						action,
+						low,
+						average,
+						high,
+					});
+				}
 			}
-		});
+		);
 
 		// Formar el objeto de respuesta final.
 		const response = {
@@ -251,16 +226,14 @@ const getTransactionStatus = async (params) => {
 
 		const { data } = await instance.get(`${baseUrl}/tx/${id}`, {
 			headers: {
-				"user-agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
 
 		const $ = cheerio.load(data);
 		const tokensTransferred = [];
-		const transactionType =
-			$("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
+		const transactionType = $("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
 
 		try {
 			const transactionDetailsHtml = $("#nav_tabcontent_erc20_transfer").html();
@@ -269,30 +242,13 @@ const getTransactionStatus = async (params) => {
 
 			$$(".row-count").each((i, elem) => {
 				const $elem = $$(elem);
-				const from = $elem
-					.find('span.fw-medium:contains("From")')
-					.next("a")
-					.attr("data-highlight-target");
-				const to = $elem
-					.find('span.fw-medium:contains("To")')
-					.next("a")
-					.attr("data-highlight-target");
-				const amount = $elem
-					.find('span.fw-medium:contains("For")')
-					.next("span")
-					.text();
+				const from = $elem.find('span.fw-medium:contains("From")').next("a").attr("data-highlight-target");
+				const to = $elem.find('span.fw-medium:contains("To")').next("a").attr("data-highlight-target");
+				const amount = $elem.find('span.fw-medium:contains("For")').next("span").text();
 				const tokenElement = $elem.find('a[href*="/token/"]').last();
-				const tokenName = tokenElement
-					.find('span[data-bs-toggle="tooltip"]')
-					.first()
-					.text()
-					.trim();
+				const tokenName = tokenElement.find('span[data-bs-toggle="tooltip"]').first().text().trim();
 
-				const symbol = tokenElement
-					.find("span > span.text-muted > span")
-					.first()
-					.text()
-					.trim();
+				const symbol = tokenElement.find("span > span.text-muted > span").first().text().trim();
 
 				const icon = tokenElement.find("img").attr("src");
 
@@ -308,32 +264,15 @@ const getTransactionStatus = async (params) => {
 			});
 		} catch (error) {}
 
-		const status = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge"
-		)
-			.text()
-			.split(" ")[0]
-			.trim();
+		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge").text().split(" ")[0].trim();
 
 		const block = $(
 			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
 		).text();
 
-		const timestamp2 = $(
-			"#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9"
-		)
-			.text()
-			.trim()
-			.replace(/\n/g, "")
-			.split("|")[0]
-			.split(" (")[0];
+		const timestamp2 = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0].split(" (")[0];
 
-		const timestamp = $(
-			"#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9"
-		)
-			.text()
-			.trim()
-			.split("|")[0];
+		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().split("|")[0];
 
 		const date = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9")
 			.text()
@@ -344,9 +283,7 @@ const getTransactionStatus = async (params) => {
 			.replace(" AM UTC)", "")
 			.replace(" PM UTC)", "");
 
-		const from_a = $(
-			"#ContentPlaceHolder1_maintable div.from-address-col"
-		).html();
+		const from_a = $("#ContentPlaceHolder1_maintable div.from-address-col").html();
 
 		const from_div = cheerio.load(from_a);
 
@@ -358,54 +295,20 @@ const getTransactionStatus = async (params) => {
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valueNetwork = $(
-			"#ContentPlaceHolder1_spanValue > div > span:nth-child(2)"
-		)
-			.text()
-			.replace("ETH", "")
-			.trim();
+		const valueNetwork = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
 
-		const valueDolar = $(
-			"#ContentPlaceHolder1_spanValue > div > span.text-muted"
-		)
-			.text()
-			.replace("($", "")
-			.replace(")", "")
-			.trim();
+		const valueDolar = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
-		const transactionFeeNetwork = $(
-			"#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)"
-		)
-			.text()
-			.replace("ETH", "")
-			.trim();
+		const transactionFeeNetwork = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
 
-		const transactionFeeDolar = $(
-			"#ContentPlaceHolder1_spanTxFee > div > span.text-muted"
-		)
-			.text()
-			.replace("($", "")
-			.replace(")", "")
-			.trim();
+		const transactionFeeDolar = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
-		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice")
-			.text()
-			.split("Gwei");
+		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gwei = gasPriceGwei[1]
-			.replace("(", "")
-			.replace(")", "")
-			.replace("ETH", "")
-			.trim();
+		const gwei = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
 
-		const observation = $(
-			"#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span"
-		)
-			.text()
-			.replace("[", "")
-			.replace("]", "")
-			.trim();
+		const observation = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span").text().replace("[", "").replace("]", "").trim();
 
 		const response = {
 			transactionType,
@@ -459,33 +362,19 @@ const getTransactionsList = async (params) => {
 	const baseUrl = baseUrls[params.env || environment];
 
 	try {
-		const { data } = await instance.get(
-			`${baseUrl}/txs?a=${address}&ps=${show}&p=${page}`,
-			{
-				headers: {
-					"user-agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-					"Upgrade-Insecure-Requests": "1",
-				},
-			}
-		);
+		const { data } = await instance.get(`${baseUrl}/txs?a=${address}&ps=${show}&p=${page}`, {
+			headers: {
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"Upgrade-Insecure-Requests": "1",
+			},
+		});
 
 		const $ = cheerio.load(data);
 
 		const transactions = [];
 
-		const records = $(
-			"#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span"
-		)
-			.text()
-			.match(/\d+/g)
-			.join("");
-		const nPage = $(
-			"#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)"
-		)
-			.text()
-			.replace("Page", "")
-			.split("of");
+		const records = $("#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span").text().match(/\d+/g).join("");
+		const nPage = $("#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)").text().replace("Page", "").split("of");
 
 		const pagination = {
 			records,
@@ -493,30 +382,21 @@ const getTransactionsList = async (params) => {
 			page: nPage ? nPage?.[0]?.trim() : 0,
 		};
 
-		const tabla = $(
-			"#ContentPlaceHolder1_divTransactions > div.table-responsive"
-		).html();
+		const tabla = $("#ContentPlaceHolder1_divTransactions > div.table-responsive").html();
 		const campos = cheerio.load(tabla);
 
 		campos("tbody tr").each((_index, element) => {
 			const transaction = {};
 
-			transaction.hash = campos(element)
-				.find("td:nth-child(2) a")
-				.text()
-				.trim();
-			transaction.method = campos(element)
-				.find("td:nth-child(3) span")
-				.attr("data-title");
+			transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
+			transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
 
 			transaction.block = campos(element).find("td:nth-child(5) a").text();
 			//#ContentPlaceHolder1_divTransactions > div.table-responsive > table > tbody > tr:nth-child(1) > td.showAge
 			transaction.age = campos(element).find("td.showAge").text();
 
 			//#ContentPlaceHolder1_divTransactions > div.table-responsive > table > tbody > tr:nth-child(1) > td.showAge > span
-			transaction.date = campos(element)
-				.find(" td.showAge > span")
-				.attr("data-bs-title");
+			transaction.date = campos(element).find(" td.showAge > span").attr("data-bs-title");
 
 			const divFrom = campos(element).find("td:nth-child(9)").html();
 
@@ -532,25 +412,14 @@ const getTransactionsList = async (params) => {
 
 			transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
 
-			let _amount = campos(element)
-				.find("td:nth-child(12)")
-				.text()
-				.split("$")[0]
-				.trim();
+			let _amount = campos(element).find("td:nth-child(12)").text().split("$")[0].trim();
 
 			_amount = _amount.split(" ");
 
-			transaction.fiatAmount = campos(element)
-				.find("td:nth-child(12)")
-				.text()
-				.split("$")[1]
-				.replace(/\n/g, "")
-				.trim();
+			transaction.fiatAmount = campos(element).find("td:nth-child(12)").text().split("$")[1].replace(/\n/g, "").trim();
 			transaction.amount = _amount[0];
 			transaction.asset = _amount[1];
-			transaction.txnFee = campos(element)
-				.find("td.small.text-muted.showTxnFee")
-				.text();
+			transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
 
 			transactions.push(transaction);
 		});
@@ -584,8 +453,7 @@ const getTransactionStatusV2 = async (params) => {
 			httpsAgent: agent,
 			headers: {
 				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 			},
 		});
 
@@ -619,18 +487,13 @@ const getTransactionStatusV2 = async (params) => {
 				httpsAgent: agent,
 				headers: {
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 				},
 			});
 
 			if (!response.data?.data?.hits) return transaction;
 
-			for (
-				let index = response.data.data.hits.length - 1;
-				index >= 0;
-				index--
-			) {
+			for (let index = response.data.data.hits.length - 1; index >= 0; index--) {
 				const hit = response.data.data.hits[index];
 
 				if (hit.from !== details.to || hit.to !== details.from) continue;
