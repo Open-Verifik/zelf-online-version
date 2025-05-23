@@ -112,12 +112,13 @@ const decryptParams = async (data, authUser) => {
 	return { password, mnemonic, face };
 };
 
-const formatArweaveSearchResult = async (transactionRecord) => {
+const formatArweaveRecord = async (transactionRecord) => {
 	const zelfNameObject = {
 		id: transactionRecord.node?.id,
 		url: `${arweaveUrl}/${transactionRecord.node?.id}`,
 		explorerUrl: `${explorerUrl}/${transactionRecord.node?.id}`,
 		publicData: {},
+		zelfProofQRCode: await ArweaveModule.arweaveIDToBase64(transactionRecord.node?.id),
 	};
 
 	for (let index = 0; index < transactionRecord.node?.tags.length; index++) {
@@ -134,14 +135,11 @@ const formatArweaveSearchResult = async (transactionRecord) => {
 
 	zelfNameObject.zelfProof = zelfProofTag ? zelfProofTag.value : null;
 
-	zelfNameObject.zelfName = zelfNameTag.value;
-
-	zelfNameObject.zelfProofQRCode = await ArweaveModule.arweaveIDToBase64(zelfNameObject.id);
+	zelfNameObject.zelfName = zelfNameTag ? zelfNameTag.value : null;
 
 	if (zelfNameObject.publicData.extraParams) {
 		const extraParams = JSON.parse(zelfNameObject.publicData.extraParams);
 
-		// assign all extraParams properties to the publicData
 		Object.assign(zelfNameObject.publicData, extraParams);
 
 		delete zelfNameObject.publicData.extraParams;
@@ -252,6 +250,24 @@ const urlToBase64 = async (url) => {
 	}
 };
 
+const _arweaveIDToBase64 = async (id) => {
+	try {
+		const encryptedResponse = await axios.get(`${arweaveUrl}/${id}`, {
+			responseType: "arraybuffer",
+		});
+
+		if (encryptedResponse?.data) {
+			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
+
+			return `data:image/png;base64,${base64Image}`;
+		}
+	} catch (exception) {
+		console.error({ VWEx: exception });
+
+		return exception?.message;
+	}
+};
+
 const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
 	const { eth, solana, sui } = addresses;
 	const { mnemonic, zkProof } = dataToEncrypt.metadata;
@@ -326,7 +342,7 @@ const _generateZelfProof = async (dataToEncrypt, zelfNameObject) => {
 module.exports = {
 	calculateZelfNamePrice,
 	decryptParams,
-	formatArweaveSearchResult,
+	formatArweaveRecord,
 	removeExpiredRecords,
 	formatIPFSRecord,
 	urlToBase64,

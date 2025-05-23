@@ -99,7 +99,10 @@ const leaseZelfName = async (params, authUser) => {
 const decryptZelfName = async (params, authUser) => {
 	const zelfNameObjects = await _findZelfName({ zelfName: params.zelfName }, "both", authUser);
 
-	const zelfNameObject = zelfNameObjects[0];
+	const zelfNameObject = {
+		...(zelfNameObjects.arweave?.[0] || {}),
+		...(zelfNameObjects.ipfs?.[0] || {}),
+	};
 
 	const { face, password } = await _decryptParams(params, authUser);
 
@@ -118,10 +121,20 @@ const decryptZelfName = async (params, authUser) => {
 
 	const { mnemonic, zkProof, solanaSecretKey } = decryptedZelfProof.metadata;
 
-	const { encryptedMessage, privateKey, requiresUpdate } = await initTagUpdates(zelfNameObject, mnemonic);
+	const { encryptedMessage, privateKey, tagsToAdd } = await initTagUpdates(zelfNameObject, {
+		mnemonic,
+		zkProof,
+		solanaSecretKey,
+		password,
+	});
 
-	if (requiresUpdate) {
-		await updateTags(zelfNameObject, sui);
+	console.log({ tagsToAdd });
+
+	if (tagsToAdd.length) {
+		const { ipfs, arweave } = await updateTags(zelfNameObject, tagsToAdd);
+
+		zelfNameObject.updatedIpfs = ipfs;
+		zelfNameObject.updatedArweave = arweave;
 	}
 
 	return {
@@ -142,6 +155,8 @@ const decryptZelfName = async (params, authUser) => {
 			},
 			config.JWT_SECRET
 		),
+		updatedIpfs: zelfNameObject.updatedIpfs,
+		updatedArweave: zelfNameObject.updatedArweave,
 	};
 };
 
@@ -224,16 +239,6 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, a
 	}
 
 	metadata.extraParams = JSON.stringify(metadata.extraParams);
-
-	zelfNameObject.ipfs = await IPFSModule.insert(
-		{
-			base64: zelfNameObject.image,
-			name: holdName,
-			metadata,
-			pinIt: true,
-		},
-		{ ...authUser, pro: true }
-	);
 
 	zelfNameObject.ipfs = await ZNSPartsModule.formatIPFSRecord(zelfNameObject.ipfs, true);
 
@@ -388,7 +393,7 @@ const _returnFormattedArweaveRecords = async (searchResults) => {
 	const hideRecordsWithoutRegisteredAt = Boolean(searchResults.length >= 2);
 
 	for (let index = 0; index < searchResults.length; index++) {
-		const zelfNameObject = await ZNSPartsModule.formatArweaveSearchResult(searchResults[index]);
+		const zelfNameObject = await ZNSPartsModule.formatArweaveRecord(searchResults[index]);
 
 		if (hideRecordsWithoutRegisteredAt && !zelfNameObject.publicData.registeredAt) continue;
 
@@ -603,7 +608,7 @@ const _findZelfName = async (params, environment = "both", authUser) => {
 	const inArweave = Boolean(searchResults.arweave?.length);
 
 	if (environment === "both") {
-		return inArweave ? searchResults.arweave : searchResults.ipfs || [];
+		return { arweave: searchResults.arweave, ipfs: searchResults.ipfs };
 	}
 
 	return inArweave ? searchResults.arweave[0] : searchResults.ipfs[0];
