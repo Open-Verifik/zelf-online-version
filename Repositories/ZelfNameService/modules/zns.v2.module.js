@@ -524,7 +524,7 @@ const _validateReferral = async (referralZelfName, authUser) => {
  */
 const previewZelfName = async (params, authUser) => {
 	try {
-		let zelfNameObjects = await _findZelfName(
+		let { ipfs, arweave } = await _findZelfName(
 			{
 				zelfName: params.zelfName,
 				key: params.key,
@@ -534,9 +534,7 @@ const previewZelfName = async (params, authUser) => {
 			authUser
 		);
 
-		if (!Array.isArray(zelfNameObjects)) {
-			zelfNameObjects = [zelfNameObjects];
-		}
+		zelfNameRecords = ipfs || arweave;
 
 		for (let index = 0; index < zelfNameObjects.length; index++) {
 			const zelfNameObject = zelfNameObjects[index];
@@ -626,9 +624,12 @@ const leaseOffline = async (params, authUser) => {
 	let zelfNameRecords = [];
 
 	try {
-		zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
-		// zelfNameRecords = zelfNameRecords.ipfs || zelfNameRecords.arweave;
-	} catch (exception) {}
+		const records = await previewZelfName({ zelfName, environment: "both" }, authUser);
+
+		zelfNameRecords = records.ipfs || records.arweave;
+	} catch (exception) {
+		console.error({ exception });
+	}
 
 	for (let index = 0; index < zelfNameRecords.length; index++) {
 		const ipfsRecord = zelfNameRecords[index];
