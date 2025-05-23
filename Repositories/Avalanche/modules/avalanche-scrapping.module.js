@@ -276,7 +276,6 @@ const getTransactionDetail = async (params) => {
 
 		return response;
 	} catch (exception) {
-		console.log(exception);
 		const error = new Error("transaction_not_found");
 
 		error.status = 404;

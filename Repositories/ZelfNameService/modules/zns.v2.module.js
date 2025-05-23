@@ -659,8 +659,6 @@ const leaseOffline = async (params, authUser) => {
 
 	if (!_preview) _preview = await preview({ zelfProof });
 
-	console.log({ _preview, zelfProof });
-
 	if (!zelfName.includes(_preview.publicData.zelfName.toLowerCase())) {
 		const error = new Error("zelfName_does_not_match_in_zelfProof");
 		error.status = 409;
