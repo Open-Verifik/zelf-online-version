@@ -627,6 +627,7 @@ const leaseOffline = async (params, authUser) => {
 
 	try {
 		zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
+		// zelfNameRecords = zelfNameRecords.ipfs || zelfNameRecords.arweave;
 	} catch (exception) {}
 
 	for (let index = 0; index < zelfNameRecords.length; index++) {
