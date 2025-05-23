@@ -128,8 +128,6 @@ const decryptZelfName = async (params, authUser) => {
 		password,
 	});
 
-	console.log({ tagsToAdd });
-
 	if (tagsToAdd.length) {
 		const { ipfs, arweave } = await updateTags(zelfNameObject, tagsToAdd);
 

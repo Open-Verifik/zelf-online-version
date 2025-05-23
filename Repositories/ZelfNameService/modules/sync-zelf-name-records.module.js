@@ -49,7 +49,7 @@ const initTagUpdates = async (zelfNameObject, secretKeys) => {
 };
 
 const updateTags = async (zelfNameObject, tagsToAdd = []) => {
-	if (!tagsToAdd.length) return;
+	if (!tagsToAdd.length || !zelfNameObject.zelfProofQRCode) return {};
 
 	const extraParams = {
 		origin: zelfNameObject.publicData.origin || "online",
@@ -99,15 +99,6 @@ const updateTags = async (zelfNameObject, tagsToAdd = []) => {
 
 	let arweave = {};
 
-	if (metadata.type === "mainnet") {
-		// save in Arweave as well
-		// arweave = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
-		// 	hasPassword: metadata.hasPassword,
-		// 	zelfProof: metadata.zelfProof,
-		// 	publicData: metadata,
-		// });
-	}
-
 	// unpin the current IPFS hash
 	if (zelfNameObject.ipfsHash || zelfNameObject.ipfs_pin_hash) {
 		await IPFSModule.unPinFiles([zelfNameObject.ipfsHash || zelfNameObject.ipfs_pin_hash]);
@@ -122,6 +113,15 @@ const updateTags = async (zelfNameObject, tagsToAdd = []) => {
 		},
 		{ pro: true }
 	);
+
+	if (metadata.type === "mainnet") {
+		// save in Arweave as well
+		arweave = await ArweaveModule.zelfNameRegistration(zelfNameObject.zelfProofQRCode, {
+			hasPassword: metadata.hasPassword,
+			zelfProof: metadata.zelfProof,
+			publicData: metadata,
+		});
+	}
 
 	return {
 		ipfs,
