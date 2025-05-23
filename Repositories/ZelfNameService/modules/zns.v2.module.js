@@ -149,8 +149,8 @@ const decryptZelfName = async (params, authUser) => {
 		url: zelfNameObject.url,
 		zelfName: zelfNameObject.publicData.zelfName,
 		publicData: {
-			...zelfNameObject.publicData,
 			...decryptedZelfProof.publicData,
+			...zelfNameObject.publicData,
 		},
 		durationToken: jwt.sign(
 			{
@@ -626,8 +626,36 @@ const _findZelfName = async (params, environment = "both", authUser) => {
 	return inArweave ? searchResults.arweave[0] : searchResults.ipfs[0];
 };
 
+const _validatePassword = async (zelfProof, syncPassword) => {
+	const jsonfile = require("../../../config/0012589021.json");
+
+	let isValidPassword = false;
+
+	try {
+		await decrypt({
+			faceBase64: jsonfile.mFace,
+			password: syncPassword,
+			os: "DESKTOP",
+			zelfProof,
+			addServerPassword: false,
+		});
+	} catch (exception) {
+		console.error({ exception: exception.message });
+
+		isValidPassword = Boolean(exception.message.includes("ERR_VERIFICATION_FAILED"));
+	}
+
+	if (!isValidPassword) {
+		const error = new Error("zelfName_password_invalid");
+		error.status = 409;
+		throw error;
+	}
+
+	return isValidPassword;
+};
+
 const leaseOffline = async (params, authUser) => {
-	const { zelfName, duration, zelfProof, zelfProofQRCode } = params;
+	const { zelfName, duration, zelfProof, zelfProofQRCode, sync, syncPublicData, syncPassword } = params;
 
 	let mainnetRecord = null;
 	let holdRecord = null;
@@ -639,6 +667,10 @@ const leaseOffline = async (params, authUser) => {
 		zelfNameRecords = records.ipfs || records.arweave;
 	} catch (exception) {
 		console.error({ exception });
+	}
+
+	if (sync && syncPublicData && syncPassword) {
+		await _validatePassword(zelfProof, syncPassword);
 	}
 
 	for (let index = 0; index < zelfNameRecords.length; index++) {
@@ -656,6 +688,20 @@ const leaseOffline = async (params, authUser) => {
 	}
 
 	let _preview = holdRecord?.preview || mainnetRecord?.preview;
+
+	const zelfNameRecord = holdRecord || mainnetRecord;
+
+	if (sync && (holdRecord || mainnetRecord)) {
+		const syncKeys = Object.keys(syncPublicData);
+
+		for (let index = 0; index < syncKeys.length; index++) {
+			const key = syncKeys[index];
+
+			if (!zelfNameRecord.publicData[key]) {
+				zelfNameRecord.publicData[key] = syncPublicData[key];
+			}
+		}
+	}
 
 	const { price, reward } = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, duration);
 

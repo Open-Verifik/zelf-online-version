@@ -177,9 +177,7 @@ const filter = async (property = "name", value) => {
 
 	if (!files.length) {
 		const error = new Error("ipfs_file_not_found");
-
 		error.status = 404;
-
 		throw error;
 	}
 
