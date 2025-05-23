@@ -244,6 +244,16 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, a
 
 	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
+	zelfNameObject.ipfs = await IPFSModule.insert(
+		{
+			base64: zelfNameObject.image,
+			name: zelfNameObject.zelfName,
+			metadata,
+			pinIt: true,
+		},
+		{ ...authUser, pro: true }
+	);
+
 	zelfNameObject.ipfs = await ZNSPartsModule.formatIPFSRecord(zelfNameObject.ipfs, true);
 
 	delete zelfNameObject.ipfs.publicData.zelfProof;
