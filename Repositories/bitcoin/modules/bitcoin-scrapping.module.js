@@ -112,41 +112,38 @@ const getBalance = async (params) => {
 			transactions,
 		};
 	} catch (e) {
-		console.log(e);
 		const error = new Error("not_found");
 		error.status = 404;
 		throw error;
 	}
 };
 
-const convertTestnetTransactionValues = (transactions) => {
-	if (!Array.isArray(transactions)) {
-		transactions = [transactions];
-	}
+function extractTransactionData(transactions) {
+	return transactions.map((tx) => {
+		const fromInput = tx.inputs.find((input) => input.address);
+		const toOutputs = tx.outputs.filter((output) => output.address && output.address !== fromInput?.address);
 
-	return transactions.map((tx) => ({
-		fee_btc: convertSatoshiToBTC(tx.fee),
-		fee_satoshis: tx.fee,
-		fee: tx.fee,
-		locktime: tx.locktime,
-		size: tx.size,
-		status: tx.status.confirmed ? "success" : "pending",
-		version: tx.version,
-		weight: tx.weight,
-		inputs: tx.vin.map((input) => ({
-			address: input?.prevout?.scriptpubkey_address,
-			value: input?.prevout?.value,
-			value_btc: convertSatoshiToBTC(input?.prevout?.value),
-			value_satoshis: input?.prevout?.value,
-		})),
-		outputs: tx.vout.map((output) => ({
-			address: output.scriptpubkey_address,
-			value: output.value,
-			value_btc: convertSatoshiToBTC(output.value),
-			value_satoshis: output.value,
-		})),
-	}));
-};
+		const amountSats = toOutputs.reduce((sum, output) => sum + output.value, 0);
+		const amountBTC = amountSats / 1e8;
+
+		return {
+			hash: tx.txid,
+			amount: amountBTC,
+			amountSats: amountSats,
+			from: fromInput?.address || null,
+			to: toOutputs.map((output) => output.address),
+			networkFee: tx.fee / 1e8,
+			networkFeeSats: tx.fee,
+			networkFeePayer: fromInput?.address || null,
+			status: tx.block ? "confirmed" : "pending",
+			blockNumber: tx.block?.height || null,
+			logoURI: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
+			tokenType: "coin",
+			symbol: "BTC",
+			decimals: 8,
+		};
+	});
+}
 
 const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
 	const txsData = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}/txs`);
@@ -155,7 +152,7 @@ const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
 
 	if (!txids.length) return { transactions: [] };
 
-	return { transactions: convertTestnetTransactionValues(txsData) };
+	return { transactions: extractTransactionData(txsData) };
 };
 
 const getTestnetBalance = async (params) => {

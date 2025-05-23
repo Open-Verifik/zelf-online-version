@@ -3,6 +3,8 @@ const instance = getCleanInstance(30000);
 const { generateRandomUserAgent } = require("../../../Core/helpers");
 const oklink = require("./oklink");
 const solscan = require("./solscan");
+const moment = require("moment");
+const { getTickerPrice } = require("../../binance/modules/binance.module");
 /**
  * @param {*} params
  */
@@ -35,31 +37,83 @@ const getTokens = async (params, query) => {
 };
 
 const getTransaction = async (params, query) => {
-	const response = await solscan.getTransaction(params, query);
+	try {
+		const [txData] = await oklink.getTransaction(params, query);
 
-	if (!response || !response.transaction) return null;
+		const tokens = txData?.innerMainAction?.innerMainAction || [];
 
-	const rawTransactionData = response.transaction.parsed_instructions.find((instruction) => instruction.type === "transfer");
+		let body = JSON.stringify({
+			method: "getTransaction",
+			jsonrpc: "2.0",
+			params: [
+				params.id,
+				{
+					encoding: "jsonParsed",
+					commitment: "confirmed",
+					maxSupportedTransactionVersion: 0,
+				},
+			],
+			id: "57cfb101-62b9-4ab0-b33e-0914f9121075",
+		});
 
-	return {
-		parsed_instructions: response.transaction.parsed_instructions,
-		amount: rawTransactionData?.data_raw.info?.lamports,
-		priorityFee: response.transaction.priorityFee,
-		block: response.transaction.block_id,
-		fee: response.transaction.fee,
-		from: rawTransactionData?.data_raw.info?.source,
-		id: response.transaction.trans_id,
-		status: response.transaction.status ? "success" : "pending",
-		timestamp: response.transaction.trans_time,
-		to: rawTransactionData?.data_raw.info?.destination,
-		_source: response.transaction,
-	};
+		const { data } = await instance.post(`https://explorer-api.mainnet-beta.solana.com`, body, {
+			headers: {
+				origin: "https://explorer.solana.com",
+				"Content-Type": "application/json",
+			},
+		});
+
+		const { price: price } = await getTickerPrice({ symbol: "SOL" });
+		const status = data.result?.meta?.status?.Ok === null ? "Success" : "Failed";
+		const block = data.result?.slot?.toString();
+		const timestamp = data.result?.blockTime.toString();
+		const transactionFeeNetwork = data.result?.meta?.fee.toString();
+		const date = moment.unix(timestamp);
+
+		return {
+			transactionType: tokens.length ? "swap" : "transfer",
+			hash: params.id,
+			id: params.id,
+			status,
+			block,
+			timestamp,
+			network: "solana",
+			symbol: txData?.symbol,
+			image: txData?.logoUrl,
+			age: date.fromNow(),
+			date: date.format("YYYY-MM-DD HH:mm:ss"),
+			from: txData?.from,
+			to: txData?.to,
+			amount: txData?.lamports,
+			fiatAmount: txData?.lamports * price,
+			transactionFee: (transactionFeeNetwork / 1000000000).toString(),
+			transactionFeeFiat: ((transactionFeeNetwork / 1000000000) * price).toString(),
+			tokensTransferred: formatSolanaTransfers(tokens),
+			_status: data.result.meta.status,
+		};
+	} catch (error) {
+		console.error({ error });
+
+		throw new Error("500");
+	}
 };
 
 const getTransactions = async (params, query) => {
 	const response = (await solscan.getTransfers(params, query)) || (await oklink.getTransactions(params, query));
 	return response;
 };
+
+function formatSolanaTransfers(transfers) {
+	return transfers.map((tx) => ({
+		from: tx.from,
+		to: tx.to,
+		amount: tx.value.toString(),
+		symbol: tx.symbol || "SOL",
+		network: "solana",
+		token: tx.tokenName || "Wrapped SOL",
+		icon: tx.logoUrl,
+	}));
+}
 
 const getGasTracker = async () => {
 	try {

@@ -232,6 +232,37 @@ const getTransactionStatus = async (params) => {
 		});
 
 		const $ = cheerio.load(data);
+		const tokensTransferred = [];
+		const transactionType = $("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
+
+		try {
+			const transactionDetailsHtml = $("#nav_tabcontent_erc20_transfer").html();
+
+			const $$ = cheerio.load(transactionDetailsHtml);
+
+			$$(".row-count").each((i, elem) => {
+				const $elem = $$(elem);
+				const from = $elem.find('span.fw-medium:contains("From")').next("a").attr("data-highlight-target");
+				const to = $elem.find('span.fw-medium:contains("To")').next("a").attr("data-highlight-target");
+				const amount = $elem.find('span.fw-medium:contains("For")').next("span").text();
+				const tokenElement = $elem.find('a[href*="/token/"]').last();
+				const tokenName = tokenElement.find('span[data-bs-toggle="tooltip"]').first().text().trim();
+
+				const symbol = tokenElement.find("span > span.text-muted > span").first().text().trim();
+
+				const icon = tokenElement.find("img").attr("src");
+
+				tokensTransferred.push({
+					from,
+					to,
+					amount,
+					symbol,
+					network: "ethereum",
+					token: tokenName,
+					icon: icon ? `https://etherscan.io${icon}` : null,
+				});
+			});
+		} catch (error) {}
 
 		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge").text().split(" ")[0].trim();
 
@@ -264,38 +295,43 @@ const getTransactionStatus = async (params) => {
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valueETH = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
+		const amount = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
 
-		const valueDolar = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const fiatAmount = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
-		const transactionFeeETH = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
+		const transactionFeeNetwork = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
 
-		const transactionFeeDolar = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const transactionFeeFiat = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
 		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gweiETH = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
+		const gwei = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
 
 		const observation = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span").text().replace("[", "").replace("]", "").trim();
 
 		const response = {
+			transactionType,
 			hash: id,
 			id,
 			status,
 			block,
 			timestamp,
+			network: "ethereum",
+			symbol: "ETH",
+			image: "https://etherscan.io/assets/svg/logos/ether-default-logo.svg",
 			age: timestamp2,
 			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
 			to,
-			valueETH,
-			valueDolar,
-			transactionFeeETH,
-			transactionFeeDolar,
+			amount: Number(amount),
+			fiatAmount: Number(fiatAmount),
+			transactionFeeNetwork,
+			transactionFeeFiat: Number(transactionFeeFiat),
 			gasPrice,
-			gweiETH,
+			gwei,
 			observation,
+			tokensTransferred,
 		};
 
 		if (!id || !status || !to || !from) {
