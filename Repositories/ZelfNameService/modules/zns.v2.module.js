@@ -133,6 +133,12 @@ const decryptZelfName = async (params, authUser) => {
 
 		zelfNameObject.updatedIpfs = ipfs;
 		zelfNameObject.updatedArweave = arweave;
+
+		for (let index = 0; index < tagsToAdd.length; index++) {
+			const tag = tagsToAdd[index];
+
+			zelfNameObject.publicData[tag.name] = tag.value;
+		}
 	}
 
 	return {
