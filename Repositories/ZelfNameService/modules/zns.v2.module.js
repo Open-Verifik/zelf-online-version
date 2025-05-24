@@ -681,26 +681,16 @@ const leaseOffline = async (params, authUser) => {
 		if (ipfsRecord.publicData.type === "mainnet") mainnetRecord = ipfsRecord;
 	}
 
-	if (zelfNameRecords.length === 2 || mainnetRecord) {
-		const error = new Error("zelfName_purchased_already");
-		error.status = 409;
-		throw error;
-	}
-
 	let _preview = holdRecord?.preview || mainnetRecord?.preview;
 
 	const zelfNameRecord = holdRecord || mainnetRecord;
 
 	if (sync && (holdRecord || mainnetRecord)) {
-		const syncKeys = Object.keys(syncPublicData);
-
-		for (let index = 0; index < syncKeys.length; index++) {
-			const key = syncKeys[index];
-
-			if (!zelfNameRecord.publicData[key]) {
-				zelfNameRecord.publicData[key] = syncPublicData[key];
-			}
-		}
+		return await _syncOfflineZelfName(zelfNameRecord, syncPublicData);
+	} else if (mainnetRecord) {
+		const error = new Error("zelfName_purchased_already");
+		error.status = 409;
+		throw error;
 	}
 
 	const { price, reward } = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, duration);
@@ -1273,6 +1263,45 @@ const _confirmCoinbaseCharge = async (zelfNameObject, zelfPayNameObject = {}) =>
 	return {
 		...charge,
 		confirmed: config.coinbase.forceApproval || confirmed,
+	};
+};
+
+const _syncOfflineZelfName = async (zelfNameRecord, syncPublicData) => {
+	const syncKeys = Object.keys(syncPublicData);
+
+	const tagsToAdd = [];
+
+	let ipfs = null;
+	let arweave = null;
+
+	for (let index = 0; index < syncKeys.length; index++) {
+		const key = syncKeys[index];
+
+		if (!zelfNameRecord.publicData[key]) {
+			zelfNameRecord.publicData[key] = syncPublicData[key];
+			tagsToAdd.push({ key, value: syncPublicData[key] });
+		}
+	}
+
+	if (!tagsToAdd.length) {
+		const error = new Error("Nothing to sync");
+		error.status = 409;
+		throw error;
+	}
+
+	({ ipfs, arweave } = await updateTags(zelfNameRecord, tagsToAdd));
+
+	return {
+		tagsToAdd,
+		...ipfs,
+		arweave,
+		durationToken: jwt.sign(
+			{
+				zelfName: zelfNameRecord.zelfName,
+				exp: moment().add(30, "day").unix(),
+			},
+			config.JWT_SECRET
+		),
 	};
 };
 

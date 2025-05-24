@@ -10,15 +10,7 @@ module.exports = (server) => {
 
 	server.get(`${PATH}/address/:id`, Controller.getAddress);
 
-	server.get(
-		`${PATH}/transactions/:id`,
-		Middleware.validateAddressTransactions,
-		Controller.transactionsList
-	);
+	server.get(`${PATH}/:id/transactions`, Middleware.validateAddressTransactions, Controller.transactionsList);
 
-	server.get(
-		`${PATH}/token/:id`,
-		Middleware.validateToken,
-		Controller.getToken
-	);
+	server.get(`${PATH}/token/:id`, Middleware.validateToken, Controller.getToken);
 };
