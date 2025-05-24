@@ -400,6 +400,8 @@ const getTransactionsList = async (params) => {
 
 			const divFrom = campos(element).find("td:nth-child(9)").html();
 
+			if (!divFrom) return null;
+
 			const from = cheerio.load(divFrom);
 
 			transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
