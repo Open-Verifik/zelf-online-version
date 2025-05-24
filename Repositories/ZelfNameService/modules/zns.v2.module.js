@@ -273,30 +273,22 @@ const searchZelfName = async (params, authUser) => {
 
 	if (params.duration) query.duration = params.duration;
 
-	let finalResult = null;
+	let zelfNames = [];
 
 	try {
 		const searchResults = await ArweaveModule.search(params.zelfName || params.key === "zelfName" ? params.value : null, query);
 
-		const zelfNames = await _returnFormattedArweaveRecords(searchResults);
-
-		if (!zelfNames.length) {
-			const error = new Error("not_found_in_arweave");
-			error.status = 404;
-			throw error;
-		}
-
-		finalResult = {
-			arweave: zelfNames,
-			ipfs: await _searchInIPFS(params.environment, query, authUser, true),
-		};
+		zelfNames = await _returnFormattedArweaveRecords(searchResults);
 	} catch (exception) {
 		console.error({ exception: exception });
-
-		finalResult = await _searchInIPFS(params.environment, query, authUser);
 	}
 
-	return finalResult;
+	if (!zelfNames.length) return await _searchInIPFS(params.environment, query, authUser);
+
+	return {
+		arweave: zelfNames,
+		ipfs: await _searchInIPFS(params.environment, query, authUser, true),
+	};
 };
 
 const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, authUser) => {

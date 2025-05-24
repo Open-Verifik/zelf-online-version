@@ -175,11 +175,7 @@ const filter = async (property = "name", value) => {
 			break;
 	}
 
-	if (!files.length) {
-		const error = new Error("ipfs_file_not_found");
-		error.status = 404;
-		throw error;
-	}
+	if (!files.length) return [];
 
 	for (let index = 0; index < files.length; index++) {
 		const file = files[index];
