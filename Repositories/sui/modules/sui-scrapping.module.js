@@ -121,15 +121,20 @@ const getTransactions = async (params, query) => {
 		return data.map((item) => ({
 			hash: item.hash,
 			age: moment(item.timestamp).fromNow(),
-			date: new Date(item.timestamp).toISOString().split("T")[0],
+			date: moment(item.timestamp).format("YYYY-MM-DD HH:mm:ss"),
+			timestamp: item.timestamp,
 			from: item.from,
 			to: item.to,
+			asset: "SUI",
 			block: item.checkpoint.toString(),
 			method: item.method,
 			fiatBalance: item.usdValue || 0,
 			amount: Number(item.amount).toFixed(6),
+			_amount: item.amount,
 			txnFee: item.fee.toString(),
 			gas: item.gas.toString(),
+			traffic: item.from === address ? "OUT" : "IN",
+			_source: item,
 		}));
 	}
 
@@ -163,13 +168,20 @@ const getTransaction = async (params) => {
 			hash: data.data.hash,
 			status: data.data.status,
 			block: data.data.height.toString(),
-			timestamp: moment(data.data.timestamp).fromNow(),
+			age: moment(data.data.timestamp).fromNow(),
+			date: moment(data.data.timestamp).format("YYYY-MM-DD HH:mm:ss"),
 			from: data.data.from,
 			to: data.data.to,
-			valueSUI: data.data.amount.toString(),
-			valueDolar: "",
-			transactionFeeDolar: data.data.computationCostFee.toString(),
-			gasPrice: data.data.gasPrice.toString(),
+			amount: data.data.amount,
+			txFee: data.data.totalGasFee,
+			gasPrice: data.data.gasPrice,
+			tokenTransferNum: data.data.tokenTransferNum,
+			computationCostFee: data.data.computationCostFee,
+			nonRefundableStorageFee: data.data.nonRefundableStorageFee,
+			gasBudget: data.data.gasBudget,
+			gasPayment: data.data.gasPayment,
+			confirmedNumber: data.data.confirmedNumber,
+			_source: data.data,
 		};
 
 		return response;

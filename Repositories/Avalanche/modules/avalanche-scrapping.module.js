@@ -2,14 +2,13 @@ const axios = require("axios");
 const moment = require("moment");
 const { generateRandomUserAgent } = require("../../../Core/helpers");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
-
+const cheerio = require("cheerio");
 // Crear instancia axios con timeout
 const instance = axios.create({ timeout: 30000 });
 
 // Crear instancia https que ignora certificados SSL inválidos
 const https = require("https");
-const { hash } = require("crypto");
-const { fail } = require("assert");
+
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 /**
@@ -126,7 +125,7 @@ const getTransactionsList = async (params) => {
 	// Formatear transacciones
 	const transactions = data.data.hits.map((tx) => ({
 		hash: tx.hash,
-		method: tx.method === "swap" ? "Swap" : tx.method,
+		method: tx.method.startsWith("swap") ? "Swap" : tx.method,
 		block: tx.blockHeight.toString(),
 		age: moment(tx.blocktime * 1000).fromNow(),
 		date: moment(tx.blocktime * 1000),
@@ -147,36 +146,141 @@ const getTransactionsList = async (params) => {
  */
 const getTransactionDetail = async (params) => {
 	try {
-		const t = Date.now();
+		const id = params.id;
 
-		const { id } = params;
+		const baseUrl = "https://snowscan.xyz";
 
-		const url = `https://www.oklink.com/api/explorer/v1/avaxc/transactions/${id}?t=${t}`;
-
-		const { data } = await axios.get(url, {
-			httpsAgent: agent,
+		const { data } = await instance.get(`${baseUrl}/tx/${id}`, {
 			headers: {
-				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"Upgrade-Insecure-Requests": "1",
 			},
 		});
 
-		const resp = {
+		const $ = cheerio.load(data);
+		const tokensTransferred = [];
+		const transactionType = $("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
+
+		try {
+			const transactionDetailsHtml = $("#nav_tabcontent_erc20_transfer").html();
+
+			const $$ = cheerio.load(transactionDetailsHtml);
+
+			$$(".row-count").each((i, elem) => {
+				const $elem = $$(elem);
+				const from = $elem.find('span.fw-medium:contains("From")').next("a").attr("data-highlight-target");
+				const to = $elem.find('span.fw-medium:contains("To")').next("a").attr("data-highlight-target");
+				const amount = $elem.find('span.fw-medium:contains("For")').next("span").text();
+				const tokenElement = $elem.find('a[href*="/token/"]').last();
+				const tokenName = tokenElement.find('span[data-bs-toggle="tooltip"]').first().text().trim();
+
+				const symbol = tokenElement.find("span > span.text-muted > span").first().text().trim();
+
+				const icon = tokenElement.find("img").attr("src");
+
+				tokensTransferred.push({
+					from,
+					to,
+					amount,
+					symbol,
+					network: "avalanche",
+					token: tokenName,
+					icon: icon ? `https://snowscan.xyz${icon}` : null,
+				});
+			});
+		} catch (error) {}
+
+		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge").text().split(" ")[0].trim();
+
+		const block = $(
+			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
+		).text();
+
+		const timestamp2 = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0].split(" (")[0];
+
+		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().split("|")[0];
+
+		const date = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9")
+			.text()
+			.trim()
+			.replace(/\n/g, "")
+			.split("|")[0]
+			.split(" (")[1]
+			.replace(" AM UTC)", "")
+			.replace(" PM UTC)", "");
+
+		const from_a = $("#ContentPlaceHolder1_maintable div.from-address-col").html();
+
+		const from_div = cheerio.load(from_a);
+
+		const from = from_div("a.js-clipboard").attr("data-clipboard-text");
+		///en pruba 9
+		const to_a = $("#ContentPlaceHolder1_maintable div.to-address-col").html();
+
+		const to_div = cheerio.load(to_a);
+
+		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
+
+		const valueNetwork = $("#ContentPlaceHolder1_spanValue > div > ")
+			.text()
+			.replace("AVAX", "")
+			.split("$")[0]
+			.trim()
+			.replace("(", "")
+			.replace(")", "")
+			.trim();
+
+		const valueDolar =
+			$("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().trim().replace("($", "").replace(")", "") ||
+			$("#ContentPlaceHolder1_spanValue > div > ").text().replace("AVAX", "").split("$")[1].trim();
+
+		const transactionFee = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("AVAX", "").trim();
+
+		const transactionFeeFiat = $("#data-tfprice").text().replace("$", "").replace(")", "").replace("(", "").trim();
+
+		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
+
+		const gasPrice = gasPriceGwei[0].trim();
+		const gwei = gasPriceGwei[1].replace("(", "").replace(")", "").replace("AVAX", "").trim();
+
+		const observation = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span").text().replace("[", "").replace("]", "").trim();
+
+		const response = {
+			transactionType,
 			hash: id,
-			status: data.data.status === "0x1" ? "Success" : "fail",
-			block: data.data.blockHeigh,
-			age: moment(data.data.blocktime * 1000).fromNow(),
-			date: moment(data.data.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
-			from: data.data.from,
-			to: data.data.to,
-			amount: data.data.value.toString(),
-			assetPrice: data.data.legalRate.toString(),
-			txnFee: data.data.fee.toString(),
-			gasPrice: data.data.gasPrice.toString(),
+			id,
+			status,
+			block,
+			timestamp,
+			network: "avalanche",
+			symbol: "AVAX",
+			image: "https://snowscan.xyz/assets/avax/images/svg/logos/chain-dim.svg",
+			age: timestamp2,
+			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
+			from,
+			to,
+			amount: Number(valueNetwork),
+			// valueDolar: Number(valueDolar),
+			fiatAmount: Number(valueDolar),
+			transactionFee,
+			transactionFeeFiat,
+			gasPrice,
+			gwei,
+			observation,
+			tokensTransferred,
 		};
-		return { transaction: resp };
-	} catch (error) {
-		return { transaction: [] };
+
+		if (!id || !status || !to || !from) {
+			throw new Error("404:transaction_not_found");
+		}
+
+		return response;
+	} catch (exception) {
+		const error = new Error("transaction_not_found");
+
+		error.status = 404;
+
+		throw error;
 	}
 };
 

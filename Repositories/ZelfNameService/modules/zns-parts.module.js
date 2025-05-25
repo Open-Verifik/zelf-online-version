@@ -1,4 +1,4 @@
-const sessionModule = require("../../Session/modules/session.module");
+const SessionModule = require("../../Session/modules/session.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const config = require("../../../Core/config");
@@ -6,6 +6,7 @@ const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 const moment = require("moment");
 const axios = require("axios");
+const { encrypt, encryptQR } = require("../../Wallet/modules/encryption");
 
 const zelfNamePricing = {
 	1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
@@ -102,21 +103,22 @@ const decryptParams = async (data, authUser) => {
 		};
 	}
 
-	const password = await sessionModule.sessionDecrypt(data.password || null, authUser);
+	const password = await SessionModule.sessionDecrypt(data.password || null, authUser);
 
-	const mnemonic = await sessionModule.sessionDecrypt(data.mnemonic || null, authUser);
+	const mnemonic = await SessionModule.sessionDecrypt(data.mnemonic || null, authUser);
 
-	const face = await sessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
+	const face = await SessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
 
 	return { password, mnemonic, face };
 };
 
-const formatArweaveSearchResult = async (transactionRecord) => {
+const formatArweaveRecord = async (transactionRecord) => {
 	const zelfNameObject = {
 		id: transactionRecord.node?.id,
 		url: `${arweaveUrl}/${transactionRecord.node?.id}`,
 		explorerUrl: `${explorerUrl}/${transactionRecord.node?.id}`,
 		publicData: {},
+		zelfProofQRCode: await ArweaveModule.arweaveIDToBase64(transactionRecord.node?.id),
 	};
 
 	for (let index = 0; index < transactionRecord.node?.tags.length; index++) {
@@ -133,33 +135,34 @@ const formatArweaveSearchResult = async (transactionRecord) => {
 
 	zelfNameObject.zelfProof = zelfProofTag ? zelfProofTag.value : null;
 
-	zelfNameObject.zelfName = zelfNameTag.value;
+	zelfNameObject.zelfName = zelfNameTag ? zelfNameTag.value : null;
 
-	zelfNameObject.zelfProofQRCode = await ArweaveModule.arweaveIDToBase64(zelfNameObject.id);
+	if (zelfNameObject.publicData.extraParams) {
+		const extraParams = JSON.parse(zelfNameObject.publicData.extraParams);
+
+		Object.assign(zelfNameObject.publicData, extraParams);
+
+		delete zelfNameObject.publicData.extraParams;
+	}
 
 	return zelfNameObject;
 };
 
 const removeExpiredRecords = async (records) => {
-	const now = moment();
-
-	for (let index = records.length - 1; index >= 0; index--) {
-		const record = records[index];
-
-		const expiresAt = moment(record.metadata.keyvalues.expiresAt);
-
-		const isExpired = now.isAfter(expiresAt);
-
-		const type = record.metadata.keyvalues.type;
-
-		if (isExpired && type === "hold") {
-			records.splice(index, 1);
-
-			record.ipfs_pin_hash ? await IPFSModule.unPinFiles([record.ipfs_pin_hash]) : "do nothing";
-
-			continue;
-		}
-	}
+	// const now = moment();
+	// for (let index = records.length - 1; index >= 0; index--) {
+	// 	const record = records[index];
+	// 	const expiresAt = moment(record.metadata.keyvalues.expiresAt);
+	// 	const isExpired = now.isAfter(expiresAt);
+	// 	const type = record.metadata.keyvalues.type;
+	// 	if (isExpired) {
+	// 		records.splice(index, 1);
+	// 		if (type === "hold") {
+	// 			record.ipfs_pin_hash ? await IPFSModule.unPinFiles([record.ipfs_pin_hash]) : "do nothing";
+	// 			continue;
+	// 		}
+	// 	}
+	// }
 };
 
 const formatIPFSRecord = async (ipfsRecord, foundInArweave) => {
@@ -229,10 +232,121 @@ const _IPFSToBase64 = async (url) => {
 	}
 };
 
+const urlToBase64 = async (url) => {
+	try {
+		const encryptedResponse = await axios.get(url, {
+			responseType: "arraybuffer",
+		});
+
+		if (encryptedResponse?.data) {
+			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
+
+			return `data:image/png;base64,${base64Image}`;
+		}
+	} catch (exception) {
+		console.error({ VWEx: exception });
+
+		return exception?.message;
+	}
+};
+
+const _arweaveIDToBase64 = async (id) => {
+	try {
+		const encryptedResponse = await axios.get(`${arweaveUrl}/${id}`, {
+			responseType: "arraybuffer",
+		});
+
+		if (encryptedResponse?.data) {
+			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
+
+			return `data:image/png;base64,${base64Image}`;
+		}
+	} catch (exception) {
+		console.error({ VWEx: exception });
+
+		return exception?.message;
+	}
+};
+
+const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
+	const { eth, solana, sui } = addresses;
+	const { mnemonic, zkProof } = dataToEncrypt.metadata;
+
+	let encryptedMessage;
+
+	let privateKey;
+
+	const pgpKeys = await SessionModule.walletEncrypt(
+		{
+			mnemonic,
+			zkProof,
+			solanaPrivateKey: solana.secretKey,
+			suiSecretKey: sui.secretKey,
+		},
+		eth.address,
+		password
+	);
+
+	encryptedMessage = pgpKeys.encryptedMessage;
+
+	privateKey = pgpKeys.privateKey;
+
+	return {
+		encryptedMessage,
+		privateKey,
+	};
+};
+
+const assignProperties = (zelfNameObject, dataToEncrypt, addresses, payload) => {
+	const { price, reward, priceWithoutDiscount, discount, discountType } = calculateZelfNamePrice(
+		zelfNameObject.zelfName.split(".")[0].length,
+		zelfNameObject.duration,
+		payload.referralZelfName
+	);
+
+	const { eth, btc, solana, sui } = addresses;
+
+	zelfNameObject.price = price;
+	zelfNameObject.reward = reward;
+	zelfNameObject.discount = discount;
+	zelfNameObject.discountType = discountType;
+	zelfNameObject.publicData = dataToEncrypt.publicData;
+	zelfNameObject.ethAddress = eth.address;
+	zelfNameObject.btcAddress = btc.address;
+	zelfNameObject.solanaAddress = solana.address;
+	zelfNameObject.suiAddress = sui.address;
+	zelfNameObject.hasPassword = `${Boolean(payload.password)}`;
+
+	zelfNameObject.metadata = payload.removePGP
+		? dataToEncrypt.metadata
+		: payload.previewZelfProof
+		? {
+				mnemonic: dataToEncrypt.metadata.mnemonic
+					.split(" ")
+					.map((word, index, array) => (index < 2 || index >= array.length - 2 ? word : "****"))
+					.join(" "),
+				solanaSecretKey: `${dataToEncrypt.metadata.solanaSecretKey.slice(0, 6)}****${dataToEncrypt.metadata.solanaSecretKey.slice(-6)}`,
+				suiSecretKey: `${sui.secretKey.slice(0, 6)}****${sui.secretKey.slice(-6)}`,
+		  }
+		: undefined;
+};
+
+const _generateZelfProof = async (dataToEncrypt, zelfNameObject) => {
+	zelfNameObject.zelfProof = await encrypt(dataToEncrypt);
+
+	if (!zelfNameObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
+
+	zelfNameObject.image = await encryptQR(dataToEncrypt);
+};
+
 module.exports = {
 	calculateZelfNamePrice,
 	decryptParams,
-	formatArweaveSearchResult,
+	formatArweaveRecord,
 	removeExpiredRecords,
 	formatIPFSRecord,
+	urlToBase64,
+	generatePGPKeys,
+	assignProperties,
+	generateZelfProof: _generateZelfProof,
 };

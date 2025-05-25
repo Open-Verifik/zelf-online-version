@@ -1,9 +1,18 @@
-const moment = require("moment");
+require("dotenv").config();
 
-const { getCleanInstance } = require("../../../Core/axios");
-const instance = getCleanInstance(30000);
+const axios = require("axios");
+const moment = require("moment");
+const https = require("https");
 const cheerio = require("cheerio");
+
+const { idAseet_ } = require("../../dataAnalytics/modules/dataAnalytics.module");
+const { getCleanInstance } = require("../../../Core/axios");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
+const { get_ApiKey } = require("../../Solana/modules/oklink");
+
+const instance = getCleanInstance(30000);
+const agent = new https.Agent({ rejectUnauthorized: false });
+const apiKey = process.env.API_KEY_ETH;
 
 const baseUrls = {
 	production: "https://etherscan.io",
@@ -15,151 +24,88 @@ const baseUrls = {
  */
 const environment = "production";
 const getAddress = async (params) => {
-	const baseUrl = baseUrls[params.env || environment];
-
 	try {
 		const address = params.address;
 
-		const { data } = await instance.get(`${baseUrl}/address/${address}`, {
-			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
-			},
-		});
+		const { data } = await instance.get(`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=${apiKey}`, {});
 
-		const $ = cheerio.load(data);
+		const { price: price } = await getTickerPrice({ symbol: "ETH" });
 
-		const fullName = $("#ensName > span > a > div > span").text().replace(/\n/g, "");
+		async function formatTokenData(tokens, params) {
+			const formattedTokens = await Promise.all(
+				tokens.map(async (token) => {
+					const { tokenInfo, balance, rawBalance } = token;
+					const rate = tokenInfo.price?.rate || 0;
+					const decimals =
+						parseInt(tokenInfo.decimals).toString().length > 3
+							? Number(String(parseInt(tokenInfo.decimals)).slice(0, 2))
+							: parseInt(tokenInfo.decimals);
+					const formattedAmount = parseFloat(rawBalance) / Math.pow(10, decimals);
+					const fiatBalance = formattedAmount * rate;
+					let idAseet;
+					try {
+						idAseet = await idAseet_(tokenInfo.symbol);
+					} catch (error) {
+						idAseet = {};
+					}
 
-		const balance = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(2) > div")
-			.text()
-			.replace(/\n/g, "")
-			.replace(" ETH", "")
-			.trim();
+					return {
+						tokenType: "ERC-20",
+						fiatBalance: parseFloat(fiatBalance.toFixed(7)),
+						_fiatBalance: fiatBalance.toFixed(7),
+						symbol: tokenInfo.symbol,
+						name: tokenInfo.name,
+						price: rate.toFixed(6),
+						_price: rate,
+						image: `https://s2.coinmarketcap.com/static/img/coins/64x64/${idAseet.idAseet}.png`,
+						decimals: decimals,
+						amount: formattedAmount.toFixed(12),
+						_amount: formattedAmount,
+						address: tokenInfo.address,
+					};
+				})
+			);
 
-		const accounts = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(3)")
-			.text()
-			.replace(/\n/g, "")
-			.split("@");
-
-		let account;
-
-		try {
-			account = {
-				asset: "ETH",
-				fiatBalance: accounts[0].replace("Eth Value", "").replace("(", "").replace(",", "").replace("$", "").trim(),
-				price: accounts[1].replace("$", "").replace("/ETH)", "").replace(",", "").trim(),
-			};
-		} catch (error) {
-			//si no tiene nada
-			account = {
-				asset: "ETH",
-				fiatBalance: "0.00",
-				price: (await getTickerPrice({ symbol: `ETH` })).price,
-			};
+			return formattedTokens;
 		}
 
-		const totalTokens = $("#dropdownMenuBalance").text().trim().replace(/\n/g, "").split("(");
+		const tokens = await formatTokenData(data.tokens);
 
-		let tokensContracts;
-
-		try {
-			tokensContracts = {
-				balance: totalTokens[0].replace("$", "").trim(),
-				total: Number(totalTokens[1].replace("Tokens)", "").trim()),
-			};
-		} catch (error) {
-			tokensContracts = {
-				balance: "0.00",
-				total: 0,
-			};
-		}
-
-		const tokens = [];
-
-		let currentTokenType = "";
-
-		$("ul.list li.nav-item").each((index, element) => {
-			const tokenTypeElement = $(element).find(".fw-medium").text().trim();
-
-			if (tokenTypeElement) {
-				currentTokenType = tokenTypeElement.replace("Tokens", "").split("(")[0].trim();
-				return;
-			}
-
-			const tokenName = $(element).find(".list-name span").attr("data-bs-title") || $(element).find(".list-name").text().trim();
-			const tokenAmount = $(element).find(".text-muted").text().trim();
-
-			const [_amount, rest] = tokenAmount.split(" ");
-
-			// Then, split the second part on '@' to isolate the price
-			const [, _price] = tokenAmount.split("@");
-
-			const tokenType = $(element).find(".badge").text().trim();
-			const tokenLink = $(element).find("a.nav-link").attr("href").replace("/token/", "");
-			const tokenImage = $(element).find("img").attr("src");
-
-			let name = null;
-			let symbol = null;
-
-			try {
-				name = tokenName.split("(")[0].trim();
-				symbol = tokenName.split("(")[1].replace(")", "").trim();
-			} catch (error) {}
-
-			if (name && tokenImage) {
-				const token = {
-					tokenType: currentTokenType,
-					fiatBalance: Number(_price * _amount),
-					name: name,
-					symbol: symbol,
-					amount: _amount.replace(/,/g, ""),
-					price: _price,
-					type: tokenType,
-					address: tokenLink.split("?")[0],
-					image: tokenImage?.startsWith("https")
-						? tokenImage
-						: `https://etherscan.io${tokenImage}` ||
-						  `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
-				};
-
-				tokens.push(token);
-			}
-		});
-
-		const tokenHoldings = {
-			...tokensContracts,
-			tokens,
-		};
-
-		const transactions = [];
-
-		try {
-			const tabla = $("#transactions > div > div.table-responsive").html();
-			const campos = cheerio.load(tabla);
-
-			campos("tbody tr").each((_index, element) => _parseTransactionsContent(campos, element, transactions));
-		} catch (error) {
-			console.error({ error });
-		}
-
-		tokenHoldings.tokens.unshift({
+		tokens.push({
 			tokenType: "ETH",
-			fiatBalance: Number(account.fiatBalance),
+			fiatBalance: data.ETH.balance * price,
 			symbol: "ETH",
 			name: "Ethereum",
-			price: account.price,
-			image: "https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
-			amount: balance,
+			price: price,
+			image: "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
+			amount: data.ETH.balance.toString(),
 		});
 
+		function sumFiatBalance(tokens) {
+			return tokens.reduce((total, token) => total + token.fiatBalance, 0);
+		}
+		const { transactions } = await getTransactionsList({
+			address,
+			page: "1",
+			show: "10",
+		});
+
+		const fiatBalance = data.ETH.balance * price;
 		const response = {
 			address,
-			fullName,
-			balance,
-			fiatBalance: Number(account.fiatBalance),
-			account,
-			tokenHoldings,
+			balance: data.ETH.balance,
+			fiatBalance,
+			type: "system_account",
+			account: {
+				asset: "ETH",
+				fiatBalance: fiatBalance.toString(),
+				price,
+			},
+			tokenHoldings: {
+				total: tokens.length,
+				balance: sumFiatBalance(tokens).toString(),
+				tokens,
+			},
 			transactions,
 		};
 
@@ -286,68 +232,115 @@ const getTransactionStatus = async (params) => {
 		});
 
 		const $ = cheerio.load(data);
+		const tokensTransferred = [];
+		const transactionType = $("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
 
-		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div.row.align-items-center.mb-4 > div.col.col-md-9 > span")
-			.text()
-			.split(" ")[0]
-			.trim();
+		try {
+			const transactionDetailsHtml = $("#nav_tabcontent_erc20_transfer").html();
+
+			const $$ = cheerio.load(transactionDetailsHtml);
+
+			$$(".row-count").each((i, elem) => {
+				const $elem = $$(elem);
+				const from = $elem.find('span.fw-medium:contains("From")').next("a").attr("data-highlight-target");
+				const to = $elem.find('span.fw-medium:contains("To")').next("a").attr("data-highlight-target");
+				const amount = $elem.find('span.fw-medium:contains("For")').next("span").text();
+				const tokenElement = $elem.find('a[href*="/token/"]').last();
+				const tokenName = tokenElement.find('span[data-bs-toggle="tooltip"]').first().text().trim();
+
+				const symbol = tokenElement.find("span > span.text-muted > span").first().text().trim();
+
+				const icon = tokenElement.find("img").attr("src");
+
+				tokensTransferred.push({
+					from,
+					to,
+					amount,
+					symbol,
+					network: "ethereum",
+					token: tokenName,
+					icon: icon ? `https://etherscan.io${icon}` : null,
+				});
+			});
+		} catch (error) {}
+
+		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge").text().split(" ")[0].trim();
 
 		const block = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
+			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
 		).text();
 
-		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0];
+		const timestamp2 = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0].split(" (")[0];
 
-		///en pruba 8
-		const from_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(10) > div.col-md-9").html();
+		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().split("|")[0];
+
+		const date = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9")
+			.text()
+			.trim()
+			.replace(/\n/g, "")
+			.split("|")[0]
+			.split(" (")[1]
+			.replace(" AM UTC)", "")
+			.replace(" PM UTC)", "");
+
+		const from_a = $("#ContentPlaceHolder1_maintable div.from-address-col").html();
 
 		const from_div = cheerio.load(from_a);
 
 		const from = from_div("a.js-clipboard").attr("data-clipboard-text");
 		///en pruba 9
-		const to_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(11) > div.col-md-9 > div").html();
+		const to_a = $("#ContentPlaceHolder1_maintable div.to-address-col").html();
 
 		const to_div = cheerio.load(to_a);
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valueETH = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
+		const amount = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
 
-		const valueDolar = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const fiatAmount = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
-		const transactionFeeETH = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
+		const transactionFeeNetwork = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
 
-		const transactionFeeDolar = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const transactionFeeFiat = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
 		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gweiETH = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
+		const gwei = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
 
 		const observation = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span").text().replace("[", "").replace("]", "").trim();
 
 		const response = {
+			transactionType,
+			hash: id,
 			id,
 			status,
 			block,
 			timestamp,
+			network: "ethereum",
+			symbol: "ETH",
+			image: "https://etherscan.io/assets/svg/logos/ether-default-logo.svg",
+			age: timestamp2,
+			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
 			to,
-			valueETH,
-			valueDolar,
-			transactionFeeETH,
-			transactionFeeDolar,
+			amount: Number(amount),
+			fiatAmount: Number(fiatAmount),
+			transactionFeeNetwork,
+			transactionFeeFiat: Number(transactionFeeFiat),
 			gasPrice,
-			gweiETH,
+			gwei,
 			observation,
+			tokensTransferred,
 		};
 
 		if (!id || !status || !to || !from) {
-			throw new Error("404");
+			throw new Error("404:transaction_not_found");
 		}
 
 		return response;
 	} catch (exception) {
+		console.error(exception);
 		const error = new Error("transaction_not_found");
 
 		error.status = 404;
@@ -397,27 +390,35 @@ const getTransactionsList = async (params) => {
 
 			transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
 			transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
-			transaction.block = campos(element).find("td:nth-child(4) a").text();
-			transaction.age = campos(element).find("td:nth-child(5) span").attr("data-bs-title");
 
-			const divFrom = campos(element).find("td:nth-child(8)").html();
+			transaction.block = campos(element).find("td:nth-child(5) a").text();
+			//#ContentPlaceHolder1_divTransactions > div.table-responsive > table > tbody > tr:nth-child(1) > td.showAge
+			transaction.age = campos(element).find("td.showAge").text();
+
+			//#ContentPlaceHolder1_divTransactions > div.table-responsive > table > tbody > tr:nth-child(1) > td.showAge > span
+			transaction.date = campos(element).find(" td.showAge > span").attr("data-bs-title");
+
+			const divFrom = campos(element).find("td:nth-child(9)").html();
+
+			if (!divFrom) return null;
 
 			const from = cheerio.load(divFrom);
 
 			transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
-			transaction.traffic = campos(element).find("td:nth-child(9)").text();
 
-			const divTo = campos(element).find("td:nth-child(10)").html();
+			transaction.traffic = campos(element).find("td:nth-child(10)").text();
+
+			const divTo = campos(element).find("td:nth-child(11)").html();
 
 			const to = cheerio.load(divTo);
 
 			transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
 
-			let _amount = campos(element).find("td:nth-child(11)").text().split("$")[0].trim();
+			let _amount = campos(element).find("td:nth-child(12)").text().split("$")[0].trim();
 
 			_amount = _amount.split(" ");
 
-			transaction.fiatAmount = campos(element).find("td:nth-child(11)").text().split("$")[1].replace(/\n/g, "");
+			transaction.fiatAmount = campos(element).find("td:nth-child(12)").text().split("$")[1].replace(/\n/g, "").trim();
 			transaction.amount = _amount[0];
 			transaction.asset = _amount[1];
 			transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
@@ -427,7 +428,7 @@ const getTransactionsList = async (params) => {
 
 		return { pagination, transactions };
 	} catch (error) {
-		console.error({ error });
+		console.error({ error, address });
 
 		return {
 			pagination: { records: "0", pages: "0", page: "0" },
@@ -436,53 +437,84 @@ const getTransactionsList = async (params) => {
 	}
 };
 
-const _parseTransactionsContent = (campos, element, transactions = []) => {
-	const transaction = {};
+/**
+ * get transaction status v2
+ * @param {Object} params
+ */
+const getTransactionStatusV2 = async (params) => {
+	let transaction = null;
 
-	transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
-	transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
-	transaction.block = campos(element).find("td:nth-child(5) a").text();
+	try {
+		const t = Date.now();
 
-	const ageCol = campos(element).find("td:nth-child(7) span");
-	const dateCol = campos(element).find("td:nth-child(6) span");
+		const { id } = params;
 
-	const age = ageCol.text().trim();
-	const date = dateCol.text().trim();
+		const url = `https://www.oklink.com/api/explorer/v1/eth/transactions/${id}?t=${t}`;
 
-	transaction.age = age;
-	transaction.date = moment.utc(date).toISOString();
+		const { data } = await axios.get(url, {
+			httpsAgent: agent,
+			headers: {
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+			},
+		});
 
-	const divFrom = campos(element).find("td:nth-child(9)").html();
+		const details = data?.data;
 
-	if (!divFrom) return;
+		if (!details) return null;
 
-	const from = cheerio.load(divFrom);
+		const type = details.inputHex === "0x" ? "transfer" : "swap";
 
-	transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
-	transaction.traffic = campos(element).find("td:nth-child(10)").text();
+		transaction = {
+			age: moment(details.blocktime * 1000).fromNow(),
+			amount: details.value.toString(),
+			assetPrice: details.legalRate.toString(),
+			block: details.blockHeigh,
+			confirmations: details.confirm,
+			date: moment(details.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
+			from: details.from,
+			gasPrice: details.gasPrice.toString(),
+			hash: id,
+			image: details.logoUrl,
+			status: details.status === "0x1" ? "Success" : "fail",
+			to: details.to,
+			txnFee: details.fee.toString(),
+			type,
+		};
 
-	const divTo = campos(element).find("td:nth-child(11)").html();
-	const to = cheerio.load(divTo);
+		if (type === "swap") {
+			const transfersUrl = `https://www.oklink.com/api/explorer/v1/eth/transfers?limit=9999&offset=0&tokenType=ERC20&tranHash=${id}&t=${t}`;
 
-	transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
+			const response = await axios.get(transfersUrl, {
+				httpsAgent: agent,
+				headers: {
+					"X-Apikey": get_ApiKey().getApiKey(),
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				},
+			});
 
-	const amountCol = campos(element).find("td:nth-child(12)");
-	const amountTooltipData = amountCol.find("span").attr("data-bs-title");
+			if (!response.data?.data?.hits) return transaction;
 
-	const fiatAndTokenAmount = amountTooltipData.split(" | ");
-	const tokenAmountAndAsset = fiatAndTokenAmount[0].split(" ");
+			for (let index = response.data.data.hits.length - 1; index >= 0; index--) {
+				const hit = response.data.data.hits[index];
 
-	const tokenAmount = tokenAmountAndAsset[0].trim();
-	const asset = tokenAmountAndAsset[1].trim();
+				if (hit.from !== details.to || hit.to !== details.from) continue;
 
-	const fiatAmount = fiatAndTokenAmount[1].replace("$", "").trim();
+				transaction.swapAmount = hit.valueRaw;
+				transaction.swapSymbol = hit.symbol;
+				transaction.swapLogo = hit.logoUrl;
+				transaction.swapContractAddress = hit.tokenContractAddress;
 
-	transaction.fiatAmount = fiatAmount;
-	transaction.amount = tokenAmount;
-	transaction.asset = asset;
-	transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
+				break;
+			}
+		}
 
-	transactions.push(transaction);
+		return transaction;
+	} catch (error) {
+		console.error({ error });
+	}
+
+	return transaction;
 };
 
 module.exports = {
@@ -490,4 +522,5 @@ module.exports = {
 	getGasTracker,
 	getTransactionsList,
 	getTransactionStatus,
+	getTransactionStatusV2,
 };

@@ -1,4 +1,4 @@
-const { string, validate, stringEnum } = require("../../../Core/JoiUtils");
+const { string, validate } = require("../../../Core/JoiUtils");
 
 const schemas = {
 	asset: {
@@ -6,7 +6,7 @@ const schemas = {
 		currency: string().required(),
 	},
 	asset_chart_data: {
-		interval: stringEnum(["1m", "1h", "4h", "8h", "1d", "7d", "1M", "90d", "180d", "365d"]).required(),
+		interval: string().required(),
 	},
 };
 

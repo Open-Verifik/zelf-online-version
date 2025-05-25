@@ -13,6 +13,7 @@ const moment = require("moment");
 const getAddress = async (params) => {
 	try {
 		const address = params.id;
+
 		const response = await axios.get(
 			`https://www.oklink.com/es-la/sol/account/${address}`,
 
@@ -137,7 +138,33 @@ const getTokens = async (params, query) => {
 		return null;
 	}
 };
+
 let transactions = [];
+
+const getTransaction = async (params, query) => {
+	try {
+		const t = Date.now();
+
+		const address = params.id;
+
+		const { data } = await axios.get(
+			`https://www.oklink.com/api/explorer/v2/sol/mainAction/${address}?chain=solana&t=${t}`,
+			{
+				httpsAgent: agent,
+				headers: {
+					"X-Apikey": get_ApiKey().getApiKey(),
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				},
+			}
+		);
+
+		return data.data;
+	} catch (error) {
+		return null;
+	}
+};
+
 const getTransactions = async (params, query) => {
 	try {
 		const t = Date.now();
@@ -185,7 +212,7 @@ const getTransactions = async (params, query) => {
 				page: query.page,
 			},
 			transactions: addTrafficParameter(
-				formatDataTransfers(transactions, address),
+				formatTransactions(transactions, address),
 				address
 			),
 		};
@@ -193,15 +220,8 @@ const getTransactions = async (params, query) => {
 		return null;
 	}
 };
-const formatData = (data) => {
-	const forma = new formatterClass(data);
 
-	const translated = forma.translateKeys();
-
-	return translated;
-};
-
-function formatDataTransfers(transfers, address) {
+function formatTransactions(transfers, address) {
 	try {
 		return transfers.map((tx) => ({
 			hash: tx.signature,
@@ -211,7 +231,7 @@ function formatDataTransfers(transfers, address) {
 			method: "Transfer",
 			traffic: tx.flow,
 			to: tx.to,
-			amount: Number(tx.changeAmount).toFixed(4),
+			amount: Number(tx.changeAmount),
 			from_token_account: tx.from,
 			to_token_account: address,
 			status: tx.status,
@@ -275,5 +295,6 @@ module.exports = {
 	getAddress,
 	getTokens,
 	getTransactions,
+	getTransaction,
 	get_ApiKey,
 };

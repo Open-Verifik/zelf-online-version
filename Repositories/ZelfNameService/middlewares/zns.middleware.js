@@ -28,6 +28,14 @@ const schemas = {
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string(),
 	},
+	leaseRecovery: {
+		zelfProof: string().required(),
+		newZelfName: string().required(),
+		faceBase64: string().required(),
+		password: string().required(),
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
+		captchaToken: string(),
+	},
 	create: {
 		password: string(),
 		addServerPassword: boolean(),
@@ -79,7 +87,15 @@ const schemas = {
 const getValidation = async (ctx, next) => {
 	const payload = Object.assign(ctx.request.query, ctx.request.body);
 
-	const valid = validate(schemas.search, payload);
+	const { zelfName, key, value, captchaToken, os } = payload;
+
+	const valid = validate(schemas.search, {
+		zelfName,
+		key,
+		value,
+		captchaToken,
+		os,
+	});
 
 	const authUser = ctx.state.user;
 
@@ -111,10 +127,6 @@ const getValidation = async (ctx, next) => {
 		return;
 	}
 
-	if (payload.zelfName) payload.zelfName = payload.zelfName.toLowerCase();
-
-	const { zelfName, key, value, captchaToken, os } = payload;
-
 	if (!zelfName && (!key || !value)) {
 		ctx.status = 409;
 
@@ -123,22 +135,22 @@ const getValidation = async (ctx, next) => {
 		return;
 	}
 
-	const _zelfName = zelfName || value;
+	// const _zelfName = zelfName || value;
 
-	const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
+	// const captchaZelfName = _getZelfNameForCaptcha(_zelfName);
 
-	const captchaScore =
-		(authUser.session && !captchaToken) || config.google.captchaApproval
-			? 1
-			: await captchaService.createAssessment(captchaToken, os, captchaZelfName);
+	// const captchaScore =
+	// 	authUser.session || !captchaToken || config.google.captchaApproval
+	// 		? 1
+	// 		: await captchaService.createAssessment(captchaToken, os, captchaZelfName);
 
-	if (captchaScore < 0.79) {
-		ctx.status = 409;
+	// if (captchaScore < 0.79) {
+	// 	ctx.status = 409;
 
-		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+	// 	ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
 
-		return;
-	}
+	// 	return;
+	// }
 
 	await next();
 };
@@ -206,6 +218,88 @@ const leaseValidation = async (ctx, next) => {
 	}
 
 	const captchaZelfName = _getZelfNameForCaptcha(`${zelfName}`);
+
+	const captchaScore =
+		(authUser.session && !captchaToken) || config.google.captchaApproval
+			? 1
+			: await captchaService.createAssessment(captchaToken, os, captchaZelfName, skipIt);
+
+	if (captchaScore < 0.79) {
+		_consoleLogSuspicious(ctx, captchaScore, zelfName);
+
+		ctx.status = 409;
+
+		ctx.body = { captchaScore, validationError: "Captcha not acceptable" };
+
+		return;
+	}
+
+	await next();
+};
+
+/**
+ * lease recovery Validation
+ * @param {*} ctx
+ * @param {*} next
+ */
+const leaseRecoveryValidation = async (ctx, next) => {
+	const valid = validate(schemas.leaseRecovery, ctx.request.body);
+
+	const authUser = ctx.state.user;
+
+	if (authUser.session) {
+		// we will now check if the session is active
+		const session = await Session.findOne({ _id: authUser.session });
+
+		if (session?.status !== "active" || !session?.clientIP) {
+			ctx.status = 403;
+			ctx.body = { validationError: "Session is not active" };
+			return;
+		}
+
+		if (session.leaseCount >= config.sessions.leaseLimit) {
+			ctx.status = 403;
+			ctx.body = { validationError: "Search limit exceeded" };
+			return;
+		}
+
+		// then after is that we will increment searchCount
+		await Session.updateOne({ _id: authUser.session }, { $inc: { leaseCount: 1 } });
+	}
+
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	ctx.request.body.newZelfName = ctx.request.body.newZelfName.toLowerCase();
+
+	const { type, newZelfName, captchaToken, os, skipIt } = ctx.request.body;
+
+	const typeValid = validate(schemas[type], ctx.request.body);
+
+	if (typeValid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: typeValid.error.message };
+		return;
+	}
+
+	if (!newZelfName.includes(".zelf")) {
+		ctx.status = 409;
+		ctx.body = { validationError: "Not a valid zelf name" };
+		return;
+	}
+
+	if (newZelfName.length < 6) {
+		ctx.status = 409;
+		ctx.body = { validationError: "ZelfName should be 1 character or more." };
+		return;
+	}
+
+	const captchaZelfName = _getZelfNameForCaptcha(`${newZelfName}`);
 
 	const captchaScore =
 		(authUser.session && !captchaToken) || config.google.captchaApproval
@@ -552,6 +646,7 @@ const zelfPayValidation = async (ctx, next) => {
 module.exports = {
 	getValidation,
 	leaseValidation,
+	leaseRecoveryValidation,
 	leaseConfirmationValidation,
 	previewValidation,
 	previewZelfProofValidation,

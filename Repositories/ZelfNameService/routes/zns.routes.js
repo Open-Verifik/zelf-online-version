@@ -19,6 +19,8 @@ module.exports = (server) => {
 
 	server.post(`${PATH}/v2/lease`, Middleware.leaseValidation, Controller.leaseZelfName_v2);
 
+	server.post(`${PATH}/v2/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery);
+
 	server.get(`${PATH}/zelfpay`, Middleware.zelfPayValidation, Controller.zelfPay);
 
 	server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOfflineZelfName);
@@ -30,6 +32,8 @@ module.exports = (server) => {
 	server.post(`${PATH}/v2/lease-confirmation`, Middleware.leaseConfirmationValidation, Controller.leaseConfirmation_v2);
 
 	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewZelfName);
+
+	server.post(`${PATH}/v2/preview`, Middleware.previewValidation, Controller.previewZelfName_v2);
 
 	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof);
 

@@ -3,11 +3,12 @@ const instance = getCleanInstance(30000);
 const Model = require("../models/dataAnalytics.model");
 const moment = require("moment");
 const axios = require("axios");
+
 let _binanceInstance = null;
+
 /**
  * @param {*} params
  */
-
 const getAssetDetails = async (params) => {
 	try {
 		const { symbol, network, idAseet } = await idAseet_(params.asset);
@@ -29,15 +30,24 @@ const getAssetDetails = async (params) => {
 		const response = {
 			price: {
 				price: statistics.data.data.statistics.price,
-				priceChangePercentage1h: statistics.data.data.statistics.priceChangePercentage1h,
-				priceChangePercentage1y: statistics.data.data.statistics.priceChangePercentage1y,
-				priceChangePercentage24h: statistics.data.data.statistics.priceChangePercentage24h,
-				priceChangePercentage30d: statistics.data.data.statistics.priceChangePercentage30d,
-				priceChangePercentage60d: statistics.data.data.statistics.priceChangePercentage60d,
-				priceChangePercentage7d: statistics.data.data.statistics.priceChangePercentage7d,
-				priceChangePercentage90d: statistics.data.data.statistics.priceChangePercentage90d,
-				priceChangePercentageAll: statistics.data.data.statistics.priceChangePercentageAll,
-				priceChangePercentageYesterday: statistics.data.data.statistics.priceChangePercentageYesterday,
+				priceChangePercentage1h:
+					statistics.data.data.statistics.priceChangePercentage1h,
+				priceChangePercentage1y:
+					statistics.data.data.statistics.priceChangePercentage1y,
+				priceChangePercentage24h:
+					statistics.data.data.statistics.priceChangePercentage24h,
+				priceChangePercentage30d:
+					statistics.data.data.statistics.priceChangePercentage30d,
+				priceChangePercentage60d:
+					statistics.data.data.statistics.priceChangePercentage60d,
+				priceChangePercentage7d:
+					statistics.data.data.statistics.priceChangePercentage7d,
+				priceChangePercentage90d:
+					statistics.data.data.statistics.priceChangePercentage90d,
+				priceChangePercentageAll:
+					statistics.data.data.statistics.priceChangePercentageAll,
+				priceChangePercentageYesterday:
+					statistics.data.data.statistics.priceChangePercentageYesterday,
 			},
 			about: {
 				symbol: symbol,
@@ -46,27 +56,38 @@ const getAssetDetails = async (params) => {
 				urls: statistics.data.data.urls,
 				information: {
 					marketCap: statistics.data.data.statistics.marketCap,
-					marketCapChangePercentage24h: statistics.data.data.statistics.marketCapChangePercentage24h,
+					marketCapChangePercentage24h:
+						statistics.data.data.statistics.marketCapChangePercentage24h,
 					volume: statistics.data.data.volume,
-					volumeChangePercentage24h: statistics.data.data.volumeChangePercentage24h,
+					volumeChangePercentage24h:
+						statistics.data.data.volumeChangePercentage24h,
 					totalSupply: statistics.data.data.statistics.totalSupply,
 					circulatingSupply: statistics.data.data.statistics.circulatingSupply,
-					holders: statistics.data?.data?.analysisV2?.addressByTimeHeld?.holdersPercent,
+					holders:
+						statistics.data?.data?.analysisV2?.addressByTimeHeld
+							?.holdersPercent,
 				},
 				performance24h: {
 					volume: statistics.data.data.statistics.volumeYesterday,
-					volumePriceChangePercentage: statistics.data.data.statistics.ytdPriceChangePercentage,
-					traders: statistics.data?.data?.analysisV2?.addressByTimeHeld?.tradersPercent,
+					volumePriceChangePercentage:
+						statistics.data.data.statistics.ytdPriceChangePercentage,
+					traders:
+						statistics.data?.data?.analysisV2?.addressByTimeHeld
+							?.tradersPercent,
 				},
 			},
 		};
 
-		response.chart = await getChart({
-			asset: symbol,
-			interval: params.interval || "1h",
-			startDate: moment().subtract(1, "month").format("YYYY-MM-DD HH:mm:ss"),
-			endDate: moment().format("YYYY-MM-DD HH:mm:ss"),
-		});
+		try {
+			response.chart = await getChart({
+				asset: symbol,
+				interval: params.interval || "1d",
+				startDate: moment().subtract(1, "month").format("YYYY-MM-DD HH:mm:ss"),
+				endDate: moment().format("YYYY-MM-DD HH:mm:ss"),
+			});
+		} catch (error) {
+			response.chart = [];
+		}
 
 		return response;
 	} catch (error) {
@@ -101,7 +122,9 @@ const _getBinanceInstance = () => {
 const getKLines = async (symbol = "BTCUSDT", interval = "1m", limit = 1000) => {
 	const instance = _getBinanceInstance();
 
-	const response = await instance.get(`/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+	const response = await instance.get(
+		`/v3/klines?symbol=${symbol}&interval=${interval}&limit=${parseInt(limit)}`
+	);
 
 	return response.data ? response.data : [];
 };
@@ -137,22 +160,30 @@ const _getExactLimit = (_startDate, interval) => {
 };
 
 const getChart = async (data) => {
-	const { asset, interval, limit, startDate, endDate } = data;
+	const { interval, limit, startDate, endDate } = data;
 
+	let { asset } = data;
 	let _limit = limit;
 	let _endDate = null;
 	let _startDate = null;
 
 	if (startDate && endDate) {
 		_startDate = moment(startDate).format("YYYY-MM-DD HH:mm:ss");
-
-		_endDate = endDate === "now" ? moment(new Date()).format("YYYY-MM-DD HH:mm:ss") : moment(endDate).format("YYYY-MM-DD HH:mm:ss");
+		_endDate =
+			endDate === "now"
+				? moment(new Date()).format("YYYY-MM-DD HH:mm:ss")
+				: moment(endDate).format("YYYY-MM-DD HH:mm:ss");
 
 		_limit = _getExactLimit(_startDate, interval);
 	}
 
-	const klines = await getKLines(`${asset}USDT`, interval, _limit ? _limit : limit);
+	if (asset === "USDT") asset = "USDC";
 
+	const klines = await getKLines(
+		`${asset}USDT`,
+		interval,
+		_limit ? _limit : limit
+	);
 	const klinesMap = [];
 
 	for (let index = 0; index < klines.length; index++) {
@@ -160,13 +191,14 @@ const getChart = async (data) => {
 
 		const dateTime = moment.unix(kline[0] / 1000);
 
-		if (endDate && !dateTime.isBetween(_startDate, _endDate, "hours")) {
+		if (
+			endDate &&
+			startDate &&
+			!dateTime.isBetween(_startDate, _endDate, "hours")
+		)
 			continue;
-		}
-
-		if (endDate && dateTime.isAfter(_endDate, "days")) {
-			break;
-		}
+		if (endDate && dateTime.isAfter(_endDate, "days")) continue;
+		if (startDate && dateTime.isBefore(_startDate, "days")) continue;
 
 		klinesMap.push({
 			index,
@@ -202,17 +234,25 @@ const idAseet_ = async (asset) => {
 			};
 		}
 
-		const cryptoResponse = await instance.get("https://s3.coinmarketcap.com/generated/core/crypto/app-search.json", {
-			headers: {
-				"user-agent": "Dart/3.2 (dart:io)",
-				appversion: "4.63.1",
-				platform: "android",
-			},
-		});
+		const cryptoResponse = await instance.get(
+			"https://s3.coinmarketcap.com/generated/core/crypto/app-search.json",
+			{
+				headers: {
+					"user-agent": "Dart/3.2 (dart:io)",
+					appversion: "4.63.1",
+					platform: "android",
+				},
+			}
+		);
 
 		const formatCryptoData = (data) => {
 			const { fields, values } = data;
-			const ignoredFields = new Set(["type", "rank", "address", "search_score"]);
+			const ignoredFields = new Set([
+				"type",
+				"rank",
+				"address",
+				"search_score",
+			]);
 
 			return values.map((valueArray) => {
 				let obj = {};
@@ -226,7 +266,9 @@ const idAseet_ = async (asset) => {
 		};
 
 		const findTokenBySymbol = (symbol) => {
-			return formatCryptoData(cryptoResponse.data).find((token) => token.symbol === symbol);
+			return formatCryptoData(cryptoResponse.data).find(
+				(token) => token.symbol === symbol
+			);
 		};
 
 		const result = findTokenBySymbol(asset);
@@ -237,7 +279,11 @@ const idAseet_ = async (asset) => {
 			throw error;
 		}
 
-		await Model.findOneAndUpdate({}, { $set: { crypto: formatCryptoData(cryptoResponse.data) } }, { new: true, upsert: true });
+		await Model.findOneAndUpdate(
+			{},
+			{ $set: { crypto: formatCryptoData(cryptoResponse.data) } },
+			{ new: true, upsert: true }
+		);
 
 		return {
 			symbol: result.symbol,
@@ -252,4 +298,5 @@ const idAseet_ = async (asset) => {
 module.exports = {
 	getAssetDetails,
 	getChart,
+	idAseet_,
 };

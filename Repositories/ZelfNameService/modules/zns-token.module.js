@@ -42,7 +42,7 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 		const tokenBalance = await connection.getTokenAccountBalance(senderTokenAccount.address);
 
 		// Ensure sender has enough tokens to send
-		const amountToSend = Math.round(amount * 10 ** 8);
+		const amountToSend = Math.round(250 * 10 ** 8);
 
 		if (tokenBalance.value.amount < amountToSend) {
 			throw new Error("Insufficient balance in sender's token account.");
@@ -71,14 +71,14 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 			// Use sendWithRetry for reliable account creation
 			const createSignature = await sendWithRetry(createTransaction, [senderWallet], 3);
 
-			console.log("Receiver Token Account created successfully:", createSignature);
+			// console.log("Receiver Token Account created successfully:", createSignature);
 
 			// Confirm the creation before proceeding
 			await connection.confirmTransaction(createSignature, "finalized");
 		}
 
 		// Proceed with the token transfer
-		console.log("PRE - > Creating Transfer Instruction");
+		// console.log("PRE - > Creating Transfer Instruction");
 
 		const transferInstruction = splToken.createTransferCheckedInstruction(
 			senderTokenAccount.address, // Sender's token account
@@ -94,7 +94,7 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 		// Use sendWithRetry for reliable token transfer
 		const transferSignature = await sendWithRetry(transferTransaction, [senderWallet]);
 
-		console.log("Transaction successful, signature:", transferSignature, { transferTransaction });
+		// console.log("Transaction successful, signature:", transferSignature, { transferTransaction });
 
 		return transferSignature;
 	} catch (error) {
@@ -154,22 +154,20 @@ const addPurchaseReward = async (zelfNameObject) => {
 	if (!zelfNameObject) return null;
 
 	try {
-		const referralReward = new PurchaseRewardModel({
+		const purchaseReward = new PurchaseRewardModel({
 			zelfName: zelfNameObject.zelfName,
 			ethAddress: zelfNameObject.ethAddress,
 			solanaAddress: zelfNameObject.solanaAddress,
 			zelfNamePrice: zelfNameObject.zelfNamePrice,
-			tokenAmount: Math.round(zelfNameObject.zelfNamePrice / config.token.rewardPrice),
+			tokenAmount: 250, //Math.round(zelfNameObject.zelfNamePrice / config.token.rewardPrice),
 			status: "pending",
 			attempts: 0,
 			payload: {},
 			ipfsHash: zelfNameObject.ipfsHash,
-			arweaveId: zelfNameObject.arweaveId,
+			arweaveId: zelfNameObject.arweaveId || "not_set",
 		});
 
-		await referralReward.save();
-
-		return referralReward;
+		return await purchaseReward.save();
 	} catch (error) {
 		console.error("Error adding purchase:", error);
 		throw error; // Re-throw for higher-level error handling if needed
@@ -258,9 +256,9 @@ const releasePurchaseRewards = async (authUser) => {
 	}
 
 	try {
-		console.log("Processing purchase reward:", purchaseReward);
+		// console.log("Processing purchase reward:", purchaseReward);
 
-		const signature = await giveTokensAfterPurchase(purchaseReward.zelfNamePrice / config.token.rewardPrice, purchaseReward.solanaAddress);
+		const signature = await giveTokensAfterPurchase(250, purchaseReward.solanaAddress);
 
 		purchaseReward.status = "completed";
 		purchaseReward.completedAt = new Date();
@@ -283,7 +281,30 @@ const releasePurchaseRewards = async (authUser) => {
 	}
 };
 
+const getPurchaseReward = async (zelfName, afterDate) => {
+	if (!zelfName) return null;
+
+	const queryParams = {
+		where_zelfName: zelfName,
+		findOne: true,
+	};
+
+	if (afterDate) queryParams["where>=_createdAt"] = afterDate;
+
+	try {
+		const purchaseReward = await MongoORM.buildQuery(queryParams, PurchaseRewardModel, null);
+
+		if (!purchaseReward) return null;
+
+		return purchaseReward;
+	} catch (error) {
+		console.error("Error getting purchase reward:", error);
+		throw error; // Re-throw for higher-level error handling if needed
+	}
+};
+
 module.exports = {
+	getPurchaseReward,
 	addReferralReward,
 	addPurchaseReward,
 	releaseReferralRewards,

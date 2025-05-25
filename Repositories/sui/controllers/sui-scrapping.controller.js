@@ -16,10 +16,7 @@ const address = async (ctx) => {
 
 const transactions = async (ctx) => {
 	try {
-		const data = await Module.getTransactions(
-			ctx.request.params,
-			ctx.request.query
-		);
+		const data = await Module.getTransactions(ctx.request.params, ctx.request.query);
 
 		ctx.body = { data };
 	} catch (error) {

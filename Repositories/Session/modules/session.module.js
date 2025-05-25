@@ -75,7 +75,7 @@ const insert = async (params) => {
 	try {
 		await session.save();
 	} catch (exception) {
-		console.log({
+		console.error({
 			exception,
 			identifier: params.clientIP,
 			...session,
@@ -196,6 +196,7 @@ const sessionDecrypt = async (content, authUser) => {
 
 		return decryptedContent;
 	} catch (exception) {
+		console.error({ exception });
 		throw new Error("decryption_failed");
 	}
 };

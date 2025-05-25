@@ -2,6 +2,8 @@ const Module = require("../modules/zns.module");
 const Modulev2 = require("../modules/zns.v2.module");
 const ZNSTokenModule = require("../modules/zns-token.module");
 const RevenueCatModule = require("../modules/revenue-cat.module");
+const { updateOldZelfNameObject } = require("../modules/my-zns.module");
+const ZNSRecoveryModule = require("../modules/zns-recovery.module");
 
 const searchZelfName = async (ctx) => {
 	try {
@@ -34,7 +36,7 @@ const searchZelfName = async (ctx) => {
 
 const searchZelfName_v2 = async (ctx) => {
 	try {
-		const data = await Modulev2.searchZelfName(ctx.request.query, ctx.state.user);
+		let data = await Modulev2.searchZelfName(ctx.request.query, ctx.state.user);
 
 		if (data && data.available && data.zelfName.includes("zelfpay")) {
 			const zelfName = data.zelfName.replace("zelfpay", "zelf");
@@ -49,6 +51,12 @@ const searchZelfName_v2 = async (ctx) => {
 				};
 
 				return;
+			}
+		} else if (data && data.ipfs?.length) {
+			const zelfNameObject = data.ipfs[0];
+
+			if (!zelfNameObject.publicData.registeredAt) {
+				data = await updateOldZelfNameObject(zelfNameObject);
 			}
 		}
 
@@ -78,6 +86,23 @@ const leaseZelfName = async (ctx) => {
 const leaseZelfName_v2 = async (ctx) => {
 	try {
 		const data = await Modulev2.leaseZelfName({ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() }, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
+const leaseRecovery = async (ctx) => {
+	try {
+		const data = await ZNSRecoveryModule.leaseRecovery(
+			{ ...ctx.request.body, zelfName: `${ctx.request.body.zelfName}`.toLowerCase() },
+			ctx.state.user
+		);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -120,6 +145,26 @@ const leaseConfirmation_v2 = async (ctx) => {
 const previewZelfName = async (ctx) => {
 	try {
 		const data = await Module.previewZelfName(
+			{
+				...ctx.request.body,
+				zelfName: `${ctx.request.body.zelfName}`.toLowerCase(),
+			},
+			ctx.state.user
+		);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
+const previewZelfName_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.previewZelfName(
 			{
 				...ctx.request.body,
 				zelfName: `${ctx.request.body.zelfName}`.toLowerCase(),
@@ -207,6 +252,8 @@ const leaseOfflineZelfName = async (ctx) => {
 
 const leaseOfflineZelfName_v2 = async (ctx) => {
 	try {
+		ctx.request.body.zelfName = `${ctx.request.body.zelfName}`.toLowerCase();
+
 		const data = await Modulev2.leaseOffline(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
@@ -226,6 +273,10 @@ const revenueCatWebhook = async (ctx) => {
 		ctx.body = { data };
 	} catch (error) {
 		console.error(error);
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
 	}
 };
 
@@ -298,6 +349,7 @@ module.exports = {
 	leaseConfirmation,
 	leaseConfirmation_v2,
 	previewZelfName,
+	previewZelfName_v2,
 	previewZelfProof,
 	decryptZelfName,
 	decryptZelfName_v2,
@@ -308,4 +360,5 @@ module.exports = {
 	purchaseRewards,
 	update,
 	zelfPay,
+	leaseRecovery,
 };

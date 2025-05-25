@@ -82,6 +82,8 @@ async function getPngAsBase64(url) {
 }
 
 const decrypt = async (data) => {
+	data.zelfProof = data.zelfProof.replace(/ /g, "+");
+
 	try {
 		const encryptedResponse = await axios.post("/vw/decrypt-wallet", {
 			face_base_64: data.faceBase64,
@@ -95,7 +97,6 @@ const decrypt = async (data) => {
 	} catch (exception) {
 		const _error = exception.response?.data;
 
-		console.log({ _error, senseprint_base_64: data.zelfProof });
 		let error = new Error(_error.code);
 
 		switch (_error.code) {

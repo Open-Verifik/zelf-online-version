@@ -78,8 +78,6 @@ const searchZelfLease = async (zelfName) => {
 	if (!zelfPayNameObject) {
 		const createdZelfPay = await createZelfPay(zelfNameObject);
 
-		console.log({ createZelfPay: createdZelfPay });
-
 		zelfPayNameObject = createdZelfPay.ipfs || createdZelfPay.arweave;
 	}
 
@@ -191,7 +189,6 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 		parseFloat(zelfPayObject.publicData.price) || ZNSPartsModule.calculateZelfNamePrice(zelfName_.split(".zelf")[0].length, 1).price;
 
 	if (price !== priceInIPFS) {
-		console.log({ publicData: zelfPayObject.publicData });
 		const error = new Error(`Validation_failed:${price}!==${priceInIPFS}`);
 		error.status = 409;
 		throw error;
@@ -327,6 +324,7 @@ const getReceiptEmail = async (body) => {
 		email,
 	});
 };
+
 //calcular precio en la difrente redes
 const calculateCryptoValue = async (network, price_) => {
 	try {

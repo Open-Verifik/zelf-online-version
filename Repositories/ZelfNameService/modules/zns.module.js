@@ -81,8 +81,14 @@ const searchZelfName = async (params, authUser) => {
 
 		const zelfNames = [];
 
+		const hideRecordsWithoutRegisteredAt = Boolean(searchResults.length >= 2);
+
 		for (let index = 0; index < searchResults.length; index++) {
-			const zelfNameObject = await _formatArweaveSearchResult(searchResults[index]);
+			const zelfNameObject = await ZNSPartsModule.formatArweaveRecord(searchResults[index]);
+
+			if (hideRecordsWithoutRegisteredAt && !zelfNameObject.publicData.registeredAt) continue;
+
+			zelfNameObject.zelfProof = zelfNameObject.zelfProof.replace(/ /g, "+");
 
 			zelfNames.push(zelfNameObject);
 		}
@@ -230,56 +236,6 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 					available: true,
 			  }
 			: null;
-	}
-};
-
-const _formatArweaveSearchResult = async (transactionRecord) => {
-	const zelfNameObject = {
-		id: transactionRecord.node?.id,
-		url: `${arweaveUrl}/${transactionRecord.node?.id}`,
-		explorerUrl: `${explorerUrl}/${transactionRecord.node?.id}`,
-		publicData: {},
-	};
-
-	for (let index = 0; index < transactionRecord.node?.tags.length; index++) {
-		const tag = transactionRecord.node?.tags[index];
-
-		zelfNameObject.publicData[tag.name] = tag.value;
-	}
-
-	const zelfProofTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfProof");
-
-	const zelfNameTag = transactionRecord.node?.tags.find((tag) => tag.name === "zelfName");
-
-	zelfNameObject.zelfProof = zelfProofTag ? zelfProofTag.value : null;
-
-	zelfNameObject.zelfName = zelfNameTag.value;
-
-	const { discount, discountType } = ZNSPartsModule.calculateZelfNamePrice(15, 1, zelfNameObject.zelfName.split(".zelf")[0]);
-
-	zelfNameObject.publicData.discount = discount;
-	zelfNameObject.publicData.discountType = discountType;
-
-	zelfNameObject.zelfProofQRCode = await _arweaveIDToBase64(zelfNameObject.id);
-
-	return zelfNameObject;
-};
-
-const _arweaveIDToBase64 = async (id) => {
-	try {
-		const encryptedResponse = await axios.get(`${arweaveUrl}/${id}`, {
-			responseType: "arraybuffer",
-		});
-
-		if (encryptedResponse?.data) {
-			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
-
-			return `data:image/png;base64,${base64Image}`;
-		}
-	} catch (exception) {
-		console.error({ VWEx: exception });
-
-		return exception?.message;
 	}
 };
 
@@ -635,11 +591,8 @@ const _confirmCoinbaseCharge = async (zelfNameObject) => {
 	const chargeID = zelfNameObject.publicData?.coinbase_id || zelfNameObject.publicData?.coinbase_hosted_url?.split("/pay/")[1];
 
 	if (!chargeID) {
-		console.log({ publicData: zelfNameObject.publicData });
 		const error = new Error("coinbase_charge_id_not_found");
-
 		error.status = 404;
-
 		throw error;
 	}
 
@@ -782,8 +735,6 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
 	if (searchResult.available) return null;
 
 	if (returnResults) return searchResult;
-
-	console.log({ searchResult, zelfName });
 
 	const error = new Error("zelfName_is_taken");
 
