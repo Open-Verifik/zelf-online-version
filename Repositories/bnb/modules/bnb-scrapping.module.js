@@ -33,14 +33,14 @@ const getBalance = async (params) => {
 		const totalFiatBalance = sumarPrice(tokens);
 
 		const rawValue = BigInt(data.data);
-		const bnbValue = Number(rawValue) / 1e18;
-		const fiatBalance = bnbValue * price;
+		const BSCValue = Number(rawValue) / 1e18;
+		const fiatBalance = BSCValue * price;
 		const response = {
 			address,
-			balance: bnbValue,
+			balance: BSCValue,
 			fiatBalance,
 			account: {
-				asset: "BNB",
+				asset: "BSC",
 				fiatBalance: fiatBalance.toString(),
 				price: price,
 			},
@@ -462,11 +462,11 @@ const getTransactionStatus = async (params) => {
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valueBNB = $(
+		const valueBSC = $(
 			"#ContentPlaceHolder1_spanValue > div > span:nth-child(2)"
 		)
 			.text()
-			.replace("BNB", "")
+			.replace("BSC", "")
 			.trim();
 
 		const valueDolar = $(
@@ -477,11 +477,11 @@ const getTransactionStatus = async (params) => {
 			.replace(")", "")
 			.trim();
 
-		const transactionFeeBNB = $(
+		const transactionFeeBSC = $(
 			"#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)"
 		)
 			.text()
-			.replace("BNB", "")
+			.replace("BSC", "")
 			.trim();
 
 		const transactionFeeDolar = $(
@@ -510,9 +510,9 @@ const getTransactionStatus = async (params) => {
 			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
 			to,
-			valueBNB,
+			valueBSC,
 			valueDolar,
-			transactionFeeBNB,
+			transactionFeeBSC,
 			transactionFeeDolar,
 			observation,
 		};
@@ -563,7 +563,7 @@ const getTransactionsList = async (params, query) => {
 			return transactions.map((tx) => {
 				return {
 					hash: tx.Txhash,
-					mBNBod: tx.MBNBod,
+					mBSCod: tx.MBSCod,
 					block: tx.Blockno,
 					age: moment(tx.DateTime).fromNow(),
 					date: tx.DateTime,
@@ -572,7 +572,7 @@ const getTransactionsList = async (params, query) => {
 					traffic: determineTraffic(address, tx.Sender, tx.Receiver),
 					fiatAmount: tx.Value.replace("$", ""),
 					amount: tx.Amount.split(" ")[0].replace(",", ""),
-					asset: "BNB",
+					asset: "BSC",
 					txnFee: tx.TxnFee,
 				};
 			});
@@ -633,7 +633,7 @@ const _parseTransactionsContent = (campos, element, transactions = []) => {
 	const transaction = {};
 
 	transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
-	transaction.mBNBod = campos(element)
+	transaction.mBSCod = campos(element)
 		.find("td:nth-child(3) span")
 		.attr("data-title");
 	transaction.block = campos(element).find("td:nth-child(4) a").text();
