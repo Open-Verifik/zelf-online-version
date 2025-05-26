@@ -162,6 +162,26 @@ const previewZelfName = async (ctx) => {
 	}
 };
 
+const previewZelfName_v2 = async (ctx) => {
+	try {
+		const data = await Modulev2.previewZelfName(
+			{
+				...ctx.request.body,
+				zelfName: `${ctx.request.body.zelfName}`.toLowerCase(),
+			},
+			ctx.state.user
+		);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error({ error });
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 const previewZelfProof = async (ctx) => {
 	try {
 		const data = await Module.previewZelfProof(ctx.request.body.zelfProof, ctx.state.user);
@@ -329,6 +349,7 @@ module.exports = {
 	leaseConfirmation,
 	leaseConfirmation_v2,
 	previewZelfName,
+	previewZelfName_v2,
 	previewZelfProof,
 	decryptZelfName,
 	decryptZelfName_v2,

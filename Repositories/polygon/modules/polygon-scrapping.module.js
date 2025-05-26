@@ -11,189 +11,91 @@ const moment = require("moment");
 
 const getBalance = async (params) => {
 	try {
-		const address = params.address;
+		console.log(params);
+		const address = params.id;
 
-		const { data } = await instance.get(`${baseUrl}/address/${params.id}`, {
-			headers: {
-				"user-agent":
-					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
-			},
-		});
-
-		const $ = cheerio.load(data);
-
-		const fullName = $("#ensName > span > a > div > span")
-			.text()
-			.replace(/\n/g, "");
-
-		const balance = $(
-			"#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(2) > div"
-		)
-			.text()
-			.replace(/\n/g, "")
-			.replace(" POL", "")
-			.trim();
-
-		const accounts = $(
-			"#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(3)"
-		)
-			.text()
-			.replace(/\n/g, "")
-			.split("@");
-
-		let account;
-
-		try {
-			account = {
-				asset: "POL",
-				fiatBalance: accounts[0]
-					.replace("Less Than", "")
-					.replace("POL Value", "")
-					.replace("(", "")
-					.replace(",", "")
-					.replace("$", "")
-					.trim(),
-				price: (await getTickerPrice({ symbol: `POL` })).price,
-			};
-		} catch (error) {
-			//si no tiene nada
-			account = {
-				asset: "POL",
-				fiatBalance: "0.00",
-				price: (await getTickerPrice({ symbol: `POL` })).price,
-			};
-		}
-
-		const totalTokens = $("#dropdownMenuBalance")
-			.text()
-			.trim()
-			.replace(/\n/g, "")
-			.split("(")[0];
-
-		const balanceTokens = $("#dropdownMenuBalance")
-			.text()
-			.trim()
-			.replace(/\n/g, "")
-			.split("(")[1];
-
-		let tokensContracts;
-
-		try {
-			tokensContracts = {
-				balance: totalTokens.replace("$", "").replace(">", "").trim(),
-				total: balanceTokens.replace(">", "").replace("Tokens)", "").trim(),
-			};
-		} catch (error) {
-			console.log(error);
-			tokensContracts = {
-				balance: "0.00",
-				total: 0,
-			};
-		}
-
-		const tokens = [];
-
-		let currentTokenType = "";
-
-		$("ul.list li.nav-item").each((index, element) => {
-			const tokenTypeElement = $(element).find(".fw-medium").text().trim();
-
-			if (tokenTypeElement) {
-				currentTokenType = tokenTypeElement
-					.replace("Tokens", "")
-					.split("(")[0]
-					.trim();
-				return;
+		const { data } = await instance.get(
+			`https://polygon.blockscout.com/api/v2/addresses/${address}`,
+			{
+				headers: {
+					"user-agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+					"Upgrade-Insecure-Requests": "1",
+				},
 			}
+		);
 
-			const tokenName =
-				$(element).find(".list-name span").attr("data-bs-title") ||
-				$(element).find(".list-name").text().trim();
-			const tokenAmount = $(element).find(".text-muted").text().trim();
+		const { price: price } = await getTickerPrice({ symbol: "POL" });
 
-			const [_amount, rest] = tokenAmount.split(" ");
+		const tokensResponse = await instance.get(
+			`https://polygon.blockscout.com/api/v2/addresses/${address}/tokens?type=ERC-20`
+		);
 
-			// Then, split the second part on '@' to isolate the price
-			const [, _price] = tokenAmount.split("@");
+		function formatearTokens(entrada) {
+			return entrada.map((item) => {
+				const token = item.token;
+				const decimals = parseInt(token.decimals);
+				const rawAmount = item.value;
+				const price = item.token.exchange_rate;
+				const amount = Number(rawAmount) / Math.pow(10, decimals);
 
-			const tokenType = $(element).find(".badge").text().trim();
-			const tokenLink = $(element)
-				.find("a.nav-link")
-				.attr("href")
-				.replace("/token/", "");
-			const tokenImage = $(element).find("img").attr("src");
-
-			let name = null;
-			let symbol = null;
-
-			try {
-				name = tokenName.split("(")[0].trim();
-				symbol = tokenName.split("(")[1].replace(")", "").trim();
-			} catch (error) {}
-
-			if (name && tokenImage) {
-				const token = {
-					tokenType: currentTokenType,
-					fiatBalance: (_price * _amount).toFixed(10),
-					name: cleanString(name),
-					symbol: cleanString(symbol),
-					amount: _amount.replace(/,/g, ""),
-					price: _price,
-					type: tokenType,
-					address: tokenLink.split("?")[0],
-					image: tokenImage?.startsWith("https")
-						? tokenImage
-						: `https://etherscan.io${tokenImage}` ||
-						  `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
+				return {
+					tokenType: token.type || "ERC-20",
+					fiatBalance: amount * price,
+					_fiatBalance: (amount * price).toFixed(decimals),
+					symbol: token.symbol,
+					name: token.name,
+					price: price,
+					_price: Number(price),
+					image: token.icon_url || "",
+					decimals: decimals,
+					amount: amount.toFixed(decimals),
+					_amount: amount,
+					address: token.address,
 				};
-
-				tokens.push(token);
-			}
-		});
-
-		const tokenHoldings = {
-			...tokensContracts,
-			tokens,
-		};
-
-		const transactions = [];
-
-		try {
-			const tabla = $("#transactions > div > div.table-responsive").html();
-			const campos = cheerio.load(tabla);
-
-			campos("tbody tr").each((_index, element) =>
-				_parseTransactionsContent(campos, element, transactions)
-			);
-		} catch (error) {
-			console.error({ error });
+			});
 		}
 
-		tokenHoldings.tokens.unshift({
-			tokenType: "POL",
-			fiatBalance: Number(account.fiatBalance),
-			symbol: "POL",
-			name: "polygon",
-			price: account.price,
-			image:
-				"https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
-			amount: balance,
-		});
+		const tokens = formatearTokens(tokensResponse.data.items);
+
+		const transactions = await getTransactionsList(
+			{ id: address },
+			{ show: 10 }
+		);
 
 		const response = {
 			address,
-			fullName,
-			balance,
-			fiatBalance: Number(account.fiatBalance),
-			account,
-			tokenHoldings,
-			transactions,
+			balance: data.coin_balance,
+			fiatBalance: data.coin_balance * price,
+			type: "system_account",
+			account: {
+				asset: "POL",
+				fiatBalance: data.coin_balance * price,
+				price: price,
+			},
+			tokenHoldings: {
+				total: 1 + tokens.length,
+				balance: data.coin_balance,
+				tokens: [
+					{
+						tokenType: "ERC-20",
+						fiatBalance: data.coin_balance * price,
+						symbol: "POL",
+						name: "Polygon",
+						price: price,
+						image:
+							"https://s2.coinmarketcap.com/static/img/coins/64x64/28321.png",
+						amount: data.coin_balance,
+					},
+					...tokens,
+				],
+			},
+			transactions: transactions.transactions,
 		};
 
 		return response;
 	} catch (error) {
-		console.error({ error });
+		//console.error({ error });
 	}
 };
 
@@ -325,6 +227,8 @@ const getTransactionStatus = async (params) => {
 	try {
 		const id = params.id;
 
+		const baseUrl = "https://polygonscan.com";
+
 		const { data } = await instance.get(`${baseUrl}/tx/${id}`, {
 			headers: {
 				"user-agent":
@@ -334,6 +238,55 @@ const getTransactionStatus = async (params) => {
 		});
 
 		const $ = cheerio.load(data);
+		const tokensTransferred = [];
+		const transactionType =
+			$("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
+
+		try {
+			const transactionDetailsHtml = $("#nav_tabcontent_erc20_transfer").html();
+
+			const $$ = cheerio.load(transactionDetailsHtml);
+
+			$$(".row-count").each((i, elem) => {
+				const $elem = $$(elem);
+				const from = $elem
+					.find('span.fw-medium:contains("From")')
+					.next("a")
+					.attr("data-highlight-target");
+				const to = $elem
+					.find('span.fw-medium:contains("To")')
+					.next("a")
+					.attr("data-highlight-target");
+				const amount = $elem
+					.find('span.fw-medium:contains("For")')
+					.next("span")
+					.text();
+				const tokenElement = $elem.find('a[href*="/token/"]').last();
+				const tokenName = tokenElement
+					.find('span[data-bs-toggle="tooltip"]')
+					.first()
+					.text()
+					.trim();
+
+				const symbol = tokenElement
+					.find("span > span.text-muted > span")
+					.first()
+					.text()
+					.trim();
+
+				const icon = tokenElement.find("img").attr("src");
+
+				tokensTransferred.push({
+					from,
+					to,
+					amount,
+					symbol,
+					network: "polygon",
+					token: tokenName,
+					icon: icon ? `${baseUrl}${icon}` : null,
+				});
+			});
+		} catch (error) {}
 
 		const status = $(
 			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge"
@@ -385,14 +338,12 @@ const getTransactionStatus = async (params) => {
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valueETH = $(
-			"#ContentPlaceHolder1_spanValue > div > span:nth-child(2)"
-		)
+		const amount = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)")
 			.text()
-			.replace("ETH", "")
+			.replace("POL", "")
 			.trim();
 
-		const valueDolar = $(
+		const fiatAmount = $(
 			"#ContentPlaceHolder1_spanValue > div > span.text-muted"
 		)
 			.text()
@@ -400,14 +351,14 @@ const getTransactionStatus = async (params) => {
 			.replace(")", "")
 			.trim();
 
-		const transactionFeeETH = $(
+		const transactionFeeNetwork = $(
 			"#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)"
 		)
 			.text()
-			.replace("ETH", "")
+			.replace("POL", "")
 			.trim();
 
-		const transactionFeeDolar = $(
+		const transactionFeeFiat = $(
 			"#ContentPlaceHolder1_spanTxFee > div > span.text-muted"
 		)
 			.text()
@@ -420,10 +371,10 @@ const getTransactionStatus = async (params) => {
 			.split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gweiETH = gasPriceGwei[1]
+		const gwei = gasPriceGwei[1]
 			.replace("(", "")
 			.replace(")", "")
-			.replace("ETH", "")
+			.replace("POL", "")
 			.trim();
 
 		const observation = $(
@@ -435,22 +386,28 @@ const getTransactionStatus = async (params) => {
 			.trim();
 
 		const response = {
+			transactionType,
 			hash: id,
 			id,
 			status,
 			block,
 			timestamp,
+			network: "polygon",
+			symbol: "POL",
+			image:
+				"https://polygonscan.com/assets/svg/logos/polygon-default-logo.svg",
 			age: timestamp2,
 			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
 			to,
-			valueETH,
-			valueDolar,
-			transactionFeeETH,
-			transactionFeeDolar,
+			amount: Number(amount),
+			fiatAmount: Number(fiatAmount),
+			transactionFeeNetwork,
+			transactionFeeFiat: Number(transactionFeeFiat),
 			gasPrice,
-			gweiETH,
+			gwei,
 			observation,
+			tokensTransferred,
 		};
 
 		if (!id || !status || !to || !from) {
@@ -459,7 +416,7 @@ const getTransactionStatus = async (params) => {
 
 		return response;
 	} catch (exception) {
-		console.log(exception);
+		console.error(exception);
 		const error = new Error("transaction_not_found");
 
 		error.status = 404;

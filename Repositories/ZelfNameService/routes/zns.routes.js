@@ -33,6 +33,8 @@ module.exports = (server) => {
 
 	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewZelfName);
 
+	server.post(`${PATH}/v2/preview`, Middleware.previewValidation, Controller.previewZelfName_v2);
+
 	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof);
 
 	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptZelfName);
