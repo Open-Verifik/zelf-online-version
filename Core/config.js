@@ -140,6 +140,11 @@ const configuration = {
 	oklink: {
 		apiKey: process.env.OKLINK_API_KEY,
 	},
+	lifi: {
+		url: process.env.LIFI_API_URL || "https://li.quest/v1",
+		apiKey: process.env.LIFI_API_KEY,
+		integrator: process.env.LIFI_INTEGRATOR,
+	},
 };
 
 module.exports = configuration;
