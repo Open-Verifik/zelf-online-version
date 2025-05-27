@@ -1,6 +1,6 @@
 const config = require("../../../Core/config");
 
-const { string, object, array, validate, stringEnum, forbidden, stringOrNumber, minMaxNumber } = require("../../../Core/JoiUtils");
+const { string, object, array, validate, stringEnum, forbidden, stringOrNumber, minMaxNumber, number } = require("../../../Core/JoiUtils");
 
 const schemas = {
 	executeSolanaSwap: {
@@ -66,6 +66,7 @@ const schemas = {
 	getTokens: {
 		chains: string(),
 		chainTypes: string(),
+		minPriceUSD: number(),
 	},
 	getTools: {
 		chain: stringOrNumber(),
