@@ -11,9 +11,18 @@ const moment = require("moment");
 
 const getBalance = async (params) => {
 	try {
-		const address = params.address;
+		const address = params.id;
 
-		const { data } = await instance.get(`${baseUrl}/address/${params.id}`, {
+		const checkRedirect = await instance.get(`https://polygon.blockscout.com/api/v2/search/check-redirect?q=${address}`, {
+			headers: {
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"Upgrade-Insecure-Requests": "1",
+			},
+		});
+
+		const formatedAddress = checkRedirect.data.parameter;
+
+		const { data } = await instance.get(`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}`, {
 			headers: {
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
@@ -22,7 +31,7 @@ const getBalance = async (params) => {
 
 		const $ = cheerio.load(data);
 
-		const fullName = $("#ensName > span > a > div > span").text().replace(/\n/g, "");
+		const tokensResponse = await instance.get(`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}/tokens?type=ERC-20`);
 
 		const balance = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(2) > div")
 			.text()
