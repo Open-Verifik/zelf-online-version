@@ -1,26 +1,9 @@
 const Module = require("../modules/bnb-scrapping.module");
 const HttpHandler = require("../../../Core/http-handler");
 
-const getAddress = async (ctx) => {
+const address = async (ctx) => {
 	try {
-		const data = await Module.getAddress(ctx.request.params);
-
-		ctx.body = { data };
-	} catch (error) {
-		console.error(error);
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
-	}
-};
-const getToken = async (ctx) => {
-	const params = ctx.request.params;
-
-	const query = ctx.request.query;
-
-	try {
-		const data = await Module.getTokens(params, query);
+		const data = await Module.getBalance(ctx.request.params);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -62,9 +45,23 @@ const transactionStatus = async (ctx) => {
 		ctx.body = { error: error.message };
 	}
 };
+
+const gasTracker = async (ctx) => {
+	try {
+		const data = await Module.getGasTracker(ctx.request.query);
+
+		ctx.body = { data };
+	} catch (error) {
+		console.error(error);
+
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
 module.exports = {
-	getAddress,
-	getToken,
+	address,
+	gasTracker,
 	transactionStatus,
 	transactionsList,
 };

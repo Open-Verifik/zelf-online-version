@@ -4,164 +4,110 @@ const cheerio = require("cheerio");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const baseUrl = "https://polygonscan.com";
 const moment = require("moment");
+
 /**
  * @param {*} params
  */
 
 const getBalance = async (params) => {
 	try {
-		const address = params.address;
+		const address = params.id;
 
-		const { data } = await instance.get(`${baseUrl}/address/${params.id}`, {
-			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
-			},
-		});
-
-		const $ = cheerio.load(data);
-
-		const fullName = $("#ensName > span > a > div > span").text().replace(/\n/g, "");
-
-		const balance = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(2) > div")
-			.text()
-			.replace(/\n/g, "")
-			.replace(" POL", "")
-			.trim();
-
-		const accounts = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(3)")
-			.text()
-			.replace(/\n/g, "")
-			.split("@");
-
-		let account;
-
-		try {
-			account = {
-				asset: "POL",
-				fiatBalance: accounts[0].replace("Less Than", "").replace("POL Value", "").replace("(", "").replace(",", "").replace("$", "").trim(),
-				price: (await getTickerPrice({ symbol: `POL` })).price,
-			};
-		} catch (error) {
-			//si no tiene nada
-			account = {
-				asset: "POL",
-				fiatBalance: "0.00",
-				price: (await getTickerPrice({ symbol: `POL` })).price,
-			};
-		}
-
-		const totalTokens = $("#dropdownMenuBalance").text().trim().replace(/\n/g, "").split("(")[0];
-
-		const balanceTokens = $("#dropdownMenuBalance").text().trim().replace(/\n/g, "").split("(")[1];
-
-		let tokensContracts;
-
-		try {
-			tokensContracts = {
-				balance: totalTokens.replace("$", "").replace(">", "").trim(),
-				total: balanceTokens.replace(">", "").replace("Tokens)", "").trim(),
-			};
-		} catch (error) {
-			console.error(error);
-
-			tokensContracts = {
-				balance: "0.00",
-				total: 0,
-			};
-		}
-
-		const tokens = [];
-
-		let currentTokenType = "";
-
-		$("ul.list li.nav-item").each((index, element) => {
-			const tokenTypeElement = $(element).find(".fw-medium").text().trim();
-
-			if (tokenTypeElement) {
-				currentTokenType = tokenTypeElement.replace("Tokens", "").split("(")[0].trim();
-				return;
+		const checkRedirect = await instance.get(
+			`https://polygon.blockscout.com/api/v2/search/check-redirect?q=${address}`,
+			{
+				headers: {
+					"user-agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+					"Upgrade-Insecure-Requests": "1",
+				},
 			}
+		);
 
-			const tokenName = $(element).find(".list-name span").attr("data-bs-title") || $(element).find(".list-name").text().trim();
-			const tokenAmount = $(element).find(".text-muted").text().trim();
+		const formatedAddress = checkRedirect.data.parameter;
 
-			const [_amount, rest] = tokenAmount.split(" ");
+		const { data } = await instance.get(
+			`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}`,
+			{
+				headers: {
+					"user-agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+					"Upgrade-Insecure-Requests": "1",
+				},
+			}
+		);
 
-			// Then, split the second part on '@' to isolate the price
-			const [, _price] = tokenAmount.split("@");
+		const { price: price } = await getTickerPrice({ symbol: "POL" });
 
-			const tokenType = $(element).find(".badge").text().trim();
-			const tokenLink = $(element).find("a.nav-link").attr("href").replace("/token/", "");
-			const tokenImage = $(element).find("img").attr("src");
+		const tokensResponse = await instance.get(
+			`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}/tokens?type=ERC-20`
+		);
 
-			let name = null;
-			let symbol = null;
+		function formatearTokens(entrada) {
+			return entrada.map((item) => {
+				const token = item.token;
+				const decimals = parseInt(token.decimals);
+				const rawAmount = item.value;
+				const price = item.token.exchange_rate;
+				const amount = Number(rawAmount) / Math.pow(10, decimals);
 
-			try {
-				name = tokenName.split("(")[0].trim();
-				symbol = tokenName.split("(")[1].replace(")", "").trim();
-			} catch (error) {}
-
-			if (name && tokenImage) {
-				const token = {
-					tokenType: currentTokenType,
-					fiatBalance: (_price * _amount).toFixed(10),
-					name: cleanString(name),
-					symbol: cleanString(symbol),
-					amount: _amount.replace(/,/g, ""),
-					price: _price,
-					type: tokenType,
-					address: tokenLink.split("?")[0],
-					image: tokenImage?.startsWith("https")
-						? tokenImage
-						: `https://etherscan.io${tokenImage}` ||
-						  `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
+				return {
+					tokenType: token.type || "ERC-20",
+					fiatBalance: amount * price,
+					_fiatBalance: (amount * price).toFixed(decimals),
+					symbol: token.symbol,
+					name: token.name,
+					price: price,
+					_price: Number(price),
+					image: token.icon_url || "",
+					decimals: decimals,
+					amount: amount.toFixed(decimals),
+					_amount: amount,
+					address: token.address,
 				};
-
-				tokens.push(token);
-			}
-		});
-
-		const tokenHoldings = {
-			...tokensContracts,
-			tokens,
-		};
-
-		const transactions = [];
-
-		try {
-			const tabla = $("#transactions > div > div.table-responsive").html();
-			const campos = cheerio.load(tabla);
-
-			campos("tbody tr").each((_index, element) => _parseTransactionsContent(campos, element, transactions));
-		} catch (error) {
-			console.error({ error });
+			});
 		}
 
-		tokenHoldings.tokens.unshift({
-			tokenType: "POL",
-			fiatBalance: Number(account.fiatBalance),
-			symbol: "POL",
-			name: "polygon",
-			price: account.price,
-			image: "https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
-			amount: balance,
-		});
+		const tokens = formatearTokens(tokensResponse.data.items);
+
+		const transactions = await getTransactionsList(
+			{ id: address },
+			{ show: 10 }
+		);
 
 		const response = {
 			address,
-			fullName,
-			balance,
-			fiatBalance: Number(account.fiatBalance),
-			account,
-			tokenHoldings,
-			transactions,
+			balance: data.coin_balance,
+			fiatBalance: data.coin_balance * price,
+			type: "system_account",
+			account: {
+				asset: "POL",
+				fiatBalance: data.coin_balance * price,
+				price: price,
+			},
+			tokenHoldings: {
+				total: 1 + tokens.length,
+				balance: data.coin_balance,
+				tokens: [
+					{
+						tokenType: "ERC-20",
+						fiatBalance: data.coin_balance * price,
+						symbol: "POL",
+						name: "Polygon",
+						price: price,
+						image:
+							"https://s2.coinmarketcap.com/static/img/coins/64x64/28321.png",
+						amount: data.coin_balance,
+					},
+					...tokens,
+				],
+			},
+			transactions: transactions.transactions,
 		};
 
 		return response;
 	} catch (error) {
-		console.error({ error });
+		//console.error({ error });
 	}
 };
 
@@ -169,7 +115,8 @@ const getGasTracker = async (params) => {
 	try {
 		let { data } = await instance.get(`${baseUrl}/gastracker`, {
 			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"user-agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
@@ -180,9 +127,16 @@ const getGasTracker = async (params) => {
 		const averageGwei = $("#spanAvgPrice").text().replace(/\n/g, "").trim();
 		const highGwei = $("#spanHighPrice").text().replace(/\n/g, "").trim();
 
-		const lowPriorityAndBase = $("#spanDynamicLowPriorityAndBase").text().trim();
+		const lowPriorityAndBase = $("#spanDynamicLowPriorityAndBase")
+			.text()
+			.trim();
 
-		const lowTime = $("#divLowPrice > div.text-muted").first().text().replace(/\n/g, "").trim().trim();
+		const lowTime = $("#divLowPrice > div.text-muted")
+			.first()
+			.text()
+			.replace(/\n/g, "")
+			.trim()
+			.trim();
 		const priceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -191,8 +145,14 @@ const getGasTracker = async (params) => {
 		const lowBase = parseFloat(lowNumbers[0]).toString();
 		const lowPriority = parseFloat(lowNumbers[1]).toString();
 
-		const avgPriorityAndBase = $("#spanDynamicProposePriorityAndBase").text().trim();
-		const averageTime = $("#divAvgPrice > div.text-muted").text().replace(/\n/g, "").trim().trim();
+		const avgPriorityAndBase = $("#spanDynamicProposePriorityAndBase")
+			.text()
+			.trim();
+		const averageTime = $("#divAvgPrice > div.text-muted")
+			.text()
+			.replace(/\n/g, "")
+			.trim()
+			.trim();
 		const avgPriceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -200,8 +160,14 @@ const getGasTracker = async (params) => {
 		const avgBase = parseFloat(avgNumbers[0]).toString();
 		const avgPriority = parseFloat(avgNumbers[1]).toString();
 
-		const highPriorityAndBase = $("#spanDynamicHighPriorityAndBase").text().trim();
-		const highTime = $("#divHighPrice > div.text-muted").text().replace(/\n/g, "").trim().trim();
+		const highPriorityAndBase = $("#spanDynamicHighPriorityAndBase")
+			.text()
+			.trim();
+		const highTime = $("#divHighPrice > div.text-muted")
+			.text()
+			.replace(/\n/g, "")
+			.trim()
+			.trim();
 		const highPriceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -210,23 +176,28 @@ const getGasTracker = async (params) => {
 		const highPriority = parseFloat(highNumbers[1]).toString();
 
 		const featuredActions = [];
-		$("#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr").each(
-			(index, element) => {
-				const action = $(element).find("td span").text().trim();
-				const low = $(element).find("td").eq(1).text().replace("$", "").trim();
-				const average = $(element).find("td").eq(2).text().replace("$", "").trim();
-				const high = $(element).find("td").eq(3).text().replace("$", "").trim();
+		$(
+			"#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr"
+		).each((index, element) => {
+			const action = $(element).find("td span").text().trim();
+			const low = $(element).find("td").eq(1).text().replace("$", "").trim();
+			const average = $(element)
+				.find("td")
+				.eq(2)
+				.text()
+				.replace("$", "")
+				.trim();
+			const high = $(element).find("td").eq(3).text().replace("$", "").trim();
 
-				if (action) {
-					featuredActions.push({
-						action,
-						low,
-						average,
-						high,
-					});
-				}
+			if (action) {
+				featuredActions.push({
+					action,
+					low,
+					average,
+					high,
+				});
 			}
-		);
+		});
 
 		// Formar el objeto de respuesta final.
 		const response = {
@@ -268,73 +239,196 @@ const getTransactionStatus = async (params) => {
 	try {
 		const id = params.id;
 
+		const baseUrl = "https://polygonscan.com";
+
 		const { data } = await instance.get(`${baseUrl}/tx/${id}`, {
 			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"user-agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 				"Upgrade-Insecure-Requests": "1",
 			},
 		});
 
 		const $ = cheerio.load(data);
+		const tokensTransferred = [];
+		const transactionType =
+			$("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
 
-		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div.row.align-items-center.mb-4 > div.col.col-md-9 > span")
+		try {
+			const transactionDetailsHtml = $("#nav_tabcontent_erc20_transfer").html();
+
+			const $$ = cheerio.load(transactionDetailsHtml);
+
+			$$(".row-count").each((i, elem) => {
+				const $elem = $$(elem);
+				const from = $elem
+					.find('span.fw-medium:contains("From")')
+					.next("a")
+					.attr("data-highlight-target");
+				const to = $elem
+					.find('span.fw-medium:contains("To")')
+					.next("a")
+					.attr("data-highlight-target");
+				const amount = $elem
+					.find('span.fw-medium:contains("For")')
+					.next("span")
+					.text();
+				const tokenElement = $elem.find('a[href*="/token/"]').last();
+				const tokenName = tokenElement
+					.find('span[data-bs-toggle="tooltip"]')
+					.first()
+					.text()
+					.trim();
+
+				const symbol = tokenElement
+					.find("span > span.text-muted > span")
+					.first()
+					.text()
+					.trim();
+
+				const icon = tokenElement.find("img").attr("src");
+
+				tokensTransferred.push({
+					from,
+					to,
+					amount,
+					symbol,
+					network: "polygon",
+					token: tokenName,
+					icon: icon ? `${baseUrl}${icon}` : null,
+				});
+			});
+		} catch (error) {}
+
+		const status = $(
+			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge"
+		)
 			.text()
 			.split(" ")[0]
 			.trim();
 
 		const block = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
+			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
 		).text();
 
-		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0];
+		const timestamp2 = $(
+			"#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9"
+		)
+			.text()
+			.trim()
+			.replace(/\n/g, "")
+			.split("|")[0]
+			.split(" (")[0];
 
-		///en pruba 8
-		const from_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(10) > div.col-md-9").html();
+		const timestamp = $(
+			"#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9"
+		)
+			.text()
+			.trim()
+			.split("|")[0];
+
+		const date = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9")
+			.text()
+			.trim()
+			.replace(/\n/g, "")
+			.split("|")[0]
+			.split(" (")[1]
+			.replace(" AM UTC)", "")
+			.replace(" PM UTC)", "");
+
+		const from_a = $(
+			"#ContentPlaceHolder1_maintable div.from-address-col"
+		).html();
 
 		const from_div = cheerio.load(from_a);
 
 		const from = from_div("a.js-clipboard").attr("data-clipboard-text");
 		///en pruba 9
-		const to_a = $("#ContentPlaceHolder1_maintable > div.card.p-5.mb-3 > div:nth-child(11) > div.col-md-9 > div").html();
+		const to_a = $("#ContentPlaceHolder1_maintable div.to-address-col").html();
 
 		const to_div = cheerio.load(to_a);
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valuePOL = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
+		const amount = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)")
+			.text()
+			.replace("POL", "")
+			.trim();
 
-		const valueDolar = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const fiatAmount = $(
+			"#ContentPlaceHolder1_spanValue > div > span.text-muted"
+		)
+			.text()
+			.replace("($", "")
+			.replace(")", "")
+			.trim();
 
-		const transactionFeePOL = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
+		const transactionFeeNetwork = $(
+			"#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)"
+		)
+			.text()
+			.replace("POL", "")
+			.trim();
 
-		const transactionFeeDolar = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const transactionFeeFiat = $(
+			"#ContentPlaceHolder1_spanTxFee > div > span.text-muted"
+		)
+			.text()
+			.replace("($", "")
+			.replace(")", "")
+			.trim();
 
-		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
+		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice")
+			.text()
+			.split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gweiPOL = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
+		const gwei = gasPriceGwei[1]
+			.replace("(", "")
+			.replace(")", "")
+			.replace("POL", "")
+			.trim();
+
+		const observation = $(
+			"#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span"
+		)
+			.text()
+			.replace("[", "")
+			.replace("]", "")
+			.trim();
 
 		const response = {
+			transactionType,
+			hash: id,
 			id,
 			status,
 			block,
 			timestamp,
+			network: "polygon",
+			symbol: "POL",
+			image:
+				"https://polygonscan.com/assets/svg/logos/polygon-default-logo.svg",
+			age: timestamp2,
+			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			from,
 			to,
-			valuePOL,
-			valueDolar,
-			transactionFeePOL,
-			transactionFeeDolar,
+			amount: Number(amount),
+			fiatAmount: Number(fiatAmount),
+			transactionFeeNetwork,
+			transactionFeeFiat: Number(transactionFeeFiat),
 			gasPrice,
-			gweiPOL,
+			gwei,
+			observation,
+			tokensTransferred,
 		};
 
 		if (!id || !status || !to || !from) {
-			throw new Error("404");
+			throw new Error("404:transaction_not_found");
 		}
 
 		return response;
 	} catch (exception) {
+		console.error(exception);
 		const error = new Error("transaction_not_found");
 
 		error.status = 404;
@@ -353,16 +447,22 @@ const getTransactionsList = async (params, query) => {
 	const show = query.show;
 
 	try {
-		const { data } = await instance.get(`${baseUrl}/txs?a=${address}&ps=${show}`, {
-			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
-			},
-		});
+		const { data } = await instance.get(
+			`${baseUrl}/txs?a=${address}&ps=${show}`,
+			{
+				headers: {
+					"user-agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+					"Upgrade-Insecure-Requests": "1",
+				},
+			}
+		);
 
 		const $ = cheerio.load(data);
 
-		const transactions = JSON.parse(data.split("quickExportTransactionListData = '")[1].split("';")[0]);
+		const transactions = JSON.parse(
+			data.split("quickExportTransactionListData = '")[1].split("';")[0]
+		);
 
 		const formatTransactions = (address, transactions) => {
 			return transactions.map((tx) => {
@@ -392,8 +492,18 @@ const getTransactionsList = async (params, query) => {
 				return "UNKNOWN";
 			}
 		}
-		const records = $("#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span").text().match(/\d+/g).join("");
-		const nPage = $("#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)").text().replace("Page", "").split("of");
+		const records = $(
+			"#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span"
+		)
+			.text()
+			.match(/\d+/g)
+			.join("");
+		const nPage = $(
+			"#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)"
+		)
+			.text()
+			.replace("Page", "")
+			.split("of");
 
 		const pagination = {
 			records,
@@ -428,7 +538,9 @@ const _parseTransactionsContent = (campos, element, transactions = []) => {
 	const transaction = {};
 
 	transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
-	transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
+	transaction.method = campos(element)
+		.find("td:nth-child(3) span")
+		.attr("data-title");
 	transaction.block = campos(element).find("td:nth-child(4) a").text();
 
 	const ageCol = campos(element).find("td:nth-child(6) span");
@@ -469,7 +581,9 @@ const _parseTransactionsContent = (campos, element, transactions = []) => {
 	transaction.fiatAmount = fiatAmount;
 	transaction.amount = tokenAmount;
 	transaction.asset = asset;
-	transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
+	transaction.txnFee = campos(element)
+		.find("td.small.text-muted.showTxnFee")
+		.text();
 
 	transactions.push(transaction);
 };
