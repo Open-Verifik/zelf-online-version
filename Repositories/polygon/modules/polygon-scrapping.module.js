@@ -11,11 +11,23 @@ const moment = require("moment");
 
 const getBalance = async (params) => {
 	try {
-		console.log(params);
 		const address = params.id;
 
+		const checkRedirect = await instance.get(
+			`https://polygon.blockscout.com/api/v2/search/check-redirect?q=${address}`,
+			{
+				headers: {
+					"user-agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+					"Upgrade-Insecure-Requests": "1",
+				},
+			}
+		);
+
+		const formatedAddress = checkRedirect.data.parameter;
+
 		const { data } = await instance.get(
-			`https://polygon.blockscout.com/api/v2/addresses/${address}`,
+			`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}`,
 			{
 				headers: {
 					"user-agent":
@@ -28,7 +40,7 @@ const getBalance = async (params) => {
 		const { price: price } = await getTickerPrice({ symbol: "POL" });
 
 		const tokensResponse = await instance.get(
-			`https://polygon.blockscout.com/api/v2/addresses/${address}/tokens?type=ERC-20`
+			`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}/tokens?type=ERC-20`
 		);
 
 		function formatearTokens(entrada) {
