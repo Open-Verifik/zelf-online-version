@@ -1,6 +1,5 @@
 const config = require("../../../Core/config");
 const Controller = require("../controllers/toncoin-scrapping.controller");
-const Middleware = require("../middlewares/toncoin-scrapping.middleware");
 
 const base = "/ton";
 
@@ -11,5 +10,5 @@ module.exports = (server) => {
 
 	server.get(`${PATH}/address/:id/transactions`, Controller.transactionsList);
 
-	server.get(`${PATH}/transaction/:id`, Middleware.validateToken, Controller.getTransactionDetail);
+	server.get(`${PATH}/transaction/:id`, Controller.getTransactionDetail);
 };

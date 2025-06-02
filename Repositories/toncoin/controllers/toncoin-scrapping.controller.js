@@ -1,7 +1,7 @@
 const Module = require("../modules/toncoin-scrapping.module");
 const HttpHandler = require("../../../Core/http-handler");
 
-const balance = async (ctx) => {
+const getAddress = async (ctx) => {
 	try {
 		const data = await Module.getBalance(ctx.request.params);
 
@@ -14,6 +14,7 @@ const balance = async (ctx) => {
 		ctx.body = { error: error.message };
 	}
 };
+
 const getTransactionDetail = async (ctx) => {
 	const params = ctx.request.params;
 
@@ -50,7 +51,7 @@ const transactionsList = async (ctx) => {
 };
 
 module.exports = {
-	balance,
+	getAddress,
 	getTransactionDetail,
 	transactionsList,
 };

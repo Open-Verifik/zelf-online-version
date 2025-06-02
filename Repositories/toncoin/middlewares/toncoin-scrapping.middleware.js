@@ -56,6 +56,7 @@ const validateToken = async (ctx, next) => {
 
 	await next();
 };
+
 const validateAddressTransactions = async (ctx, next) => {
 	const valid = validate(schemas.validateAddressTransactions, ctx.request.query);
 
