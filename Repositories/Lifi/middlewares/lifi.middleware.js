@@ -3,7 +3,7 @@ const config = require("../../../Core/config");
 const { string, object, array, validate, stringEnum, forbidden, stringOrNumber, minMaxNumber, number } = require("../../../Core/JoiUtils");
 
 const schemas = {
-	executeSolanaSwap: {
+	executeAdvancedStepTransaction: {
 		fromChain: string().required(),
 		id: string().required(),
 		integrator: forbidden(),
@@ -73,8 +73,8 @@ const schemas = {
 	},
 };
 
-const executeSolanaSwapValidation = async (ctx, next) => {
-	if (!_configValidation(ctx) || !_validate(ctx, "body", schemas.executeSolanaSwap)) return;
+const executeAdvancedStepTransactionValidation = async (ctx, next) => {
+	if (!_configValidation(ctx) || !_validate(ctx, "body", schemas.executeAdvancedStepTransaction)) return;
 
 	return next();
 };
@@ -144,7 +144,7 @@ const _validate = (ctx, source, schema) => {
 };
 
 module.exports = {
-	executeSolanaSwapValidation,
+	executeAdvancedStepTransactionValidation,
 	getChainsValidation,
 	getQuoteValidation,
 	getStatusValidation,

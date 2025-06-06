@@ -93,9 +93,9 @@ const getTools = async (ctx) => {
 /**
  * @param {Object} ctx
  */
-const executeSolanaSwap = async (ctx) => {
+const executeAdvancedStepTransaction = async (ctx) => {
 	try {
-		const data = await Module.executeSolanaSwap(ctx.request.body);
+		const data = await Module.executeAdvancedStepTransaction(ctx.request.body);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -112,5 +112,5 @@ module.exports = {
 	getTokenByChainId,
 	getTokens,
 	getTools,
-	executeSolanaSwap,
+	executeAdvancedStepTransaction,
 };

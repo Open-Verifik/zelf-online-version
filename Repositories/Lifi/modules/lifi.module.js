@@ -63,7 +63,7 @@ const getTools = async (params) => {
 	return data;
 };
 
-const executeSolanaSwap = async (params) => {
+const executeAdvancedStepTransaction = async (params) => {
 	const requiredParams = Object.keys(EXECUTE_SOLANA_SWAP_REQUIRED_PARAMS);
 
 	let missingParams = requiredParams.filter((param) => !params[param]);
@@ -89,5 +89,5 @@ module.exports = {
 	getTokenByChainId,
 	getTokens,
 	getTools,
-	executeSolanaSwap,
+	executeAdvancedStepTransaction,
 };
