@@ -22,6 +22,7 @@ module.exports = (server) => {
 	//J
 	//K
 	//L
+	require("../Repositories/Lifi/routes/lifi.route")(server);
 	//M
 	//N
 	//O
