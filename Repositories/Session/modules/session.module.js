@@ -39,12 +39,10 @@ const insert = async (params) => {
 		findOne: true,
 	};
 
-	const identifier = config.env === "development" ? params.identifier : params.clientIP;
-
 	if (config.env === "development") {
-		queryParams.where_identifier = identifier;
+		queryParams.where_identifier = params.identifier || params.clientIP;
 	} else {
-		queryParams.where_clientIP = identifier;
+		queryParams.where_clientIP = params.clientIP;
 	}
 
 	const existingSession = await get(queryParams);
@@ -65,9 +63,9 @@ const insert = async (params) => {
 	}
 
 	const session = new Model({
-		identifier,
+		identifier: params.identifier || params.clientIP,
 		clientIP: params.clientIP,
-		type: params.type || "createWallet",
+		type: params.type || "general",
 		status: "active",
 		isWebExtension: params.isWebExtension || false,
 	});

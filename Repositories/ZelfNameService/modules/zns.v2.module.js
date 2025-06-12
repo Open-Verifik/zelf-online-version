@@ -144,7 +144,7 @@ const decryptZelfName = async (params, authUser) => {
 	return {
 		hasPassword: Boolean(password),
 		image: zelfNameObject.zelfProofQRCode,
-		priv: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey } : undefined,
+		metadata: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey } : undefined,
 		pgp: { encryptedMessage, privateKey },
 		url: zelfNameObject.url,
 		zelfName: zelfNameObject.publicData.zelfName,

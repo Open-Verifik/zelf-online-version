@@ -78,13 +78,21 @@ const auth = async (data, authUser) => {
 		findOne: true,
 	});
 
-	if (!client) throw new Error("404");
+	if (!client) {
+		const error = new Error("client_not_found");
+		error.status = 404;
+		throw error;
+	}
 
 	const isKeyValid = await client.isValidApiKey(apiKey);
 
-	if (!isKeyValid) throw new Error("403");
+	if (!isKeyValid) {
+		const error = new Error("client_invalid_api_key");
+		error.status = 403;
+		throw error;
+	}
 
-	let tokenDuration = 1;
+	let tokenDuration = 30;
 
 	if (email.includes(config.revenueCat.allowedEmail)) tokenDuration = 700;
 

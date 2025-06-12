@@ -226,7 +226,7 @@ const _IPFSToBase64 = async (url) => {
 			return `data:image/png;base64,${base64Image}`;
 		}
 	} catch (exception) {
-		console.error({ VWEx: exception });
+		console.error({ VWEx: exception, url });
 
 		return exception?.message;
 	}

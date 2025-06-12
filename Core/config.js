@@ -9,9 +9,6 @@ const configuration = {
 	base_url: process.env.BASE_URL || "https://verifik.co",
 	sessionSecret: process.env.SESSION_SECRET,
 	so: process.env.ENVOS,
-	openai: {
-		key: process.env.OPENAI_API_KEY,
-	},
 	sessions: {
 		version: 2,
 		globalLimit: process.env.GLOBAL_LIMIT || 5 * 60 * 10, // 5 requests per second for 10 minutes
@@ -23,13 +20,7 @@ const configuration = {
 	email_providers: {
 		mailgun: {
 			proxyEmail: process.env.MAILGUN_PROXY_EMAIL,
-			user: process.env.MAILGUN_USER,
-			password: process.env.MAILGUN_PASS,
-			host: process.env.MAILGUN_HOST,
-			port: process.env.MAILGUN_PORT,
-			from: process.env.MAILGUN_DEFAULT_FROM,
 			apiKey: process.env.MAILGUN_API_KEY,
-			publicKey: process.env.MAILGUN_PUBLIC_KEY,
 		},
 	},
 	signedData: {
