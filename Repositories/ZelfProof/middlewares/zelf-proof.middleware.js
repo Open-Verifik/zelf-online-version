@@ -15,7 +15,7 @@ const schemas = {
 		publicData: jsonObjectWithMinKeys(),
 		faceBase64: string().required(),
 		livenessLevel: string().required(),
-		metadata: jsonObjectWithMinKeys(),
+		metadata: jsonObjectWithMinKeys().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		password: string(),
 		identifier: string().required(),
