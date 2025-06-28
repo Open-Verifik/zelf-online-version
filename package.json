@@ -61,8 +61,7 @@
 	],
 	"resolutions": {
 		"axios": "1.8.2",
-		"elliptic": "^6.6.1",
-		"ws": "^8.0.0"
+		"elliptic": "^6.6.1"
 	},
 	"author": "Miguel Trevino",
 	"license": "ISC"
