@@ -40,7 +40,7 @@ const getCleanInstance = (timeout = 90000) => {
 
 const getEncryptionInstance = () => {
 	_encryptionInstance = axios.create({
-		timeout: 25000,
+		timeout: 60000,
 		baseURL: config.zelfProof.url,
 	});
 
