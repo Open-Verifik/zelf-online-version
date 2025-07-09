@@ -2,6 +2,7 @@ const moment = require("moment");
 const SessionModule = require("../../Session/modules/session.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const ZNSPartsModule = require("./zns-parts.module");
+const ZNSSearchModule = require("./zns-search.module");
 const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
@@ -261,199 +262,6 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, a
 	zelfNameObject.publicData = Object.assign(zelfNameObject.publicData, zelfNameObject.ipfs.publicData);
 };
 
-/**
- *
- * @param {*} params
- * @param {*} authUser
- */
-const searchZelfName = async (params, authUser) => {
-	const query = params.zelfName ? { key: "zelfName", value: params.zelfName } : { key: params.key, value: params.value };
-
-	query.value = query.key === "zelfName" ? query.value.toLowerCase() : query.value;
-
-	if (params.duration) query.duration = params.duration;
-
-	let zelfNames = [];
-
-	try {
-		const searchResults = await ArweaveModule.search(params.zelfName || params.key === "zelfName" ? params.value : null, query);
-
-		zelfNames = await _returnFormattedArweaveRecords(searchResults);
-	} catch (exception) {
-		console.error({ exception: exception });
-	}
-
-	if (!zelfNames.length) return await _searchInIPFS(params.environment, query, authUser);
-
-	return {
-		arweave: zelfNames,
-		ipfs: await _searchInIPFS(params.environment, query, authUser, true),
-	};
-};
-
-const _retriveFromIPFSByEnvironment = async (ipfsRecords, environment, query, authUser) => {
-	switch (environment) {
-		case "hold":
-			ipfsRecords.push(
-				...(await IPFSModule.get(
-					{
-						key: query.key || "zelfName",
-						value: `${query.value || query.zelfName}.hold`,
-					},
-					authUser
-				))
-			);
-			break;
-		case "mainnet":
-			ipfsRecords.push(...(await IPFSModule.get(query, authUser)));
-			break;
-
-		default:
-			try {
-				ipfsRecords.push(...(await IPFSModule.get(query, authUser)));
-			} catch (exception) {
-				console.error({ mainNetIPFSError: exception });
-			}
-
-			try {
-				ipfsRecords.push(
-					...(await IPFSModule.get(
-						{
-							key: query.key || "zelfName",
-							value: `${query.value || query.zelfName}.hold`,
-						},
-						authUser
-					))
-				);
-			} catch (exception) {
-				console.error({ holdIPFSError: exception });
-			}
-
-			break;
-	}
-};
-
-/**
- * search in IPFS
- * @param {Object} params
- * @param {Object} authUser
- * @author Miguel Trevino
- */
-const _searchInIPFS = async (environment = "both", query, authUser, foundInArweave) => {
-	const zelfName = query.value || query.zelfName;
-
-	const { price, reward } = zelfName.includes(".zelf")
-		? ZNSPartsModule.calculateZelfNamePrice(zelfName.split(".zelf")[0].length, query.duration)
-		: { price: 0, reward: 0 };
-
-	try {
-		let ipfsRecords = [];
-
-		await _retriveFromIPFSByEnvironment(ipfsRecords, environment, query, authUser);
-
-		if (!ipfsRecords.length) {
-			return foundInArweave
-				? []
-				: zelfName && zelfName.includes(".zelf")
-				? {
-						price,
-						reward,
-						zelfName,
-						available: true,
-				  }
-				: null;
-		}
-
-		const zelfNames = await _returnFormattedIPFSRecords(ipfsRecords, environment, foundInArweave);
-
-		if (!zelfNames.length) {
-			const error = new Error("not_found_in_arweave");
-			error.status = 404;
-			throw error;
-		}
-
-		return foundInArweave ? zelfNames : { ipfs: zelfNames };
-	} catch (exception) {
-		console.error({ _searchInIPFS_exception: exception });
-
-		return foundInArweave
-			? []
-			: query.key === "zelfName"
-			? {
-					price,
-					reward,
-					zelfName,
-					available: true,
-			  }
-			: null;
-	}
-};
-
-const _returnFormattedArweaveRecords = async (searchResults) => {
-	if (searchResults?.available) return [];
-
-	const zelfNames = [];
-
-	const now = moment();
-
-	const hideRecordsWithoutRegisteredAt = Boolean(searchResults.length >= 2);
-
-	for (let index = 0; index < searchResults.length; index++) {
-		const zelfNameObject = await ZNSPartsModule.formatArweaveRecord(searchResults[index]);
-
-		if (hideRecordsWithoutRegisteredAt && !zelfNameObject.publicData.registeredAt) continue;
-
-		const expiresAt = moment(zelfNameObject.publicData.expiresAt).add(45, "day");
-
-		const isExpired = now.isAfter(expiresAt);
-
-		if (isExpired) continue;
-
-		zelfNameObject.zelfProof = zelfNameObject.zelfProof.replace(/ /g, "+");
-
-		zelfNames.push(zelfNameObject);
-	}
-
-	return zelfNames;
-};
-
-const _returnFormattedIPFSRecords = async (ipfsRecords, environment, foundInArweave) => {
-	const zelfNamesInIPFS = [];
-
-	const now = moment();
-
-	for (let index = 0; index < ipfsRecords.length; index++) {
-		const ipfsRecord = ipfsRecords[index];
-
-		const formattedIPFS = await ZNSPartsModule.formatIPFSRecord(ipfsRecord, foundInArweave);
-
-		const expiresAt = moment(formattedIPFS.publicData.expiresAt).add(formattedIPFS.publicData.type === "mainnet" ? 45 : 0, "day");
-
-		const isExpired = now.isAfter(expiresAt);
-
-		if (isExpired) {
-			ipfsRecord.ipfs_pin_hash ? await IPFSModule.unPinFiles([ipfsRecord.ipfs_pin_hash]) : "do nothing";
-
-			continue;
-		}
-
-		if (environment === "both") {
-			zelfNamesInIPFS.push(formattedIPFS);
-
-			continue;
-		}
-
-		if (
-			(environment === "hold" && ipfsRecord.metadata.keyvalues.type === "hold") ||
-			(environment === "mainnet" && (!ipfsRecord.metadata.keyvalues.type || ipfsRecord.metadata.keyvalues.type === "mainnet"))
-		) {
-			zelfNamesInIPFS.push(formattedIPFS);
-		}
-	}
-
-	return zelfNamesInIPFS;
-};
-
 const _createWalletsFromPhrase = async (params) => {
 	const _mnemonic = params.type === "import" ? params.mnemonic : generateMnemonic(params.wordsCount);
 
@@ -478,7 +286,7 @@ const _createWalletsFromPhrase = async (params) => {
 };
 
 const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser, returnResults = false) => {
-	const searchResult = await searchZelfName(
+	const searchResult = await ZNSSearchModule.searchZelfName(
 		{
 			zelfName,
 			environment,
@@ -500,7 +308,7 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
 const _validateReferral = async (referralZelfName, authUser) => {
 	if (!referralZelfName) return null;
 
-	const searchResult = await searchZelfName(
+	const searchResult = await ZNSSearchModule.searchZelfName(
 		{
 			zelfName: referralZelfName,
 			environment: "mainnet",
@@ -568,7 +376,7 @@ const previewZelfName = async (params, authUser) => {
  */
 const _previewWithIPFS = async (params, authUser) => {
 	try {
-		const searchResult = await _searchInIPFS(params.environment, params, { ...authUser, pro: true }, false);
+		const searchResult = await ZNSSearchModule._searchInIPFS(params.environment, params, { ...authUser, pro: true }, false);
 
 		if (!searchResult || searchResult?.available) throw new Error("404:not_found");
 
@@ -593,7 +401,7 @@ const _previewWithIPFS = async (params, authUser) => {
 const _findZelfName = async (params, environment = "both", authUser) => {
 	const { zelfName, key, value } = params;
 
-	const searchResults = await searchZelfName(
+	const searchResults = await ZNSSearchModule.searchZelfName(
 		{
 			zelfName,
 			key,
@@ -1036,7 +844,7 @@ const _getZelfNameToConfirm = async (zelfName, authUser) => {
 
 		let zelfPayRecords = [];
 
-		zelfPayRecords = await searchZelfName(
+		zelfPayRecords = await ZNSSearchModule.searchZelfName(
 			{
 				zelfName: zelfPay,
 				environment: "mainnet",
@@ -1298,7 +1106,7 @@ const _syncOfflineZelfName = async (zelfNameRecord, syncPublicData) => {
 };
 
 module.exports = {
-	searchZelfName,
+	searchZelfName: ZNSSearchModule.searchZelfName,
 	decryptZelfName,
 	leaseZelfName,
 	leaseOffline,
