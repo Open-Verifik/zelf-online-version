@@ -2,6 +2,7 @@ const moment = require("moment");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const ZNSPartsModule = require("./zns-parts.module");
+const WalrusModule = require("../../Walrus/modules/walrus.module");
 
 /**
  * Main search function for ZelfNames
@@ -18,17 +19,13 @@ const searchZelfName = async (params, authUser) => {
 
 	// Search in primary source (Arweave)
 
-	const arweaveResults = await _searchInArweave(query);
+	const searchResult = {
+		arweave: await _searchInArweave(query),
+		ipfs: (await _searchInIPFS(params.environment, query, authUser))?.ipfs,
+	};
 
-	// If no results from primary source, search in backup source (IPFS) only
-	if (!arweaveResults.length) {
-		return await _searchInIPFS(params.environment, query, authUser);
-	}
-
-	// If primary source has results, return both primary and backup results
 	return {
-		arweave: arweaveResults,
-		ipfs: await _searchInIPFS(params.environment, query, authUser, true),
+		walrus: await WalrusModule.zelfNameRegistration(searchResult.ipfs[0].zelfProofQRCode, searchResult.ipfs[0].publicData),
 	};
 };
 

@@ -42,6 +42,15 @@ const leaseZelfName = async (params, authUser) => {
 		mnemonic: decryptedParams.mnemonic,
 	});
 
+	return {
+		eth,
+		btc,
+		solana,
+		sui,
+		zkProof,
+		mnemonic,
+	};
+
 	const dataToEncrypt = {
 		publicData: {
 			ethAddress: eth.address,

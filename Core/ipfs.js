@@ -25,16 +25,6 @@ const web3Instance = new pinataWeb3.PinataSDK({
 
 const upload = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
 	try {
-		// // Remove base64 header if present (data:image/png;base64,...)
-		// const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
-		// const buffer = Buffer.from(base64Data, "base64");
-
-		// // Create a Blob from the buffer
-		// const blob = new Blob([buffer], { type: mimeType });
-
-		// // Create a File from the Blob
-		// const file = new File([blob], filename, { type: mimeType });
-
 		// Upload the file to Pinata
 		const uploadResponse = await pinata.upload.base64(base64Image).addMetadata({
 			name: filename,

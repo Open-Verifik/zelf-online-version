@@ -9,8 +9,6 @@ const explorerUrl = `https://viewblock.io/arweave/tx`;
 
 const owner = config.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
 
-console.log("arweaveUrl", arweaveUrl, owner);
-
 const graphql = `${arweaveUrl}/graphql`;
 
 const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
@@ -93,7 +91,7 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 
 	// if the size is greater than 100kb, we need to skip the upload
 	if (fileSize > 100 * 1024) {
-		console.log("skipping upload because the file size is greater than 100kb", {
+		console.info("skipping upload because the file size is greater than 100kb", {
 			fileInKb: fileSize / 1024,
 			fileInMb: fileSize / 1024 / 1024,
 		});
