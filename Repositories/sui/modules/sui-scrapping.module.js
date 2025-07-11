@@ -14,8 +14,10 @@ const urlBase = "https://www.oklink.com";
 
 const getAddress = async (params) => {
 	const t = Date.now();
+	let price = 0;
+	let address = "";
 	try {
-		const address = params.id;
+		address = params.id;
 
 		const { data } = await axios.get(
 			`${urlBase}/api/explorer/v2/common/address/getHolderInfo?address=${address}&blockChain=SUI&t=${t}`,
@@ -24,14 +26,20 @@ const getAddress = async (params) => {
 				httpsAgent: agent,
 				headers: {
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 				},
 			}
 		);
 
-		const { price } = await getTickerPrice({ symbol: "SUI" });
+		const { price: price_ } = await getTickerPrice({ symbol: "SUI" });
 
-		const { transactions } = await getTransactions({ id: address }, { page: "0", show: "10" });
+		price = price_ || 0;
+
+		const { transactions } = await getTransactions(
+			{ id: address },
+			{ page: "0", show: "10" }
+		);
 
 		const response = {
 			address,
@@ -54,7 +62,27 @@ const getAddress = async (params) => {
 		};
 
 		return response;
-	} catch (error) {}
+	} catch (error) {
+		return {
+			address,
+			fullName: "",
+			balance: "0",
+			_balance: 0,
+			fiatBalance: 0,
+			_fiatBalance: 0,
+			account: {
+				asset: "SUI",
+				fiatBalance: 0,
+				price: price,
+			},
+			tokenHoldings: {
+				balance: "0",
+				total: 0,
+				tokens: [],
+			},
+			transactions: [],
+		};
+	}
 };
 /**
  *
@@ -70,7 +98,8 @@ const getTokens = async (params, query) => {
 			httpsAgent: agent,
 			headers: {
 				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 			},
 		}
 	);
@@ -112,7 +141,8 @@ const getTransactions = async (params, query) => {
 			httpsAgent: agent,
 			headers: {
 				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 			},
 		}
 	);
@@ -151,13 +181,17 @@ const getTransactions = async (params, query) => {
 const getTransaction = async (params) => {
 	try {
 		const t = Date.now();
-		const { data } = await axios.get(`${urlBase}/api/explorer/v1/sui/transactionDetail?txHash=${params.id}&t=${t}`, {
-			httpsAgent: agent,
-			headers: {
-				"X-Apikey": get_ApiKey().getApiKey(),
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-			},
-		});
+		const { data } = await axios.get(
+			`${urlBase}/api/explorer/v1/sui/transactionDetail?txHash=${params.id}&t=${t}`,
+			{
+				httpsAgent: agent,
+				headers: {
+					"X-Apikey": get_ApiKey().getApiKey(),
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+				},
+			}
+		);
 
 		if (data.code == 404) {
 			const error = new Error("transaction_not_found");
