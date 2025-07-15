@@ -20,6 +20,7 @@ const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance
 const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const { createUnderName } = require("./undernames.module");
 const { initTagUpdates, updateTags } = require("./sync-zelf-name-records.module");
+const WalrusModule = require("../../Walrus/modules/walrus.module");
 
 /**
  * lease zelfName
@@ -41,15 +42,6 @@ const leaseZelfName = async (params, authUser) => {
 		...params,
 		mnemonic: decryptedParams.mnemonic,
 	});
-
-	return {
-		eth,
-		btc,
-		solana,
-		sui,
-		zkProof,
-		mnemonic,
-	};
 
 	const dataToEncrypt = {
 		publicData: {
@@ -188,8 +180,8 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 			duration: zelfNameObject.duration || 1,
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 			expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
+			type: "mainnet",
 		},
-		type: "mainnet",
 	};
 
 	if (referralZelfNameObject) {
@@ -198,6 +190,14 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 		metadata.extraParams.referralSolanaAddress =
 			referralZelfNameObject.publicData?.solanaAddress || referralZelfNameObject.metadata?.solanaAddress;
 	}
+
+	zelfNameObject.walrus = await WalrusModule.zelfNameRegistration(zelfNameObject.image, {
+		hasPassword: metadata.hasPassword,
+		zelfProof: metadata.zelfProof,
+		publicData: metadata,
+	});
+
+	metadata.extraParams.walrus = zelfNameObject.walrus.blobId;
 
 	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
@@ -235,14 +235,14 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, a
 		btcAddress: zelfNameObject.btcAddress,
 		solanaAddress: zelfNameObject.solanaAddress,
 		extraParams: {
+			duration: zelfNameObject.duration || 1,
+			type: "hold",
 			origin: zelfNameObject.origin || "online",
 			suiAddress: zelfNameObject.suiAddress,
 			price: zelfNameObject.price,
-			duration: zelfNameObject.duration || 1,
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 			expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
 		},
-		type: "hold",
 	};
 
 	if (referralZelfNameObject) {
@@ -304,6 +304,8 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
 	);
 
 	if (searchResult.available) return null;
+
+	console.log({ searchResult });
 
 	if (returnResults) return searchResult;
 

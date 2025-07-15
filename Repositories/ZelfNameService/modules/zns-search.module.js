@@ -17,16 +17,68 @@ const searchZelfName = async (params, authUser) => {
 
 	if (params.duration) query.duration = params.duration;
 
-	// Search in primary source (Arweave)
-
 	const searchResult = {
 		arweave: await _searchInArweave(query),
-		ipfs: (await _searchInIPFS(params.environment, query, authUser))?.ipfs,
 	};
 
-	return {
-		walrus: await WalrusModule.zelfNameRegistration(searchResult.ipfs[0].zelfProofQRCode, searchResult.ipfs[0].publicData),
-	};
+	// Search in primary source (Arweave)
+	searchResult.ipfs = await _searchInIPFS(params.environment, query, authUser, true);
+
+	if (searchResult.ipfs.available) return searchResult.ipfs;
+
+	searchResult.ipfs = searchResult.ipfs;
+
+	return searchResult;
+
+	/*
+	{
+		"success": true,
+		"blobId": "fSWx7-xmJKC7L7JqWKGngAVrYtkwkZ8hhvY1IK3fNxI",
+		"publicUrl": "https://aggregator.walrus.space/fSWx7-xmJKC7L7JqWKGngAVrYtkwkZ8hhvY1IK3fNxI",
+		"explorerUrl": "https://walruscan.com/mainnet/blob/fSWx7-xmJKC7L7JqWKGngAVrYtkwkZ8hhvY1IK3fNxI",
+		"metadata": {
+			"zelfProof": "AwjFLS9YX3iFObebRZYLNavEUYOs7OO0M3MPsMYZRqZIcYWPMrTds6EWHY9+FI/VmYZzT/YkCfAR72x9Q3dJj5yRALeZXcFnJ8xeNyxQRLqCf4XtTxaJJbecerajzyaEKgeMnSNGRjuGbvzXBbJMiB0Kr0sZgMNgJFRssAQ5zV5/YFFaEOs5DB3b36/Hhy/woEQBYmjJsvE2WuUYyXTKSj/lVvizGcpm9hyNMMb6mRS8gfgQUDwHm2rJdn2APn90cRZh74DNu937KlMbXsmAoj9Cazei3rRRIFfm8KH7gvSfIbXmEgFUeHmOXwCD0Cu1vbjOfP6F47t0SDSiWjxR+6t1KTWkiHQO+w8NQy0Y0E8mDrYrznhEx29sfG4Kiu05qYpUrxPp7b0XyNsPBDHumjB5RjS2ZVSwGWBMfjugck9wW9vxYlY5y/Gk4hhShO0ViAeK4OEhmYahvJpgDs9Q9bCouZ8TEfxW4LOT11/UDf9sOk9L6yU/Hn4kzm7akSZrYnANy7Di7nuM2d8yHAT/Wi0rdYJWisMVKEx513MIS52//IPzKyX9Nj+5FRplmrQu4hn7rwe8IuvtYj0y0Gd6cLO3BNAzVteAsOdwZ8RXzlBXu4oofqaudYh9xQ3QlECIVpFEXCSKqaIn7umsc+isyNA73KLyOTraBhfrjymFG+9LXLqOmRJw/9WKqJGMA2OgFz373PghWvQ3Odi/5rxrX3fut40tBwCQDdmDoJI3dRNdgD2cokOBSjEgF/rCkVX3d99hTFcM+yMmcpkALtjD/POhEZGG9uJgKQ5M+/XE7R/+LRE9R/UwWujmrfRTMV5lnzg2/G/gzJ4j8Kpgxw/ZHLuFo3UVa1UKeu4WJ36HHmppv5woMD68vAKEcxXHsLa/Sz6Xg80832OMyLBuhBVQB3/+XJ5AXHfQqq31kSBY8YBMVkMVH48fpnaOwp+hXI0+dUwRTsyyFCzA47O8M/oFehWFuI6lenFBPPFgbopH3g/RiX1pGxv35J/AefkhUncIQzeHuP83ja4Hv2dhzb1p05r8CtUEsIgTLSlCAWUlotY5Dlz95E1yAeH7E3ThanQh+A==",
+			"hasPassword": "true",
+			"contentType": "image/png",
+			"fileName": "jumitrmo.zelf.hold.png",
+			"uploadTimestamp": "2025-07-15T19:07:42.660Z",
+			"sizeBytes": 18047,
+			"network": "mainnet"
+		},
+		"storage": {
+			"epochs": 5,
+			"network": "mainnet",
+			"deletable": false
+		},
+		"uploadResult": {
+			"blobId": "fSWx7-xmJKC7L7JqWKGngAVrYtkwkZ8hhvY1IK3fNxI",
+			"blobObject": {
+				"id": {
+					"id": "0x41c03b1c7931db7d77ce8127289effb4c0700b502e72ab7a5dcb608e23d4d4a3"
+				},
+				"registered_epoch": 9,
+				"blob_id": "8240351619959906259125496024078508970520452290642942755717499122791467787645",
+				"size": "18047",
+				"encoding_type": 1,
+				"certified_epoch": 9,
+				"storage": {
+					"id": {
+						"id": "0xd49d8dc53ca4d7a92b42f0de7c2215d16e210660a9456d3ed9370db17d606cac"
+					},
+					"start_epoch": 9,
+					"end_epoch": 14,
+					"storage_size": "66034000"
+				},
+				"deletable": false
+			}
+		}
+	}
+	*/
+
+	// return {
+	// 	// walrus: await WalrusModule.prepareImageForFrontend(blobDetails.blobId),
+	// 	walrus: await WalrusModule.zelfNameRegistration(searchResult.ipfs[0].zelfProofQRCode, searchResult.ipfs[0].publicData),
+	// };
 };
 
 /**
@@ -152,9 +204,7 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 		await _retriveFromIPFSByEnvironment(ipfsRecords, environment, query, authUser);
 
 		if (!ipfsRecords.length) {
-			return foundInArweave
-				? []
-				: zelfName && zelfName.includes(".zelf")
+			return zelfName && zelfName.includes(".zelf")
 				? {
 						price,
 						reward,
@@ -165,6 +215,8 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 		}
 
 		const zelfNames = await _returnFormattedIPFSRecords(ipfsRecords, environment, foundInArweave);
+
+		console.log({ zelfNames });
 
 		if (!zelfNames.length) {
 			const error = new Error("not_found_in_arweave");
