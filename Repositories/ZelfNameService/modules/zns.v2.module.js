@@ -167,14 +167,17 @@ const decryptZelfName = async (params, authUser) => {
 };
 
 const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, authUser) => {
+	const zelfName = zelfNameObject.zelfName.replace(".hold", "");
+
 	const metadata = {
 		hasPassword: zelfNameObject.hasPassword,
 		zelfProof: zelfNameObject.zelfProof,
-		zelfName: zelfNameObject.zelfName,
+		zelfName,
 		ethAddress: zelfNameObject.ethAddress,
 		solanaAddress: zelfNameObject.solanaAddress,
 		btcAddress: zelfNameObject.btcAddress,
 		extraParams: {
+			origin: zelfNameObject.origin || "online",
 			suiAddress: zelfNameObject.suiAddress,
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
@@ -204,7 +207,7 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{
 			base64: zelfNameObject.image,
-			name: zelfNameObject.zelfName,
+			name: zelfName,
 			metadata,
 			pinIt: true,
 		},
@@ -214,6 +217,8 @@ const _confirmFreeZelfName = async (zelfNameObject, referralZelfNameObject, auth
 	zelfNameObject.ipfs = await ZNSPartsModule.formatIPFSRecord(zelfNameObject.ipfs, true);
 
 	delete zelfNameObject.ipfs.publicData.zelfProof;
+
+	if (!zelfNameObject.publicData) zelfNameObject.publicData = {};
 
 	zelfNameObject.publicData = Object.assign(zelfNameObject.publicData, zelfNameObject.ipfs.publicData);
 
@@ -466,7 +471,7 @@ const _validatePassword = async (zelfProof, syncPassword) => {
 };
 
 const leaseOffline = async (params, authUser) => {
-	const { zelfName, duration, zelfProof, zelfProofQRCode, sync, syncPublicData, syncPassword } = params;
+	const { zelfName, duration, zelfProof, zelfProofQRCode, sync, syncPublicData, syncPassword, referralZelfName } = params;
 
 	let mainnetRecord = null;
 	let holdRecord = null;
@@ -504,15 +509,11 @@ const leaseOffline = async (params, authUser) => {
 		throw error;
 	}
 
-	const { price, reward } = ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, duration);
-
-	const zelfNameObject = {
-		zelfName: `${zelfName}.hold`,
-		zelfProof,
-		image: zelfProofQRCode,
-		price,
-		reward,
-	};
+	const { price, reward, discount, priceWithoutDiscount, discountType } = ZNSPartsModule.calculateZelfNamePrice(
+		zelfName.length - 5,
+		duration,
+		referralZelfName
+	);
 
 	if (!_preview) _preview = await preview({ zelfProof });
 
@@ -521,6 +522,21 @@ const leaseOffline = async (params, authUser) => {
 		error.status = 409;
 		throw error;
 	}
+
+	const zelfNameObject = {
+		zelfName: `${zelfName}.hold`,
+		zelfProof,
+		image: zelfProofQRCode,
+		price,
+		reward,
+		hasPassword: _preview.passwordLayer === "WithPassword" ? "true" : "false",
+		ethAddress: _preview.publicData.ethAddress,
+		btcAddress: _preview.publicData.btcAddress,
+		solanaAddress: _preview.publicData.solanaAddress,
+		suiAddress: _preview.publicData.suiAddress,
+		duration: duration || 1,
+		origin: "offline",
+	};
 
 	if (holdRecord)
 		return {
@@ -545,34 +561,38 @@ const leaseOffline = async (params, authUser) => {
 		throw error;
 	}
 
-	zelfNameObject.ipfs = await IPFSModule.insert(
-		{
-			base64: zelfNameObject.image,
-			name: zelfNameObject.zelfName,
-			metadata: {
-				zelfProof: zelfNameObject.zelfProof,
-				zelfName: zelfNameObject.zelfName,
-				extraParams: JSON.stringify({
-					origin: "offline",
-					registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-					hasPassword: _preview.passwordLayer === "WithPassword" ? "true" : "false",
-					duration: duration || 1,
-					price: zelfNameObject.price,
-					expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
-					suiAddress: _preview.publicData.suiAddress,
-					v: "2",
-				}),
-				type: "hold",
-				ethAddress: _preview.publicData.ethAddress,
-				btcAddress: _preview.publicData.btcAddress,
-				solanaAddress: _preview.publicData.solanaAddress,
+	if (zelfNameObject.price === 0) {
+		await _confirmFreeZelfName(zelfNameObject, referralZelfName, authUser);
+	} else {
+		zelfNameObject.ipfs = await IPFSModule.insert(
+			{
+				base64: zelfNameObject.image,
+				name: zelfNameObject.zelfName,
+				metadata: {
+					zelfProof: zelfNameObject.zelfProof,
+					zelfName: zelfNameObject.zelfName,
+					ethAddress: _preview.publicData.ethAddress,
+					btcAddress: _preview.publicData.btcAddress,
+					solanaAddress: _preview.publicData.solanaAddress,
+					extraParams: JSON.stringify({
+						origin: "offline",
+						registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+						hasPassword: _preview.passwordLayer === "WithPassword" ? "true" : "false",
+						duration: duration || 1,
+						price: zelfNameObject.price,
+						expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
+						suiAddress: _preview.publicData.suiAddress,
+						v: "2",
+						type: "hold",
+					}),
+				},
+				pinIt: true,
 			},
-			pinIt: true,
-		},
-		{ ...authUser, pro: true }
-	);
+			{ ...authUser, pro: true }
+		);
 
-	zelfNameObject.ipfs = await ZNSPartsModule.formatIPFSRecord(zelfNameObject.ipfs, true);
+		zelfNameObject.ipfs = await ZNSPartsModule.formatIPFSRecord(zelfNameObject.ipfs, true);
+	}
 
 	return {
 		...zelfNameObject,
