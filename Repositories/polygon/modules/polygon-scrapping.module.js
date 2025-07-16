@@ -30,15 +30,17 @@ const getBalance = async (params) => {
 			},
 		});
 
-		const $ = cheerio.load(data);
+		const { price: price } = await getTickerPrice({ symbol: "POL" });
 
 		const tokensResponse = await instance.get(`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}/tokens?type=ERC-20`);
 
-		const balance = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(2) > div")
-			.text()
-			.replace(/\n/g, "")
-			.replace(" POL", "")
-			.trim();
+		function formatearTokens(entrada) {
+			return entrada.map((item) => {
+				const token = item.token;
+				const decimals = parseInt(token.decimals);
+				const rawAmount = item.value;
+				const price = item.token.exchange_rate;
+				const amount = Number(rawAmount) / Math.pow(10, decimals);
 
 				return {
 					_amount: amount,
@@ -57,7 +59,7 @@ const getBalance = async (params) => {
 			});
 		}
 
-		const totalTokens = $("#dropdownMenuBalance").text().trim().replace(/\n/g, "").split("(")[0];
+		const tokens = formatearTokens(tokensResponse.data.items);
 
 		const transactions = await getTransactionsList({ id: address }, { show: 10 });
 
@@ -221,6 +223,8 @@ const getTransactionStatus = async (params) => {
 	try {
 		const id = params.id;
 
+		const baseUrl = "https://polygonscan.com";
+
 		const { data } = await instance.get(`${baseUrl}/tx/${id}`, {
 			headers: {
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
@@ -337,7 +341,7 @@ const getTransactionStatus = async (params) => {
 
 		return response;
 	} catch (exception) {
-		console.log(exception);
+		console.error(exception);
 		const error = new Error("transaction_not_found");
 
 		error.status = 404;
