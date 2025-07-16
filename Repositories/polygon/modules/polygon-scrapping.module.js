@@ -1,14 +1,15 @@
-const { getCleanInstance } = require("../../../Core/axios");
-const instance = getCleanInstance(30000);
 const cheerio = require("cheerio");
-const { getTickerPrice } = require("../../binance/modules/binance.module");
-const baseUrl = "https://polygonscan.com";
 const moment = require("moment");
+
+const { getCleanInstance } = require("../../../Core/axios");
+const { getTickerPrice } = require("../../binance/modules/binance.module");
+
+const baseUrl = "https://polygonscan.com";
+const instance = getCleanInstance(30000);
 
 /**
  * @param {*} params
  */
-
 const getBalance = async (params) => {
 	try {
 		const address = params.id;
@@ -39,134 +40,54 @@ const getBalance = async (params) => {
 			.replace(" POL", "")
 			.trim();
 
-		const accounts = $("#ContentPlaceHolder1_divSummary > div.row.g-3.mb-4 > div:nth-child(1) > div > div > div:nth-child(3)")
-			.text()
-			.replace(/\n/g, "")
-			.split("@");
-
-		let account;
-
-		try {
-			account = {
-				asset: "POL",
-				fiatBalance: accounts[0].replace("Less Than", "").replace("POL Value", "").replace("(", "").replace(",", "").replace("$", "").trim(),
-				price: (await getTickerPrice({ symbol: `POL` })).price,
-			};
-		} catch (error) {
-			//si no tiene nada
-			account = {
-				asset: "POL",
-				fiatBalance: "0.00",
-				price: (await getTickerPrice({ symbol: `POL` })).price,
-			};
+				return {
+					_amount: amount,
+					_fiatBalance: (amount * price).toFixed(decimals),
+					_price: Number(price),
+					address: token.address,
+					amount: amount.toFixed(decimals),
+					decimals: decimals,
+					fiatBalance: amount * price,
+					image: token.icon_url || "",
+					name: token.name,
+					price: price,
+					symbol: token.symbol,
+					tokenType: token.type || "ERC-20",
+				};
+			});
 		}
 
 		const totalTokens = $("#dropdownMenuBalance").text().trim().replace(/\n/g, "").split("(")[0];
 
-		const balanceTokens = $("#dropdownMenuBalance").text().trim().replace(/\n/g, "").split("(")[1];
-
-		let tokensContracts;
-
-		try {
-			tokensContracts = {
-				balance: totalTokens.replace("$", "").replace(">", "").trim(),
-				total: balanceTokens.replace(">", "").replace("Tokens)", "").trim(),
-			};
-		} catch (error) {
-			console.error(error);
-
-			tokensContracts = {
-				balance: "0.00",
-				total: 0,
-			};
-		}
-
-		const tokens = [];
-
-		let currentTokenType = "";
-
-		$("ul.list li.nav-item").each((index, element) => {
-			const tokenTypeElement = $(element).find(".fw-medium").text().trim();
-
-			if (tokenTypeElement) {
-				currentTokenType = tokenTypeElement.replace("Tokens", "").split("(")[0].trim();
-				return;
-			}
-
-			const tokenName = $(element).find(".list-name span").attr("data-bs-title") || $(element).find(".list-name").text().trim();
-			const tokenAmount = $(element).find(".text-muted").text().trim();
-
-			const [_amount, rest] = tokenAmount.split(" ");
-
-			// Then, split the second part on '@' to isolate the price
-			const [, _price] = tokenAmount.split("@");
-
-			const tokenType = $(element).find(".badge").text().trim();
-			const tokenLink = $(element).find("a.nav-link").attr("href").replace("/token/", "");
-			const tokenImage = $(element).find("img").attr("src");
-
-			let name = null;
-			let symbol = null;
-
-			try {
-				name = tokenName.split("(")[0].trim();
-				symbol = tokenName.split("(")[1].replace(")", "").trim();
-			} catch (error) {}
-
-			if (name && tokenImage) {
-				const token = {
-					tokenType: currentTokenType,
-					fiatBalance: (_price * _amount).toFixed(10),
-					name: cleanString(name),
-					symbol: cleanString(symbol),
-					amount: _amount.replace(/,/g, ""),
-					price: _price,
-					type: tokenType,
-					address: tokenLink.split("?")[0],
-					image: tokenImage?.startsWith("https")
-						? tokenImage
-						: `https://etherscan.io${tokenImage}` ||
-						  `https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8`,
-				};
-
-				tokens.push(token);
-			}
-		});
-
-		const tokenHoldings = {
-			...tokensContracts,
-			tokens,
-		};
-
-		const transactions = [];
-
-		try {
-			const tabla = $("#transactions > div > div.table-responsive").html();
-			const campos = cheerio.load(tabla);
-
-			campos("tbody tr").each((_index, element) => _parseTransactionsContent(campos, element, transactions));
-		} catch (error) {
-			console.error({ error });
-		}
-
-		tokenHoldings.tokens.unshift({
-			tokenType: "POL",
-			fiatBalance: Number(account.fiatBalance),
-			symbol: "POL",
-			name: "polygon",
-			price: account.price,
-			image: "https://nwgz3prwfm5e3gvqyostyhk4avy3ygozgvqlvzd2txqjmwctdzxq.arweave.zelf.world/bY2dvjYrOk2asMOlPB1cBXG8Gdk1YLrkep3gllhTHm8",
-			amount: balance,
-		});
+		const transactions = await getTransactionsList({ id: address }, { show: 10 });
 
 		const response = {
 			address,
-			fullName,
-			balance,
-			fiatBalance: Number(account.fiatBalance),
-			account,
-			tokenHoldings,
-			transactions,
+			balance: data.coin_balance,
+			fiatBalance: data.coin_balance * price,
+			type: "system_account",
+			account: {
+				asset: "POL",
+				fiatBalance: data.coin_balance * price,
+				price: price,
+			},
+			tokenHoldings: {
+				total: 1 + tokens.length,
+				balance: data.coin_balance,
+				tokens: [
+					{
+						tokenType: "ERC-20",
+						fiatBalance: data.coin_balance * price,
+						symbol: "POL",
+						name: "Polygon",
+						price: price,
+						image: "https://s2.coinmarketcap.com/static/img/coins/64x64/28321.png",
+						amount: data.coin_balance,
+					},
+					...tokens,
+				],
+			},
+			transactions: transactions.transactions,
 		};
 
 		return response;
@@ -175,7 +96,7 @@ const getBalance = async (params) => {
 	}
 };
 
-const getGasTracker = async (params) => {
+const getGasTracker = async () => {
 	try {
 		let { data } = await instance.get(`${baseUrl}/gastracker`, {
 			headers: {
@@ -192,7 +113,12 @@ const getGasTracker = async (params) => {
 
 		const lowPriorityAndBase = $("#spanDynamicLowPriorityAndBase").text().trim();
 
-		const lowTime = $("#divLowPrice > div.text-muted").first().text().replace(/\n/g, "").trim().trim();
+		let lowTime = $("#divLowPrice > div.text-muted")
+			.first()
+			.text()
+			.replace(/^\(([^)]+)\).*$/, "$1")
+			.trim();
+
 		const priceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
@@ -202,24 +128,41 @@ const getGasTracker = async (params) => {
 		const lowPriority = parseFloat(lowNumbers[1]).toString();
 
 		const avgPriorityAndBase = $("#spanDynamicProposePriorityAndBase").text().trim();
-		const averageTime = $("#divAvgPrice > div.text-muted").text().replace(/\n/g, "").trim().trim();
 		const avgPriceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
+
+		let averageTime = $("#divAvgPrice > div.text-muted")
+			.text()
+			.replace(/^\(([^)]+)\).*$/, "$1")
+			.trim();
+
 		const avgNumbers = avgPriorityAndBase.match(/\d+(\.\d+)?/g);
 		const avgBase = parseFloat(avgNumbers[0]).toString();
 		const avgPriority = parseFloat(avgNumbers[1]).toString();
 
 		const highPriorityAndBase = $("#spanDynamicHighPriorityAndBase").text().trim();
-		const highTime = $("#divHighPrice > div.text-muted").text().replace(/\n/g, "").trim().trim();
 		const highPriceInDollars = $("div.text-muted")
 			.text()
 			.match(/\$\d+\.\d+/)[0];
+
+		let highTime = $("#divHighPrice > div.text-muted")
+			.text()
+			.replace(/^\(([^)]+)\).*$/, "$1")
+			.trim();
+
 		const highNumbers = highPriorityAndBase.match(/\d+(\.\d+)?/g);
 		const highBase = parseFloat(highNumbers[0]).toString();
 		const highPriority = parseFloat(highNumbers[1]).toString();
 
 		const featuredActions = [];
+
+		const timeRegexp = /\(([^)]+)\)/;
+
+		lowTime = `${lowTime.match(timeRegexp)?.[1]}`?.trim();
+		averageTime = `${averageTime.match(timeRegexp)?.[1]}`?.trim();
+		highTime = `${highTime.match(timeRegexp)?.[1]}`?.trim();
+
 		$("#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr").each(
 			(index, element) => {
 				const action = $(element).find("td span").text().trim();
@@ -241,24 +184,24 @@ const getGasTracker = async (params) => {
 		// Formar el objeto de respuesta final.
 		const response = {
 			low: {
-				gwei: lowGwei,
 				base: lowBase,
-				priority: lowPriority,
 				cost: priceInDollars,
+				gwei: lowGwei,
+				priority: lowPriority,
 				time: lowTime,
 			},
 			average: {
-				gwei: averageGwei,
 				base: avgBase,
-				priority: avgPriority,
 				cost: avgPriceInDollars,
+				gwei: averageGwei,
+				priority: avgPriority,
 				time: averageTime,
 			},
 			high: {
-				gwei: highGwei,
 				base: highBase,
-				priority: highPriority,
 				cost: highPriceInDollars,
+				gwei: highGwei,
+				priority: highPriority,
 				time: highTime,
 			},
 			featuredActions,
@@ -286,6 +229,37 @@ const getTransactionStatus = async (params) => {
 		});
 
 		const $ = cheerio.load(data);
+		const tokensTransferred = [];
+		const transactionType = $("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
+
+		try {
+			const transactionDetailsHtml = $("#nav_tabcontent_erc20_transfer").html();
+
+			const $$ = cheerio.load(transactionDetailsHtml);
+
+			$$(".row-count").each((i, elem) => {
+				const $elem = $$(elem);
+				const from = $elem.find('span.fw-medium:contains("From")').next("a").attr("data-highlight-target");
+				const to = $elem.find('span.fw-medium:contains("To")').next("a").attr("data-highlight-target");
+				const amount = $elem.find('span.fw-medium:contains("For")').next("span").text();
+				const tokenElement = $elem.find('a[href*="/token/"]').last();
+				const tokenName = tokenElement.find('span[data-bs-toggle="tooltip"]').first().text().trim();
+
+				const symbol = tokenElement.find("span > span.text-muted > span").first().text().trim();
+
+				const icon = tokenElement.find("img").attr("src");
+
+				tokensTransferred.push({
+					amount,
+					from,
+					to,
+					icon: icon ? `${baseUrl}${icon}` : null,
+					network: "polygon",
+					symbol,
+					token: tokenName,
+				});
+			});
+		} catch (error) {}
 
 		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge").text().split(" ")[0].trim();
 
@@ -318,38 +292,43 @@ const getTransactionStatus = async (params) => {
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
 
-		const valueETH = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
+		const amount = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("POL", "").trim();
 
-		const valueDolar = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const fiatAmount = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
-		const transactionFeeETH = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
+		const transactionFeeNetwork = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("POL", "").trim();
 
-		const transactionFeeDolar = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
+		const transactionFeeFiat = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
 
 		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
 
 		const gasPrice = gasPriceGwei[0].trim();
-		const gweiETH = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
+		const gwei = gasPriceGwei[1].replace("(", "").replace(")", "").replace("POL", "").trim();
 
 		const observation = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span").text().replace("[", "").replace("]", "").trim();
 
 		const response = {
+			age: timestamp2,
+			amount: Number(amount),
+			block,
+			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
+			fiatAmount: Number(fiatAmount),
+			from,
+			gasPrice,
+			gwei,
 			hash: id,
 			id,
-			status,
-			block,
-			timestamp,
-			age: timestamp2,
-			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
-			from,
-			to,
-			valueETH,
-			valueDolar,
-			transactionFeeETH,
-			transactionFeeDolar,
-			gasPrice,
-			gweiETH,
+			image: "https://polygonscan.com/assets/svg/logos/polygon-default-logo.svg",
+			network: "polygon",
 			observation,
+			status,
+			symbol: "POL",
+			timestamp,
+			to,
+			tokensTransferred,
+			transactionFeeFiat: Number(transactionFeeFiat),
+			transactionFeeNetwork,
+			transactionType,
 		};
 
 		if (!id || !status || !to || !from) {
@@ -391,17 +370,17 @@ const getTransactionsList = async (params, query) => {
 		const formatTransactions = (address, transactions) => {
 			return transactions.map((tx) => {
 				return {
-					hash: tx.Txhash,
-					method: tx.Method,
-					block: tx.Blockno,
 					age: moment(tx.DateTime).fromNow(),
-					date: tx.DateTime,
-					from: tx.Sender,
-					to: tx.Receiver,
-					traffic: determineTraffic(address, tx.Sender, tx.Receiver),
-					fiatAmount: tx.Value.replace("$", ""),
 					amount: tx.Amount.split(" ")[0].replace(",", ""),
 					asset: "POL",
+					block: tx.Blockno,
+					date: tx.DateTime,
+					fiatAmount: tx.Value.replace("$", ""),
+					from: tx.Sender,
+					hash: tx.Txhash,
+					method: tx.Method,
+					to: tx.Receiver,
+					traffic: determineTraffic(address, tx.Sender, tx.Receiver),
 					txnFee: tx.TxnFee,
 				};
 			});
@@ -437,65 +416,6 @@ const getTransactionsList = async (params, query) => {
 			transactions: [],
 		};
 	}
-};
-
-function cleanString(str) {
-	return str
-		.replace(/✅/g, "") // Elimina el emoji ✅
-		.replace(/\[.*?\]/g, "") // Elimina cualquier texto dentro de corchetes [ ... ]
-		.replace(/claim at:|until \d{2}\.\d{2}/gi, "") // Elimina frases específicas
-		.replace(/\s+/g, " ") // Reemplaza múltiples espacios por uno solo
-		.trim(); // Elimina espacios al inicio y al final
-}
-
-const _parseTransactionsContent = (campos, element, transactions = []) => {
-	const transaction = {};
-
-	transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
-	transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
-	transaction.block = campos(element).find("td:nth-child(4) a").text();
-
-	const ageCol = campos(element).find("td:nth-child(6) span");
-	const dateCol = campos(element).find("td:nth-child(5) span");
-
-	const age = ageCol.text().trim();
-	const date = dateCol.text().trim();
-
-	transaction.age = age;
-	transaction.date = date;
-
-	const divFrom = campos(element).find("td:nth-child(8)").html();
-
-	if (!divFrom) return;
-
-	const from = cheerio.load(divFrom);
-
-	transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
-	transaction.traffic = campos(element).find("td:nth-child(9)").text();
-
-	const divTo = campos(element).find("td:nth-child(10)").html();
-	const to = cheerio.load(divTo);
-
-	transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
-
-	const amountCol = campos(element).find("td:nth-child(11)");
-
-	const amountTooltipData = amountCol.find("span").attr("data-bs-title");
-
-	const fiatAndTokenAmount = amountTooltipData.split(" | ");
-	const tokenAmountAndAsset = fiatAndTokenAmount[0].split(" ");
-
-	const tokenAmount = tokenAmountAndAsset[0].trim();
-	const asset = tokenAmountAndAsset[1].trim();
-
-	const fiatAmount = fiatAndTokenAmount[1].replace("$", "").trim();
-
-	transaction.fiatAmount = fiatAmount;
-	transaction.amount = tokenAmount;
-	transaction.asset = asset;
-	transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
-
-	transactions.push(transaction);
 };
 
 module.exports = {

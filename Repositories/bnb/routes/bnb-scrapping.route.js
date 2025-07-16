@@ -1,6 +1,6 @@
 const config = require("../../../Core/config");
-const Controller = require("../controllers/bnb-scrapping.controller");
 
+const Controller = require("../controllers/bnb-scrapping.controller");
 const Middleware = require("../middlewares/bnb-scrapping.middleware");
 
 const base = "/bnb";

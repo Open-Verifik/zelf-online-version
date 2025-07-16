@@ -50,18 +50,18 @@ const getAddress = async (params) => {
 					}
 
 					return {
-						tokenType: "ERC-20",
-						fiatBalance: parseFloat(fiatBalance.toFixed(7)),
+						_amount: formattedAmount,
 						_fiatBalance: fiatBalance.toFixed(7),
-						symbol: tokenInfo.symbol,
+						_price: rate,
+						address: tokenInfo.address,
+						amount: formattedAmount.toFixed(12),
+						decimals: decimals,
+						fiatBalance: parseFloat(fiatBalance.toFixed(7)),
+						image: `https://s2.coinmarketcap.com/static/img/coins/64x64/${idAseet.idAseet}.png`,
 						name: tokenInfo.name,
 						price: rate.toFixed(6),
-						_price: rate,
-						image: `https://s2.coinmarketcap.com/static/img/coins/64x64/${idAseet.idAseet}.png`,
-						decimals: decimals,
-						amount: formattedAmount.toFixed(12),
-						_amount: formattedAmount,
-						address: tokenInfo.address,
+						symbol: tokenInfo.symbol,
+						tokenType: "ERC-20",
 					};
 				})
 			);
@@ -72,13 +72,13 @@ const getAddress = async (params) => {
 		const tokens = await formatTokenData(data.tokens);
 
 		tokens.push({
-			tokenType: "ETH",
+			amount: data.ETH.balance.toString(),
 			fiatBalance: data.ETH.balance * price,
-			symbol: "ETH",
+			image: "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
 			name: "Ethereum",
 			price: price,
-			image: "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
-			amount: data.ETH.balance.toString(),
+			symbol: "ETH",
+			tokenType: "ETH",
 		});
 
 		function sumFiatBalance(tokens) {
@@ -311,27 +311,27 @@ const getTransactionStatus = async (params) => {
 		const observation = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span").text().replace("[", "").replace("]", "").trim();
 
 		const response = {
-			transactionType,
-			hash: id,
-			id,
-			status,
-			block,
-			timestamp,
-			network: "ethereum",
-			symbol: "ETH",
-			image: "https://etherscan.io/assets/svg/logos/ether-default-logo.svg",
 			age: timestamp2,
-			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
-			from,
-			to,
 			amount: Number(amount),
+			block,
+			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			fiatAmount: Number(fiatAmount),
-			transactionFeeNetwork,
-			transactionFeeFiat: Number(transactionFeeFiat),
+			from,
 			gasPrice,
 			gwei,
+			hash: id,
+			id,
+			image: "https://etherscan.io/assets/svg/logos/ether-default-logo.svg",
+			network: "ethereum",
 			observation,
+			status,
+			symbol: "ETH",
+			timestamp,
+			to,
 			tokensTransferred,
+			transactionFeeFiat: Number(transactionFeeFiat),
+			transactionFeeNetwork,
+			transactionType,
 		};
 
 		if (!id || !status || !to || !from) {
