@@ -112,7 +112,7 @@ const decryptZelfName = async (params, authUser) => {
 		addServerPassword: Boolean(params.addServerPassword),
 		faceBase64: face,
 		password,
-		zelfProof: zelfNameObject.zelfProof || params.zelfProof,
+		zelfProof: zelfNameObject.publicData.zelfProof || params.zelfProof,
 	});
 
 	if (decryptedZelfProof.error) {
@@ -134,6 +134,7 @@ const decryptZelfName = async (params, authUser) => {
 		const { ipfs, arweave } = await updateTags(zelfNameObject, tagsToAdd);
 
 		zelfNameObject.updatedIpfs = ipfs;
+
 		zelfNameObject.updatedArweave = arweave;
 
 		for (let index = 0; index < tagsToAdd.length; index++) {
@@ -142,6 +143,8 @@ const decryptZelfName = async (params, authUser) => {
 			zelfNameObject.publicData[tag.name] = tag.value;
 		}
 	}
+
+	if (!zelfNameObject.zelfProofQRCode) zelfNameObject.zelfProofQRCode = await ZNSPartsModule.urlToBase64(zelfNameObject.url);
 
 	return {
 		hasPassword: Boolean(password),
@@ -309,8 +312,6 @@ const _findDuplicatedZelfName = async (zelfName, environment = "both", authUser,
 	);
 
 	if (searchResult.available) return null;
-
-	console.log({ searchResult });
 
 	if (returnResults) return searchResult;
 
@@ -516,8 +517,6 @@ const leaseOffline = async (params, authUser) => {
 	);
 
 	if (!_preview) _preview = await preview({ zelfProof });
-
-	console.log({ _preview, zelfProof });
 
 	if (!zelfName.includes(_preview.publicData.zelfName.toLowerCase())) {
 		const error = new Error("zelfName_does_not_match_in_zelfProof");
