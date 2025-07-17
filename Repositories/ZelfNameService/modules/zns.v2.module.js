@@ -247,7 +247,7 @@ const _saveHoldZelfNameInIPFS = async (zelfNameObject, referralZelfNameObject, a
 	zelfNameObject.ipfs = await IPFSModule.insert(
 		{
 			base64: zelfNameObject.image,
-			name: zelfNameObject.zelfName,
+			name: holdName,
 			metadata,
 			pinIt: true,
 		},
