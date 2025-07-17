@@ -57,7 +57,7 @@ const handleOldZelfNameUpdate = async (data) => {
 
 const searchZelfName = async (ctx) => {
 	try {
-		const data = await Module.searchZelfName(ctx.request.query, ctx.state.user);
+		const data = await Modulev2.searchZelfName(ctx.request.query, ctx.state.user);
 
 		// Handle zelfPay logic
 		const zelfPayResult = await handleZelfPayLogic(data, ctx.state.user);
