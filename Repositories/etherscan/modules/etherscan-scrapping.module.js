@@ -1,5 +1,6 @@
 require("dotenv").config();
-
+const urlBase = process.env.MICROSERVICES_BOGOTA_URL;
+const token = process.env.MICROSERVICES_BOGOTA_TOKEN;
 const axios = require("axios");
 const moment = require("moment");
 const https = require("https");
@@ -15,6 +16,7 @@ const agent = new https.Agent({ rejectUnauthorized: false });
 const apiKey = process.env.API_KEY_ETH;
 
 const baseUrls = {
+	bogota: "https://etherscan.io",
 	production: "https://etherscan.io",
 	development: "https://sepolia.etherscan.io",
 };
@@ -222,125 +224,14 @@ const getTransactionStatus = async (params) => {
 	try {
 		const id = params.id;
 
-		const baseUrl = baseUrls[params.env || environment];
-
-		const { data } = await instance.get(`${baseUrl}/tx/${id}`, {
+		const { data } = await instance.get(`${urlBase}/api/evm-tx/ethereum-transaction?address=${id}`, {
 			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
+				Authorization: `Bearer ${token}`,
 			},
 		});
 
-		const $ = cheerio.load(data);
-		const tokensTransferred = [];
-		const transactionType = $("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
-
-		try {
-			const transactionDetailsHtml = $("#nav_tabcontent_erc20_transfer").html();
-
-			const $$ = cheerio.load(transactionDetailsHtml);
-
-			$$(".row-count").each((i, elem) => {
-				const $elem = $$(elem);
-				const from = $elem.find('span.fw-medium:contains("From")').next("a").attr("data-highlight-target");
-				const to = $elem.find('span.fw-medium:contains("To")').next("a").attr("data-highlight-target");
-				const amount = $elem.find('span.fw-medium:contains("For")').next("span").text();
-				const tokenElement = $elem.find('a[href*="/token/"]').last();
-				const tokenName = tokenElement.find('span[data-bs-toggle="tooltip"]').first().text().trim();
-
-				const symbol = tokenElement.find("span > span.text-muted > span").first().text().trim();
-
-				const icon = tokenElement.find("img").attr("src");
-
-				tokensTransferred.push({
-					from,
-					to,
-					amount,
-					symbol,
-					network: "ethereum",
-					token: tokenName,
-					icon: icon ? `https://etherscan.io${icon}` : null,
-				});
-			});
-		} catch (error) {}
-
-		const status = $("#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(2) span.badge").text().split(" ")[0].trim();
-
-		const block = $(
-			"#ContentPlaceHolder1_maintable > div.card.p-5 > div:nth-child(3) > div.col-md-9 > div > span.d-flex.align-items-center.gap-1 > a"
-		).text();
-
-		const timestamp2 = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().replace(/\n/g, "").split("|")[0].split(" (")[0];
-
-		const timestamp = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9").text().trim().split("|")[0];
-
-		const date = $("#ContentPlaceHolder1_divTimeStamp > div > div.col-md-9")
-			.text()
-			.trim()
-			.replace(/\n/g, "")
-			.split("|")[0]
-			.split(" (")[1]
-			.replace(" AM UTC)", "")
-			.replace(" PM UTC)", "");
-
-		const from_a = $("#ContentPlaceHolder1_maintable div.from-address-col").html();
-
-		const from_div = cheerio.load(from_a);
-
-		const from = from_div("a.js-clipboard").attr("data-clipboard-text");
-		///en pruba 9
-		const to_a = $("#ContentPlaceHolder1_maintable div.to-address-col").html();
-
-		const to_div = cheerio.load(to_a);
-
-		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
-
-		const amount = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(2)").text().replace("ETH", "").trim();
-
-		const fiatAmount = $("#ContentPlaceHolder1_spanValue > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
-
-		const transactionFeeNetwork = $("#ContentPlaceHolder1_spanTxFee > div > span:nth-child(1)").text().replace("ETH", "").trim();
-
-		const transactionFeeFiat = $("#ContentPlaceHolder1_spanTxFee > div > span.text-muted").text().replace("($", "").replace(")", "").trim();
-
-		const gasPriceGwei = $("#ContentPlaceHolder1_spanGasPrice").text().split("Gwei");
-
-		const gasPrice = gasPriceGwei[0].trim();
-		const gwei = gasPriceGwei[1].replace("(", "").replace(")", "").replace("ETH", "").trim();
-
-		const observation = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span").text().replace("[", "").replace("]", "").trim();
-
-		const response = {
-			age: timestamp2,
-			amount: Number(amount),
-			block,
-			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
-			fiatAmount: Number(fiatAmount),
-			from,
-			gasPrice,
-			gwei,
-			hash: id,
-			id,
-			image: "https://etherscan.io/assets/svg/logos/ether-default-logo.svg",
-			network: "ethereum",
-			observation,
-			status,
-			symbol: "ETH",
-			timestamp,
-			to,
-			tokensTransferred,
-			transactionFeeFiat: Number(transactionFeeFiat),
-			transactionFeeNetwork,
-			transactionType,
-		};
-
-		if (!id || !status || !to || !from) {
-			throw new Error("404:transaction_not_found");
-		}
-
-		return response;
+		return data;
 	} catch (exception) {
-		console.error(exception);
 		const error = new Error("transaction_not_found");
 
 		error.status = 404;
@@ -356,77 +247,16 @@ const getTransactionStatus = async (params) => {
  */
 const getTransactionsList = async (params) => {
 	const address = params.address;
-	const page = params.page;
 	const show = params.show;
 
-	const baseUrl = baseUrls[params.env || environment];
-
 	try {
-		const { data } = await instance.get(`${baseUrl}/txs?a=${address}&ps=${show}&p=${page}`, {
+		const { data } = await instance.get(`${urlBase}/api/evm-tx/ethereum-transactions?address=${address}&show=${show}`, {
 			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
+				Authorization: `Bearer ${token}`,
 			},
 		});
 
-		const $ = cheerio.load(data);
-
-		const transactions = [];
-
-		const records = $("#ContentPlaceHolder1_divDataInfo > div > div:nth-child(1) > span").text().match(/\d+/g).join("");
-		const nPage = $("#ContentPlaceHolder1_divBottomPagination > nav > ul > li:nth-child(3)").text().replace("Page", "").split("of");
-
-		const pagination = {
-			records,
-			pages: nPage ? nPage?.[1]?.trim() : 0,
-			page: nPage ? nPage?.[0]?.trim() : 0,
-		};
-
-		const tabla = $("#ContentPlaceHolder1_divTransactions > div.table-responsive").html();
-		const campos = cheerio.load(tabla);
-
-		campos("tbody tr").each((_index, element) => {
-			const transaction = {};
-
-			transaction.hash = campos(element).find("td:nth-child(2) a").text().trim();
-			transaction.method = campos(element).find("td:nth-child(3) span").attr("data-title");
-
-			transaction.block = campos(element).find("td:nth-child(5) a").text();
-			//#ContentPlaceHolder1_divTransactions > div.table-responsive > table > tbody > tr:nth-child(1) > td.showAge
-			transaction.age = campos(element).find("td.showAge").text();
-
-			//#ContentPlaceHolder1_divTransactions > div.table-responsive > table > tbody > tr:nth-child(1) > td.showAge > span
-			transaction.date = campos(element).find(" td.showAge > span").attr("data-bs-title");
-
-			const divFrom = campos(element).find("td:nth-child(9)").html();
-
-			if (!divFrom) return null;
-
-			const from = cheerio.load(divFrom);
-
-			transaction.from = from("a.js-clipboard").attr("data-clipboard-text");
-
-			transaction.traffic = campos(element).find("td:nth-child(10)").text();
-
-			const divTo = campos(element).find("td:nth-child(11)").html();
-
-			const to = cheerio.load(divTo);
-
-			transaction.to = to("a.js-clipboard").attr("data-clipboard-text");
-
-			let _amount = campos(element).find("td:nth-child(12)").text().split("$")[0].trim();
-
-			_amount = _amount.split(" ");
-
-			transaction.fiatAmount = campos(element).find("td:nth-child(12)").text().split("$")[1].replace(/\n/g, "").trim();
-			transaction.amount = _amount[0];
-			transaction.asset = _amount[1];
-			transaction.txnFee = campos(element).find("td.small.text-muted.showTxnFee").text();
-
-			transactions.push(transaction);
-		});
-
-		return { pagination, transactions };
+		return { pagination: { records: "0", pages: "0", page: "0" }, transactions: data };
 	} catch (error) {
 		console.error({ error, address });
 
