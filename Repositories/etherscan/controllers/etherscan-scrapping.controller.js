@@ -1,5 +1,4 @@
 const Module = require("../modules/etherscan-scrapping.module");
-const HttpHandler = require("../../../Core/http-handler");
 
 const address = async (ctx) => {
 	try {

@@ -3,7 +3,7 @@ const config = require("../../../Core/config");
 const Controller = require("../controllers/bnb-scrapping.controller");
 const Middleware = require("../middlewares/bnb-scrapping.middleware");
 
-const base = "/bnb";
+const base = "/bsc";
 
 module.exports = (server) => {
 	const PATH = config.basePath(base);
