@@ -1,5 +1,4 @@
 const Module = require("../modules/polygon-scrapping.module");
-const HttpHandler = require("../../../Core/http-handler");
 
 const balance = async (ctx) => {
 	try {
