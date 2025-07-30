@@ -216,8 +216,6 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 
 		const zelfNames = await _returnFormattedIPFSRecords(ipfsRecords, environment, foundInArweave);
 
-		console.log({ zelfNames });
-
 		if (!zelfNames.length) {
 			const error = new Error("not_found_in_arweave");
 			error.status = 404;
