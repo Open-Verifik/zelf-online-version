@@ -31,6 +31,7 @@ module.exports = (server) => {
 	require("../Repositories/purchase-zelf/routes/purchase.route")(server);
 	//Q
 	//R
+	require("../Repositories/Rewards/routes/rewards.route")(server);
 	//S
 	require("../Repositories/sui/routes/sui-scrapping.route")(server);
 	require("../Repositories/Solana/routes/solana-scrapping.route")(server);
