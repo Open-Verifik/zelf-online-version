@@ -1,5 +1,6 @@
 const IPFS = require("../../../Core/ipfs");
 const ZNSSearchModule = require("../../ZelfNameService/modules/zns-search.module");
+const ZNSTokenModule = require("../../ZelfNameService/modules/zns-token.module");
 const NotificationService = require("../services/notification.service");
 const Model = require("../models/rewards.model"); // MongoDB model for TTL cache
 const moment = require("moment");
@@ -194,8 +195,14 @@ const dailyRewards = async (data, authUser) => {
 		// Get ZelfName type to determine reward range
 		const zelfNamePublicData = await _getZelfNamePublicData(zelfName);
 
+		// Validate that user has a Solana address for token transfer
+		if (!zelfNamePublicData.solanaAddress) {
+			throw new Error("No Solana address found for this ZelfName. Please update your ZelfName with a Solana address to receive rewards.");
+		}
+
 		// Check if user already claimed today
 		const todayReward = await _getTodayReward(zelfName);
+
 		if (todayReward) {
 			return {
 				success: false,
@@ -212,8 +219,8 @@ const dailyRewards = async (data, authUser) => {
 		const rewardPrimaryKey = `${zelfName}${todayKey}`;
 		// Create reward data
 		const rewardData = {
+			name: zelfName,
 			rewardPrimaryKey,
-			zelfName: zelfName,
 			amount: rewardAmount,
 			type: "daily",
 			status: "claimed",
@@ -226,8 +233,8 @@ const dailyRewards = async (data, authUser) => {
 
 		// Metadata for IPFS querying (key-value pairs)
 		const metadata = {
+			name: zelfName,
 			rewardPrimaryKey, // Composite key for direct lookup
-			zelfName: zelfName,
 			rewardType: "daily",
 			rewardDate: todayKey, // Date without time for easy querying
 			zelfNameType: zelfNamePublicData.type,
@@ -242,8 +249,8 @@ const dailyRewards = async (data, authUser) => {
 
 		// Step 1: Save to MongoDB with TTL (5 minutes) for immediate availability
 		const mongoReward = new Model({
+			name: zelfName,
 			rewardPrimaryKey,
-			zelfName,
 			amount: rewardAmount,
 			type: "daily",
 			status: "claimed",
@@ -257,7 +264,6 @@ const dailyRewards = async (data, authUser) => {
 		});
 
 		await mongoReward.save();
-		console.log("Reward saved to MongoDB cache");
 
 		// Step 2: Save to IPFS for permanent storage (async, non-blocking)
 		const ipfsResult = await IPFS.pinFile(`data:application/json;base64,${base64Json}`, filename, "application/json", metadata);
@@ -266,13 +272,51 @@ const dailyRewards = async (data, authUser) => {
 			// Update MongoDB record with IPFS CID
 			mongoReward.ipfsCid = ipfsResult.IpfsHash;
 			await mongoReward.save();
-			console.log("Reward saved to IPFS with CID:", ipfsResult.IpfsHash);
-		} else {
-			console.error("Failed to store reward in IPFS, but MongoDB cache is active");
 		}
 
 		// Trigger notification
 		await _sendRewardNotification(zelfName, rewardAmount, "claimed");
+
+		// Step 3: Send ZNS tokens to user's Solana address
+		let tokenTransferResult = null;
+		let tokenTransferError = null;
+
+		try {
+			console.log(`Sending ${rewardAmount} ZNS tokens to ${zelfNamePublicData.solanaAddress} for ${zelfName}`);
+			const transferSignature = await ZNSTokenModule.giveTokensAfterPurchase(rewardAmount, zelfNamePublicData.solanaAddress);
+
+			tokenTransferResult = {
+				success: true,
+				signature: transferSignature,
+				amount: rewardAmount,
+				recipientAddress: zelfNamePublicData.solanaAddress,
+			};
+
+			// Update reward status to include token transfer success
+			rewardData.tokenTransfer = tokenTransferResult;
+			mongoReward.tokenTransfer = tokenTransferResult;
+			await mongoReward.save();
+
+			console.log(`Successfully sent ZNS tokens. Transaction signature: ${transferSignature}`);
+		} catch (tokenError) {
+			console.error("Failed to send ZNS tokens:", tokenError);
+
+			tokenTransferError = {
+				success: false,
+				error: tokenError.message,
+				amount: rewardAmount,
+				recipientAddress: zelfNamePublicData.solanaAddress,
+			};
+
+			// Update reward status to include token transfer failure
+			rewardData.tokenTransfer = tokenTransferError;
+			mongoReward.tokenTransfer = tokenTransferError;
+			mongoReward.tokenTransferStatus = "failed";
+			await mongoReward.save();
+
+			// Don't throw error here, user still gets the reward record
+			// The token transfer can be retried later if needed
+		}
 
 		return {
 			success: true,
@@ -287,11 +331,16 @@ const dailyRewards = async (data, authUser) => {
 				nextClaimAvailable: moment().add(1, "day").startOf("day").toISOString(),
 				ipfsCid: ipfsResult?.IpfsHash || null,
 				mongoId: mongoReward._id,
+				tokenTransfer: tokenTransferResult || tokenTransferError,
 				storage: {
 					mongodb: "immediate (5min TTL)",
 					ipfs: ipfsResult ? "stored" : "failed",
 				},
 			},
+			tokenTransferStatus: tokenTransferResult ? "success" : "failed",
+			tokenTransferMessage: tokenTransferResult
+				? `${rewardAmount} ZNS tokens have been sent to your Solana address!`
+				: `Reward claimed but token transfer failed. Please contact support with error: ${tokenTransferError?.error}`,
 		};
 	} catch (error) {
 		console.error("Error in dailyRewards:", error);

@@ -20,7 +20,7 @@
 		"@mysten/sui": "^1.36.0",
 		"@mysten/sui.js": "^0.54.1",
 		"@mysten/walrus": "^0.2.3",
-		"@solana/spl-token": "^0.1.8",
+		"@solana/spl-token": "^0.4.13",
 		"@solana/web3.js": "^1.93.0",
 		"axios": "1.8.2",
 		"bcrypt-nodejs": "^0.0.3",

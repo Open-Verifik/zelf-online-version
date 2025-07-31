@@ -13,6 +13,7 @@ const initConnection = async () => {
 	const url = `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}/`;
 
 	connection = new solanaWeb3.Connection(url);
+
 	await connection.getSlot();
 };
 
@@ -39,48 +40,33 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 			senderWallet.publicKey
 		);
 
-		const tokenBalance = await connection.getTokenAccountBalance(senderTokenAccount.address);
+		// Convert amount to smallest unit (8 decimals for ZNS token)
+		// If amount is already in smallest unit, don't convert again
+		const amountToSend =
+			typeof amount === "number" && amount < 1000
+				? Math.round(amount * 10 ** 8) // Convert from tokens to smallest unit
+				: Math.round(amount); // Already in smallest unit
 
-		// Ensure sender has enough tokens to send
-		const amountToSend = Math.round(250 * 10 ** 8);
-
-		if (tokenBalance.value.amount < amountToSend) {
+		if (senderTokenAccount.amount < amountToSend) {
 			throw new Error("Insufficient balance in sender's token account.");
 		}
 
 		// Receiver's public key
 		const receiverPublicKey = new solanaWeb3.PublicKey(receiverSolanaAddress);
 
-		// Get the receiver's associated token account address
-		const associatedTokenAddress = await splToken.getAssociatedTokenAddress(tokenMintAddress, receiverPublicKey);
+		// Get or create the receiver's associated token account
+		const receiverTokenAccount = await splToken.getOrCreateAssociatedTokenAccount(
+			connection,
+			senderWallet, // Payer (sender pays for account creation if needed)
+			tokenMintAddress,
+			receiverPublicKey
+		);
 
-		// Check if the receiver's token account exists
-		const receiverAccountInfo = await connection.getAccountInfo(associatedTokenAddress);
-
-		if (!receiverAccountInfo) {
-			// Create the receiver's associated token account
-			const createReceiverAccountInstruction = splToken.createAssociatedTokenAccountInstruction(
-				senderWallet.publicKey, // Payer
-				associatedTokenAddress, // Associated token account to be created
-				receiverPublicKey, // Receiver's public key
-				tokenMintAddress // Token mint address
-			);
-
-			const createTransaction = new solanaWeb3.Transaction().add(computeBudgetInstruction, createReceiverAccountInstruction);
-
-			// Use sendWithRetry for reliable account creation
-			const createSignature = await sendWithRetry(createTransaction, [senderWallet], 3);
-
-			// Confirm the creation before proceeding
-			await connection.confirmTransaction(createSignature, "finalized");
-		}
-
-		// Proceed with the token transfer
-
+		// Create the token transfer instruction
 		const transferInstruction = splToken.createTransferCheckedInstruction(
 			senderTokenAccount.address, // Sender's token account
 			tokenMintAddress, // Token mint address
-			associatedTokenAddress, // Receiver's token account
+			receiverTokenAccount.address, // Receiver's token account
 			senderWallet.publicKey, // Owner of the sender's token account
 			amountToSend, // Amount to send (in smallest unit)
 			8 // Decimals of the token
@@ -188,7 +174,11 @@ const releaseReferralRewards = async (authUser) => {
 
 		firstGroup = referralRewards[0];
 
-		await giveTokensAfterPurchase(firstGroup);
+		// Calculate reward tokens: 5% of total purchase amount
+		const rewardTokens = Math.round(firstGroup.totalSum * 0.05 * 100) / 100; // 5% with 2 decimal places
+
+		// Send tokens using proper parameters
+		await giveTokensAfterPurchase(rewardTokens, firstGroup.referralSolanaAddress);
 
 		// Update all records in this group with a single updateMany
 		await ReferralRewardModel.updateMany(

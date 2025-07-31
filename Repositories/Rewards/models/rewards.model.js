@@ -8,7 +8,7 @@ const rewardsSchema = new mongoose.Schema(
 			unique: true,
 			index: true,
 		},
-		zelfName: {
+		name: {
 			type: String,
 			required: true,
 			index: true,
