@@ -205,11 +205,10 @@ const formatIPFSRecord = async (ipfsRecord, foundInArweave) => {
 
 	if (zelfNameObject.publicData.leaseExpiresAt) zelfNameObject.publicData.expiresAt = zelfNameObject.publicData.leaseExpiresAt;
 
-	if (!foundInArweave) {
-		zelfNameObject.zelfProof = zelfNameObject.publicData.zelfProof;
+	// Always set zelfProof and zelfProofQRCode for IPFS records
+	zelfNameObject.zelfProof = zelfNameObject.publicData.zelfProof;
 
-		zelfNameObject.zelfProofQRCode = await _IPFSToBase64(zelfNameObject.url);
-	}
+	zelfNameObject.zelfProofQRCode = await _IPFSToBase64(zelfNameObject.url);
 
 	return zelfNameObject;
 };
