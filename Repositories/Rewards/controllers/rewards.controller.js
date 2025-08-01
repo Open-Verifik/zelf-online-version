@@ -110,6 +110,19 @@ const rewardStats = async (ctx) => {
 	}
 };
 
+const firstTransactionReward = async (ctx) => {
+	try {
+		const data = await Module.rewardFirstTransaction(ctx.request.body, ctx.state.user);
+
+		ctx.body = data;
+	} catch (error) {
+		console.error(error);
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	get,
 	show,
@@ -119,4 +132,5 @@ module.exports = {
 	dailyRewards,
 	rewardHistory,
 	rewardStats,
+	firstTransactionReward,
 };

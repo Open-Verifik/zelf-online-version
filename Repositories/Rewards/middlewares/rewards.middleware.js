@@ -125,6 +125,20 @@ const rewardStatsValidation = async (ctx, next) => {
 	}
 };
 
+const firstTransactionRewardValidation = async (ctx, next) => {
+	try {
+		const schema = Joi.object({
+			zelfName: Joi.string().required().min(3).max(27),
+		});
+
+		await schema.validateAsync(ctx.request.body);
+		await next();
+	} catch (error) {
+		ctx.status = 400;
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	getValidation,
 	showValidation,
@@ -134,4 +148,5 @@ module.exports = {
 	dailyRewardsValidation,
 	rewardHistoryValidation,
 	rewardStatsValidation,
+	firstTransactionRewardValidation,
 };

@@ -21,6 +21,9 @@ module.exports = (server) => {
 	// Daily rewards endpoint
 	server.post(`${PATH}/daily`, Middleware.dailyRewardsValidation, Controller.dailyRewards);
 
+	// First transaction reward endpoint
+	server.post(`${PATH}/first-transaction`, Middleware.firstTransactionRewardValidation, Controller.firstTransactionReward);
+
 	// User reward history endpoint
 	server.get(`${PATH}/history/:zelfName`, Middleware.rewardHistoryValidation, Controller.rewardHistory);
 

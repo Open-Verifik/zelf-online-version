@@ -4,6 +4,7 @@ const ZNSTokenModule = require("../../ZelfNameService/modules/zns-token.module")
 const NotificationService = require("../services/notification.service");
 const Model = require("../models/rewards.model"); // MongoDB model for TTL cache
 const moment = require("moment");
+const ZNSTransactionDetector = require("../../ZelfNameService/modules/zns-transaction-detector.module");
 
 const get = async (params = {}, authUser = {}) => {
 	try {
@@ -517,6 +518,172 @@ const _getTotalRewardsInPeriod = async (zelfName, startDate) => {
 	}
 };
 
+const rewardFirstTransaction = async (data, authUser) => {
+	try {
+		const { zelfName } = data;
+
+		if (!zelfName) {
+			throw new Error("ZelfName is required");
+		}
+
+		console.log(`🎁 Checking first transaction reward for ${zelfName}`);
+
+		// Get ZelfName public data to find Solana address
+		const zelfNamePublicData = await _getZelfNamePublicData(zelfName);
+		if (!zelfNamePublicData) throw new Error(`ZelfName ${zelfName} not found`);
+
+		if (!zelfNamePublicData.solanaAddress) throw new Error(`No Solana address found for ${zelfName}`);
+
+		// Check if user has already received first transaction reward
+		const existingReward = await IPFS.filter("first_zns_transaction", zelfName);
+		const hasFirstTransactionReward = existingReward.length > 0;
+
+		if (hasFirstTransactionReward) {
+			return {
+				success: false,
+				message: "First transaction reward already claimed",
+				rewardType: "first_transaction",
+				alreadyClaimed: true,
+			};
+		}
+
+		// Check if user has sent ZNS tokens (indicating they've used the token)
+		const sentTokenCheck = await ZNSTransactionDetector.hasSentZNSTokens(
+			zelfNamePublicData.solanaAddress,
+			{ hours: 24 * 365, minAmount: 0.001 } // Check last year, any amount
+		);
+
+		if (!sentTokenCheck.hasSent) {
+			return {
+				success: false,
+				message: "No ZNS token transactions found. Make your first ZNS transaction to earn this reward!",
+				rewardType: "first_transaction",
+				eligible: false,
+				requirements: {
+					action: "Send ZNS tokens",
+					description: "Make your first ZNS token transaction to unlock this reward",
+				},
+			};
+		}
+
+		// User is eligible for first transaction reward
+		const rewardAmount = 1.0; // 1 ZNS for first transaction
+		const rewardType = "first_transaction";
+		const rewardDate = moment().format("YYYY-MM-DD");
+
+		// Create reward data
+		const rewardData = {
+			zelfName,
+			amount: rewardAmount,
+			rewardType,
+			rewardDate,
+			description: "First ZNS Transaction Reward",
+			requirements: {
+				action: "Sent ZNS tokens",
+				transactionCount: sentTokenCheck.transactionCount,
+				totalAmountSent: sentTokenCheck.totalAmountSent,
+				lastTransaction: sentTokenCheck.lastTransaction?.signature,
+			},
+			timestamp: new Date().toISOString(),
+		};
+
+		// Save to IPFS with specific filter key for first ZNS transaction
+		const rewardJson = JSON.stringify(rewardData);
+		const base64Json = Buffer.from(rewardJson).toString("base64");
+		const filename = `first-zns-transaction-${zelfName}.json`;
+
+		// Metadata for IPFS querying with specific filter key
+		const metadata = {
+			first_zns_transaction: zelfName, // Specific filter key for easy searching
+			zelfName: zelfName,
+			rewardType: "first_transaction",
+			rewardDate: rewardDate,
+			amount: rewardAmount.toString(),
+			description: "First ZNS Transaction Reward",
+		};
+
+		const ipfsResult = await IPFS.pinFile(`data:application/json;base64,${base64Json}`, filename, "application/json", metadata);
+		rewardData.ipfsHash = ipfsResult.IpfsHash;
+
+		// Save to MongoDB
+		const Reward = require("../models/rewards.model");
+		const mongoReward = new Reward({
+			name: zelfName,
+			rewardPrimaryKey: `first_transaction_${zelfName}`,
+			amount: rewardAmount,
+			type: "achievement", // Using achievement type for first transaction
+			status: "claimed",
+			description: "First ZNS Transaction Reward",
+			claimedAt: new Date(),
+			zelfNameType: zelfNamePublicData.type || "hold", // Get from public data
+			ipfsCid: ipfsResult.IpfsHash,
+			metadata: rewardData,
+		});
+
+		await mongoReward.save();
+
+		// Send ZNS tokens to user
+		let tokenTransferResult = null;
+		let tokenTransferError = null;
+
+		try {
+			console.log(`🎁 Sending ${rewardAmount} ZNS tokens for first transaction to ${zelfNamePublicData.solanaAddress}`);
+
+			const ZNSTokenModule = require("../../ZelfNameService/modules/zns-token.module");
+			const transferSignature = await ZNSTokenModule.giveTokensAfterPurchase(rewardAmount, zelfNamePublicData.solanaAddress);
+
+			tokenTransferResult = {
+				success: true,
+				signature: transferSignature,
+				amount: rewardAmount,
+				recipientAddress: zelfNamePublicData.solanaAddress,
+			};
+
+			rewardData.tokenTransfer = tokenTransferResult;
+			mongoReward.tokenTransfer = tokenTransferResult;
+			mongoReward.status = "completed";
+			await mongoReward.save();
+
+			console.log(`✅ First transaction reward sent! Transaction signature: ${transferSignature}`);
+		} catch (tokenError) {
+			console.error("❌ Failed to send first transaction reward:", tokenError);
+			tokenTransferError = {
+				success: false,
+				error: tokenError.message,
+				amount: rewardAmount,
+				recipientAddress: zelfNamePublicData.solanaAddress,
+			};
+
+			rewardData.tokenTransfer = tokenTransferError;
+			mongoReward.tokenTransfer = tokenTransferError;
+			mongoReward.status = "failed";
+			await mongoReward.save();
+		}
+
+		// Send notification
+		await _sendRewardNotification(zelfName, rewardAmount, tokenTransferResult ? "success" : "failed");
+
+		return {
+			success: true,
+			message: "First transaction reward claimed successfully!",
+			reward: {
+				amount: rewardAmount,
+				rewardType,
+				zelfName,
+				description: "First ZNS Transaction Reward",
+				requirements: rewardData.requirements,
+			},
+			tokenTransfer: tokenTransferResult || tokenTransferError,
+			tokenTransferStatus: tokenTransferResult ? "success" : "failed",
+			ipfsHash: ipfsResult.hash,
+			timestamp: rewardData.timestamp,
+		};
+	} catch (error) {
+		console.error("❌ Error in rewardFirstTransaction:", error);
+		throw new Error(`Failed to process first transaction reward: ${error.message}`);
+	}
+};
+
 module.exports = {
 	get,
 	show,
@@ -524,6 +691,7 @@ module.exports = {
 	update,
 	destroy,
 	dailyRewards,
+	rewardFirstTransaction,
 	checkAndSendReminders,
 	getUserRewardHistory,
 	getUserRewardStats,
