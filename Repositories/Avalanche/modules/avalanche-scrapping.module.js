@@ -128,7 +128,7 @@ const getTransactionsList = async (params) => {
 		amount: tx.value.toFixed(4),
 		asset: "AVAX",
 		block: tx.blockHeight.toString(),
-		date: moment(tx.blocktime * 1000),
+		date: moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
 		from: tx.from,
 		hash: tx.hash,
 		method: tx.method.startsWith("swap") ? "Swap" : tx.method,

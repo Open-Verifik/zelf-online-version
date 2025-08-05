@@ -11,17 +11,28 @@ const { getTickerPrice } = require("../../binance/modules/binance.module");
 
 const getAddress = async (params) => {
 	let response;
+	let source;
 
 	switch (params.source) {
 		case "solscan":
 			response = await solscan.getAddress(params);
+			source = "solscan";
 			break;
 		case "oklink":
 			response = await oklink.getAddress(params);
+			source = "oklink";
 			break;
 		default:
-			response = (await solscan.getAddress(params)) || (await oklink.getAddress(params));
+			const solscanResponse = await solscan.getAddress(params);
+			const oklinkResponse = await oklink.getAddress(params);
+			response = solscanResponse || oklinkResponse;
+			source = solscanResponse ? "solscan" : oklinkResponse ? "oklink" : null;
 			break;
+	}
+
+	// Add source to response if response exists
+	if (response) {
+		response.source = source;
 	}
 
 	return response;

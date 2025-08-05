@@ -204,7 +204,7 @@ function formatTransactions(transactions, token) {
 	return transactions.map((tx) => ({
 		hash: tx.trans_id,
 		block: tx.block_id.toString(),
-		date: new Date(tx.block_time * 1000),
+		date: moment(tx.block_time * 1000).format("YYYY-MM-DD HH:mm:ss"),
 		age: moment(tx.block_time * 1000).fromNow(),
 		from: tx.from_address,
 		method: tx.activity_type === "ACTIVITY_SPL_TRANSFER" ? "transfer" : tx.activity_type,
