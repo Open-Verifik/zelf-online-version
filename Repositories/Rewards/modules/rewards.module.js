@@ -361,35 +361,38 @@ const checkAndSendReminders = async () => {
 // Get user's reward history
 const getUserRewardHistory = async (zelfName, limit = 10) => {
 	try {
-		// Get all rewards for this user from IPFS
-		const ipfsFiles = await IPFS.filter("zelfName", zelfName);
+		// Get all reward files for this user from IPFS
+		const ipfsFiles = await IPFS.filter("name", zelfName);
 
 		// Parse and sort rewards by date
 		const rewards = [];
 		let totalEarned = 0;
 
 		for (const file of ipfsFiles) {
-			try {
-				// Retrieve the actual reward data
-				const rewardFile = await IPFS.retrieve(file.ipfs_pin_hash);
+			// Extract metadata from keyvalues object
+			const metadata = {
+				name: file.metadata?.name,
+			};
 
-				if (rewardFile && rewardFile.url) {
-					// Fetch the JSON content
-					const response = await fetch(rewardFile.url);
-					const rewardData = await response.json();
+			if (!file.metadata?.keyvalues?.rewardType) continue;
 
-					rewards.push({
-						...rewardData,
-						ipfsCid: file.ipfs_pin_hash,
-						metadata: file.metadata,
-					});
+			if (file.metadata && file.metadata.keyvalues) {
+				Object.assign(metadata, file.metadata.keyvalues);
+			}
 
-					if (rewardData.status === "claimed") {
-						totalEarned += rewardData.amount || 0;
-					}
-				}
-			} catch (parseError) {
-				console.error("Error parsing reward file:", parseError);
+			// Use the metadata directly - no need to fetch URLs
+			rewards.push({
+				ipfsCid: file.ipfs_pin_hash,
+				metadata: metadata,
+				amount: parseFloat(metadata.amount) || 0,
+				rewardType: metadata.rewardType,
+				rewardDate: metadata.rewardDate,
+				claimedAt: metadata.redeemedAt || metadata.rewardDate,
+				status: "claimed", // All stored rewards are claimed
+			});
+
+			if (metadata.amount) {
+				totalEarned += parseFloat(metadata.amount) || 0;
 			}
 		}
 
@@ -441,10 +444,17 @@ const _calculateDailyStreak = async (zelfName) => {
 
 		// Filter for daily rewards and parse dates
 		for (const file of ipfsFiles) {
-			if (file.metadata && file.metadata.rewardType === "daily") {
+			// Extract metadata from keyvalues object
+			const metadata = {};
+			if (file.metadata && file.metadata.keyvalues) {
+				// keyvalues is an object, not an array
+				Object.assign(metadata, file.metadata.keyvalues);
+			}
+
+			if (metadata.rewardType === "daily") {
 				dailyRewards.push({
-					date: moment(file.metadata.rewardDate, "YYYY-MM-DD"),
-					metadata: file.metadata,
+					date: moment(metadata.rewardDate, "YYYY-MM-DD"),
+					metadata: metadata,
 				});
 			}
 		}
@@ -476,6 +486,17 @@ const _calculateDailyStreak = async (zelfName) => {
 	}
 };
 
+// Helper function to check if user has claimed today
+const _hasClaimedToday = async (zelfName) => {
+	try {
+		const todayReward = await _getTodayReward(zelfName);
+		return todayReward !== null;
+	} catch (error) {
+		console.error("Error checking if user claimed today:", error);
+		return false;
+	}
+};
+
 // Helper function to get total rewards in a period
 const _getTotalRewardsInPeriod = async (zelfName, startDate) => {
 	try {
@@ -486,12 +507,19 @@ const _getTotalRewardsInPeriod = async (zelfName, startDate) => {
 		const startMoment = moment(startDate);
 
 		for (const file of ipfsFiles) {
-			if (file.metadata && file.metadata.rewardDate) {
-				const rewardDate = moment(file.metadata.rewardDate, "YYYY-MM-DD");
+			// Extract metadata from keyvalues object
+			const metadata = {};
+			if (file.metadata && file.metadata.keyvalues) {
+				// keyvalues is an object, not an array
+				Object.assign(metadata, file.metadata.keyvalues);
+			}
+
+			if (metadata.rewardDate) {
+				const rewardDate = moment(metadata.rewardDate, "YYYY-MM-DD");
 
 				// Check if reward is within the period
 				if (rewardDate.isSameOrAfter(startMoment)) {
-					const amount = parseFloat(file.metadata.amount) || 0;
+					const amount = parseFloat(metadata.amount) || 0;
 					total += amount;
 				}
 			}
@@ -580,7 +608,7 @@ const rewardFirstTransaction = async (data, authUser) => {
 		const metadata = {
 			first_zns_transaction: zelfName, // Specific filter key for easy searching
 			name: zelfName,
-			type: "first_transaction",
+			rewardType: "first_transaction",
 			date: rewardDate,
 			amount: rewardAmount.toString(),
 			description: "First ZNS Transaction Reward",
