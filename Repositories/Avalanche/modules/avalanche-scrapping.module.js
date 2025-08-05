@@ -24,11 +24,17 @@ const getBalance = async (params) => {
 
 		// Obtener tokens y transacciones
 		let tokenHoldings = await getTokens({ id: params.id }, { show: "200" });
+
+		// Convert native AVAX balance from raw format to proper decimal format
+		const avaxDecimals = data.nativeTokenBalance.decimals;
+		const avaxAmount = (Number(data.nativeTokenBalance.balance) / Math.pow(10, avaxDecimals)).toFixed(avaxDecimals);
+
 		tokenHoldings.tokens.push({
-			amount: data.nativeTokenBalance.balance,
+			amount: avaxAmount,
+			decimals: avaxDecimals,
 			fiatBalance: data.nativeTokenBalance?.balanceValue?.value.toString(),
 			image: data.nativeTokenBalance.logoUri,
-			name: "AVAX",
+			name: "Avalanche",
 			price: data.nativeTokenBalance?.price?.value.toString(),
 			symbol: "AVAX",
 			tokenType: "AVAX",
