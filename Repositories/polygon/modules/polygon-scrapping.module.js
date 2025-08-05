@@ -36,15 +36,20 @@ const getBalance = async (params) => {
 
 		const tokensResponse = await instance.get(`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}/tokens?type=ERC-20`);
 
-		function formatearTokens(entrada) {
-			return entrada.map((item) => {
+		function formatTokens(entrada) {
+			return entrada.reduce((acc, item) => {
+				const price = item.token?.exchange_rate || 0;
+
+				// Skip tokens with zero price to filter out spam tokens
+				if (price === 0 || price === null || price === undefined) return acc;
+
 				const token = item.token;
 				const decimals = parseInt(token.decimals);
 				const rawAmount = item.value;
-				const price = item.token.exchange_rate;
+
 				const amount = Number(rawAmount) / Math.pow(10, decimals);
 
-				return {
+				const formattedToken = {
 					_amount: amount,
 					_fiatBalance: (amount * price).toFixed(decimals),
 					_price: Number(price),
@@ -58,35 +63,44 @@ const getBalance = async (params) => {
 					symbol: token.symbol,
 					tokenType: token.type || "ERC-20",
 				};
-			});
+
+				acc.push(formattedToken);
+				return acc;
+			}, []);
 		}
 
-		const tokens = formatearTokens(tokensResponse.data.items);
+		const tokens = formatTokens(tokensResponse.data.items);
 
 		const transactions = await getTransactionsList({ id: address }, { show: 10 });
 
+		// Convert native MATIC balance from wei to proper decimal format (18 decimals)
+		const maticDecimals = 18;
+		const maticAmount = Number(data.coin_balance) / Math.pow(10, maticDecimals);
+		const maticFiatBalance = maticAmount * price;
+
 		const response = {
 			address,
-			balance: data.coin_balance,
-			fiatBalance: data.coin_balance * price,
+			balance: maticAmount.toFixed(maticDecimals),
+			fiatBalance: maticFiatBalance,
 			type: "system_account",
 			account: {
 				asset: "POL",
-				fiatBalance: data.coin_balance * price,
+				fiatBalance: maticFiatBalance,
 				price: price,
 			},
 			tokenHoldings: {
 				total: 1 + tokens.length,
-				balance: data.coin_balance,
+				balance: maticAmount.toFixed(maticDecimals),
 				tokens: [
 					{
-						tokenType: "ERC-20",
-						fiatBalance: data.coin_balance * price,
+						tokenType: "MATIC", // Changed from ERC-20 to MATIC for native token
+						fiatBalance: maticFiatBalance,
 						symbol: "POL",
 						name: "Polygon",
 						price: price,
 						image: "https://s2.coinmarketcap.com/static/img/coins/64x64/28321.png",
-						amount: data.coin_balance,
+						amount: maticAmount.toFixed(maticDecimals),
+						decimals: maticDecimals,
 					},
 					...tokens,
 				],
