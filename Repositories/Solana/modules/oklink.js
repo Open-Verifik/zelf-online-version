@@ -52,10 +52,7 @@ const getAddress = async (params) => {
 			},
 		};
 
-		data.tokenHoldings = await getTokens(
-			{ id: address },
-			{ page: 0, show: 10 }
-		);
+		data.tokenHoldings = await getTokens({ id: address }, { page: 0, show: 10 });
 
 		data.tokenHoldings.tokens.unshift({
 			tokenType: "SOL",
@@ -64,14 +61,10 @@ const getAddress = async (params) => {
 			name: "Solana",
 			price: data.account.price,
 			amount: data.balance,
-			image:
-				"https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+			image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
 		});
 
-		const { transactions } = await getTransactions(
-			{ id: address },
-			{ page: 0, show: 10 }
-		);
+		const { transactions } = await getTransactions({ id: address }, { page: 0, show: 10 });
 
 		data.transactions = transactions;
 
@@ -94,8 +87,7 @@ const getTokens = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -147,17 +139,13 @@ const getTransaction = async (params, query) => {
 
 		const address = params.id;
 
-		const { data } = await axios.get(
-			`https://www.oklink.com/api/explorer/v2/sol/mainAction/${address}?chain=solana&t=${t}`,
-			{
-				httpsAgent: agent,
-				headers: {
-					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-				},
-			}
-		);
+		const { data } = await axios.get(`https://www.oklink.com/api/explorer/v2/sol/mainAction/${address}?chain=solana&t=${t}`, {
+			httpsAgent: agent,
+			headers: {
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+			},
+		});
 
 		return data.data;
 	} catch (error) {
@@ -179,8 +167,7 @@ const getTransactions = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -195,8 +182,7 @@ const getTransactions = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -205,16 +191,16 @@ const getTransactions = async (params, query) => {
 
 		let total = (data.data.hits.length += slp.data.data.hits.length);
 
+		// Format and sort all transactions together
+		const formattedTransactions = addTrafficParameter(formatTransactions(transactions, address), address);
+
 		return {
 			pagination: {
 				records: total.toString(),
 				pages: query.page,
 				page: query.page,
 			},
-			transactions: addTrafficParameter(
-				formatTransactions(transactions, address),
-				address
-			),
+			transactions: formattedTransactions,
 		};
 	} catch (error) {
 		return null;
@@ -223,9 +209,10 @@ const getTransactions = async (params, query) => {
 
 function formatTransactions(transfers, address) {
 	try {
-		return transfers.map((tx) => ({
+		const formattedTransactions = transfers.map((tx) => ({
 			hash: tx.signature,
 			block: tx.slot.toString(),
+			date: moment(tx.timestamp * 1000).format("YYYY-MM-DD HH:mm:ss"),
 			age: moment(tx.timestamp * 1000).fromNow(),
 			from: tx.from,
 			method: "Transfer",
@@ -236,7 +223,11 @@ function formatTransactions(transfers, address) {
 			to_token_account: address,
 			status: tx.status,
 			asset: tx.tokenName ? tx.tokenName : "SOL",
+			timestamp: tx.timestamp, // Keep original timestamp for sorting
 		}));
+
+		// Sort by timestamp (newest first)
+		return formattedTransactions.sort((a, b) => b.timestamp - a.timestamp);
 	} catch (error) {
 		console.error({ error });
 		return [];

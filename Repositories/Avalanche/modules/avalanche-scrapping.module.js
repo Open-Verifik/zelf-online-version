@@ -137,16 +137,18 @@ const getTransactionsList = async (params) => {
 		amount: tx.value.toFixed(4),
 		asset: "AVAX",
 		block: tx.blockHeight.toString(),
-		date: moment(tx.blocktime * 1000),
+		date: moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
 		from: tx.from,
 		hash: tx.hash,
 		method: tx.method.startsWith("swap") ? "Swap" : tx.method,
 		to: tx.to,
 		traffic: tx.realValue < 0 ? "OUT" : "IN",
 		txnFee: tx.fee.toFixed(4),
+		timestamp: tx.blocktime, // Keep original timestamp for sorting
 	}));
 
-	return transactions;
+	// Sort by timestamp (newest first)
+	return transactions.sort((a, b) => b.timestamp - a.timestamp);
 };
 
 /**

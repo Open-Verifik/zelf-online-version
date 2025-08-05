@@ -118,7 +118,7 @@ const getTransactions = async (params, query) => {
 	);
 
 	function formatCryptoData(data) {
-		return data.map((item) => ({
+		const formattedTransactions = data.map((item) => ({
 			_amount: item.amount,
 			_source: item,
 			age: moment(item.timestamp).fromNow(),
@@ -136,6 +136,9 @@ const getTransactions = async (params, query) => {
 			traffic: item.from === address ? "OUT" : "IN",
 			txnFee: item.fee.toString(),
 		}));
+
+		// Sort by timestamp (newest first)
+		return formattedTransactions.sort((a, b) => b.timestamp - a.timestamp);
 	}
 
 	return {
