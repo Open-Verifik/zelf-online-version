@@ -25,7 +25,11 @@ const rewardsSchema = new mongoose.Schema(
 		status: {
 			type: String,
 			default: "claimed",
-			enum: ["pending", "claimed", "expired"],
+			enum: ["pending", "claimed", "expired", "failed"],
+		},
+		failReason: {
+			type: String,
+			optional: true,
 		},
 		description: {
 			type: String,

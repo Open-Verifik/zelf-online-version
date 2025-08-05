@@ -160,7 +160,6 @@ const _getTodayReward = async (zelfName) => {
 		// Step 1: Check MongoDB first (TTL cache for first 5 minutes)
 		const mongoReward = await Model.findOne({ rewardPrimaryKey });
 		if (mongoReward) {
-			console.log("Found reward in MongoDB cache");
 			return {
 				...mongoReward.toObject(),
 				source: "mongodb",
@@ -169,11 +168,9 @@ const _getTodayReward = async (zelfName) => {
 		}
 
 		// Step 2: If not in MongoDB, check IPFS (after 5 minutes)
-		console.log("Checking IPFS for reward...");
 		const ipfsRewards = await IPFS.filter("rewardPrimaryKey", rewardPrimaryKey);
 
 		if (ipfsRewards && ipfsRewards[0]) {
-			console.log("Found reward in IPFS");
 			return {
 				...ipfsRewards[0],
 				source: "ipfs",
@@ -283,7 +280,6 @@ const dailyRewards = async (data, authUser) => {
 		let tokenTransferError = null;
 
 		try {
-			console.log(`Sending ${rewardAmount} ZNS tokens to ${zelfNamePublicData.solanaAddress} for ${zelfName}`);
 			const transferSignature = await ZNSTokenModule.giveTokensAfterPurchase(rewardAmount, zelfNamePublicData.solanaAddress);
 
 			tokenTransferResult = {
@@ -297,8 +293,6 @@ const dailyRewards = async (data, authUser) => {
 			rewardData.tokenTransfer = tokenTransferResult;
 			mongoReward.tokenTransfer = tokenTransferResult;
 			await mongoReward.save();
-
-			console.log(`Successfully sent ZNS tokens. Transaction signature: ${transferSignature}`);
 		} catch (tokenError) {
 			console.error("Failed to send ZNS tokens:", tokenError);
 
@@ -352,24 +346,20 @@ const dailyRewards = async (data, authUser) => {
 // Notification system placeholder functions
 const _sendRewardNotification = async (zelfName, amount, status) => {
 	// TODO: Implement notification system
-	console.log(`Notification: ${zelfName} ${status} ${amount} ZNS reward`);
 };
 
 const _sendDailyReminderNotification = async (zelfName) => {
 	// TODO: Implement daily reminder notification
-	console.log(`Reminder: ${zelfName} can claim daily reward`);
 };
 
 const _sendWeeklyRewardSummary = async (zelfName, weeklyTotal) => {
 	// TODO: Implement weekly summary notification
-	console.log(`Weekly Summary: ${zelfName} earned ${weeklyTotal} ZNS this week`);
 };
 
 // Function to check and send reminder notifications (for cron job)
 const checkAndSendReminders = async () => {
 	// TODO: Implement logic to find users who haven't claimed today
 	// and send them reminder notifications
-	console.log("Checking for users to send reminder notifications...");
 };
 
 // Get user's reward history
@@ -526,8 +516,6 @@ const rewardFirstTransaction = async (data, authUser) => {
 			throw new Error("ZelfName is required");
 		}
 
-		console.log(`🎁 Checking first transaction reward for ${zelfName}`);
-
 		// Get ZelfName public data to find Solana address
 		const zelfNamePublicData = await _getZelfNamePublicData(zelfName);
 		if (!zelfNamePublicData) throw new Error(`ZelfName ${zelfName} not found`);
@@ -595,19 +583,20 @@ const rewardFirstTransaction = async (data, authUser) => {
 		// Metadata for IPFS querying with specific filter key
 		const metadata = {
 			first_zns_transaction: zelfName, // Specific filter key for easy searching
-			zelfName: zelfName,
-			rewardType: "first_transaction",
-			rewardDate: rewardDate,
+			name: zelfName,
+			type: "first_transaction",
+			date: rewardDate,
 			amount: rewardAmount.toString(),
 			description: "First ZNS Transaction Reward",
+			solanaAddress: zelfNamePublicData.solanaAddress,
 		};
 
 		const ipfsResult = await IPFS.pinFile(`data:application/json;base64,${base64Json}`, filename, "application/json", metadata);
 		rewardData.ipfsHash = ipfsResult.IpfsHash;
 
 		// Save to MongoDB
-		const Reward = require("../models/rewards.model");
-		const mongoReward = new Reward({
+
+		const mongoReward = new Model({
 			name: zelfName,
 			rewardPrimaryKey: `first_transaction_${zelfName}`,
 			amount: rewardAmount,
@@ -627,9 +616,6 @@ const rewardFirstTransaction = async (data, authUser) => {
 		let tokenTransferError = null;
 
 		try {
-			console.log(`🎁 Sending ${rewardAmount} ZNS tokens for first transaction to ${zelfNamePublicData.solanaAddress}`);
-
-			const ZNSTokenModule = require("../../ZelfNameService/modules/zns-token.module");
 			const transferSignature = await ZNSTokenModule.giveTokensAfterPurchase(rewardAmount, zelfNamePublicData.solanaAddress);
 
 			tokenTransferResult = {
@@ -641,10 +627,8 @@ const rewardFirstTransaction = async (data, authUser) => {
 
 			rewardData.tokenTransfer = tokenTransferResult;
 			mongoReward.tokenTransfer = tokenTransferResult;
-			mongoReward.status = "completed";
+			mongoReward.status = "claimed";
 			await mongoReward.save();
-
-			console.log(`✅ First transaction reward sent! Transaction signature: ${transferSignature}`);
 		} catch (tokenError) {
 			console.error("❌ Failed to send first transaction reward:", tokenError);
 			tokenTransferError = {
@@ -657,6 +641,7 @@ const rewardFirstTransaction = async (data, authUser) => {
 			rewardData.tokenTransfer = tokenTransferError;
 			mongoReward.tokenTransfer = tokenTransferError;
 			mongoReward.status = "failed";
+			mongoReward.failReason = tokenError.message;
 			await mongoReward.save();
 		}
 
