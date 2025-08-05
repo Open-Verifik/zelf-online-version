@@ -135,9 +135,11 @@ const getTransactionsList = async (params) => {
 		to: tx.to,
 		traffic: tx.realValue < 0 ? "OUT" : "IN",
 		txnFee: tx.fee.toFixed(4),
+		timestamp: tx.blocktime, // Keep original timestamp for sorting
 	}));
 
-	return transactions;
+	// Sort by timestamp (newest first)
+	return transactions.sort((a, b) => b.timestamp - a.timestamp);
 };
 
 /**

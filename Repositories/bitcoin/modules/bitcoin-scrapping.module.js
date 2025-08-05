@@ -255,7 +255,7 @@ async function extractTransactionData(transactions, userAddress) {
 
 	if (!btcPrice) throw new Error("Could not retrieve BTC price");
 
-	return transactions.map((tx) => {
+	const formattedTransactions = transactions.map((tx) => {
 		const fromInput = tx.inputs.find((input) => input.address);
 		const toOutputs = tx.outputs.filter((output) => output.address && output.address !== fromInput?.address);
 
@@ -290,8 +290,12 @@ async function extractTransactionData(transactions, userAddress) {
 			traffic,
 			txnFee: (tx.fee / 1e8).toString(),
 			txnFeeSats: tx.fee.toString(),
+			timestamp: tx.time, // Keep original timestamp for sorting
 		};
 	});
+
+	// Sort by timestamp (newest first)
+	return formattedTransactions.sort((a, b) => b.timestamp - a.timestamp);
 }
 
 module.exports = {

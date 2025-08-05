@@ -191,13 +191,16 @@ const getTransactions = async (params, query) => {
 
 		let total = (data.data.hits.length += slp.data.data.hits.length);
 
+		// Format and sort all transactions together
+		const formattedTransactions = addTrafficParameter(formatTransactions(transactions, address), address);
+
 		return {
 			pagination: {
 				records: total.toString(),
 				pages: query.page,
 				page: query.page,
 			},
-			transactions: addTrafficParameter(formatTransactions(transactions, address), address),
+			transactions: formattedTransactions,
 		};
 	} catch (error) {
 		return null;
@@ -206,7 +209,7 @@ const getTransactions = async (params, query) => {
 
 function formatTransactions(transfers, address) {
 	try {
-		return transfers.map((tx) => ({
+		const formattedTransactions = transfers.map((tx) => ({
 			hash: tx.signature,
 			block: tx.slot.toString(),
 			date: moment(tx.timestamp * 1000).format("YYYY-MM-DD HH:mm:ss"),
@@ -220,7 +223,11 @@ function formatTransactions(transfers, address) {
 			to_token_account: address,
 			status: tx.status,
 			asset: tx.tokenName ? tx.tokenName : "SOL",
+			timestamp: tx.timestamp, // Keep original timestamp for sorting
 		}));
+
+		// Sort by timestamp (newest first)
+		return formattedTransactions.sort((a, b) => b.timestamp - a.timestamp);
 	} catch (error) {
 		console.error({ error });
 		return [];
