@@ -20,19 +20,30 @@ const getBalance = async (params) => {
 			return tokens.reduce((acumulador, token) => acumulador + parseFloat(token.price), 0);
 		}
 
-		const tokens = await getTokens({ id: address });
+		let tokens = await getTokens({ id: address });
 
 		const totalFiatBalance = sumarPrice(tokens);
 
 		const rawValue = BigInt(data.data);
 		const BSCValue = Number(rawValue) / 1e18;
 		const fiatBalance = BSCValue * price;
+
+		tokens.push({
+			amount: BSCValue.toString(),
+			fiatBalance: fiatBalance,
+			image: "https://dynamic-assets.coinbase.com/36f266bc4826775268588346777c84c1ae035e7de268a6e124bcc22659f0aa2bf4f66dcad89b2ac978cfdb4d51c2d9f63cf7157769efb500b20ca16a6d5719c7/asset_icons/7deb6ff58870072405c0418d85501c4521c3296e33ef58452be98e4ca592ed19.png",
+			name: "BNB",
+			price: price,
+			symbol: "BNB",
+			tokenType: "BNB",
+		});
+
 		const response = {
 			address,
 			balance: BSCValue,
 			fiatBalance,
 			account: {
-				asset: "BSC",
+				asset: "BNB",
 				fiatBalance: fiatBalance.toString(),
 				price: price,
 			},

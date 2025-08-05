@@ -23,7 +23,16 @@ const getBalance = async (params) => {
 		});
 
 		// Obtener tokens y transacciones
-		const tokenHoldings = await getTokens({ id: params.id }, { show: "200" });
+		let tokenHoldings = await getTokens({ id: params.id }, { show: "200" });
+		tokenHoldings.tokens.push({
+			amount: data.nativeTokenBalance.balance,
+			fiatBalance: data.nativeTokenBalance?.balanceValue?.value.toString(),
+			image: data.nativeTokenBalance.logoUri,
+			name: "AVAX",
+			price: data.nativeTokenBalance?.price?.value.toString(),
+			symbol: "AVAX",
+			tokenType: "AVAX",
+		});
 
 		const transactions = await getTransactionsList({
 			id: params.id,
