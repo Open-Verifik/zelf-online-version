@@ -10,7 +10,7 @@
 ### 2. **Core Swagger Configuration (`swagger.js`)**
 - **OpenAPI 3.0** specification
 - **Comprehensive API Info**: Title, version, description, contact details
-- **Multiple Servers**: Development (localhost:3002) and Production (api.zelf.com)
+- **Multiple Servers**: Development (localhost:3002) and Production (api.zelf.world)
 - **JWT Security Scheme**: Bearer token authentication
 - **Global Schemas**: Reusable data models for requests/responses
 - **15 Organized Tags**: Logical grouping of endpoints by functionality

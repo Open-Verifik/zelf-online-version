@@ -21,7 +21,7 @@ npm start
 Once the server is running, you can access the interactive API documentation at:
 
 - **Development**: http://localhost:${PORT}/swagger (where PORT is from your environment or config)
-- **Production**: https://api.zelf.com/swagger
+- **Production**: https://api.zelf.world/swagger
 
 ## 📚 API Documentation Features
 
