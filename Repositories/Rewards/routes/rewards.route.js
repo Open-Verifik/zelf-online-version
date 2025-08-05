@@ -2,7 +2,7 @@ const config = require("../../../Core/config");
 
 const Controller = require("../controllers/rewards.controller");
 const Middleware = require("../middlewares/rewards.middleware");
-const primaryKey = "id";
+
 const base = "/rewards";
 
 module.exports = (server) => {
