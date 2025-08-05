@@ -35,10 +35,14 @@ const rewardsSchema = new mongoose.Schema(
 			type: String,
 			optional: true,
 		},
-		claimedAt: {
+		rewardDate: {
 			type: Date,
 			required: true,
 			default: Date.now,
+		},
+		redeemedAt: {
+			type: Date,
+			optional: true,
 		},
 		zelfNameType: {
 			type: String,

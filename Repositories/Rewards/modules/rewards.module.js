@@ -219,7 +219,8 @@ const dailyRewards = async (data, authUser) => {
 			type: "daily",
 			status: "claimed",
 			description: `Daily wheel reward for ${zelfNamePublicData.type} ZelfName`,
-			claimedAt: new Date().toISOString(),
+			rewardDate: moment().format("YYYY-MM-DD"),
+			redeemedAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 			zelfNameType: zelfNamePublicData.type,
 			wheelSpin: true,
 			rewardRange: zelfNamePublicData.type === "hold" ? "0.1-1.0" : "0.2-2.0",
@@ -230,10 +231,10 @@ const dailyRewards = async (data, authUser) => {
 			name: zelfName,
 			rewardPrimaryKey, // Composite key for direct lookup
 			rewardType: "daily",
-			rewardDate: todayKey, // Date without time for easy querying
+			rewardDate: moment().format("YYYY-MM-DD"), // Date without time for easy querying
+			redeemedAt: moment().format("YYYY-MM-DD HH:mm:ss"), // Exact timestamp when redeemed
 			zelfNameType: zelfNamePublicData.type,
 			amount: rewardAmount.toString(),
-			redeemedAt: moment().format("YYYY-MM-DD HH:mm:ss"), // Exact timestamp when redeemed
 		};
 
 		// Store reward as JSON in IPFS
@@ -609,10 +610,11 @@ const rewardFirstTransaction = async (data, authUser) => {
 			first_zns_transaction: zelfName, // Specific filter key for easy searching
 			name: zelfName,
 			rewardType: "first_transaction",
-			date: rewardDate,
 			amount: rewardAmount.toString(),
 			description: "First ZNS Transaction Reward",
 			solanaAddress: zelfNamePublicData.solanaAddress,
+			rewardDate: moment().format("YYYY-MM-DD"),
+			redeemedAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 		};
 
 		const ipfsResult = await IPFS.pinFile(`data:application/json;base64,${base64Json}`, filename, "application/json", metadata);
@@ -627,7 +629,8 @@ const rewardFirstTransaction = async (data, authUser) => {
 			type: "achievement", // Using achievement type for first transaction
 			status: "claimed",
 			description: "First ZNS Transaction Reward",
-			claimedAt: new Date(),
+			rewardDate: moment().format("YYYY-MM-DD"),
+			redeemedAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 			zelfNameType: zelfNamePublicData.type || "hold", // Get from public data
 			ipfsCid: ipfsResult.IpfsHash,
 			metadata: rewardData,
