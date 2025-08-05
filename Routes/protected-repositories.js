@@ -14,6 +14,7 @@ module.exports = (server) => {
 	require("../Repositories/etherscan/routes/etherscan.route")(server);
 	require("../Repositories/etherscan/routes/etherscan-scrapping.route")(server);
 	//F
+	require("../Repositories/fantom/routes/fantom-scrapping.route")(server);
 	//G
 	//H
 	require("../Repositories/ZelfProof/routes/zelf-proof.route")(server);

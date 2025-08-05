@@ -57,7 +57,8 @@
 		"readable-stream": "^4.5.2",
 		"request": "^2.88.2",
 		"swagger-jsdoc": "^6.2.8",
-		"tiny-secp256k1": "^2.2.3"
+		"tiny-secp256k1": "^2.2.3",
+		"web3-validator": "^2.0.6"
 	},
 	"dresolutions": {
 		"axios": "1.8.2",
