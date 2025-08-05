@@ -7,74 +7,84 @@ const crypto = ["ETH", "SOL", "BTC", "CB"];
 
 const zelfNameDuration = ["1"]; //, "2", "3", "4", "5", "lifetime"
 
+const base64ImageRegExp = /^data:image\/(png|jpeg|jpg|gif|bmp);base64,([A-Za-z0-9+/=]+)$/;
+
 const _customErrors = (errors) => {
 	errors.forEach((err) => {
 		switch (err.code) {
+			case "forbidden":
+				err.message = `forbidden ${err.local.key}\n`;
+
+				break;
+			case "alternatives.match":
+				err.message = `invalid ${err.local.key}\n`;
+
+				break;
 			case "any.required":
 				err.message = `missing ${err.local.key}\n`;
-				break;
 
+				break;
 			case "string.empty":
 				err.message = `missing ${err.local.key}\n`;
-				break;
 
+				break;
 			case "date.format":
 				err.message = `${err.local.key} format required: ${err.local.format}\n`;
-				break;
 
+				break;
 			case "number.min":
 				err.message = `${err.local.key} minimun is: ${err.local.limit}\n`;
-				break;
 
+				break;
 			case "number.max":
 				err.message = `${err.local.key} maximum is: ${err.local.limit}\n`;
-				break;
 
+				break;
 			case "string.min":
 				err.message = `${err.local.key} minimun length: ${err.local.limit}\n`;
-				break;
 
+				break;
 			case "string.max":
 				err.message = `${err.local.key} maximum length: ${err.local.limit}\n`;
-				break;
 
+				break;
 			case "string.regex":
 			case "object.regex":
 			case "string.pattern.base":
 				err.message = `Format incorrect: ${err.local.key}`;
-				break;
 
+				break;
 			case "any.only":
 				err.message = `${err.local.key} must be one of: [${err.local.valids.join(",")}]`;
-				break;
 
+				break;
 			default:
 				// console.error(err);
 				break;
 		}
 	});
+
 	return errors;
 };
 
-const dateWithFormat = () => Joi.date().raw().format("DD/MM/YYYY").error(_customErrors);
-
-const dateOfBirth = () => Joi.date().raw().format("DD/MM/YYYY").error(_customErrors);
-
-const firstName = () => Joi.string().min(2).error(_customErrors);
-
-const lastName = () => Joi.string().min(2).error(_customErrors);
-
-const symbol = () => Joi.string().min(1).error(_customErrors);
-
-const model = () => Joi.string().min(1).error(_customErrors);
-
-const manufacturer = () => Joi.string().min(1).error(_customErrors);
-
-const line = () => Joi.string().min(1).error(_customErrors);
-
-const string = () => Joi.string().error(_customErrors);
-
+const array = () => Joi.array();
 const boolean = () => Joi.boolean().error(_customErrors);
+const dateOfBirth = () => Joi.date().raw().format("DD/MM/YYYY").error(_customErrors);
+const dateWithFormat = () => Joi.date().raw().format("DD/MM/YYYY").error(_customErrors);
+const firstName = () => Joi.string().min(2).error(_customErrors);
+const forbidden = () => Joi.forbidden().error(_customErrors);
+const imageBase64WithType = () => Joi.string().regex(base64ImageRegExp).error(_customErrors);
+const lastName = () => Joi.string().min(2).error(_customErrors);
+const line = () => Joi.string().min(1).error(_customErrors);
+const manufacturer = () => Joi.string().min(1).error(_customErrors);
+const model = () => Joi.string().min(1).error(_customErrors);
+const number = () => Joi.number().error(_customErrors);
+const minMaxNumber = (min, max) => Joi.number().min(min).max(max).error(_customErrors);
+const object = (schema) => Joi.object(schema);
+const objectId = () => Joi.string().hex().length(24).error(_customErrors);
+const string = () => Joi.string().error(_customErrors);
+const stringOrNumber = () => Joi.alternatives().try(Joi.string(), Joi.number());
+const symbol = () => Joi.string().min(1).error(_customErrors);
 
 const zelfNameDuration_ = () =>
 	Joi.string()
@@ -100,18 +110,6 @@ const stringEnum = (enumArray) =>
 	Joi.string()
 		.valid(...enumArray)
 		.error(_customErrors);
-
-const number = () => Joi.number().error(_customErrors);
-
-const object = (schema) => Joi.object(schema);
-
-const array = () => Joi.array();
-
-const objectId = () => Joi.string().hex().length(24).error(_customErrors);
-
-const base64ImageRegExp = /^data:image\/(png|jpeg|jpg|gif|bmp);base64,([A-Za-z0-9+/=]+)$/;
-
-const imageBase64WithType = () => Joi.string().regex(base64ImageRegExp).error(_customErrors);
 
 const urlSecure = () =>
 	Joi.string()
@@ -155,30 +153,33 @@ const jsonObjectWithMinKeys = () =>
 		.error(_customErrors);
 
 module.exports = {
-	fileObject,
-	objectId,
-	object,
-	array,
-	stringEnum,
-	string,
-	boolean,
-	number,
-	dateWithFormat,
-	dateOfBirth,
 	alternative,
-	validate,
-	model,
-	manufacturer,
-	line,
-	symbol,
-	lastName,
-	imageBase64WithType,
-	urlSecure,
 	alternativeMany,
+	array,
+	boolean,
+	crypto_,
+	dateOfBirth,
+	dateWithFormat,
+	fileObject,
 	firstName,
+	forbidden,
+	imageBase64WithType,
+	jsonObjectWithMinKeys,
+	lastName,
+	line,
+	manufacturer,
+	minMaxNumber,
+	model,
+	number,
+	object,
+	objectId,
 	province,
 	showRecords,
-	jsonObjectWithMinKeys,
+	string,
+	stringEnum,
+	stringOrNumber,
+	symbol,
+	urlSecure,
+	validate,
 	zelfNameDuration_,
-	crypto_,
 };

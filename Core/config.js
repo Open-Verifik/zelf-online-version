@@ -108,6 +108,13 @@ const configuration = {
 		processId: process.env.ARWEAVE_PROCESS_ID,
 		transactionId: process.env.ARWEAVE_TRANSACTION_ID,
 	},
+	walrus: {
+		network: process.env.WALRUS_NETWORK || "testnet",
+		privateKey: process.env.WALRUS_PRIVATE_KEY,
+		suiRpcUrl: process.env.WALRUS_SUI_RPC_URL || "https://fullnode.testnet.sui.io:443",
+		defaultEpochs: Number(process.env.WALRUS_DEFAULT_EPOCHS) || 5,
+		maxFileSize: Number(process.env.WALRUS_MAX_FILE_SIZE) || 100 * 1024, // 100KB
+	},
 	coinbase: {
 		key: process.env.COINBASE_API_KEY,
 		forceApproval: Boolean(process.env.COINBASE_FORCE_APPROVAL === "true"),
@@ -130,6 +137,11 @@ const configuration = {
 	},
 	oklink: {
 		apiKey: process.env.OKLINK_API_KEY,
+	},
+	lifi: {
+		url: process.env.LIFI_API_URL || "https://li.quest/v1",
+		apiKey: process.env.LIFI_API_KEY,
+		integrator: process.env.LIFI_INTEGRATOR,
 	},
 };
 

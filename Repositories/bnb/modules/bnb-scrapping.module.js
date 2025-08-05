@@ -1,40 +1,180 @@
+const cheerio = require("cheerio");
+const moment = require("moment");
+require("dotenv").config();
+const urlBase = process.env.MICROSERVICES_BOGOTA_URL;
+const token = process.env.MICROSERVICES_BOGOTA_TOKEN;
 const { getCleanInstance } = require("../../../Core/axios");
+const { getTickerPrice } = require("../../binance/modules/binance.module");
+
+const baseUrl = "https://bscscan.com";
 const instance = getCleanInstance(30000);
-const { generateRandomUserAgent } = require("../../../Core/helpers");
-const endpoint = `https://api-v2.solscan.io/v2`;
 
-/**
- * @param {*} params
- */
-
-const getAddress = async (params) => {
+const getBalance = async (params) => {
 	try {
-		const { data } = await instance.get(`https://api.xrpscan.com/api/v1/account/${params.id}`, {
+		const address = params.id;
+		const { data } = await instance.get(`https://bsc-explorer-api.nodereal.io/api/token/getBalance?address=${address}`);
+		const { price } = await getTickerPrice({ symbol: "BNB" });
+		const { transactions } = await getTransactionsList({ id: address }, { show: "10" });
+
+		function sumarPrice(tokens) {
+			return tokens.reduce((acumulador, token) => acumulador + parseFloat(token.price), 0);
+		}
+
+		const tokens = await getTokens({ id: address });
+
+		const totalFiatBalance = sumarPrice(tokens);
+
+		const rawValue = BigInt(data.data);
+		const BSCValue = Number(rawValue) / 1e18;
+		const fiatBalance = BSCValue * price;
+		const response = {
+			address,
+			balance: BSCValue,
+			fiatBalance,
+			account: {
+				asset: "BSC",
+				fiatBalance: fiatBalance.toString(),
+				price: price,
+			},
+			tokenHoldings: {
+				total: tokens.length,
+				balance: totalFiatBalance,
+				tokens: tokens,
+			},
+			transactions,
+		};
+
+		return response;
+	} catch (error) {
+		console.error({ error });
+	}
+};
+
+const getTokens = async (params) => {
+	try {
+		const address = params.id;
+
+		const { data } = await instance.get(`https://bsc-explorer-api.nodereal.io/api/token/getTokensByAddress?address=${address}&pageSize=0x64`);
+
+		const formattedTokens = formatTokens(data.data);
+
+		return formattedTokens;
+	} catch (error) {
+		console.error({ error });
+	}
+};
+
+function formatTokens(data) {
+	const erc20Tokens = data.erc20.details || [];
+
+	return erc20Tokens.map((token) => {
+		const decimals = parseInt(token.tokenDecimals, 16); // De hexadecimal a número
+		const rawBalance = BigInt(token.tokenBalance); // Balance en BigInt
+		const amount = Number(rawBalance) / Math.pow(10, decimals); // Balance en unidades normales
+
+		const price = token.price || 0;
+		const fiatBalance = amount * price;
+
+		return {
+			_amount: amount,
+			_fiatBalance: fiatBalance.toFixed(7),
+			_price: price,
+			address: token.tokenAddress,
+			amount: amount.toFixed(12),
+			decimals: decimals,
+			fiatBalance: parseFloat(fiatBalance.toFixed(7)),
+			image: "", // Puedes después añadir un fetch a CoinMarketCap o una API para obtener imágenes
+			name: token.tokenName,
+			price: price.toFixed(6),
+			symbol: token.tokenSymbol.length <= 10 ? token.tokenSymbol : token.tokenSymbol.substring(0, 10), // Limitamos símbolo si es muy largo
+			tokenType: "BEP-20",
+		};
+	});
+}
+
+const getGasTracker = async () => {
+	try {
+		let { data } = await instance.get(`${baseUrl}/gastracker`, {
 			headers: {
-				"user-agent": generateRandomUserAgent(),
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+				"Upgrade-Insecure-Requests": "1",
 			},
 		});
 
-		const _response = {
-			address: params.id,
-			balance: data.Balance / 1_000_000_000,
-			type: "", //result.type,
-			fiatBalance: 0,
-			account: {
-				asset: "XRP",
-				fiatValue: "0",
-				price: "0",
+		const $ = cheerio.load(data);
+
+		const lowGwei = $("#spanLowPrice").text().replace(/\n/g, "").trim();
+		const averageGwei = $("#spanAvgPrice").text().replace(/\n/g, "").trim();
+		const highGwei = $("#spanHighPrice").text().replace(/\n/g, "").trim();
+
+		const lowTime = $("#divLowPrice > div.text-muted").first().text().replace(/\n/g, "").trim().trim();
+
+		const averageTime = $("#divAvgPrice > div.text-muted").text().replace(/\n/g, "").trim().trim();
+
+		const highTime = $("#divHighPrice > div.text-muted").text().replace(/\n/g, "").trim().trim();
+
+		const featuredActions = [];
+		$("#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr").each(
+			(index, element) => {
+				const action = $(element).find("td span").text().trim();
+				const low = $(element).find("td").eq(1).text().replace("$", "").trim();
+				const average = $(element).find("td").eq(2).text().replace("$", "").trim();
+				const high = $(element).find("td").eq(3).text().replace("$", "").trim();
+
+				if (action) {
+					featuredActions.push({
+						action,
+						low,
+						average,
+						high,
+					});
+				}
+			}
+		);
+
+		const response = {
+			low: {
+				gwei: lowGwei,
+				time: lowTime,
 			},
-			tokenHoldings: null,
+			average: {
+				gwei: averageGwei,
+				time: averageTime,
+			},
+			high: {
+				gwei: highGwei,
+				time: highTime,
+			},
+			featuredActions,
 		};
 
-		_response.tokenHoldings = await getTokens(`${params.id}`);
-
-		if (_response.tokenHoldings.balance) _response.fiatBalance += _response.tokenHoldings.balance;
-
-		return _response;
+		return response;
 	} catch (error) {
-		console.error({ error });
+		console.error({ error: error });
+	}
+};
+
+/**
+ * get transaction status
+ * @param {Object} params
+ */
+const getTransactionStatus = async (params) => {
+	try {
+		const id = params.id;
+
+		const { data } = await instance.get(`${urlBase}/api/evm-tx/bsc-transaction?address=${id}`, {
+			headers: {
+				Authorization: `Bearer ${token}`,
+			},
+		});
+
+		return data;
+	} catch (exception) {
+		const error = new Error("transaction_not_found");
+
+		error.status = 404;
+
+		throw error;
 	}
 };
 
@@ -44,53 +184,33 @@ const getAddress = async (params) => {
  * @returns
  */
 const getTransactionsList = async (params, query) => {
-	const { data } = await instance.get(`https://api.xrpscan.com/api/v1/account/${params.id}/transactions`, {
-		headers: {
-			"user-agent": generateRandomUserAgent(),
-		},
-	});
-	return { transactions: data };
-};
-
-/**
- * get transaction status
- * @param {Object} params
- */
-const getTokens = async (params) => {
-	const { data } = await instance.get(`https://api.xrpscan.com/api/v1/account/${params}/assets`, {
-		headers: {
-			"user-agent": generateRandomUserAgent(),
-		},
-	});
-
-	const tokenHoldings = {
-		total: data.length,
-		balance: 0,
-		fiatBalance: 0,
-		tokens: [],
-	};
+	const address = params.id;
+	const show = query.show;
 
 	try {
-		for (let index = 0; index < data.length; index++) {
-			const token = data[index];
+		const { data } = await instance.get(`${urlBase}/api/evm-tx/bsc-transactions?address=${address}&show=${show}`, {
+			headers: {
+				Authorization: `Bearer ${token}`,
+			},
+		});
 
-			tokenHoldings.fiatBalance += token.value;
+		return {
+			pagination: { records: "0", pages: "0", page: "0" },
+			transactions: data,
+		};
+	} catch (error) {
+		console.error({ error });
 
-			tokenHoldings.tokens.push({
-				fiatBalance: token.value,
-				counterparty: token.counterparty,
-				currency: token.currency,
-			});
-		}
-	} catch (exception) {
-		console.error({ exception });
+		return {
+			pagination: { records: "0", pages: "0", page: "0" },
+			transactions: [],
+		};
 	}
-
-	return tokenHoldings;
 };
 
 module.exports = {
-	getAddress,
+	getBalance,
+	getGasTracker,
 	getTransactionsList,
-	getTokens,
+	getTransactionStatus,
 };

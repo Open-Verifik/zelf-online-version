@@ -19,7 +19,7 @@ const get = async (data) => {
 };
 
 const show = async (data, authUser) => {
-	const { cid, expires } = data;
+	const { cid } = data;
 
 	try {
 		const file = await IPFS.retrieve(cid);

@@ -1,7 +1,6 @@
 const axios = require("../../../Core/axios").getEncryptionInstance();
 const config = require("../../../Core/config");
 const QRCode = require("qrcode");
-const IPFSModule = require("../../IPFS/modules/ipfs.module");
 
 const encrypt = async (data) => {
 	try {
@@ -101,9 +100,11 @@ const decrypt = async (data) => {
 
 		const error = _formattingError(exception.response?.data);
 
-		return {
-			error,
-		};
+		let _error = new Error(error.message);
+
+		_error.status = error.status;
+
+		throw _error;
 	}
 };
 
@@ -120,9 +121,11 @@ const preview = async (data) => {
 
 		const error = _formattingError(exception.response?.data);
 
-		return {
-			error,
-		};
+		let _error = new Error(error.message);
+
+		_error.status = error.status;
+
+		throw _error;
 	}
 };
 

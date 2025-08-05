@@ -17,8 +17,10 @@
 		"@joi/date": "^2.1.0",
 		"@koa/cors": "^5.0.0",
 		"@koa/router": "^12.0.1",
+		"@mysten/sui": "^1.36.0",
 		"@mysten/sui.js": "^0.54.1",
-		"@solana/spl-token": "^0.4.9",
+		"@mysten/walrus": "^0.2.3",
+		"@solana/spl-token": "^0.4.13",
 		"@solana/web3.js": "^1.93.0",
 		"axios": "1.8.2",
 		"bcrypt-nodejs": "^0.0.3",
@@ -54,16 +56,16 @@
 		"request": "^2.88.2",
 		"tiny-secp256k1": "^2.2.3"
 	},
+	"dresolutions": {
+		"axios": "1.8.2",
+		"elliptic": "^6.6.1",
+		"ws": "^8.0.0"
+	},
 	"keywords": [
 		"zelf",
 		"crypto",
 		"biometrics"
 	],
-	"resolutions": {
-		"axios": "1.8.2",
-		"elliptic": "^6.6.1",
-		"ws": "^8.0.0"
-	},
 	"author": "Miguel Trevino",
 	"license": "ISC"
 }

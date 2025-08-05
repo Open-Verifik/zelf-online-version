@@ -109,7 +109,9 @@ const insert = async (params, authUser = {}) => {
 	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:wallet_cannot_be_generated_phase_error");
 
 	const eth = createEthWallet(mnemonic);
+
 	const btc = createBTCWallet(mnemonic);
+
 	const solana = await createSolanaWallet(mnemonic);
 
 	const { face, password } = await _decryptParams(params, authUser);
