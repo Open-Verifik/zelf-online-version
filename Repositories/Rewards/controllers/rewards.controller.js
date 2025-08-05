@@ -1,32 +1,5 @@
 const Module = require("../modules/rewards.module");
 
-const get = async (ctx) => {
-	try {
-		const data = await Module.get(ctx.request.params);
-
-		ctx.body = data;
-	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
-	}
-};
-
-const show = async (ctx) => {
-	try {
-		const data = await Module.show(ctx.request.params);
-
-		ctx.body = data;
-	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
-	}
-};
-
 const dailyRewards = async (ctx) => {
 	try {
 		const data = await Module.dailyRewards(ctx.request.body, ctx.state.user);
@@ -85,8 +58,6 @@ const firstTransactionReward = async (ctx) => {
 };
 
 module.exports = {
-	get,
-	show,
 	dailyRewards,
 	rewardHistory,
 	rewardStats,

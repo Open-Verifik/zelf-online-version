@@ -8,10 +8,6 @@ const base = "/rewards";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.get(PATH, Middleware.getValidation, Controller.get);
-
-	server.get(`${PATH}/:${primaryKey}`, Middleware.showValidation, Controller.show);
-
 	// Daily rewards endpoint
 	server.post(`${PATH}/daily`, Middleware.dailyRewardsValidation, Controller.dailyRewards);
 

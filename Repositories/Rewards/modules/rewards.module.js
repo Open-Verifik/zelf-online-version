@@ -440,7 +440,7 @@ const getUserRewardStats = async (zelfName) => {
 const _calculateDailyStreak = async (zelfName) => {
 	try {
 		// Get all daily rewards for this user
-		const ipfsFiles = await IPFS.filter("zelfName", zelfName);
+		const ipfsFiles = await IPFS.filter("name", zelfName);
 		const dailyRewards = [];
 
 		// Filter for daily rewards and parse dates
@@ -502,7 +502,7 @@ const _hasClaimedToday = async (zelfName) => {
 const _getTotalRewardsInPeriod = async (zelfName, startDate) => {
 	try {
 		// Get all rewards for this user
-		const ipfsFiles = await IPFS.filter("zelfName", zelfName);
+		const ipfsFiles = await IPFS.filter("name", zelfName);
 		let total = 0;
 
 		const startMoment = moment(startDate);
