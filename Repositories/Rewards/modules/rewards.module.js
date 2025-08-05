@@ -5,6 +5,7 @@ const NotificationService = require("../services/notification.service");
 const Model = require("../models/rewards.model"); // MongoDB model for TTL cache
 const moment = require("moment");
 const ZNSTransactionDetector = require("../../ZelfNameService/modules/zns-transaction-detector.module");
+const { normalizeZelfName } = require("../middlewares/rewards.middleware");
 
 const get = async (params = {}) => {
 	try {
@@ -149,8 +150,12 @@ const _filterByMultipleKeys = async (filters) => {
 // Helper function to check if user already claimed today
 const _getTodayReward = async (zelfName) => {
 	try {
+		// Normalize zelfName
+		zelfName = normalizeZelfName(zelfName);
+
 		// Create composite key for direct lookup
 		const todayKey = moment().format("YYYY-MM-DD");
+
 		const rewardPrimaryKey = `${zelfName}${todayKey}`;
 
 		// Step 1: Check MongoDB first (TTL cache for first 5 minutes)
@@ -362,8 +367,11 @@ const checkAndSendReminders = async () => {
 // Get user's reward history
 const getUserRewardHistory = async (zelfName, limit = 10) => {
 	try {
+		// Normalize zelfName
+		const normalizedZelfName = normalizeZelfName(zelfName);
+
 		// Get all reward files for this user from IPFS
-		const ipfsFiles = await IPFS.filter("name", zelfName);
+		const ipfsFiles = await IPFS.filter("name", normalizedZelfName);
 
 		// Parse and sort rewards by date
 		const rewards = [];
@@ -439,8 +447,11 @@ const getUserRewardStats = async (zelfName) => {
 // Helper function to calculate daily streak
 const _calculateDailyStreak = async (zelfName) => {
 	try {
+		// Normalize zelfName
+		const normalizedZelfName = normalizeZelfName(zelfName);
+
 		// Get all daily rewards for this user
-		const ipfsFiles = await IPFS.filter("name", zelfName);
+		const ipfsFiles = await IPFS.filter("name", normalizedZelfName);
 		const dailyRewards = [];
 
 		// Filter for daily rewards and parse dates
@@ -490,7 +501,11 @@ const _calculateDailyStreak = async (zelfName) => {
 // Helper function to check if user has claimed today
 const _hasClaimedToday = async (zelfName) => {
 	try {
-		const todayReward = await _getTodayReward(zelfName);
+		// Normalize zelfName
+		const normalizedZelfName = normalizeZelfName(zelfName);
+
+		const todayReward = await _getTodayReward(normalizedZelfName);
+
 		return todayReward !== null;
 	} catch (error) {
 		console.error("Error checking if user claimed today:", error);
@@ -501,8 +516,11 @@ const _hasClaimedToday = async (zelfName) => {
 // Helper function to get total rewards in a period
 const _getTotalRewardsInPeriod = async (zelfName, startDate) => {
 	try {
+		// Normalize zelfName
+		const normalizedZelfName = normalizeZelfName(zelfName);
+
 		// Get all rewards for this user
-		const ipfsFiles = await IPFS.filter("name", zelfName);
+		const ipfsFiles = await IPFS.filter("name", normalizedZelfName);
 		let total = 0;
 
 		const startMoment = moment(startDate);

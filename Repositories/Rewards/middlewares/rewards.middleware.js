@@ -1,5 +1,10 @@
 const Joi = require("joi");
 
+// Utility function to normalize zelfName with .zelf suffix
+const normalizeZelfName = (zelfName) => {
+	return zelfName.endsWith(".zelf") ? zelfName : `${zelfName}.zelf`;
+};
+
 const dailyRewardsValidation = async (ctx, next) => {
 	try {
 		const schema = Joi.object({
@@ -7,6 +12,9 @@ const dailyRewardsValidation = async (ctx, next) => {
 		});
 
 		await schema.validateAsync(ctx.request.body);
+
+		// Normalize zelfName to include .zelf suffix if missing
+		ctx.request.body.zelfName = normalizeZelfName(ctx.request.body.zelfName);
 
 		await next();
 	} catch (error) {
@@ -27,6 +35,10 @@ const rewardHistoryValidation = async (ctx, next) => {
 
 		await paramsSchema.validateAsync(ctx.request.params);
 		await querySchema.validateAsync(ctx.request.query);
+
+		// Normalize zelfName to include .zelf suffix if missing
+		ctx.request.params.zelfName = normalizeZelfName(ctx.request.params.zelfName);
+
 		await next();
 	} catch (error) {
 		ctx.status = 400;
@@ -41,6 +53,10 @@ const rewardStatsValidation = async (ctx, next) => {
 		});
 
 		await schema.validateAsync(ctx.request.params);
+
+		// Normalize zelfName to include .zelf suffix if missing
+		ctx.request.params.zelfName = normalizeZelfName(ctx.request.params.zelfName);
+
 		await next();
 	} catch (error) {
 		ctx.status = 400;
@@ -55,6 +71,10 @@ const firstTransactionRewardValidation = async (ctx, next) => {
 		});
 
 		await schema.validateAsync(ctx.request.body);
+
+		// Normalize zelfName to include .zelf suffix if missing
+		ctx.request.body.zelfName = normalizeZelfName(ctx.request.body.zelfName);
+
 		await next();
 	} catch (error) {
 		ctx.status = 400;
@@ -67,4 +87,5 @@ module.exports = {
 	rewardHistoryValidation,
 	rewardStatsValidation,
 	firstTransactionRewardValidation,
+	normalizeZelfName, // Export the utility function for use in other modules
 };
