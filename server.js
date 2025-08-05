@@ -44,7 +44,7 @@ const server = app.listen(config.port, () => {
 
 		// Swagger documentation setup
 		app.use(async (ctx, next) => {
-			if (ctx.path === "/swagger") {
+			if (ctx.path === "/docs") {
 				ctx.type = "html";
 				ctx.body = `
 					<!DOCTYPE html>

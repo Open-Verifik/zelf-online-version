@@ -47,7 +47,7 @@ if (swaggerSpec && swaggerSpec.openapi) {
 	}
 
 	console.log("\n✅ Swagger configuration is valid and ready to use!");
-	console.log(`🌐 Access the documentation at: http://localhost:${config.port}/swagger`);
+	console.log(`🌐 Access the documentation at: http://localhost:${config.port}/docs`);
 } else {
 	console.log("❌ Swagger specification generation failed");
 	console.log("Please check your swagger.js configuration");
@@ -55,7 +55,7 @@ if (swaggerSpec && swaggerSpec.openapi) {
 
 console.log("\n📚 Next steps:");
 console.log("1. Start the server: npm start");
-console.log(`2. Open http://localhost:${config.port}/swagger in your browser`);
+console.log(`2. Open http://localhost:${config.port}/docs in your browser`);
 console.log("3. Test the /login endpoint to get a JWT token");
 console.log('4. Use the "Authorize" button to add your token');
 console.log("5. Test protected endpoints");
