@@ -12,12 +12,6 @@ module.exports = (server) => {
 
 	server.get(`${PATH}/:${primaryKey}`, Middleware.showValidation, Controller.show);
 
-	server.post(`${PATH}`, Middleware.createValidation, Controller.create);
-
-	server.put(`${PATH}`, Middleware.updateValidation, Controller.update);
-
-	server.del(`${PATH}/:${primaryKey}`, Middleware.destroyValidation, Controller.destroy);
-
 	// Daily rewards endpoint
 	server.post(`${PATH}/daily`, Middleware.dailyRewardsValidation, Controller.dailyRewards);
 

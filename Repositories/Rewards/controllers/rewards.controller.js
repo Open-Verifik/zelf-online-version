@@ -2,7 +2,7 @@ const Module = require("../modules/rewards.module");
 
 const get = async (ctx) => {
 	try {
-		const data = await Module.get(ctx.request.params, ctx.state.user);
+		const data = await Module.get(ctx.request.params);
 
 		ctx.body = data;
 	} catch (error) {
@@ -16,48 +16,9 @@ const get = async (ctx) => {
 
 const show = async (ctx) => {
 	try {
-		const data = await Module.show(ctx.request.params, ctx.state.user);
+		const data = await Module.show(ctx.request.params);
 
 		ctx.body = data;
-	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
-	}
-};
-
-const create = async (ctx) => {
-	try {
-		const data = await Module.create(ctx.request.body, ctx.state.user);
-
-		ctx.body = data;
-	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
-	}
-};
-
-const update = async (ctx) => {
-	try {
-		const data = await Module.update(ctx.request.body, ctx.state.user);
-
-		ctx.body = { data };
-	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
-	}
-};
-
-const destroy = async (ctx) => {
-	try {
-		const data = await Module.destroy(ctx.request.params, ctx.state.user);
-
-		ctx.body = { data };
 	} catch (error) {
 		console.error(error);
 		ctx.status = error.status || 500;
@@ -126,9 +87,6 @@ const firstTransactionReward = async (ctx) => {
 module.exports = {
 	get,
 	show,
-	create,
-	update,
-	destroy,
 	dailyRewards,
 	rewardHistory,
 	rewardStats,

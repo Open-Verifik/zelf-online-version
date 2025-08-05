@@ -6,7 +6,7 @@ const Model = require("../models/rewards.model"); // MongoDB model for TTL cache
 const moment = require("moment");
 const ZNSTransactionDetector = require("../../ZelfNameService/modules/zns-transaction-detector.module");
 
-const get = async (params = {}, authUser = {}) => {
+const get = async (params = {}) => {
 	try {
 		// Check for composite key optimization first
 		const zelfName = params.zelfName || params.userId;
@@ -49,17 +49,13 @@ const get = async (params = {}, authUser = {}) => {
 	}
 };
 
-const show = async (params = {}, authUser = {}) => {
+const show = async (params = {}) => {
 	try {
 		// Get specific reward by CID
-		if (params.cid) {
-			return await IPFS.retrieve(params.cid);
-		}
+		if (params.cid) return await IPFS.retrieve(params.cid);
 
 		// If ID is provided, try to find it
-		if (params.id) {
-			return await IPFS.filter("rewardId", params.id);
-		}
+		if (params.id) return await IPFS.filter("rewardId", params.id);
 
 		return null;
 	} catch (error) {

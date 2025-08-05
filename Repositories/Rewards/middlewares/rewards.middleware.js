@@ -30,53 +30,6 @@ const showValidation = async (ctx, next) => {
 	}
 };
 
-const createValidation = async (ctx, next) => {
-	try {
-		const schema = Joi.object({
-			zelfName: Joi.string().required(),
-			amount: Joi.number().required(),
-			type: Joi.string().required(),
-			description: Joi.string().optional(),
-		});
-
-		await schema.validateAsync(ctx.request.body);
-		await next();
-	} catch (error) {
-		ctx.status = 400;
-		ctx.body = { error: error.message };
-	}
-};
-
-const updateValidation = async (ctx, next) => {
-	try {
-		const schema = Joi.object({
-			id: Joi.string().required(),
-			amount: Joi.number().optional(),
-			status: Joi.string().optional(),
-		});
-
-		await schema.validateAsync(ctx.request.body);
-		await next();
-	} catch (error) {
-		ctx.status = 400;
-		ctx.body = { error: error.message };
-	}
-};
-
-const destroyValidation = async (ctx, next) => {
-	try {
-		const schema = Joi.object({
-			id: Joi.string().required(),
-		});
-
-		await schema.validateAsync(ctx.request.params);
-		await next();
-	} catch (error) {
-		ctx.status = 400;
-		ctx.body = { error: error.message };
-	}
-};
-
 const dailyRewardsValidation = async (ctx, next) => {
 	try {
 		const schema = Joi.object({
@@ -142,9 +95,6 @@ const firstTransactionRewardValidation = async (ctx, next) => {
 module.exports = {
 	getValidation,
 	showValidation,
-	createValidation,
-	updateValidation,
-	destroyValidation,
 	dailyRewardsValidation,
 	rewardHistoryValidation,
 	rewardStatsValidation,
