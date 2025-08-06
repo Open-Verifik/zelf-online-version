@@ -1,10 +1,7 @@
-/**
- * Simple test to check Fantom RPC connectivity and get basic balance
- */
-
 const axios = require("axios");
 
-const FANTOM_RPC = "https://fragrant-wild-smoke.fantom.quiknode.pro/9f6de2bac71c11f7c08e97e7be74a9d770c62a86";
+const config = require("../../../Core/config");
+const FANTOM_RPC = config.fantom.rpcUrl;
 
 console.log("=== Testing Fantom RPC Connectivity ===");
 

@@ -1,10 +1,8 @@
 const axios = require("axios");
 const moment = require("moment");
-const cheerio = require("cheerio");
-const { ethers } = require("ethers");
+const config = require("../../../Core/config");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-const { idAseet_ } = require("../../dataAnalytics/modules/dataAnalytics.module");
 const StandardizedChainFormatter = require("../../class/standardized-chain-formatter");
 
 // Initialize Sonic formatter (migrated from Fantom)
@@ -25,7 +23,8 @@ const agent = new https.Agent({
 });
 
 // Sonic API endpoints (migrated from Fantom)
-const SONIC_RPC = "https://fragrant-wild-smoke.fantom.quiknode.pro/9f6de2bac71c11f7c08e97e7be74a9d770c62a86"; // Keep QuickNode for now
+
+const SONIC_RPC = config.fantom.rpcUrl;
 const SONIC_API_BASE = "https://api.sonic.network";
 const SONICSCAN_API = "https://api.sonicscan.com/api";
 

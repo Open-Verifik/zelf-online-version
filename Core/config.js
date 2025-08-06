@@ -152,6 +152,9 @@ const configuration = {
 		apiKey: process.env.LIFI_API_KEY,
 		integrator: process.env.LIFI_INTEGRATOR,
 	},
+	fantom: {
+		rpcUrl: process.env.FANTOM_RPC_URL || "https://fragrant-wild-smoke.fantom.quiknode.pro/9f6de2bac71c11f7c08e97e7be74a9d770c62a86",
+	},
 };
 
 module.exports = configuration;
