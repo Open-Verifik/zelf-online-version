@@ -7,8 +7,8 @@ const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { idAseet_ } = require("../../dataAnalytics/modules/dataAnalytics.module");
 const StandardizedChainFormatter = require("../../class/standardized-chain-formatter");
 
-// Initialize Fantom formatter
-const fantomFormatter = new StandardizedChainFormatter("Fantom", "FTM", "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png");
+// Initialize Sonic formatter (migrated from Fantom)
+const sonicFormatter = new StandardizedChainFormatter("Sonic", "SONIC", "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png");
 
 // Create axios instance with timeout and better error handling
 const instance = axios.create({
@@ -24,10 +24,10 @@ const agent = new https.Agent({
 	rejectUnauthorized: false,
 });
 
-// Fantom API endpoints
-const FANTOM_RPC = "https://rpcapi.fantom.network";
-const FANTOM_API_BASE = "https://api.fantom.network";
-const FANTOMSCAN_API = "https://api.ftmscan.com/api";
+// Sonic API endpoints (migrated from Fantom)
+const SONIC_RPC = "https://fragrant-wild-smoke.fantom.quiknode.pro/9f6de2bac71c11f7c08e97e7be74a9d770c62a86"; // Keep QuickNode for now
+const SONIC_API_BASE = "https://api.sonic.network";
+const SONICSCAN_API = "https://api.sonicscan.com/api";
 
 // Generate random user agent
 const generateRandomUserAgent = () => {
@@ -39,127 +39,183 @@ const generateRandomUserAgent = () => {
 	return userAgents[Math.floor(Math.random() * userAgents.length)];
 };
 
+// Helper function to get latest block number
+const getLatestBlock = async () => {
+	try {
+		const response = await instance.post(
+			SONIC_RPC,
+			{
+				jsonrpc: "2.0",
+				method: "eth_blockNumber",
+				params: [],
+				id: 1,
+			},
+			{
+				headers: { "Content-Type": "application/json" },
+			}
+		);
+		return parseInt(response.data.result, 16);
+	} catch (error) {
+		console.log("Failed to get latest block:", error.message);
+		return 0;
+	}
+};
+
 /**
- * Get comprehensive address information for Fantom
+ * Get comprehensive address information for Sonic (migrated from Fantom)
  * @param {Object} query - Query parameters containing address
  * @returns {Object} Address data with balance, tokens, and transactions
  */
 const getAddress = async (query) => {
 	try {
 		const { address } = query;
-		if (!address) {
-			throw new Error("Address parameter is required");
-		}
 
-		// Get FTM balance from RPC
-		let ftmBalance = "0";
-		try {
-			const balanceResponse = await instance.post(
-				FANTOM_RPC,
-				{
-					jsonrpc: "2.0",
-					method: "eth_getBalance",
-					params: [address, "latest"],
-					id: 1,
-				},
-				{
-					headers: { "Content-Type": "application/json" },
-				}
-			);
-			ftmBalance = balanceResponse.data.result ? (parseInt(balanceResponse.data.result, 16) / Math.pow(10, 18)).toString() : "0";
-		} catch (error) {
-			console.log("Fantom balance fetch failed:", error.message);
-		}
+		// Add overall timeout to prevent hanging
+		const timeoutPromise = new Promise((_, reject) => {
+			setTimeout(() => reject(new Error("Sonic API timeout after 8 seconds")), 8000);
+		});
 
-		// Get FTM price
-		let ftmPrice = "0";
-		try {
-			const priceData = await getTickerPrice({ symbol: "FTM" });
-			ftmPrice = priceData.price || "0";
-		} catch (error) {
-			console.log("Fantom price fetch failed:", error.message);
-		}
+		const dataPromise = (async () => {
+			if (!address) {
+				throw new Error("Address parameter is required");
+			}
 
-		// Calculate fiat balance
-		const fiatBalance = parseFloat(ftmBalance) * parseFloat(ftmPrice);
+			// Get SONIC balance from RPC
+			let sonicBalance = "0";
+			try {
+				const balanceResponse = await instance.post(
+					SONIC_RPC,
+					{
+						jsonrpc: "2.0",
+						method: "eth_getBalance",
+						params: [address, "latest"],
+						id: 1,
+					},
+					{
+						headers: { "Content-Type": "application/json" },
+					}
+				);
+				sonicBalance = balanceResponse.data.result ? (parseInt(balanceResponse.data.result, 16) / Math.pow(10, 18)).toString() : "0";
+			} catch (error) {
+				console.log("Sonic balance fetch failed:", error.message);
+			}
 
-		// Get tokens (with error handling)
-		let tokens = [];
-		try {
-			const tokensData = await getTokens({ address }, { show: "100" });
-			tokens = tokensData.tokens || [];
-		} catch (error) {
-			console.log("Fantom tokens fetch failed:", error.message);
-		}
+			// Get SONIC price
+			let sonicPrice = "0";
+			try {
+				const priceData = await getTickerPrice({ symbol: "SONIC" });
+				sonicPrice = priceData.price || "0";
+			} catch (error) {
+				console.log("Sonic price fetch failed:", error.message);
+			}
 
-		// Add native FTM token to the beginning of tokens array (like SOL example)
-		const nativeFtmToken = {
-			tokenType: "FTM",
-			fiatBalance: fiatBalance,
-			symbol: "FTM",
-			name: "Fantom",
-			price: ftmPrice,
-			amount: parseFloat(ftmBalance),
-			image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png",
-			address: address, // Native token uses the wallet address
-			decimals: 18,
-		};
+			// Calculate fiat balance
+			const fiatBalance = parseFloat(sonicBalance) * parseFloat(sonicPrice);
 
-		// Insert native token at the beginning
-		tokens.unshift(nativeFtmToken);
+			// Get tokens (with error handling)
+			let tokens = [];
+			try {
+				const tokensData = await getTokens({ address }, { show: "100" });
+				tokens = tokensData.tokens || [];
+			} catch (error) {
+				console.log("Sonic tokens fetch failed:", error.message);
+				// Continue with empty tokens array if API fails
+			}
 
-		// Get transactions (with error handling)
-		let transactions = [];
-		try {
-			const transactionsData = await getTransactionsList({
+			// Add native SONIC token to the beginning of tokens array (like SOL example)
+			const nativeSonicToken = {
+				tokenType: "SONIC",
+				fiatBalance: fiatBalance,
+				symbol: "SONIC",
+				name: "Sonic",
+				price: sonicPrice,
+				amount: parseFloat(sonicBalance),
+				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png",
+				address: address, // Native token uses the wallet address
+				decimals: 18,
+			};
+
+			// Insert native token at the beginning
+			tokens.unshift(nativeSonicToken);
+
+			// Get transactions with controlled timeout
+			let transactions = [];
+			try {
+				console.log("Fetching transactions with controlled timeout...");
+
+				// Create a timeout promise for transaction fetching
+				const transactionTimeoutPromise = new Promise((_, reject) => {
+					setTimeout(() => reject(new Error("Transaction fetch timeout")), 6000);
+				});
+
+				const transactionDataPromise = getTransactionsList({
+					address,
+					page: "0",
+					show: "20",
+				});
+
+				const transactionsData = await Promise.race([transactionDataPromise, transactionTimeoutPromise]);
+				transactions = transactionsData.transactions || [];
+				console.log(`Found ${transactions.length} transactions via OKLink API`);
+			} catch (error) {
+				console.log("Transaction fetch failed:", error.message);
+				// Add error message as a transaction entry
+				transactions = [
+					{
+						hash: "0x" + "0".repeat(64),
+						method: "Error",
+						block: "N/A",
+						age: "N/A",
+						date: "N/A",
+						from: address,
+						traffic: "ERROR",
+						to: address,
+						fiatAmount: "0.00",
+						amount: "0",
+						asset: "FTM",
+						txnFee: "0",
+						note: `Transaction fetch failed: ${error.message}`,
+					},
+				];
+			}
+
+			// Skip asset ID fetch to avoid database timeout
+			let assetId = null;
+
+			// Prepare raw data for standardization
+			const rawData = {
 				address,
-				page: "0",
-				show: "20",
-			});
-			transactions = transactionsData.transactions || [];
-		} catch (error) {
-			console.log("Fantom transactions fetch failed:", error.message);
-		}
+				balance: sonicBalance,
+				fiatBalance: fiatBalance,
+				price: sonicPrice,
+				type: "system_account",
+				tokenHoldings: tokens,
+				transactions: transactions,
+			};
 
-		// Get asset ID for FTM
-		let assetId = null;
-		try {
-			assetId = await idAseet_("FTM");
-		} catch (error) {
-			console.log("Fantom asset ID fetch failed:", error.message);
-		}
+			// Use standardized formatter to ensure consistent format (without wrapping)
+			const formattedResponse = sonicFormatter.formatAddressData(rawData, address, false);
 
-		// Prepare raw data for standardization
-		const rawData = {
-			address,
-			balance: ftmBalance,
-			fiatBalance: fiatBalance,
-			price: ftmPrice,
-			type: "system_account",
-			tokenHoldings: tokens,
-			transactions: transactions,
-		};
+			// Validate the response
+			if (!sonicFormatter.validateResponse(formattedResponse)) {
+				console.warn("Sonic response validation failed, returning empty response");
+				return sonicFormatter.getEmptyResponse(address).data;
+			}
 
-		// Use standardized formatter to ensure consistent format (without wrapping)
-		const formattedResponse = fantomFormatter.formatAddressData(rawData, address, false);
+			return formattedResponse;
+		})();
 
-		// Validate the response
-		if (!fantomFormatter.validateResponse(formattedResponse)) {
-			console.warn("Fantom response validation failed, returning empty response");
-			return fantomFormatter.getEmptyResponse(address).data;
-		}
-
-		return formattedResponse;
+		return await Promise.race([dataPromise, timeoutPromise]);
 	} catch (error) {
-		console.error("Fantom getAddress error:", error.message || "Unknown error");
+		console.error("Sonic getAddress error:", error.message || "Unknown error");
 		// Return error response in correct format (without wrapping)
-		const errorResponse = fantomFormatter.getErrorResponse(error.message);
+		const errorResponse = sonicFormatter.getErrorResponse(error.message);
 		return errorResponse.data;
 	}
 };
 
 /**
- * Get ERC20 tokens for a Fantom address
+ * Get ERC20 tokens for a Sonic address (migrated from Fantom)
  * @param {Object} params - Parameters containing address
  * @param {Object} query - Query parameters for pagination
  * @returns {Object} Token holdings data
@@ -169,8 +225,8 @@ const getTokens = async (params, query) => {
 		const { address } = params;
 		const t = Date.now();
 
-		// Use OKLink API for ERC20 tokens (Fantom is EVM compatible)
-		const url = `https://www.oklink.com/api/explorer/v2/fantom/addresses/${address}/tokens?offset=0&limit=${query.show || "100"}&t=${t}`;
+		// Use OKLink API for ERC20 tokens (Sonic is EVM compatible)
+		const url = `https://www.oklink.com/api/explorer/v2/sonic/addresses/${address}/tokens?offset=0&limit=${query.show || "100"}&t=${t}`;
 
 		const { data } = await axios.get(url, {
 			httpsAgent: agent,
@@ -205,7 +261,7 @@ const getTokens = async (params, query) => {
 		}));
 
 		// Use standardized formatter for token holdings
-		const tokenHoldings = fantomFormatter.formatTokenHoldings(rawTokens);
+		const tokenHoldings = sonicFormatter.formatTokenHoldings(rawTokens);
 
 		return {
 			balance: tokenHoldings.balance,
@@ -213,7 +269,7 @@ const getTokens = async (params, query) => {
 			tokens: tokenHoldings.tokens,
 		};
 	} catch (error) {
-		console.error("Error getting Fantom tokens:", error.message || "Unknown error");
+		console.error("Error getting Sonic tokens:", error.message || "Unknown error");
 		return {
 			balance: "0",
 			total: 0,
@@ -329,56 +385,8 @@ const getTransactionsList = async (query) => {
 			}
 		}
 
-		// Try FantomScan API for regular transactions
-		try {
-			const ftmScanUrl = `https://api.ftmscan.com/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=${
-				parseInt(page) + 1
-			}&offset=${show}&sort=desc`;
-
-			const { data } = await axios.get(ftmScanUrl, {
-				timeout: 15000,
-				headers: {
-					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-				},
-			});
-
-			if (data.status === "1" && data.result && data.result.length > 0) {
-				const rawTransactions = data.result.map((tx) => {
-					// Determine transaction type based on input data
-					const type = tx.input && tx.input !== "0x" ? "contract" : "transfer";
-
-					// Determine status based on transaction status
-					const status = tx.isError === "0" ? "Success" : "Failed";
-
-					return {
-						age: moment(tx.timeStamp ? parseInt(tx.timeStamp) * 1000 : Date.now()).fromNow(),
-						amount: tx.value ? (parseFloat(tx.value) / Math.pow(10, 18)).toFixed(6) : "0",
-						assetPrice: price.toString(),
-						block: tx.blockNumber || "N/A",
-						confirmations: tx.confirmations || "1",
-						date: tx.timeStamp ? moment(parseInt(tx.timeStamp) * 1000).format("YYYY-MM-DD HH:mm:ss") : "N/A",
-						from: tx.from || address,
-						gasPrice: tx.gasPrice || "0",
-						hash: tx.hash || "0x0000000000000000000000000000000000000000000000000000000000000000",
-						image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png", // FTM logo
-						status: status,
-						to: tx.to || address,
-						txnFee: tx.gasUsed ? ((parseFloat(tx.gasUsed) * parseFloat(tx.gasPrice || 0)) / Math.pow(10, 18)).toFixed(6) : "0",
-						type: type,
-					};
-				});
-
-				// Use standardized formatter for transactions
-				const transactions = fantomFormatter.formatTransactions(rawTransactions);
-
-				return {
-					pagination: { records: transactions.length.toString(), pages: "1", page: "0" },
-					transactions: transactions.sort((a, b) => b.timestamp - a.timestamp),
-				};
-			}
-		} catch (ftmScanError) {
-			console.log("FantomScan API failed:", ftmScanError.message);
-		}
+		// Skip FantomScan API due to DNS issues - go straight to OKLink
+		console.log("Skipping FantomScan API - using OKLink directly");
 
 		// Try OKLink API as fallback
 		try {
@@ -395,7 +403,7 @@ const getTransactionsList = async (query) => {
 				try {
 					const { data } = await axios.get(url, {
 						httpsAgent: agent,
-						timeout: 10000,
+						timeout: 5000, // Reduced timeout for faster fallback
 						validateStatus: function (status) {
 							return status < 500;
 						},

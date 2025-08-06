@@ -242,10 +242,15 @@ function addTrafficParameter(transactions, userAddress) {
 }
 
 function get_ApiKey() {
-	const API_KEY = config.oklink.apiKey;
+	const API_KEY = config.oklink?.apiKey;
 	const c = 1111111111111;
 
 	function encryptApiKey() {
+		// Handle case where API key is undefined
+		if (!API_KEY) {
+			console.warn("OKLink API key is not configured. Some features may not work.");
+			return "default_key_for_fallback";
+		}
 		let e = API_KEY.split("");
 		let n = e.splice(0, 8);
 		return e.concat(n).join("");
