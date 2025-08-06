@@ -1,4 +1,10 @@
-const { getTickerPrice } = require("../../binance/modules/binance.module");
+const axios = require("axios");
+const https = require("https");
+const { getETHPrice } = require("./eth-price");
+
+const agent = new https.Agent({
+	rejectUnauthorized: false,
+});
 
 /**
  * Get token price with special handling for stablecoins and symbol mapping
@@ -8,33 +14,59 @@ const { getTickerPrice } = require("../../binance/modules/binance.module");
 const getTokenPrice = async (symbol) => {
 	try {
 		// Handle stablecoins - always $1
-		if (symbol === "USDT" || symbol === "USDC" || symbol === "DAI" || symbol === "LUSD") {
+		if (symbol === "USDT" || symbol === "USDC" || symbol === "DAI" || symbol === "LUSD" || symbol === "USDT.e" || symbol === "USDC.e") {
 			return "1.00";
 		}
 
-		// Map symbols to Binance-compatible format
-		let binanceSymbol = symbol;
+		// Handle ETH specifically
+		if (symbol === "ETH" || symbol === "WETH") {
+			return await getETHPrice();
+		}
 
-		if (symbol === "WETH") {
-			binanceSymbol = "ETH"; // Use ETH price for WETH
-		} else if (symbol === "OP") {
-			binanceSymbol = "OP"; // Optimism token
-		} else if (symbol === "SNX") {
-			binanceSymbol = "SNX"; // Synthetix token
-		} else if (symbol === "LINK") {
-			binanceSymbol = "LINK"; // Chainlink
-		} else if (symbol === "UNI") {
-			binanceSymbol = "UNI"; // Uniswap
-		} else if (symbol === "AAVE") {
-			binanceSymbol = "AAVE"; // Aave
-		} else if (symbol === "sUSD") {
-			binanceSymbol = "USD"; // Synthetic USD (treat as $1)
+		// Handle synthetic USD and other $1 tokens
+		if (symbol === "sUSD" || symbol === "FRAX") {
 			return "1.00";
 		}
 
-		// Get price from Binance API
-		const priceData = await getTickerPrice({ symbol: binanceSymbol });
-		return priceData.price || "0.00";
+		// For other tokens, try CoinGecko first
+		try {
+			const symbolMap = {
+				OP: "optimism",
+				SNX: "havven",
+				LINK: "chainlink",
+				UNI: "uniswap",
+				AAVE: "aave",
+				COMP: "compound-governance-token",
+				MKR: "maker",
+				CRV: "curve-dao-token",
+				BAL: "balancer",
+				"1INCH": "1inch",
+				SUSHI: "sushi",
+			};
+
+			const coinId = symbolMap[symbol] || symbol.toLowerCase();
+			const response = await axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`, {
+				timeout: 5000,
+				httpsAgent: agent,
+			});
+
+			if (response.data && response.data[coinId] && response.data[coinId].usd) {
+				return response.data[coinId].usd.toString();
+			}
+		} catch (coinGeckoError) {
+			// Fallback to approximate prices for common Optimism tokens
+			const fallbackPrices = {
+				OP: "2.5",
+				SNX: "3.0",
+				LINK: "15.0",
+				UNI: "8.0",
+				AAVE: "120.0",
+			};
+
+			return fallbackPrices[symbol] || "0.00";
+		}
+
+		return "0.00";
 	} catch (error) {
 		// If price fetch fails, return 0
 		return "0.00";

@@ -1,6 +1,6 @@
 const axios = require("axios");
 const https = require("https");
-const { getETHPrice } = require("./eth-price");
+const { getTRXPrice } = require("./trx-price");
 
 const agent = new https.Agent({
 	rejectUnauthorized: false,
@@ -14,30 +14,23 @@ const agent = new https.Agent({
 const getTokenPrice = async (symbol) => {
 	try {
 		// Handle stablecoins - always $1
-		if (symbol === "USDT" || symbol === "USDC" || symbol === "DAI" || symbol === "FRAX" || symbol === "USDT.e" || symbol === "USDC.e") {
+		if (symbol === "USDT" || symbol === "USDC" || symbol === "USDJ" || symbol === "TUSD") {
 			return "1.00";
 		}
 
-		// Handle ETH specifically
-		if (symbol === "ETH" || symbol === "WETH") {
-			return await getETHPrice();
+		// Handle TRX specifically
+		if (symbol === "TRX" || symbol === "WTRX") {
+			return await getTRXPrice();
 		}
 
 		// For other tokens, try CoinGecko first
 		try {
 			const symbolMap = {
-				ARB: "arbitrum",
-				GMX: "gmx",
-				MAGIC: "magic",
-				LINK: "chainlink",
-				UNI: "uniswap",
-				AAVE: "aave",
-				COMP: "compound-governance-token",
-				MKR: "maker",
-				CRV: "curve-dao-token",
-				BAL: "balancer",
-				"1INCH": "1inch",
-				SUSHI: "sushi",
+				BTT: "bittorrent",
+				WIN: "wink",
+				SUN: "sun-token",
+				JST: "just",
+				NFT: "apenft",
 			};
 
 			const coinId = symbolMap[symbol] || symbol.toLowerCase();
@@ -50,13 +43,13 @@ const getTokenPrice = async (symbol) => {
 				return response.data[coinId].usd.toString();
 			}
 		} catch (coinGeckoError) {
-			// Fallback to approximate prices for common Arbitrum tokens
+			// Fallback to approximate prices for common Tron tokens
 			const fallbackPrices = {
-				ARB: "1.2",
-				GMX: "50.0",
-				MAGIC: "0.8",
-				LINK: "15.0",
-				UNI: "8.0",
+				BTT: "0.000001",
+				WIN: "0.00001",
+				SUN: "0.01",
+				JST: "0.02",
+				NFT: "0.0000005",
 			};
 
 			return fallbackPrices[symbol] || "0.00";

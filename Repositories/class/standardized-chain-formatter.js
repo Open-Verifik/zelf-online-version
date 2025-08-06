@@ -70,9 +70,12 @@ class StandardizedChainFormatter {
 	 * @returns {Object} Standardized account data
 	 */
 	formatAccountData(rawData) {
+		// Use nativeFiatBalance for account section if available, otherwise fall back to fiatBalance
+		const accountFiatBalance = rawData.nativeFiatBalance !== undefined ? rawData.nativeFiatBalance : rawData.fiatBalance;
+
 		return {
 			asset: this.chainSymbol,
-			fiatBalance: this.formatFiatBalance(rawData.fiatBalance || 0).toString(),
+			fiatBalance: this.formatFiatBalance(accountFiatBalance || 0).toString(),
 			price: this.formatPrice(rawData.price || 0).toString(),
 		};
 	}

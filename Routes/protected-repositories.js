@@ -28,6 +28,8 @@ module.exports = (server) => {
 	//M
 	//N
 	//O
+	// optimius
+	require("../Repositories/optimism/routes/optimism-scrapping.route")(server);
 	//P
 	require("../Repositories/polygon/routes/polygon-scrapping.route")(server);
 	require("../Repositories/purchase-zelf/routes/purchase.route")(server);
@@ -38,6 +40,7 @@ module.exports = (server) => {
 	require("../Repositories/sui/routes/sui-scrapping.route")(server);
 	require("../Repositories/Solana/routes/solana-scrapping.route")(server);
 	//T
+	require("../Repositories/tron/routes/tron-scrapping.route")(server);
 	//U
 	//V
 	//W

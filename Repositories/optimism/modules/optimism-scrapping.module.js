@@ -4,7 +4,7 @@ const https = require("https");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 const StandardizedChainFormatter = require("../../class/standardized-chain-formatter");
 const { getTokenPrice } = require("../utils/token-pricing");
-const { getTickerPrice } = require("../../binance/modules/binance.module");
+const { getETHPrice } = require("../utils/eth-price");
 
 // Initialize Optimism formatter
 const optimismFormatter = new StandardizedChainFormatter("OP Mainnet", "ETH", "https://s2.coinmarketcap.com/static/img/coins/64x64/11840.png");
@@ -552,8 +552,8 @@ const getPortfolioSummary = async (params) => {
 			);
 			ethBalance = balanceResponse.data.result ? (parseInt(balanceResponse.data.result, 16) / Math.pow(10, 18)).toString() : "0";
 
-			const priceData = await getTickerPrice({ symbol: "ETH" });
-			ethPrice = priceData.price || "0";
+			const priceData = await getETHPrice();
+			ethPrice = priceData || "0";
 		} catch (error) {
 			console.log("Portfolio summary ETH data fetch failed:", error.message);
 		}
