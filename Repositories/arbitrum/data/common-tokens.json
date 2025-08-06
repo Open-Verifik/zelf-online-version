@@ -1,0 +1,72 @@
+[
+	{
+		"name": "USDC",
+		"symbol": "USDC",
+		"contractAddress": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+		"decimals": 6,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png"
+	},
+	{
+		"name": "USDT",
+		"symbol": "USDT",
+		"contractAddress": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+		"decimals": 6,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/825.png"
+	},
+	{
+		"name": "Wrapped Ether",
+		"symbol": "WETH",
+		"contractAddress": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png"
+	},
+	{
+		"name": "Arbitrum",
+		"symbol": "ARB",
+		"contractAddress": "0x912CE59144191C1204E64559FE8253a0e49E6548",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png"
+	},
+	{
+		"name": "GMX",
+		"symbol": "GMX",
+		"contractAddress": "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/11857.png"
+	},
+	{
+		"name": "Magic",
+		"symbol": "MAGIC",
+		"contractAddress": "0x539bdE0d7Dbd336b79148AA742883198BBF60342",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/18876.png"
+	},
+	{
+		"name": "ChainLink Token",
+		"symbol": "LINK",
+		"contractAddress": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/1975.png"
+	},
+	{
+		"name": "Uniswap",
+		"symbol": "UNI",
+		"contractAddress": "0xFa7F8980b0f1E64A2062791cc3b0871572f1F7f0",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/7083.png"
+	},
+	{
+		"name": "Dai Stablecoin",
+		"symbol": "DAI",
+		"contractAddress": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/4943.png"
+	},
+	{
+		"name": "Frax",
+		"symbol": "FRAX",
+		"contractAddress": "0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/6952.png"
+	}
+]
