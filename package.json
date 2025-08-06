@@ -17,8 +17,10 @@
 		"@joi/date": "^2.1.0",
 		"@koa/cors": "^5.0.0",
 		"@koa/router": "^12.0.1",
+		"@mysten/sui": "^1.36.0",
 		"@mysten/sui.js": "^0.54.1",
-		"@solana/spl-token": "^0.4.9",
+		"@mysten/walrus": "^0.2.3",
+		"@solana/spl-token": "^0.4.13",
 		"@solana/web3.js": "^1.93.0",
 		"@toruslabs/tss-lib": "^2.3.0",
 		"axios": "1.8.2",
@@ -38,7 +40,9 @@
 		"koa": "^2.15.3",
 		"koa-bodyparser": "^4.4.1",
 		"koa-jwt": "^4.0.4",
+		"koa-mount": "^4.0.0",
 		"koa-router": "^12.0.1",
+		"koa-static": "^4.0.0",
 		"mailgun.js": "^3.7.2",
 		"mongodb": "^6.13.1",
 		"mongoose": "^8.4.1",
@@ -55,18 +59,20 @@
 		"qrcode-reader": "^1.0.4",
 		"readable-stream": "^4.5.2",
 		"request": "^2.88.2",
-		"tiny-secp256k1": "^2.2.3"
+		"swagger-jsdoc": "^6.2.8",
+		"tiny-secp256k1": "^2.2.3",
+		"web3-validator": "^2.0.6"
+	},
+	"dresolutions": {
+		"axios": "1.8.2",
+		"elliptic": "^6.6.1",
+		"ws": "^8.0.0"
 	},
 	"keywords": [
 		"zelf",
 		"crypto",
 		"biometrics"
 	],
-	"resolutions": {
-		"axios": "1.8.2",
-		"elliptic": "^6.6.1",
-		"ws": "^8.0.0"
-	},
 	"author": "Miguel Trevino",
 	"license": "ISC"
 }

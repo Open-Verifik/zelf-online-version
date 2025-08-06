@@ -32,10 +32,10 @@ const convertTransactionValues = (transactions) => {
 	return transactions.map((tx) => ({
 		...tx,
 		date: tx.time,
+		fee_btc: convertSatoshiToBTC(tx.fee),
+		fee_satoshis: tx.fee,
 		hash: tx.txid,
 		network: "bitcoin",
-		fee_satoshis: tx.fee,
-		fee_btc: convertSatoshiToBTC(tx.fee),
 		inputs: tx.inputs.map((input) => ({
 			...input,
 			value_satoshis: input.value,
@@ -127,20 +127,20 @@ function extractTransactionData(transactions) {
 		const amountBTC = amountSats / 1e8;
 
 		return {
-			hash: tx.txid,
 			amount: amountBTC,
 			amountSats: amountSats,
-			from: fromInput?.address || null,
-			to: toOutputs.map((output) => output.address),
-			networkFee: tx.fee / 1e8,
-			networkFeeSats: tx.fee,
-			networkFeePayer: fromInput?.address || null,
-			status: tx.block ? "confirmed" : "pending",
 			blockNumber: tx.block?.height || null,
-			logoURI: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
-			tokenType: "coin",
-			symbol: "BTC",
 			decimals: 8,
+			from: fromInput?.address || null,
+			hash: tx.txid,
+			logoURI: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
+			networkFee: tx.fee / 1e8,
+			networkFeePayer: fromInput?.address || null,
+			networkFeeSats: tx.fee,
+			status: tx.block ? "confirmed" : "pending",
+			symbol: "BTC",
+			to: toOutputs.map((output) => output.address),
+			tokenType: "coin",
 		};
 	});
 }
@@ -200,6 +200,7 @@ const getTestnetBalance = async (params) => {
 		throw error;
 	}
 };
+
 function analizarTransaccion(tx, direccionPropia) {
 	let totalEntrada = 0;
 	let totalSalida = 0;
@@ -254,7 +255,7 @@ async function extractTransactionData(transactions, userAddress) {
 
 	if (!btcPrice) throw new Error("Could not retrieve BTC price");
 
-	return transactions.map((tx) => {
+	const formattedTransactions = transactions.map((tx) => {
 		const fromInput = tx.inputs.find((input) => input.address);
 		const toOutputs = tx.outputs.filter((output) => output.address && output.address !== fromInput?.address);
 
@@ -267,29 +268,34 @@ async function extractTransactionData(transactions, userAddress) {
 		const isIncoming = tx.outputs.some((output) => output.address === userAddress);
 
 		let traffic = "OUT";
+
 		if (!isOutgoing && isIncoming) traffic = "IN";
 		if (isOutgoing && isIncoming) traffic = "OUT";
 
 		return {
-			hash: tx.txid,
+			age: txMoment.fromNow(),
 			amount: amountBTC.toString(),
 			amountSats: amountSats,
+			asset: "BTC",
+			block: tx.block?.height?.toString() || "",
+			date: txMoment.format("YYYY-MM-DD HH:mm:ss"),
+			decimals: 8,
 			fiatAmount: fiatAmount.toFixed(2),
 			from: fromInput?.address || "",
-			to: toOutputs.map((output) => output.address),
-			txnFee: (tx.fee / 1e8).toString(),
-			txnFeeSats: tx.fee.toString(),
+			hash: tx.txid,
+			logoURI: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
 			networkFeePayer: fromInput?.address || "",
 			status: tx.block.height ? "Success" : "Pending",
-			block: tx.block?.height?.toString() || "",
-			logoURI: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
-			asset: "BTC",
-			decimals: 8,
-			date: txMoment.format("YYYY-MM-DD HH:mm:ss"),
-			age: txMoment.fromNow(),
+			to: toOutputs.map((output) => output.address),
 			traffic,
+			txnFee: (tx.fee / 1e8).toString(),
+			txnFeeSats: tx.fee.toString(),
+			timestamp: tx.time, // Keep original timestamp for sorting
 		};
 	});
+
+	// Sort by timestamp (newest first)
+	return formattedTransactions.sort((a, b) => b.timestamp - a.timestamp);
 }
 
 module.exports = {

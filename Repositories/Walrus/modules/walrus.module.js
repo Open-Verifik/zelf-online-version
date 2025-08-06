@@ -1,0 +1,687 @@
+const { getFullnodeUrl, SuiClient } = require("@mysten/sui/client");
+const { Ed25519Keypair } = require("@mysten/sui/keypairs/ed25519");
+const fs = require("fs");
+const path = require("path");
+const config = require("../../../Core/config");
+const axios = require("axios");
+const { getWalrusKeyFromMnemonic } = require("../walrus-key-generator");
+// Try to initialize Walrus client for mainnet
+const { WalrusClient } = require("@mysten/walrus");
+console.log("🔍 DEBUG: WalrusClient imported successfully");
+
+// Walrus mainnet configuration
+const WALRUS_NETWORK = "mainnet"; // Make this configurable
+
+// Updated URLs based on correct domain patterns
+const walrusUrls = {
+	// Primary aggregator URL (pattern based on SDK documentation)
+	primary: `https://aggregator.walrus.space`,
+	// Alternative URLs to try
+	alternatives: [`https://aggregator.mainnet.walrus.space`, `https://publisher.walrus.space`, `https://publisher.mainnet.walrus.space`],
+	// Fallback for direct node access (if available)
+	fallback: `https://walrus.space`,
+};
+
+const explorerUrl = `https://walruscan.com/mainnet/blob`;
+
+// Initialize clients with error handling
+let suiClient = null;
+let walrusClient = null;
+let walrusAvailable = false;
+
+try {
+	// Initialize Sui client for mainnet
+	console.log("🔍 DEBUG: Starting Walrus client initialization...");
+	console.log("🔍 DEBUG: Current working directory:", process.cwd());
+	console.log("🔍 DEBUG: Module file path:", __filename);
+
+	suiClient = new SuiClient({
+		url: getFullnodeUrl(WALRUS_NETWORK),
+	});
+	console.log("🔍 DEBUG: Sui client created successfully");
+
+	// Simple Walrus client initialization
+	console.log("🔍 DEBUG: Creating WalrusClient...");
+	walrusClient = new WalrusClient({
+		network: WALRUS_NETWORK,
+		suiClient,
+	});
+	console.log("🔍 DEBUG: WalrusClient created successfully");
+
+	walrusAvailable = true;
+	console.log(`✅ Walrus client initialized successfully on ${WALRUS_NETWORK}`);
+} catch (error) {
+	console.warn("⚠️  Walrus client initialization failed:", error.message);
+	console.warn("   Error type:", error.constructor.name);
+	console.warn("   Error stack:", error.stack);
+	console.warn("   Walrus functionality will be disabled");
+	console.warn("   This might be because mainnet SDK support is still being finalized");
+	walrusAvailable = false;
+}
+
+/**
+ * Registers a zelf name by uploading the QR code image to Walrus
+ * @param {string} zelfProofQRCode - Base64 encoded QR code image
+ * @param {object} zelfNameObject - Object containing zelf name details
+ * @returns {object} Result object with blobId, publicUrl, explorerUrl, and metadata
+ *
+ * Usage:
+ * const result = await zelfNameRegistration(qrCodeBase64, zelfNameObj);
+ * if (result.success) {
+ *   console.log('Public URL:', result.publicUrl); // Direct blob access
+ *   console.log('Explorer URL:', result.explorerUrl); // Walrus explorer
+ *   console.log('Blob ID:', result.blobId); // For database storage
+ * }
+ */
+const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
+	const { zelfProof, hasPassword, publicData } = zelfNameObject;
+
+	const zelfName = publicData.zelfName;
+
+	try {
+		// Check if Walrus is available
+		if (!walrusAvailable) {
+			return {
+				skipped: true,
+				reason: "Walrus client not available",
+				error: "Walrus SDK initialization failed",
+			};
+		}
+
+		// Check if private key is configured
+		if (!config.walrus.privateKey) {
+			return {
+				skipped: true,
+				reason: "WALRUS_PRIVATE_KEY not configured",
+				error: "Please add WALRUS_PRIVATE_KEY to your .env file",
+			};
+		}
+
+		// Get private key from mnemonic
+		let privateKeyData;
+		try {
+			privateKeyData = await getWalrusKeyFromMnemonic(config.walrus.privateKey);
+		} catch (error) {
+			return {
+				skipped: true,
+				reason: "Failed to derive private key from mnemonic",
+				error: error.message,
+			};
+		}
+
+		// Validate and convert private key
+		let privateKeyBuffer;
+		try {
+			const privateKeyHex = privateKeyData.privateKeyHex.replace(/^0x/, ""); // Remove 0x prefix if present
+
+			// Check if it's a valid hex string
+			if (!/^[0-9a-fA-F]+$/.test(privateKeyHex)) {
+				return {
+					skipped: true,
+					reason: "Invalid private key format",
+					error: "Private key must be a valid hex string (64 characters)",
+				};
+			}
+
+			// Check length (should be 64 hex characters = 32 bytes)
+			if (privateKeyHex.length !== 64) {
+				return {
+					skipped: true,
+					reason: "Invalid private key length",
+					error: `Private key must be 64 hex characters (got ${privateKeyHex.length})`,
+				};
+			}
+
+			privateKeyBuffer = Buffer.from(privateKeyHex, "hex");
+		} catch (error) {
+			return {
+				skipped: true,
+				reason: "Private key conversion failed",
+				error: `Failed to convert private key: ${error.message}`,
+			};
+		}
+
+		// Create keypair from config
+		const keypair = Ed25519Keypair.fromSecretKey(privateKeyBuffer);
+
+		// Convert base64 string to a buffer
+		const base64Data = zelfProofQRCode.replace(/^data:image\/\w+;base64,/, "");
+		const buffer = Buffer.from(base64Data, "base64");
+		const fileSize = buffer.length;
+
+		// Create temporary file
+		const tempFilePath = path.join(__dirname, `${zelfName}.png`);
+		fs.writeFileSync(tempFilePath, buffer);
+
+		// Prepare metadata for Sui object
+		const metadata = {
+			zelfProof,
+			hasPassword: hasPassword || "false",
+			contentType: "image/png",
+			fileName: `${zelfName}.png`,
+			...publicData,
+		};
+
+		// Check file size limit (100KB similar to Arweave)
+		if (fileSize > 100 * 1024) {
+			console.log("Skipping upload because the file size is greater than 100KB", {
+				fileInKb: fileSize / 1024,
+				fileInMb: fileSize / 1024 / 1024,
+			});
+
+			// Clean up temporary file
+			fs.unlinkSync(tempFilePath);
+
+			return {
+				skipped: true,
+				reason: "File size exceeds 100KB limit",
+			};
+		}
+
+		// Upload blob to Walrus
+		const blob = new Uint8Array(buffer);
+		console.log(`📤 Uploading ${zelfName}.png to Walrus (${fileSize} bytes)`);
+
+		const uploadResult = await walrusClient.writeBlob({
+			blob,
+			deletable: false,
+			epochs: 5, // Store for 5 epochs (10 days on testnet)
+			signer: keypair,
+		});
+
+		console.log(`✅ Successfully uploaded to Walrus:`, {
+			blobId: uploadResult.blobId,
+			sizeBytes: fileSize,
+			zelfName: zelfName,
+		});
+
+		// Clean up temporary file
+		fs.unlinkSync(tempFilePath);
+
+		// Attempt to store metadata on Sui blockchain
+		// const metadataResult = await storeBlobMetadataOnSui(
+		// 	uploadResult.blobId,
+		// 	{
+		// 		...metadata,
+		// 		uploadTimestamp: new Date().toISOString(),
+		// 		sizeBytes: fileSize,
+		// 		network: WALRUS_NETWORK,
+		// 	},
+		// 	keypair
+		// );
+
+		// Create metadata object on Sui blockchain
+		// This would require a custom smart contract deployment
+		// For now, we'll return the blob ID and construct URLs
+
+		return {
+			success: true,
+			blobId: uploadResult.blobId,
+			// Direct URL for fetching the blob
+			publicUrl: getPublicBlobUrl(uploadResult.blobId),
+			// Explorer URL for viewing blob details
+			explorerUrl: getExplorerBlobUrl(uploadResult.blobId),
+			// Metadata for reference
+			metadata: {
+				...metadata,
+				uploadTimestamp: new Date().toISOString(),
+				sizeBytes: fileSize,
+				network: WALRUS_NETWORK,
+			},
+			// Sui metadata storage result
+			// suiMetadata: metadataResult,
+			// Storage details
+			storage: {
+				epochs: 5,
+				network: WALRUS_NETWORK,
+				deletable: false,
+			},
+			// Full upload result for debugging
+			uploadResult,
+		};
+	} catch (error) {
+		console.error("Error uploading to Walrus:", error);
+		return {
+			skipped: true,
+			reason: "Upload failed",
+			error: error.message,
+		};
+	}
+};
+
+const search = async (queryParams = {}) => {
+	// Check if Walrus is available
+	if (!walrusAvailable) {
+		return {
+			...queryParams,
+			available: false,
+			message: "Walrus client not available",
+		};
+	}
+
+	// Walrus doesn't have built-in search functionality like Arweave
+	// This would need to be implemented through Sui blockchain queries
+	// for metadata stored via storeBlobMetadataOnSui function
+
+	if (!queryParams.key || !queryParams.value) {
+		return {
+			...queryParams,
+			available: true,
+			message: "Search requires both key and value parameters",
+		};
+	}
+
+	// TODO: Implement search functionality through Sui blockchain
+	// This would require:
+	// 1. Deploy a Move smart contract to store blob metadata on Sui
+	// 2. Query the Sui blockchain for objects with matching metadata
+	// 3. Return blob IDs that match the search criteria
+
+	console.log(`🔍 Searching for blobs with ${queryParams.key}=${queryParams.value}`);
+
+	return {
+		...queryParams,
+		available: true,
+		message: "Search functionality requires Sui smart contract deployment",
+		note: "Unlike Arweave's native tags, Walrus requires custom Sui contracts for metadata queries",
+	};
+};
+
+/**
+ * Example usage for frontend integration:
+ *
+ * // 1. After uploading, you get a result like this:
+ * const uploadResult = await zelfNameRegistration(qrCodeBase64, zelfNameObj);
+ * console.log('Blob ID:', uploadResult.blobId); // Store this in your database
+ *
+ * // 2. Later, to render the image in frontend:
+ * const dataUrl = await walrusIDToBase64(uploadResult.blobId);
+ * // dataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
+ *
+ * // 3. Use in HTML:
+ * // <img src="{dataUrl}" alt="Zelf Name QR Code" />
+ *
+ * // 4. Or send to frontend via API:
+ * // res.json({ imageData: dataUrl, blobId: uploadResult.blobId });
+ */
+
+/**
+ * Helper function to prepare image data for frontend rendering
+ * @param {string} blobId - The Walrus blob ID
+ * @returns {object} Object containing image data and metadata for frontend use
+ */
+const prepareImageForFrontend = async (blobId) => {
+	try {
+		console.log(`🎨 Preparing image for frontend: ${blobId}`);
+
+		// Get the base64 data URL using robust fetching
+		const dataUrl = await walrusIDToBase64(blobId);
+
+		// Get all available URLs
+		const allUrls = getAllBlobUrls(blobId);
+		const explorerUrl = getExplorerBlobUrl(blobId);
+
+		// Get image size info if possible
+		const sizeInfo = await getImageSizeInfo(dataUrl);
+
+		return {
+			success: true,
+			blobId,
+			dataUrl, // Use this directly in <img src="{dataUrl}" />
+			publicUrl: allUrls.primary, // Primary URL for direct access
+			allUrls, // All available URLs for fallback
+			explorerUrl, // For "View on Walrus" links
+			...sizeInfo,
+			network: WALRUS_NETWORK,
+			retrievedAt: new Date().toISOString(),
+		};
+	} catch (error) {
+		console.error(`❌ Failed to prepare image for frontend: ${blobId}`, error);
+
+		// Still provide URLs even if image fetch failed
+		const allUrls = getAllBlobUrls(blobId);
+
+		return {
+			success: false,
+			blobId,
+			error: error.message,
+			fallback: {
+				publicUrl: allUrls.primary,
+				allUrls,
+				explorerUrl: getExplorerBlobUrl(blobId),
+				network: WALRUS_NETWORK,
+				note: "Image fetch failed, but URLs are still available for direct access",
+			},
+		};
+	}
+};
+
+/**
+ * Helper function to get basic image information from data URL
+ * @param {string} dataUrl - Base64 data URL
+ * @returns {object} Basic image information
+ */
+const getImageSizeInfo = async (dataUrl) => {
+	try {
+		// Calculate approximate size
+		const base64Data = dataUrl.split(",")[1];
+		const sizeInBytes = Math.round((base64Data.length * 3) / 4);
+
+		// Extract content type
+		const contentTypeMatch = dataUrl.match(/data:([^;]+);base64,/);
+		const contentType = contentTypeMatch ? contentTypeMatch[1] : "image/png";
+
+		return {
+			sizeInBytes,
+			sizeInKB: Math.round(sizeInBytes / 1024),
+			contentType,
+			format: contentType.split("/")[1]?.toLowerCase() || "png",
+		};
+	} catch (error) {
+		console.warn("Could not extract image info:", error.message);
+		return {
+			sizeInBytes: 0,
+			sizeInKB: 0,
+			contentType: "image/png",
+			format: "png",
+		};
+	}
+};
+
+// Removed fetchBlobWithFallback - only Walrus SDK readBlob works
+
+/**
+ * Simplified blob retrieval - only uses what actually works: Walrus SDK readBlob
+ * @param {string} blobId - The Walrus blob ID
+ * @returns {Promise<string>} Base64 data URL
+ */
+const walrusIDToBase64WithWorkaround = async (blobId) => {
+	const startTime = Date.now();
+
+	try {
+		console.log(`📥 Fetching blob via Walrus SDK: ${blobId}`);
+
+		// Only strategy that works: Walrus SDK readBlob
+		if (walrusAvailable && walrusClient) {
+			const blobData = await walrusClient.readBlob({ blobId });
+
+			if (blobData && blobData.length > 0) {
+				const duration = Date.now() - startTime;
+				console.log(`✅ Success: ${blobData.length} bytes in ${duration}ms`);
+
+				const base64Image = Buffer.from(blobData).toString("base64");
+				return `data:image/png;base64,${base64Image}`;
+			}
+		}
+
+		throw new Error("Walrus SDK not available or returned empty data");
+	} catch (error) {
+		const duration = Date.now() - startTime;
+		console.error(`❌ Failed to fetch blob ${blobId}: ${error.message} (${duration}ms)`);
+		throw error;
+	}
+};
+
+/**
+ * Retrieves a blob from Walrus by ID and converts it to base64 data URL
+ * Uses only the Walrus SDK readBlob - the only method that actually works
+ * @param {string} blobId - The Walrus blob ID
+ * @returns {string} Base64 data URL that can be used directly in HTML img src
+ */
+const walrusIDToBase64 = async (blobId) => {
+	try {
+		// Check if Walrus is available
+		if (!walrusAvailable) {
+			throw new Error("Walrus client not available");
+		}
+
+		// Validate blobId format
+		if (!blobId || typeof blobId !== "string") {
+			throw new Error("Invalid blobId provided");
+		}
+
+		// Use the simplified function that only does what works
+		return await walrusIDToBase64WithWorkaround(blobId);
+	} catch (error) {
+		console.error("❌ Error fetching from Walrus:", {
+			blobId,
+			error: error.message,
+		});
+
+		throw new Error(`Failed to fetch blob ${blobId}: ${error.message}`);
+	}
+};
+
+/**
+ * Alternative approaches for metadata storage with Walrus:
+ *
+ * 1. Database Storage (Recommended for now):
+ *    - Store metadata in your regular database (MySQL, PostgreSQL, etc.)
+ *    - Use blobId as the primary key
+ *    - Query metadata from your database, not from Walrus
+ *
+ * 2. Sui Smart Contract (Future solution):
+ *    - Deploy a Move smart contract to store blob metadata
+ *    - Link metadata to blob IDs on Sui blockchain
+ *    - Query metadata using Sui client
+ *
+ * 3. IPFS + Walrus Hybrid:
+ *    - Store metadata on IPFS
+ *    - Store blob data on Walrus
+ *    - Use IPFS hash to retrieve metadata
+ */
+
+// Helper function to store metadata on Sui blockchain (requires custom Move contract)
+const storeBlobMetadataOnSui = async (blobId, metadata, keypair) => {
+	// This would require a custom Move smart contract deployed on Sui
+	// Example structure:
+	/*
+	public fun store_blob_metadata(
+		blobId: String,
+		contentType: String,
+		zelfProof: String,
+		hasPassword: bool,
+		additionalData: vector<u8>,
+		ctx: &mut TxContext
+	) {
+		// Store metadata in Sui object linked to blob ID
+	}
+	*/
+
+	console.log("🔗 Storing metadata on Sui blockchain for blob:", blobId);
+
+	// For now, return a placeholder - you'd need to implement the Move contract
+	return {
+		success: false,
+		reason: "Sui smart contract not yet deployed",
+		note: "You need to deploy a Move contract to store blob metadata on Sui",
+		metadata,
+		blobId,
+	};
+};
+
+// Helper function to retrieve metadata from Sui blockchain
+const getBlobMetadataFromSui = async (blobId) => {
+	// This would query your custom Sui smart contract
+	console.log("🔍 Retrieving metadata from Sui blockchain for blob:", blobId);
+
+	return {
+		success: false,
+		reason: "Sui smart contract not yet deployed",
+		note: "You need to deploy a Move contract to retrieve blob metadata from Sui",
+	};
+};
+
+// Helper function to check if Walrus is available
+const isWalrusAvailable = () => {
+	return walrusAvailable;
+};
+
+// Helper function to get public URL for a blob
+const getPublicBlobUrl = (blobId) => {
+	if (!blobId) {
+		throw new Error("blobId is required");
+	}
+	// Return the primary URL as the public URL
+	return `${walrusUrls.primary}/${blobId}`;
+};
+
+// Helper function to get all available URLs for a blob
+const getAllBlobUrls = (blobId) => {
+	if (!blobId) {
+		throw new Error("blobId is required");
+	}
+
+	return {
+		primary: `${walrusUrls.primary}/${blobId}`,
+		alternatives: walrusUrls.alternatives.map((url) => `${url}/${blobId}`),
+		fallback: `${walrusUrls.fallback}/${blobId}`,
+	};
+};
+
+// Helper function to get explorer URL for a blob
+const getExplorerBlobUrl = (blobId) => {
+	if (!blobId) {
+		throw new Error("blobId is required");
+	}
+	return `${explorerUrl}/${blobId}`;
+};
+
+// Helper function to get Sui explorer URL for Walrus coordination objects
+const getSuiExplorerUrl = (objectId) => {
+	if (!objectId) {
+		throw new Error("objectId is required");
+	}
+	return `https://suiscan.xyz/mainnet/object/${objectId}`;
+};
+
+// Helper function to get alternative Sui explorer URL
+const getAlternativeSuiExplorerUrl = (objectId) => {
+	if (!objectId) {
+		throw new Error("objectId is required");
+	}
+	return `https://suiexplorer.com/object/${objectId}`;
+};
+
+// Helper function to determine if an ID is a Walrus blob ID or Sui object ID
+const identifyIdType = (id) => {
+	if (!id || typeof id !== "string") {
+		return { type: "invalid", reason: "ID must be a non-empty string" };
+	}
+
+	// Sui object IDs start with 0x and are 64 characters long (including 0x)
+	if (id.startsWith("0x") && id.length === 66) {
+		return {
+			type: "sui_object",
+			id: id,
+			walruscanUrl: null,
+			suiscanUrl: getSuiExplorerUrl(id),
+			suiexplorerUrl: getAlternativeSuiExplorerUrl(id),
+		};
+	}
+
+	// Walrus blob IDs are typically different format (base58 or similar)
+	if (!id.startsWith("0x") && id.length > 20) {
+		return {
+			type: "walrus_blob",
+			id: id,
+			walruscanUrl: getExplorerBlobUrl(id),
+			publicUrl: getPublicBlobUrl(id),
+			suiscanUrl: null,
+		};
+	}
+
+	return {
+		type: "unknown",
+		reason: "ID format not recognized as either Walrus blob or Sui object",
+		id: id,
+	};
+};
+
+// Enhanced function to get all relevant URLs for any ID type
+const getExplorerUrls = (id) => {
+	const idInfo = identifyIdType(id);
+
+	return {
+		...idInfo,
+		official: {
+			walrus:
+				idInfo.type === "walrus_blob"
+					? {
+							explorer: idInfo.walruscanUrl,
+							publicAccess: idInfo.publicUrl,
+					  }
+					: null,
+			sui:
+				idInfo.type === "sui_object"
+					? {
+							suiscan: idInfo.suiscanUrl,
+							suiexplorer: idInfo.suiexplorerUrl,
+					  }
+					: null,
+		},
+	};
+};
+
+// Simple connection test function
+const testConnection = async () => {
+	try {
+		// Test if the module is properly loaded
+		if (!walrusClient) {
+			return { success: false, error: "Walrus client not initialized", available: false };
+		}
+
+		// Test basic availability check
+		const available = isWalrusAvailable();
+
+		// Test a simple network request to check connectivity (but don't fail if it's down)
+		let networkStatus = "unknown";
+		try {
+			const testUrl = walrusUrls.primary;
+			const response = await axios.get(testUrl, { timeout: 5000 });
+			networkStatus = response.status === 200 ? "connected" : "partial";
+		} catch (networkError) {
+			networkStatus = "unavailable";
+			// Don't throw - this is expected while mainnet is deploying
+		}
+
+		return {
+			success: true, // Consider it successful if client is initialized
+			available: available,
+			networkStatus: networkStatus,
+			clientInitialized: !!walrusClient,
+			timestamp: new Date().toISOString(),
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error: error.message,
+			available: isWalrusAvailable(),
+			clientInitialized: !!walrusClient,
+			timestamp: new Date().toISOString(),
+		};
+	}
+};
+
+module.exports = {
+	zelfNameRegistration,
+	search,
+	walrusIDToBase64,
+	walrusIDToBase64WithWorkaround,
+	isWalrusAvailable,
+	getPublicBlobUrl,
+	getAllBlobUrls,
+	getExplorerBlobUrl,
+	getSuiExplorerUrl,
+	getAlternativeSuiExplorerUrl,
+	storeBlobMetadataOnSui,
+	getBlobMetadataFromSui,
+	prepareImageForFrontend,
+	getImageSizeInfo,
+	getExplorerUrls,
+	identifyIdType,
+	testConnection,
+	// Configuration for debugging
+	walrusUrls,
+	WALRUS_NETWORK,
+};

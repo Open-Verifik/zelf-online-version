@@ -91,7 +91,7 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 
 	// if the size is greater than 100kb, we need to skip the upload
 	if (fileSize > 100 * 1024) {
-		console.log("skipping upload because the file size is greater than 100kb", {
+		console.info("skipping upload because the file size is greater than 100kb", {
 			fileInKb: fileSize / 1024,
 			fileInMb: fileSize / 1024 / 1024,
 		});
@@ -122,12 +122,10 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 	};
 };
 
-const search = async (zelfName, extraConditions = {}) => {
-	if (!zelfName && (!extraConditions.key || !extraConditions.value)) return null;
+const search = async (queryParams = {}) => {
+	if (!queryParams.key || !queryParams.value) return null;
 
-	const tagsToSearch = zelfName
-		? `[{ name: "zelfName", values: "${zelfName}" }]`
-		: `[{ name: "${extraConditions.key}", values: "${extraConditions.value}" }]`;
+	const tagsToSearch = `[{ name: "${queryParams.key}", values: "${queryParams.value}" }]`;
 
 	const query = {
 		query: `
@@ -165,7 +163,7 @@ const search = async (zelfName, extraConditions = {}) => {
 
 	if (!searchResults || !searchResults.length) {
 		return {
-			zelfName,
+			...queryParams,
 			available: true,
 		};
 	}

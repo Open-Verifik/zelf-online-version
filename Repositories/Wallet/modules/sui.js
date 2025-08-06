@@ -1,5 +1,10 @@
-const { Ed25519Keypair } = require("@mysten/sui.js/keypairs/ed25519");
-// const { mnemonicToSeed } = require("@mysten/sui.js/cryptography");
+const { Ed25519Keypair } = require("@mysten/sui/keypairs/ed25519");
+// const { mnemonicToSeed } = require("@mysten/sui/cryptography");
+
+// Helper function to convert Uint8Array to hex string
+function toHex(bytes) {
+	return Buffer.from(bytes).toString("hex");
+}
 
 // Function to generate SUI wallet from mnemonic
 async function generateSuiWalletFromMnemonic(mnemonic) {
@@ -16,13 +21,14 @@ async function generateSuiWalletFromMnemonic(mnemonic) {
 		// Get SUI address (starts with 0x)
 		const address = publicKey.toSuiAddress();
 
-		// Get private key (in hex format)
-		// const privateKey = toHEX(keypair.getSecretKey());
+		// Get private key (in hex format) - needed for Walrus
+		const secretKey = keypair.getSecretKey();
+		const privateKeyHex = toHex(secretKey);
 
 		return {
 			address,
-			secretKey: keypair.getSecretKey(),
-			// privateKey: `0x${privateKey}`,
+			secretKey: secretKey,
+			privateKeyHex: privateKeyHex, // Hex format for Walrus compatibility
 		};
 	} catch (error) {
 		console.error("Error generating wallet:", error);
@@ -32,4 +38,5 @@ async function generateSuiWalletFromMnemonic(mnemonic) {
 
 module.exports = {
 	generateSuiWalletFromMnemonic,
+	toHex,
 };

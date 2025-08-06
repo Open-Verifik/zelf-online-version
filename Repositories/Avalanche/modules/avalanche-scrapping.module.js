@@ -23,7 +23,22 @@ const getBalance = async (params) => {
 		});
 
 		// Obtener tokens y transacciones
-		const tokenHoldings = await getTokens({ id: params.id }, { show: "200" });
+		let tokenHoldings = await getTokens({ id: params.id }, { show: "200" });
+
+		// Convert native AVAX balance from raw format to proper decimal format
+		const avaxDecimals = data.nativeTokenBalance.decimals;
+		const avaxAmount = (Number(data.nativeTokenBalance.balance) / Math.pow(10, avaxDecimals)).toFixed(avaxDecimals);
+
+		tokenHoldings.tokens.push({
+			amount: avaxAmount,
+			decimals: avaxDecimals,
+			fiatBalance: data.nativeTokenBalance?.balanceValue?.value.toString(),
+			image: data.nativeTokenBalance.logoUri,
+			name: "Avalanche",
+			price: data.nativeTokenBalance?.price?.value.toString(),
+			symbol: "AVAX",
+			tokenType: "AVAX",
+		});
 
 		const transactions = await getTransactionsList({
 			id: params.id,
@@ -32,14 +47,14 @@ const getBalance = async (params) => {
 		});
 
 		return {
-			address: params.id,
-			image: data.nativeTokenBalance.logoUri,
-			balance: (Number(data.nativeTokenBalance.balance) / 10 ** data.nativeTokenBalance.decimals).toFixed(data.nativeTokenBalance.decimals),
 			_balance: parseFloat(
 				(Number(data.nativeTokenBalance.balance) / 10 ** data.nativeTokenBalance.decimals).toFixed(data.nativeTokenBalance.decimals)
 			),
-			fiatBalance: data.nativeTokenBalance?.balanceValue?.value || 0,
+			address: params.id,
+			balance: (Number(data.nativeTokenBalance.balance) / 10 ** data.nativeTokenBalance.decimals).toFixed(data.nativeTokenBalance.decimals),
 			decimals: data.nativeTokenBalance.decimals,
+			fiatBalance: data.nativeTokenBalance?.balanceValue?.value || 0,
+			image: data.nativeTokenBalance.logoUri,
 			account: {
 				asset: "AVAX",
 				fiatBalance: data.nativeTokenBalance?.balanceValue?.value.toString(),
@@ -76,18 +91,18 @@ const getTokens = async (params, query) => {
 
 	// Formatear datos de tokens
 	const formattedTokens = data.erc20TokenBalances.map((token) => ({
-		tokenType: token.ercType,
-		fiatBalance: token.balanceValue?.value || 0,
+		_amount: parseFloat((Number(token.balance) / 10 ** token.decimals).toFixed(12)),
 		_fiatBalance: token.balanceValue?.value.toString(),
-		symbol: token.symbol,
+		_price: token.price?.value,
+		address: token.address,
+		amount: (Number(token.balance) / 10 ** token.decimals).toFixed(12),
+		decimals: token.decimals,
+		fiatBalance: token.balanceValue?.value || 0,
+		image: token.logoUri,
 		name: token.name,
 		price: token.price?.value?.toString() || "0",
-		_price: token.price?.value,
-		image: token.logoUri,
-		decimals: token.decimals,
-		amount: (Number(token.balance) / 10 ** token.decimals).toFixed(12),
-		_amount: parseFloat((Number(token.balance) / 10 ** token.decimals).toFixed(12)),
-		address: token.address,
+		symbol: token.symbol,
+		tokenType: token.ercType,
 	}));
 
 	// Calcular balance total en moneda fiat
@@ -124,20 +139,22 @@ const getTransactionsList = async (params) => {
 
 	// Formatear transacciones
 	const transactions = data.data.hits.map((tx) => ({
-		hash: tx.hash,
-		method: tx.method.startsWith("swap") ? "Swap" : tx.method,
-		block: tx.blockHeight.toString(),
 		age: moment(tx.blocktime * 1000).fromNow(),
-		date: moment(tx.blocktime * 1000),
-		from: tx.from,
-		traffic: tx.realValue < 0 ? "OUT" : "IN",
-		to: tx.to,
 		amount: tx.value.toFixed(4),
 		asset: "AVAX",
+		block: tx.blockHeight.toString(),
+		date: moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
+		from: tx.from,
+		hash: tx.hash,
+		method: tx.method.startsWith("swap") ? "Swap" : tx.method,
+		to: tx.to,
+		traffic: tx.realValue < 0 ? "OUT" : "IN",
 		txnFee: tx.fee.toFixed(4),
+		timestamp: tx.blocktime, // Keep original timestamp for sorting
 	}));
 
-	return transactions;
+	// Sort by timestamp (newest first)
+	return transactions.sort((a, b) => b.timestamp - a.timestamp);
 };
 
 /**
@@ -246,28 +263,27 @@ const getTransactionDetail = async (params) => {
 		const observation = $("#ContentPlaceHolder1_spanValue > div > span:nth-child(4) > span").text().replace("[", "").replace("]", "").trim();
 
 		const response = {
-			transactionType,
-			hash: id,
-			id,
-			status,
-			block,
-			timestamp,
-			network: "avalanche",
-			symbol: "AVAX",
-			image: "https://snowscan.xyz/assets/avax/images/svg/logos/chain-dim.svg",
 			age: timestamp2,
-			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
-			from,
-			to,
 			amount: Number(valueNetwork),
-			// valueDolar: Number(valueDolar),
+			block,
+			date: moment(date, "MMM-DD-YYYY HH:mm:ss").format("YYYY-MM-DD HH:mm:ss"),
 			fiatAmount: Number(valueDolar),
-			transactionFee,
-			transactionFeeFiat,
+			from,
 			gasPrice,
 			gwei,
+			hash: id,
+			id,
+			image: "https://snowscan.xyz/assets/avax/images/svg/logos/chain-dim.svg",
+			network: "avalanche",
 			observation,
+			status,
+			symbol: "AVAX",
+			timestamp,
+			to,
 			tokensTransferred,
+			transactionFee,
+			transactionFeeFiat,
+			transactionType,
 		};
 
 		if (!id || !status || !to || !from) {

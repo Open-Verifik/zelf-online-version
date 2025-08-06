@@ -34,12 +34,12 @@ const getAddress = async (params) => {
 		const { transactions } = await getTransactions({ id: address }, { page: "0", show: "10" });
 
 		const response = {
-			address,
-			fullName: "",
-			balance: data.data.balance.toString(),
 			_balance: data.data.balance,
-			fiatBalance: data.data.usdBalance,
 			_fiatBalance: data.data.usdBalance.toString(),
+			address,
+			balance: data.data.balance.toString(),
+			fiatBalance: data.data.usdBalance,
+			fullName: "",
 			account: {
 				asset: "SUI",
 				fiatBalance: data.data.usdBalance,
@@ -77,15 +77,15 @@ const getTokens = async (params, query) => {
 
 	function formatCryptoData(data) {
 		return data.map((item) => ({
-			tokenType: item.symbol,
-			address_token: item.tokenType.split("::")[0],
-			fiatBalance: item.usdValue || 0,
 			_fiatBalance: item.usdValue.toString(),
-			symbol: item.symbol || "Unknown",
+			address_token: item.tokenType.split("::")[0],
+			amount: item.value ? item.value.toString() : "0",
+			fiatBalance: item.usdValue || 0,
+			image: item.logoUrl || "",
 			name: item.coinName || "Unknown",
 			price: item.price ? item.price.toString() : "0",
-			image: item.logoUrl || "",
-			amount: item.value ? item.value.toString() : "0",
+			symbol: item.symbol || "Unknown",
+			tokenType: item.symbol,
 		}));
 	}
 
@@ -118,24 +118,27 @@ const getTransactions = async (params, query) => {
 	);
 
 	function formatCryptoData(data) {
-		return data.map((item) => ({
-			hash: item.hash,
+		const formattedTransactions = data.map((item) => ({
+			_amount: item.amount,
+			_source: item,
 			age: moment(item.timestamp).fromNow(),
-			date: moment(item.timestamp).format("YYYY-MM-DD HH:mm:ss"),
-			timestamp: item.timestamp,
-			from: item.from,
-			to: item.to,
+			amount: Number(item.amount).toFixed(6),
 			asset: "SUI",
 			block: item.checkpoint.toString(),
-			method: item.method,
+			date: moment(item.timestamp).format("YYYY-MM-DD HH:mm:ss"),
 			fiatBalance: item.usdValue || 0,
-			amount: Number(item.amount).toFixed(6),
-			_amount: item.amount,
-			txnFee: item.fee.toString(),
+			from: item.from,
 			gas: item.gas.toString(),
+			hash: item.hash,
+			method: item.method,
+			timestamp: item.timestamp,
+			to: item.to,
 			traffic: item.from === address ? "OUT" : "IN",
-			_source: item,
+			txnFee: item.fee.toString(),
 		}));
+
+		// Sort by timestamp (newest first)
+		return formattedTransactions.sort((a, b) => b.timestamp - a.timestamp);
 	}
 
 	return {
@@ -165,23 +168,23 @@ const getTransaction = async (params) => {
 			throw error;
 		}
 		const response = {
-			hash: data.data.hash,
-			status: data.data.status,
-			block: data.data.height.toString(),
+			_source: data.data,
 			age: moment(data.data.timestamp).fromNow(),
+			amount: data.data.amount,
+			block: data.data.height.toString(),
+			computationCostFee: data.data.computationCostFee,
+			confirmedNumber: data.data.confirmedNumber,
 			date: moment(data.data.timestamp).format("YYYY-MM-DD HH:mm:ss"),
 			from: data.data.from,
-			to: data.data.to,
-			amount: data.data.amount,
-			txFee: data.data.totalGasFee,
-			gasPrice: data.data.gasPrice,
-			tokenTransferNum: data.data.tokenTransferNum,
-			computationCostFee: data.data.computationCostFee,
-			nonRefundableStorageFee: data.data.nonRefundableStorageFee,
 			gasBudget: data.data.gasBudget,
 			gasPayment: data.data.gasPayment,
-			confirmedNumber: data.data.confirmedNumber,
-			_source: data.data,
+			gasPrice: data.data.gasPrice,
+			hash: data.data.hash,
+			nonRefundableStorageFee: data.data.nonRefundableStorageFee,
+			status: data.data.status,
+			to: data.data.to,
+			tokenTransferNum: data.data.tokenTransferNum,
+			txFee: data.data.totalGasFee,
 		};
 
 		return response;

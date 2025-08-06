@@ -7,6 +7,7 @@ module.exports = (server) => {
 	require("../Repositories/bnb/routes/bnb-scrapping.route")(server);
 	require("../Repositories/binance/routes/binance.route")(server);
 	require("../Repositories/bitcoin/routes/bitcoin-scrapping.route")(server);
+	require("../Repositories/base/routes/base.routes")(server);
 	//C
 	require("../Repositories/cardano/routes/cardano-scrapping.route")(server);
 	//D
@@ -14,6 +15,7 @@ module.exports = (server) => {
 	require("../Repositories/etherscan/routes/etherscan.route")(server);
 	require("../Repositories/etherscan/routes/etherscan-scrapping.route")(server);
 	//F
+	require("../Repositories/fantom/routes/fantom-scrapping.route")(server);
 	//G
 	//H
 	require("../Repositories/ZelfProof/routes/zelf-proof.route")(server);
@@ -22,18 +24,23 @@ module.exports = (server) => {
 	//J
 	//K
 	//L
+	require("../Repositories/Lifi/routes/lifi.route")(server);
 	//M
 	//N
 	//O
+	// optimius
+	require("../Repositories/optimism/routes/optimism-scrapping.route")(server);
 	//P
 	require("../Repositories/polygon/routes/polygon-scrapping.route")(server);
 	require("../Repositories/purchase-zelf/routes/purchase.route")(server);
 	//Q
 	//R
+	require("../Repositories/Rewards/routes/rewards.route")(server);
 	//S
 	require("../Repositories/sui/routes/sui-scrapping.route")(server);
 	require("../Repositories/Solana/routes/solana-scrapping.route")(server);
 	//T
+	require("../Repositories/tron/routes/tron-scrapping.route")(server);
 	//U
 	//V
 	//W

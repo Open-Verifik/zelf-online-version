@@ -5,67 +5,98 @@ const RevenueCatModule = require("../modules/revenue-cat.module");
 const { updateOldZelfNameObject } = require("../modules/my-zns.module");
 const ZNSRecoveryModule = require("../modules/zns-recovery.module");
 
+/**
+ * Standard error handler for controllers
+ * @param {Object} ctx - Koa context
+ * @param {Error} error - Error object
+ */
+const handleError = (ctx, error) => {
+	console.error({ error });
+	ctx.status = error.status || 500;
+	ctx.body = { error: error.message };
+};
+
+/**
+ * Handle zelfPay logic for searchZelfName functions
+ * @param {Object} data - Search result data
+ * @param {Object} user - User object
+ * @returns {Object|null} - ZelfPay object or null
+ */
+const handleZelfPayLogic = async (data, user) => {
+	if (!data || !data.available || !data.zelfName.includes("zelfpay")) {
+		return null;
+	}
+
+	const zelfName = data.zelfName.replace("zelfpay", "zelf");
+	const zelfNameData = await Module.searchZelfName({ zelfName }, user);
+	const zelfNameObject = zelfNameData.ipfs?.length ? zelfNameData.ipfs[0] : zelfNameData.arweave[0];
+
+	if (zelfNameObject) {
+		return await Modulev2.createZelfPay(zelfNameObject, user);
+	}
+
+	return null;
+};
+
+/**
+ * Handle old zelfName object updates
+ * @param {Object} data - Search result data
+ * @returns {Object} - Updated data
+ */
+const handleOldZelfNameUpdate = async (data) => {
+	if (data && data.ipfs?.length) {
+		const zelfNameObject = data.ipfs[0];
+
+		if (!zelfNameObject.publicData.registeredAt) {
+			return await updateOldZelfNameObject(zelfNameObject);
+		}
+	}
+
+	return data;
+};
+
 const searchZelfName = async (ctx) => {
 	try {
 		const data = await Module.searchZelfName(ctx.request.query, ctx.state.user);
 
-		if (data && data.available && data.zelfName.includes("zelfpay")) {
-			const zelfName = data.zelfName.replace("zelfpay", "zelf");
+		// Handle zelfPay logic
+		const zelfPayResult = await handleZelfPayLogic(data, ctx.state.user);
 
-			const zelfNameData = await Module.searchZelfName({ zelfName }, ctx.state.user);
-
-			const zelfNameObject = zelfNameData.ipfs?.length ? zelfNameData.ipfs[0] : zelfNameData.arweave[0];
-
-			if (zelfNameObject) {
-				ctx.body = {
-					data: await Modulev2.createZelfPay(zelfNameObject, ctx.state.user),
-				};
-
-				return;
-			}
+		if (zelfPayResult) {
+			ctx.body = { data: zelfPayResult };
+			return;
 		}
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
+/**
+ * Search for a zelfName
+ * @param {Object} ctx - Koa context
+ * @returns {Object} - Search results
+ */
 const searchZelfName_v2 = async (ctx) => {
 	try {
 		let data = await Modulev2.searchZelfName(ctx.request.query, ctx.state.user);
 
-		if (data && data.available && data.zelfName.includes("zelfpay")) {
-			const zelfName = data.zelfName.replace("zelfpay", "zelf");
+		// Handle zelfPay logic
+		const zelfPayResult = await handleZelfPayLogic(data, ctx.state.user);
 
-			const zelfNameData = await Module.searchZelfName({ zelfName }, ctx.state.user);
-
-			const zelfNameObject = zelfNameData.ipfs?.length ? zelfNameData.ipfs[0] : zelfNameData.arweave[0];
-
-			if (zelfNameObject) {
-				ctx.body = {
-					data: await Modulev2.createZelfPay(zelfNameObject, ctx.state.user),
-				};
-
-				return;
-			}
-		} else if (data && data.ipfs?.length) {
-			const zelfNameObject = data.ipfs[0];
-
-			if (!zelfNameObject.publicData.registeredAt) {
-				data = await updateOldZelfNameObject(zelfNameObject);
-			}
+		// If zelfPay result is found, return it
+		if (zelfPayResult) {
+			ctx.body = { data: zelfPayResult };
+			return;
 		}
+
+		// Handle old zelfName objects update
+		data = await handleOldZelfNameUpdate(data);
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -75,11 +106,7 @@ const leaseZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -89,11 +116,7 @@ const leaseZelfName_v2 = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -106,11 +129,7 @@ const leaseRecovery = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -120,11 +139,7 @@ const leaseConfirmation = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -134,11 +149,7 @@ const leaseConfirmation_v2 = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -154,11 +165,7 @@ const previewZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -174,11 +181,7 @@ const previewZelfName_v2 = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -188,11 +191,7 @@ const previewZelfProof = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -208,11 +207,7 @@ const decryptZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -228,11 +223,7 @@ const decryptZelfName_v2 = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -242,11 +233,7 @@ const leaseOfflineZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -258,11 +245,7 @@ const leaseOfflineZelfName_v2 = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -286,11 +269,7 @@ const referralRewards = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -305,11 +284,7 @@ const purchaseRewards = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -319,11 +294,7 @@ const update = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 
@@ -333,11 +304,7 @@ const zelfPay = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
-
-		ctx.status = error.status || 500;
-
-		ctx.body = { error: error.message };
+		handleError(ctx, error);
 	}
 };
 

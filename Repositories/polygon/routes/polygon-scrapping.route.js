@@ -1,6 +1,8 @@
 const config = require("../../../Core/config");
+
 const Controller = require("../controllers/polygon-scrapping.controller");
 const Middleware = require("../middlewares/polygon-scrapping.middleware");
+
 const base = "/polygon";
 
 module.exports = (server) => {
@@ -8,7 +10,7 @@ module.exports = (server) => {
 
 	server.get(`${PATH}/address/:id`, Controller.balance);
 
-	server.get(`${PATH}/:id/transactions`, Middleware.validateAddressTransactions, Controller.transactionsList);
+	server.get(`${PATH}/address/:id/transactions`, Middleware.validateAddressTransactions, Controller.transactionsList);
 
 	server.get(`${PATH}/transaction/:id`, Middleware.validateToken, Controller.transactionStatus);
 

@@ -11,17 +11,28 @@ const { getTickerPrice } = require("../../binance/modules/binance.module");
 
 const getAddress = async (params) => {
 	let response;
+	let source;
 
 	switch (params.source) {
 		case "solscan":
 			response = await solscan.getAddress(params);
+			source = "solscan";
 			break;
 		case "oklink":
 			response = await oklink.getAddress(params);
+			source = "oklink";
 			break;
 		default:
-			response = (await solscan.getAddress(params)) || (await oklink.getAddress(params));
+			const solscanResponse = await solscan.getAddress(params);
+			const oklinkResponse = await oklink.getAddress(params);
+			response = solscanResponse || oklinkResponse;
+			source = solscanResponse ? "solscan" : oklinkResponse ? "oklink" : null;
 			break;
+	}
+
+	// Add source to response if response exists
+	if (response) {
+		response.source = source;
 	}
 
 	return response;
@@ -71,25 +82,25 @@ const getTransaction = async (params, query) => {
 		const date = moment.unix(timestamp);
 
 		return {
-			transactionType: tokens.length ? "swap" : "transfer",
+			_status: data.result.meta.status,
+			age: date.fromNow(),
+			amount: txData?.lamports,
+			block,
+			date: date.format("YYYY-MM-DD HH:mm:ss"),
+			fiatAmount: txData?.lamports * price,
+			from: txData?.from,
 			hash: params.id,
 			id: params.id,
-			status,
-			block,
-			timestamp,
-			network: "solana",
-			symbol: txData?.symbol,
 			image: txData?.logoUrl,
-			age: date.fromNow(),
-			date: date.format("YYYY-MM-DD HH:mm:ss"),
-			from: txData?.from,
+			network: "solana",
+			status,
+			symbol: txData?.symbol,
+			timestamp,
 			to: txData?.to,
-			amount: txData?.lamports,
-			fiatAmount: txData?.lamports * price,
+			tokensTransferred: formatSolanaTransfers(tokens),
 			transactionFee: (transactionFeeNetwork / 1000000000).toString(),
 			transactionFeeFiat: ((transactionFeeNetwork / 1000000000) * price).toString(),
-			tokensTransferred: formatSolanaTransfers(tokens),
-			_status: data.result.meta.status,
+			transactionType: tokens.length ? "swap" : "transfer",
 		};
 	} catch (error) {
 		console.error({ error });
@@ -105,13 +116,13 @@ const getTransactions = async (params, query) => {
 
 function formatSolanaTransfers(transfers) {
 	return transfers.map((tx) => ({
-		from: tx.from,
-		to: tx.to,
 		amount: tx.value.toString(),
-		symbol: tx.symbol || "SOL",
-		network: "solana",
-		token: tx.tokenName || "Wrapped SOL",
+		from: tx.from,
 		icon: tx.logoUrl,
+		network: "solana",
+		symbol: tx.symbol || "SOL",
+		to: tx.to,
+		token: tx.tokenName || "Wrapped SOL",
 	}));
 }
 
