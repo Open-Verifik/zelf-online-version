@@ -1,9 +1,10 @@
 const axios = require("axios");
 const moment = require("moment");
 const https = require("https");
-const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 const StandardizedChainFormatter = require("../../class/standardized-chain-formatter");
+const { getTokenPrice } = require("../utils/token-pricing");
+const commonTokens = require("../data/common-tokens.json");
 
 // Initialize Base formatter
 const baseFormatter = new StandardizedChainFormatter("Base", "ETH", "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png");
@@ -791,236 +792,6 @@ const getRPCTransactionCount = async (address, price) => {
  */
 const getCommonBaseTokens = async (address) => {
 	try {
-		// Top 30 Common Base tokens with their contract addresses
-		const commonTokens = [
-			// Stablecoins
-			{
-				name: "USDC",
-				symbol: "USDC",
-				contractAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-				decimals: 6,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png",
-			},
-			{
-				name: "USDT",
-				symbol: "USDT",
-				contractAddress: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
-				decimals: 6,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/825.png",
-			},
-			{
-				name: "DAI",
-				symbol: "DAI",
-				contractAddress: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/4943.png",
-			},
-			// Wrapped Assets
-			{
-				name: "cbETH",
-				symbol: "cbETH",
-				contractAddress: "0x2Ae3F1Ec7F1F5012CFEab0185BfC7aa3CF0DEC22",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png",
-			},
-			{
-				name: "cbBTC",
-				symbol: "cbBTC",
-				contractAddress: "0x236aa50979D5f3De3Bd1Eeb40E81137F22ab794b",
-				decimals: 8,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-			},
-			// DeFi Tokens
-			{
-				name: "Aerodrome",
-				symbol: "AERO",
-				contractAddress: "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/28744.png",
-			},
-			{
-				name: "TOSHI",
-				symbol: "TOSHI",
-				contractAddress: "0xF4d2888d29D722226FafA5d9B24F9164c09242E4",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/28744.png",
-			},
-			{
-				name: "BALD",
-				symbol: "BALD",
-				contractAddress: "0x27D2DECb4bFC9C76F0309b8E88dec3a601Fe25a8",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/28744.png",
-			},
-			{
-				name: "Meme",
-				symbol: "MEME",
-				contractAddress: "0xB33EaAd8d922B1083446DC23f610c2567fB5180f",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/28744.png",
-			},
-			{
-				name: "DEGEN",
-				symbol: "DEGEN",
-				contractAddress: "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/28744.png",
-			},
-			// L2 Tokens
-			{
-				name: "Optimism",
-				symbol: "OP",
-				contractAddress: "0x4200000000000000000000000000000000000042",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/11840.png",
-			},
-			// Gaming & Metaverse
-			{
-				name: "ZORA",
-				symbol: "ZORA",
-				contractAddress: "0x3ab6Ed69Ef663bd986Ee59205EaD8B25F2998a32",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/28744.png",
-			},
-			{
-				name: "Friend.tech",
-				symbol: "FRIEND",
-				contractAddress: "0xCF205808Ed36593aa40a44F10c7f7C2F67d4A4d4",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/28744.png",
-			},
-			// Infrastructure
-			{
-				name: "Chainlink",
-				symbol: "LINK",
-				contractAddress: "0x88DfaAABaf06f3a41D2606EA98BC8A109A5a0a02",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/1975.png",
-			},
-			{
-				name: "Uniswap",
-				symbol: "UNI",
-				contractAddress: "0x6fd9d7AD17242c41f7131d257212c54A0e816691",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/7083.png",
-			},
-			// Meme Coins
-			{
-				name: "Pepe",
-				symbol: "PEPE",
-				contractAddress: "0x6982508145454Ce325dDbE47a25d4ec3d2311933",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/24478.png",
-			},
-			{
-				name: "Shiba Inu",
-				symbol: "SHIB",
-				contractAddress: "0x981Fd6562d2c4c65fD6Cfc250ab9B4C2Db43Dc5D",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/5994.png",
-			},
-			{
-				name: "Dogecoin",
-				symbol: "DOGE",
-				contractAddress: "0x3832d2F059E55934220881F831bE501D180671A7",
-				decimals: 8,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/74.png",
-			},
-			// Yield & Staking
-			{
-				name: "Rocket Pool ETH",
-				symbol: "rETH",
-				contractAddress: "0x178E141a0E3b34152f73Ff610437A7bf9B83267A",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/15060.png",
-			},
-			{
-				name: "Lido Staked ETH",
-				symbol: "stETH",
-				contractAddress: "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/15060.png",
-			},
-			// DeFi Protocols
-			{
-				name: "Compound",
-				symbol: "COMP",
-				contractAddress: "0x9e1028F5F1D5eDE59748FFcE553474997D6ECA76",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/5692.png",
-			},
-			{
-				name: "Aave",
-				symbol: "AAVE",
-				contractAddress: "0x4B8C80D5A0F5eDc5aC26D97E282eD9C8cF0E4b7a",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/7278.png",
-			},
-			// Layer 1 Tokens
-			{
-				name: "Polygon",
-				symbol: "MATIC",
-				contractAddress: "0x4200000000000000000000000000000000000006",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3890.png",
-			},
-			{
-				name: "Arbitrum",
-				symbol: "ARB",
-				contractAddress: "0x912CE59144191C1204E64559FE8253a0e49E6548",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
-			},
-			// Exchange Tokens
-			{
-				name: "Binance Coin",
-				symbol: "BNB",
-				contractAddress: "0x4200000000000000000000000000000000000006",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/1839.png",
-			},
-			// Privacy & Security
-			{
-				name: "Tornado Cash",
-				symbol: "TORN",
-				contractAddress: "0x722E8BdD2ce80A4422E880164f2079488e115365",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/8049.png",
-			},
-			// AI & Data
-			{
-				name: "The Graph",
-				symbol: "GRT",
-				contractAddress: "0x23A941036Ae778Ac51Ab04CEa08Ed6e2FE103614",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/6719.png",
-			},
-			// Oracle & Data
-			{
-				name: "Band Protocol",
-				symbol: "BAND",
-				contractAddress: "0x86E53CF1B870786351Da77A57575e79CB55812CB",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/4066.png",
-			},
-			// Governance
-			{
-				name: "Maker",
-				symbol: "MKR",
-				contractAddress: "0xab7bAdEF82E9Fe11f6f33f87BC9bC2AA27F2fCB5",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/1518.png",
-			},
-			// Cross-chain
-			{
-				name: "Multichain",
-				symbol: "MULTI",
-				contractAddress: "0x9Fb9a33956351cA4D4D4E6C3C4B0B3e2e3e2e1d0",
-				decimals: 18,
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/28744.png",
-			},
-		];
-
 		const tokens = [];
 
 		for (const token of commonTokens) {
@@ -1050,30 +821,8 @@ const getCommonBaseTokens = async (address) => {
 					if (balance > 0) {
 						const amount = balance / Math.pow(10, token.decimals);
 
-						// Get token price from Binance API with symbol mapping
-						let price = "0.00";
-						try {
-							// Map symbols to Binance-compatible format
-							let binanceSymbol = token.symbol;
-
-							// Handle special cases
-							if (token.symbol === "USDT" || token.symbol === "USDC" || token.symbol === "DAI") {
-								price = "1.00"; // Stablecoins are always $1
-								continue; // Skip the API call
-							} else if (token.symbol === "cbETH") {
-								binanceSymbol = "ETH"; // Use ETH price for cbETH
-							} else if (token.symbol === "rETH" || token.symbol === "stETH") {
-								binanceSymbol = "ETH"; // Use ETH price for staking derivatives
-							} else if (token.symbol === "TORN") {
-								binanceSymbol = "ETH"; // Use ETH price as fallback for TORN
-							}
-
-							const priceData = await getTickerPrice({ symbol: binanceSymbol });
-							price = priceData.price || "0.00";
-						} catch (priceError) {
-							// If price fetch fails, set to 0
-							price = "0.00";
-						}
+						// Get token price using our price fetching function
+						const price = await getTokenPrice(token.symbol);
 
 						const fiatBalance = amount * parseFloat(price);
 
@@ -1182,4 +931,5 @@ module.exports = {
 	getGasTracker,
 	getPortfolioSummary,
 	getLatestBlock,
+	getCommonBaseTokens,
 };
