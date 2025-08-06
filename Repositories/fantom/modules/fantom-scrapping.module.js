@@ -145,7 +145,7 @@ const getAddress = async (query) => {
 
 				// Create a timeout promise for transaction fetching
 				const transactionTimeoutPromise = new Promise((_, reject) => {
-					setTimeout(() => reject(new Error("Transaction fetch timeout")), 6000);
+					setTimeout(() => reject(new Error("Transaction fetch timeout")), 4000);
 				});
 
 				const transactionDataPromise = getTransactionsList({
@@ -385,347 +385,30 @@ const getTransactionsList = async (query) => {
 			}
 		}
 
-		// Skip SonicScan API due to DNS issues - go straight to OKLink
-		console.log("Skipping SonicScan API - using OKLink directly");
+		// For Sonic, use RPC transaction count since OKLink doesn't support Sonic yet
+		let response;
+		let source;
 
-		// Try OKLink API as fallback
 		try {
-			const t = Date.now();
-
-			// Try different OKLink API endpoint formats for Sonic
-			const oklinkEndpoints = [
-				`https://www.oklink.com/api/explorer/v2/sonic/addresses/${address}/transactions?offset=${page}&limit=${show}&t=${t}`,
-				`https://www.oklink.com/api/explorer/v2/sonic/addresses/${address}/transactionsByClassfy/condition?offset=${page}&limit=${show}&address=${address}&nonzeroValue=false&t=${t}`,
-				`https://www.oklink.com/api/explorer/v2/sonic/addresses/${address}/internal-transactions?offset=${page}&limit=${show}&t=${t}`,
-			];
-
-			for (const url of oklinkEndpoints) {
-				try {
-					const { data } = await axios.get(url, {
-						httpsAgent: agent,
-						timeout: 5000, // Reduced timeout for faster fallback
-						validateStatus: function (status) {
-							return status < 500;
-						},
-						headers: {
-							"X-Apikey": get_ApiKey().getApiKey(),
-							"User-Agent":
-								"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-						},
-					});
-
-					if (data.code === "0" && data.data) {
-						let transactions = [];
-
-						if (data.data.hits) {
-							transactions = data.data.hits.map((tx) => {
-								// Determine transaction type based on available data
-								const type = tx.methodName || (tx.input && tx.input !== "0x") ? "contract" : "transfer";
-
-								// Determine status based on transaction status
-								const status = tx.status === "1" || tx.status === "success" ? "Success" : "Failed";
-
-								return {
-									age: moment(tx.blocktime ? tx.blocktime * 1000 : Date.now()).fromNow(),
-									amount: tx.realValue ? (parseFloat(tx.realValue) / Math.pow(10, 18)).toFixed(6) : "0",
-									assetPrice: price.toString(),
-									block: tx.blockHeight?.toString() || "N/A",
-									confirmations: tx.confirmations || "1",
-									date: tx.blocktime ? moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss") : "N/A",
-									from: tx.from || address,
-									gasPrice: tx.gasPrice || "0",
-									hash: tx.hash || "0x0000000000000000000000000000000000000000000000000000000000000000",
-									image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png", // FTM logo
-									status: status,
-									to: tx.to || address,
-									txnFee: tx.fee ? tx.fee.toFixed(6) : "0",
-									type: type,
-								};
-							});
-						} else if (data.data.transactions) {
-							transactions = data.data.transactions.map((tx) => {
-								// Determine transaction type based on available data
-								const type = tx.methodName || (tx.input && tx.input !== "0x") ? "contract" : "transfer";
-
-								// Determine status based on transaction status
-								const status = tx.status === "1" || tx.status === "success" ? "Success" : "Failed";
-
-								return {
-									age: moment(tx.blocktime ? tx.blocktime * 1000 : Date.now()).fromNow(),
-									amount: tx.value ? (parseFloat(tx.value) / Math.pow(10, 18)).toFixed(6) : "0",
-									assetPrice: price.toString(),
-									block: tx.blockHeight?.toString() || "N/A",
-									confirmations: tx.confirmations || "1",
-									date: tx.blocktime ? moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss") : "N/A",
-									from: tx.from || address,
-									gasPrice: tx.gasPrice || "0",
-									hash: tx.hash || "0x0000000000000000000000000000000000000000000000000000000000000000",
-									image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png", // FTM logo
-									status: status,
-									to: tx.to || address,
-									txnFee: tx.gasUsed ? tx.gasUsed.toFixed(6) : "0",
-									type: type,
-								};
-							});
-						}
-
-						if (transactions.length > 0) {
-							return {
-								pagination: { records: transactions.length.toString(), pages: "1", page: "0" },
-								transactions: transactions.sort((a, b) => b.timestamp - a.timestamp),
-							};
-						}
-					}
-				} catch (endpointError) {
-					console.log(`OKLink endpoint failed: ${endpointError.message}`);
-					continue; // Try next endpoint
-				}
+			console.log("Trying RPC transaction count (OKLink doesn't support Sonic yet)...");
+			const countResponse = await getRPCTransactionCount(address, price);
+			if (countResponse) {
+				response = countResponse;
+				source = "rpc_count";
+				console.log("Using RPC transaction count for Sonic");
 			}
-		} catch (oklinkError) {
-			console.log("All OKLink endpoints failed:", oklinkError.message);
+		} catch (countError) {
+			console.log("RPC count failed:", countError.message);
 		}
 
-		// Try to get transaction by hash if we know it (for specific addresses)
-		const knownTransactions = {
-			"0x91e7accb84688972cb0632ada5077ce66f801e78": {
-				hash: "0x2345ce1f7c564d7e6950402e47c3db39b1444b2ebfcd1bd21165e2cac811eaf4",
-				block: "114798393",
-				from: "0x82f98b381f196c4e0ad6aabbb9d535bfc6fc7afb",
-				to: "0x91e7accb84688972cb0632ada5077ce66f801e78",
-				value: "12029.88207755367",
-			},
-		};
-
-		if (knownTransactions[address.toLowerCase()]) {
-			const knownTx = knownTransactions[address.toLowerCase()];
-			try {
-				const txResponse = await instance.post(
-					SONIC_RPC,
-					{
-						jsonrpc: "2.0",
-						method: "eth_getTransactionByHash",
-						params: [knownTx.hash],
-						id: 1,
-					},
-					{
-						headers: { "Content-Type": "application/json" },
-					}
-				);
-
-				if (txResponse.data.result) {
-					const tx = txResponse.data.result;
-					const value = parseInt(tx.value, 16) / Math.pow(10, 18);
-					const traffic = tx.from.toLowerCase() === address.toLowerCase() ? "OUT" : "IN";
-
-					// Determine transaction type based on input data
-					const type = tx.input && tx.input !== "0x" ? "contract" : "transfer";
-
-					// Determine status (assuming confirmed transactions are successful)
-					const status = "Success"; // In a real implementation, this would come from transaction receipt
-
-					return {
-						pagination: { records: "1", pages: "1", page: "0" },
-						transactions: [
-							{
-								age: moment().fromNow(),
-								amount: value.toFixed(6),
-								assetPrice: price.toString(),
-								block: parseInt(tx.blockNumber, 16).toString(),
-								confirmations: "1",
-								date: tx.blocktime ? moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss") : "N/A",
-								from: tx.from,
-								gasPrice: tx.gasPrice || "0",
-								hash: tx.hash,
-								image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png", // FTM logo
-								status: status,
-								to: tx.to,
-								txnFee:
-									tx.gasUsed && tx.gasPrice
-										? ((parseFloat(tx.gasUsed) * parseFloat(tx.gasPrice)) / Math.pow(10, 18)).toFixed(6)
-										: "0",
-								type: type,
-							},
-						],
-					};
-				}
-			} catch (txError) {
-				console.log("Known transaction fetch failed:", txError.message);
-			}
+		// Add source to response if response exists
+		if (response) {
+			response.source = source;
+			return response;
 		}
 
-		// Try to find recent transactions involving this address by scanning recent blocks
-		try {
-			// Get latest block number
-			const latestBlockResponse = await instance.post(
-				SONIC_RPC,
-				{
-					jsonrpc: "2.0",
-					method: "eth_blockNumber",
-					params: [],
-					id: 1,
-				},
-				{
-					headers: { "Content-Type": "application/json" },
-				}
-			);
-
-			const latestBlock = parseInt(latestBlockResponse.data.result, 16);
-			const transactions = [];
-
-			// Scan recent blocks for transactions involving this address
-			const blocksToScan = 1000; // Scan last 1000 blocks to catch more transactions
-			for (let i = 0; i < blocksToScan; i++) {
-				const blockNumber = latestBlock - i;
-				try {
-					const blockResponse = await instance.post(
-						SONIC_RPC,
-						{
-							jsonrpc: "2.0",
-							method: "eth_getBlockByNumber",
-							params: [`0x${blockNumber.toString(16)}`, true],
-							id: 1,
-						},
-						{
-							headers: { "Content-Type": "application/json" },
-						}
-					);
-
-					if (blockResponse.data.result && blockResponse.data.result.transactions) {
-						const relevantTxs = blockResponse.data.result.transactions.filter(
-							(tx) => tx.from.toLowerCase() === address.toLowerCase() || (tx.to && tx.to.toLowerCase() === address.toLowerCase())
-						);
-
-						for (const tx of relevantTxs) {
-							const value = parseInt(tx.value, 16) / Math.pow(10, 18);
-							const traffic = tx.from.toLowerCase() === address.toLowerCase() ? "OUT" : "IN";
-
-							// Determine transaction type based on input data
-							const type = tx.input && tx.input !== "0x" ? "contract" : "transfer";
-
-							// Determine status (assuming confirmed transactions are successful)
-							const status = "Success"; // In a real implementation, this would come from transaction receipt
-
-							transactions.push({
-								age: moment().fromNow(),
-								amount: value.toFixed(6),
-								assetPrice: price.toString(),
-								block: parseInt(tx.blockNumber, 16).toString(),
-								confirmations: "1",
-								date: tx.blocktime ? moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss") : "N/A",
-								from: tx.from,
-								gasPrice: tx.gasPrice || "0",
-								hash: tx.hash,
-								image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png", // FTM logo
-								status: status,
-								to: tx.to,
-								txnFee:
-									tx.gasUsed && tx.gasPrice
-										? ((parseFloat(tx.gasUsed) * parseFloat(tx.gasPrice)) / Math.pow(10, 18)).toFixed(6)
-										: "0",
-								type: type,
-							});
-						}
-					}
-				} catch (blockError) {
-					// Continue with next block if one fails
-					continue;
-				}
-
-				// Limit to prevent too many API calls
-				if (transactions.length >= parseInt(show)) {
-					break;
-				}
-			}
-
-			if (transactions.length > 0) {
-				return {
-					pagination: { records: transactions.length.toString(), pages: "1", page: "0" },
-					transactions: transactions.sort((a, b) => b.timestamp - a.timestamp),
-				};
-			}
-		} catch (scanError) {
-			console.log("Block scanning failed:", scanError.message);
-		}
-
-		// Final fallback: Get transaction count from RPC and show info
-		try {
-			const nonceResponse = await instance.post(
-				SONIC_RPC,
-				{
-					jsonrpc: "2.0",
-					method: "eth_getTransactionCount",
-					params: [address, "latest"],
-					id: 1,
-				},
-				{
-					headers: { "Content-Type": "application/json" },
-				}
-			);
-
-			const txCount = nonceResponse.data.result ? parseInt(nonceResponse.data.result, 16) : 0;
-
-			// Create a placeholder transaction showing the count
-			const placeholderTransaction = {
-				age: moment().fromNow(),
-				amount: "0",
-				assetPrice: price.toString(),
-				block: "N/A",
-				confirmations: "0",
-				date: "N/A",
-				from: address,
-				gasPrice: "0",
-				hash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-				image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png", // FTM logo
-				status: "Info",
-				to: address,
-				txnFee: "0",
-				type: "info",
-				note: `This address has ${txCount} outgoing transactions. Recent block scanning completed.`,
-			};
-
-			return { pagination: { records: "1", pages: "1", page: "0" }, transactions: [placeholderTransaction] };
-		} catch (rpcError) {
-			console.log("Sonic RPC transaction count failed:", rpcError.message);
-		}
-
-		// Fallback: Try OKLink API (though it usually fails for Sonic)
-		try {
-			const t = Date.now();
-			const url = `https://www.oklink.com/api/explorer/v2/fantom/addresses/${address}/transactionsByClassfy/condition?offset=${page}&limit=${show}&address=${address}&nonzeroValue=false&t=${t}`;
-
-			const { data } = await axios.get(url, {
-				httpsAgent: agent,
-				timeout: 10000,
-				validateStatus: function (status) {
-					return status < 500;
-				},
-				headers: {
-					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-				},
-			});
-
-			if (data.code === "0" && data.data && data.data.hits) {
-				const transactions = data.data.hits.map((tx) => ({
-					asset: "SONIC",
-					block: tx.blockHeight.toString(),
-					date: tx.blocktime ? moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss") : "N/A",
-					from: tx.from,
-					hash: tx.hash,
-					to: tx.to,
-					value: (parseFloat(tx.realValue) / Math.pow(10, 18)).toFixed(6),
-					realValue: parseFloat(tx.realValue) / Math.pow(10, 18),
-					traffic: tx.realValue < 0 ? "OUT" : "IN",
-					txnFee: tx.fee.toFixed(6),
-					timestamp: tx.blocktime,
-				}));
-
-				return transactions.sort((a, b) => b.timestamp - a.timestamp);
-			}
-		} catch (oklinkError) {
-			console.log("OKLink fallback failed:", oklinkError.message);
-		}
-
+		// If no transactions found from external APIs, return empty result
+		console.log("No transactions found from external APIs");
 		return { pagination: { records: "0", pages: "0", page: "0" }, transactions: [] };
 	} catch (error) {
 		console.error("Error getting Sonic transactions:", error.message || "Unknown error");
@@ -815,17 +498,277 @@ const getTransactionStatus = async (params) => {
 };
 
 /**
- * Get gas tracker information for Fantom
+ * Get RPC transaction scanning for Sonic (since OKLink doesn't support Sonic yet)
+ * @param {string} address - Address to get transactions for
+ * @param {string} page - Page number
+ * @param {string} show - Number of transactions to show
+ * @param {string} price - SONIC price
+ * @returns {Object} Transaction data
+ */
+const getRPCTransactionScan = async (address, page, show, price) => {
+	try {
+		// Get latest block number
+		const latestBlockResponse = await instance.post(
+			SONIC_RPC,
+			{
+				jsonrpc: "2.0",
+				method: "eth_blockNumber",
+				params: [],
+				id: 1,
+			},
+			{
+				headers: { "Content-Type": "application/json" },
+			}
+		);
+
+		const latestBlock = parseInt(latestBlockResponse.data.result, 16);
+		const transactions = [];
+
+		// Scan recent blocks for transactions involving this address (optimized)
+		const blocksToScan = Math.min(100, parseInt(show) * 5); // Reduced for faster scanning
+		const startBlock = latestBlock - blocksToScan;
+
+		console.log(`Scanning blocks ${startBlock} to ${latestBlock} for transactions...`);
+
+		for (let i = 0; i < blocksToScan && i < 50; i++) {
+			// Limit to 50 blocks max for speed
+			const blockNumber = latestBlock - i;
+			try {
+				const blockResponse = await instance.post(
+					SONIC_RPC,
+					{
+						jsonrpc: "2.0",
+						method: "eth_getBlockByNumber",
+						params: [`0x${blockNumber.toString(16)}`, true],
+						id: 1,
+					},
+					{
+						headers: { "Content-Type": "application/json" },
+					}
+				);
+
+				if (blockResponse.data.result && blockResponse.data.result.transactions) {
+					const relevantTxs = blockResponse.data.result.transactions.filter(
+						(tx) => tx.from.toLowerCase() === address.toLowerCase() || (tx.to && tx.to.toLowerCase() === address.toLowerCase())
+					);
+
+					for (const tx of relevantTxs) {
+						const value = parseInt(tx.value, 16) / Math.pow(10, 18);
+						const traffic = tx.from.toLowerCase() === address.toLowerCase() ? "OUT" : "IN";
+
+						// Determine transaction type based on input data
+						const type = tx.input && tx.input !== "0x" ? "contract" : "transfer";
+
+						// Determine status (assuming confirmed transactions are successful)
+						const status = "Success";
+
+						transactions.push({
+							age: moment().fromNow(),
+							amount: value.toFixed(6),
+							assetPrice: price.toString(),
+							block: parseInt(tx.blockNumber, 16).toString(),
+							confirmations: "1",
+							date: moment().format("YYYY-MM-DD HH:mm:ss"),
+							from: tx.from,
+							gasPrice: tx.gasPrice ? parseInt(tx.gasPrice, 16).toString() : "0",
+							hash: tx.hash,
+							image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png",
+							status: status,
+							to: tx.to,
+							txnFee:
+								tx.gasUsed && tx.gasPrice ? ((parseFloat(tx.gasUsed) * parseFloat(tx.gasPrice)) / Math.pow(10, 18)).toFixed(8) : "0",
+							type: type,
+							method: type === "contract" ? "Contract Interaction" : "SONIC transfer",
+							asset: "SONIC",
+						});
+					}
+				}
+			} catch (blockError) {
+				// Continue with next block if one fails
+				continue;
+			}
+
+			// Limit to prevent too many API calls
+			if (transactions.length >= parseInt(show)) {
+				break;
+			}
+		}
+
+		if (transactions.length > 0) {
+			// Use standardized formatter for transactions
+			const formattedTransactions = sonicFormatter.formatTransactions(transactions);
+
+			return {
+				pagination: {
+					records: transactions.length.toString(),
+					pages: "1",
+					page: page,
+				},
+				transactions: formattedTransactions.sort((a, b) => b.timestamp - a.timestamp),
+			};
+		}
+
+		return null;
+	} catch (error) {
+		console.log("RPC transaction scanning failed:", error.message);
+		return null;
+	}
+};
+
+/**
+ * Get OKLink transactions for Sonic (following Base pattern)
+ * @param {string} address - Address to get transactions for
+ * @param {string} page - Page number
+ * @param {string} show - Number of transactions to show
+ * @param {string} price - SONIC price
+ * @returns {Object} Transaction data
+ */
+const getOKLinkTransactions = async (address, page, show, price) => {
+	try {
+		const t = Date.now();
+
+		// Use the OKLink endpoint that works for Sonic
+		const url = `https://www.oklink.com/api/explorer/v2/sonic/addresses/${address}/transactionsByClassfy/condition?offset=${page}&limit=${show}&address=${address}&nonzeroValue=false&t=${t}`;
+
+		const { data } = await axios.get(url, {
+			httpsAgent: agent,
+			timeout: 10000,
+			validateStatus: function (status) {
+				return status < 500;
+			},
+			headers: {
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+			},
+		});
+
+		// Check if we got a successful response
+		if ((data.code === "0" || data.code === 0) && data.data && data.data.hits) {
+			console.log(`✅ OKLink API success! Found ${data.data.hits.length} transactions out of ${data.data.total} total`);
+
+			const rawTransactions = data.data.hits.map((tx) => {
+				const value = parseFloat(tx.value);
+				const fiatValue = value * parseFloat(price);
+				const traffic = tx.from.toLowerCase() === address.toLowerCase() ? "OUT" : "IN";
+
+				return {
+					hash: tx.hash,
+					block: tx.blockHeight.toString(),
+					from: tx.from,
+					to: tx.to,
+					value: value.toString(),
+					fiatValue: fiatValue.toFixed(2),
+					gas: "0", // OKLink doesn't provide gas info in this endpoint
+					gasPrice: "0",
+					nonce: "0",
+					input: "0x",
+					blocktime: tx.blocktime,
+					traffic: traffic,
+					method: tx.method || "SONIC transfer",
+					status: tx.status === "0x1" ? "Success" : "Failed",
+					image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png",
+					date: tx.blocktime ? moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss") : "N/A",
+					age: tx.blocktime ? moment(tx.blocktime * 1000).fromNow() : "N/A",
+					txnFee: tx.fee ? parseFloat(tx.fee).toFixed(8) : "0",
+					confirmations: "1",
+				};
+			});
+
+			// Use standardized formatter for transactions
+			const transactions = sonicFormatter.formatTransactions(rawTransactions);
+
+			return {
+				pagination: {
+					records: data.data.total.toString(),
+					pages: Math.ceil(data.data.total / parseInt(show)).toString(),
+					page: page,
+				},
+				transactions: transactions,
+			};
+		} else if (data.code === "5005") {
+			// API_DECODE_ERROR - this might mean the endpoint exists but has issues
+			console.log("OKLink API returned decode error - endpoint exists but may have issues");
+			return null;
+		} else {
+			// Only log as error if there's actually an error message
+			if (data.msg || data.message) {
+				console.log(`OKLink API error: ${data.msg || data.message}`);
+			} else {
+				console.log(`OKLink API returned code ${data.code} with no error message`);
+			}
+			return null;
+		}
+	} catch (error) {
+		console.log("OKLink transactions failed:", error.message);
+		return null;
+	}
+};
+
+/**
+ * Get RPC transaction count fallback (when APIs fail)
+ * @param {string} address - Address to get transaction count for
+ * @param {string} price - SONIC price
+ * @returns {Object} Transaction data with count info
+ */
+const getRPCTransactionCount = async (address, price) => {
+	try {
+		// Get transaction count from RPC
+		const nonceResponse = await instance.post(
+			SONIC_RPC,
+			{
+				jsonrpc: "2.0",
+				method: "eth_getTransactionCount",
+				params: [address, "latest"],
+				id: 1,
+			},
+			{
+				headers: { "Content-Type": "application/json" },
+			}
+		);
+
+		const txCount = nonceResponse.data.result ? parseInt(nonceResponse.data.result, 16) : 0;
+
+		// Create a placeholder transaction showing the count
+		const placeholderTransaction = {
+			age: moment().fromNow(),
+			amount: "0",
+			assetPrice: price.toString(),
+			block: "N/A",
+			confirmations: "0",
+			date: "N/A",
+			from: address,
+			gasPrice: "0",
+			hash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+			image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3513.png", // SONIC logo
+			status: "Info",
+			to: address,
+			txnFee: "0",
+			type: "info",
+			note: `This address has ${txCount} outgoing transactions. OKLink API is the primary source for Sonic transactions.`,
+		};
+
+		return {
+			pagination: { records: "1", pages: "1", page: "0" },
+			transactions: [placeholderTransaction],
+		};
+	} catch (error) {
+		console.log("RPC transaction count failed:", error.message);
+		return null;
+	}
+};
+
+/**
+ * Get gas tracker information for Sonic (migrated from Fantom)
  * @param {Object} query - Query parameters
  * @returns {Object} Gas tracker data
  */
 const getGasTracker = async (query) => {
 	try {
-		// Get gas price from Fantom RPC
+		// Get gas price from Sonic RPC
 		let gasPrice = "1000000000"; // Default 1 gwei
 		try {
 			const gasResponse = await instance.post(
-				FANTOM_RPC,
+				SONIC_RPC,
 				{
 					jsonrpc: "2.0",
 					method: "eth_gasPrice",
@@ -838,11 +781,11 @@ const getGasTracker = async (query) => {
 			);
 			gasPrice = gasResponse.data.result || "1000000000";
 		} catch (error) {
-			console.log("Fantom gas price fetch failed:", error.message);
+			console.log("Sonic gas price fetch failed:", error.message);
 		}
 
 		const gasPriceGwei = (parseInt(gasPrice, 16) / Math.pow(10, 9)).toFixed(2);
-		const gasPriceUsd = (parseFloat(gasPriceGwei) * 0.000000001 * 0.37).toFixed(6); // Approximate FTM price
+		const gasPriceUsd = (parseFloat(gasPriceGwei) * 0.000000001 * 0.48).toFixed(6); // Approximate SONIC price
 
 		const response = {
 			low: {
@@ -862,7 +805,7 @@ const getGasTracker = async (query) => {
 			},
 			featuredActions: [
 				{
-					action: "Transfer FTM",
+					action: "Transfer SONIC",
 					low: `$${gasPriceUsd}`,
 					average: `$${gasPriceUsd}`,
 					high: `$${gasPriceUsd}`,
@@ -872,7 +815,7 @@ const getGasTracker = async (query) => {
 
 		return response;
 	} catch (error) {
-		console.error("Error getting Fantom gas tracker:", error.message || "Unknown error");
+		console.error("Error getting Sonic gas tracker:", error.message || "Unknown error");
 		throw error;
 	}
 };
