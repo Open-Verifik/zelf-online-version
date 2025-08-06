@@ -100,10 +100,10 @@ const getAddress = async (query) => {
 				console.log("Sonic balance fetch failed:", error.message);
 			}
 
-			// Get SONIC price
+			// Get SONIC price (symbol: S)
 			let sonicPrice = "0";
 			try {
-				const priceData = await getTickerPrice({ symbol: "SONIC" });
+				const priceData = await getTickerPrice({ symbol: "S" });
 				sonicPrice = priceData.price || "0";
 			} catch (error) {
 				console.log("Sonic price fetch failed:", error.message);
@@ -172,7 +172,7 @@ const getAddress = async (query) => {
 						to: address,
 						fiatAmount: "0.00",
 						amount: "0",
-						asset: "FTM",
+						asset: "SONIC",
 						txnFee: "0",
 						note: `Transaction fetch failed: ${error.message}`,
 					},
@@ -279,7 +279,7 @@ const getTokens = async (params, query) => {
 };
 
 /**
- * Get transaction list for a Fantom address
+ * Get transaction list for a Sonic address (migrated from Fantom)
  * @param {Object} query - Query parameters containing address, page, and show
  * @returns {Array} Array of transactions
  */
@@ -287,11 +287,11 @@ const getTransactionsList = async (query) => {
 	try {
 		const { address, page = "0", show = "100" } = query;
 
-		// Get FTM price for transaction formatting
+		// Get SONIC price for transaction formatting (symbol: S)
 		let price = "0.48060000"; // Default price
 		try {
 			const { getTickerPrice } = require("../../binance/modules/binance.module");
-			const priceData = await getTickerPrice({ symbol: "FTM" });
+			const priceData = await getTickerPrice({ symbol: "S" });
 			price = priceData.price || "0.48060000";
 		} catch (priceError) {
 			console.log("Price fetch failed, using default:", priceError.message);
@@ -301,7 +301,7 @@ const getTransactionsList = async (query) => {
 		let isContract = false;
 		try {
 			const codeResponse = await instance.post(
-				FANTOM_RPC,
+				SONIC_RPC,
 				{
 					jsonrpc: "2.0",
 					method: "eth_getCode",
@@ -323,7 +323,7 @@ const getTransactionsList = async (query) => {
 		if (isContract) {
 			try {
 				const logsResponse = await instance.post(
-					FANTOM_RPC,
+					SONIC_RPC,
 					{
 						jsonrpc: "2.0",
 						method: "eth_getLogs",
@@ -373,7 +373,7 @@ const getTransactionsList = async (query) => {
 					});
 
 					// Use standardized formatter for transactions
-					const transactions = fantomFormatter.formatTransactions(rawTransactions);
+					const transactions = sonicFormatter.formatTransactions(rawTransactions);
 
 					return {
 						pagination: { records: transactions.length.toString(), pages: "1", page: "0" },
@@ -385,18 +385,18 @@ const getTransactionsList = async (query) => {
 			}
 		}
 
-		// Skip FantomScan API due to DNS issues - go straight to OKLink
-		console.log("Skipping FantomScan API - using OKLink directly");
+		// Skip SonicScan API due to DNS issues - go straight to OKLink
+		console.log("Skipping SonicScan API - using OKLink directly");
 
 		// Try OKLink API as fallback
 		try {
 			const t = Date.now();
 
-			// Try different OKLink API endpoint formats for Fantom
+			// Try different OKLink API endpoint formats for Sonic
 			const oklinkEndpoints = [
-				`https://www.oklink.com/api/explorer/v2/fantom/addresses/${address}/transactions?offset=${page}&limit=${show}&t=${t}`,
-				`https://www.oklink.com/api/explorer/v2/fantom/addresses/${address}/transactionsByClassfy/condition?offset=${page}&limit=${show}&address=${address}&nonzeroValue=false&t=${t}`,
-				`https://www.oklink.com/api/explorer/v2/fantom/addresses/${address}/internal-transactions?offset=${page}&limit=${show}&t=${t}`,
+				`https://www.oklink.com/api/explorer/v2/sonic/addresses/${address}/transactions?offset=${page}&limit=${show}&t=${t}`,
+				`https://www.oklink.com/api/explorer/v2/sonic/addresses/${address}/transactionsByClassfy/condition?offset=${page}&limit=${show}&address=${address}&nonzeroValue=false&t=${t}`,
+				`https://www.oklink.com/api/explorer/v2/sonic/addresses/${address}/internal-transactions?offset=${page}&limit=${show}&t=${t}`,
 			];
 
 			for (const url of oklinkEndpoints) {
@@ -500,7 +500,7 @@ const getTransactionsList = async (query) => {
 			const knownTx = knownTransactions[address.toLowerCase()];
 			try {
 				const txResponse = await instance.post(
-					FANTOM_RPC,
+					SONIC_RPC,
 					{
 						jsonrpc: "2.0",
 						method: "eth_getTransactionByHash",
@@ -557,7 +557,7 @@ const getTransactionsList = async (query) => {
 		try {
 			// Get latest block number
 			const latestBlockResponse = await instance.post(
-				FANTOM_RPC,
+				SONIC_RPC,
 				{
 					jsonrpc: "2.0",
 					method: "eth_blockNumber",
@@ -578,7 +578,7 @@ const getTransactionsList = async (query) => {
 				const blockNumber = latestBlock - i;
 				try {
 					const blockResponse = await instance.post(
-						FANTOM_RPC,
+						SONIC_RPC,
 						{
 							jsonrpc: "2.0",
 							method: "eth_getBlockByNumber",
@@ -650,7 +650,7 @@ const getTransactionsList = async (query) => {
 		// Final fallback: Get transaction count from RPC and show info
 		try {
 			const nonceResponse = await instance.post(
-				FANTOM_RPC,
+				SONIC_RPC,
 				{
 					jsonrpc: "2.0",
 					method: "eth_getTransactionCount",
@@ -685,10 +685,10 @@ const getTransactionsList = async (query) => {
 
 			return { pagination: { records: "1", pages: "1", page: "0" }, transactions: [placeholderTransaction] };
 		} catch (rpcError) {
-			console.log("Fantom RPC transaction count failed:", rpcError.message);
+			console.log("Sonic RPC transaction count failed:", rpcError.message);
 		}
 
-		// Fallback: Try OKLink API (though it usually fails for Fantom)
+		// Fallback: Try OKLink API (though it usually fails for Sonic)
 		try {
 			const t = Date.now();
 			const url = `https://www.oklink.com/api/explorer/v2/fantom/addresses/${address}/transactionsByClassfy/condition?offset=${page}&limit=${show}&address=${address}&nonzeroValue=false&t=${t}`;
@@ -707,7 +707,7 @@ const getTransactionsList = async (query) => {
 
 			if (data.code === "0" && data.data && data.data.hits) {
 				const transactions = data.data.hits.map((tx) => ({
-					asset: "FTM",
+					asset: "SONIC",
 					block: tx.blockHeight.toString(),
 					date: tx.blocktime ? moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss") : "N/A",
 					from: tx.from,
@@ -728,13 +728,13 @@ const getTransactionsList = async (query) => {
 
 		return { pagination: { records: "0", pages: "0", page: "0" }, transactions: [] };
 	} catch (error) {
-		console.error("Error getting Fantom transactions:", error.message || "Unknown error");
+		console.error("Error getting Sonic transactions:", error.message || "Unknown error");
 		return { pagination: { records: "0", pages: "0", page: "0" }, transactions: [] };
 	}
 };
 
 /**
- * Get transaction status/details for a Fantom transaction
+ * Get transaction status/details for a Sonic transaction
  * @param {Object} params - Parameters containing transaction ID
  * @returns {Object} Transaction details
  */

@@ -10,9 +10,9 @@ console.log("OKLink API Key exists:", !!config.oklink?.apiKey);
 console.log("OKLink API Key length:", config.oklink?.apiKey?.length || 0);
 console.log();
 
-// FantomScan APIs are currently unreachable, skipping tests
-console.log("=== FantomScan APIs Status ===");
-console.log("❌ FantomScan APIs are unreachable (DNS issues)");
+// SonicScan APIs are currently unreachable, skipping tests
+console.log("=== SonicScan APIs Status ===");
+console.log("❌ SonicScan APIs are unreachable (DNS issues)");
 console.log("✅ Using QuickNode RPC for basic data");
 console.log();
 
@@ -21,7 +21,7 @@ const Module = require("../fantom/modules/fantom-scrapping.module");
 
 const testAddress = "0x8e1701cfd85258ddb8dfe89bc4c7350822b9601d";
 
-console.log("\n=== Testing Real Fantom Address ===");
+console.log("\n=== Testing Real Sonic Address ===");
 console.log("Address:", testAddress);
 console.log();
 
