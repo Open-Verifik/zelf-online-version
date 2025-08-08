@@ -1,4 +1,4 @@
-const Module = require("../modules/bnb-scrapping.module");
+const Module = require("../modules/binance-smart-chain.module");
 
 const address = async (ctx) => {
 	try {

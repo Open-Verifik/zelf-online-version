@@ -1,30 +1,40 @@
-# Use the Node.js 16.20 Alpine image as a parent image
-FROM node:16.20-alpine
+# Backend Dockerfile for Zelf (zelf.node)
+FROM node:24-alpine
 
-# Install Chromium
-RUN apk add --no-cache chromium
+# Install required packages for native dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git \
+    openssl
 
-# Set the working directory inside the container
-WORKDIR /usr/src/app
+# Set working directory
+WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package*.json ./
-COPY .env ./
+# Copy package files
+COPY package.json ./
 
-# Install the dependencies inside the container
-RUN npm install
+# Install dependencies
+RUN npm install --production && npm cache clean --force
 
-# If you want to install Nodemon globally
-RUN npm install -g nodemon
-
-# Bundle the source code inside the container
+# Copy application code
 COPY . .
 
-# Make port 3001 available outside the container
-EXPOSE 3001
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
 
-# Override any existing ENTRYPOINT set by the base image or elsewhere
-ENTRYPOINT []
+# Switch to non-root user
+USER nodejs
 
-# Run the application with Nodemon
-CMD [ "nodemon", "server.js" ]
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD node -e "const http=require('http');http.get('http://localhost:3000/api/health',res=>{process.exit(res.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+
+# Start the application
+CMD ["npm", "start"]

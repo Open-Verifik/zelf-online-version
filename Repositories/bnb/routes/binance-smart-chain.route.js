@@ -1,7 +1,7 @@
 const config = require("../../../Core/config");
 
-const Controller = require("../controllers/bnb-scrapping.controller");
-const Middleware = require("../middlewares/bnb-scrapping.middleware");
+const Controller = require("../controllers/binance-smart-chain.controller");
+const Middleware = require("../middlewares/binance-smart-chain.middleware");
 
 const baseBsc = "/bsc";
 const baseBnb = "/bnb";
