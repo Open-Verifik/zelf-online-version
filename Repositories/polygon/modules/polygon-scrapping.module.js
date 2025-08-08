@@ -17,6 +17,7 @@ const POLYGON_CHAIN_ID = (etherscanChains && etherscanChains["polygon-mainnet"])
 const { getVerification, setVerification } = require("../../etherscan/modules/verification-cache.module");
 const polygonRpcUrl = process.env.POLYGON_RPC_URL; // QuickNode only, no public RPCs
 const POLYGONSCAN_BATCH_DELAY_MS = Number(process.env.POLYGONSCAN_BATCH_DELAY_MS || 350);
+const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 6);
 
 // Debug helper (enable by setting DEBUG_POLYGON=1)
 const dbgPolygon = (...args) => {
@@ -44,6 +45,10 @@ const {
 	isLikelyScamTokenName,
 	USDC_BRIDGED,
 	USDC_NATIVE,
+	USDT,
+	DAI,
+	WETH,
+	WMATIC,
 } = require("./polygon-tokens.constants");
 
 async function getCoinGeckoPricesForPolygonContracts(contractAddresses) {
@@ -362,28 +367,47 @@ const getBalance = async (params) => {
 	try {
 		const address = params.id;
 
-		const checkRedirect = await instance.get(`https://polygon.blockscout.com/api/v2/search/check-redirect?q=${address}`, {
-			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
-			},
-		});
-
-		const formatedAddress = checkRedirect.data.parameter;
+		// Resolve/normalize address even if Blockscout is down
+		let formatedAddress = String(address).toLowerCase();
+		let blockscoutUp = true;
+		try {
+			const checkRedirect = await instance.get(`https://polygon.blockscout.com/api/v2/search/check-redirect?q=${address}`, {
+				headers: {
+					"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+					"Upgrade-Insecure-Requests": "1",
+				},
+			});
+			formatedAddress = checkRedirect?.data?.parameter || formatedAddress;
+		} catch (_) {
+			blockscoutUp = false;
+			dbgPolygon("blockscout_check_redirect_down_using_fallback", formatedAddress);
+		}
 		dbgPolygon("formattedAddress", formatedAddress);
 
-		const { data } = await instance.get(`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}`, {
-			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
-			},
-		});
+		let data = {};
+		try {
+			const resp = await instance.get(`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}`, {
+				headers: {
+					"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+					"Upgrade-Insecure-Requests": "1",
+				},
+			});
+			data = resp?.data || {};
+		} catch (_) {
+			blockscoutUp = false;
+			dbgPolygon("blockscout_address_down_using_rpc_for_native");
+		}
 
 		const { price: price } = await getTickerPrice({ symbol: "POL" });
 
-		const tokensResponse = await instance.get(`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}/tokens?type=ERC-20`);
-
-		const erc20Items = Array.isArray(tokensResponse?.data?.items) ? tokensResponse.data.items : [];
+		let erc20Items = [];
+		try {
+			const tokensResponse = await instance.get(`https://polygon.blockscout.com/api/v2/addresses/${formatedAddress}/tokens?type=ERC-20`);
+			erc20Items = Array.isArray(tokensResponse?.data?.items) ? tokensResponse.data.items : [];
+		} catch (_) {
+			blockscoutUp = false;
+			dbgPolygon("blockscout_tokens_down_try_oklink");
+		}
 		const contractAddresses = erc20Items.map((item) => item?.token?.address).filter(Boolean);
 		dbgPolygon("erc20ItemsCount", erc20Items.length);
 		dbgPolygon(
@@ -460,7 +484,19 @@ const getBalance = async (params) => {
 				.sort((a, b) => Number(b.fiatBalance) - Number(a.fiatBalance));
 		}
 
-		let tokens = formatTokens(erc20Items);
+		let tokens = [];
+		if (erc20Items.length > 0) {
+			tokens = formatTokens(erc20Items);
+		} else {
+			// Blockscout tokens unavailable → try OKLink
+			const okTokens = await getOklinkFormattedTokens(formatedAddress, 100);
+			if (okTokens.length > 0) {
+				tokens = okTokens;
+				dbgPolygon("tokens_from_oklink", tokens.length);
+			} else {
+				dbgPolygon("oklink_tokens_empty");
+			}
+		}
 		dbgPolygon(
 			"formattedTokensCount",
 			tokens.length,
@@ -509,9 +545,15 @@ const getBalance = async (params) => {
 		dbgPolygon("forcedFromItems", forcedFromItems);
 
 		// Curated tokens not present in Blockscout items → fetch balances via QuickNode RPC batch only
-		const curatedMissingFromItems = Array.from(COMMON_TOKENS_POLYGON)
-			.map((a) => a.toLowerCase())
-			.filter((a) => !erc20ByAddress.has(a));
+		const curatedUniverse = Array.from(COMMON_TOKENS_POLYGON).map((a) => a.toLowerCase());
+		let curatedMissingFromItems = curatedUniverse.filter((a) => !erc20ByAddress.has(a));
+		// If Blockscout is down, restrict RPC fallback to a small prioritized subset
+		if (!blockscoutUp) {
+			const priority = [USDC_BRIDGED, USDC_NATIVE, USDT, DAI, WETH, WMATIC];
+			const prioritySet = new Set(priority.map((a) => a.toLowerCase()));
+			curatedMissingFromItems = curatedUniverse.filter((a) => prioritySet.has(a)).slice(0, CURATED_RPC_FALLBACK_MAX);
+			dbgPolygon("restricted_curated_rpc_set", curatedMissingFromItems);
+		}
 
 		if (curatedMissingFromItems.length > 0) {
 			const rpcBalances = await getErc20BalancesViaRpcBatch(curatedMissingFromItems, formatedAddress);
