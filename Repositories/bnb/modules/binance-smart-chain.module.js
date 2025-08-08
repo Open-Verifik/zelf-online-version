@@ -10,40 +10,14 @@ const instance = getCleanInstance(30000);
 const bscscanApiKey = process.env.BSCSCAN_API_KEY;
 const bscscanApiUrl = process.env.BSCSCAN_API_URL || "https://api.bscscan.com/api";
 
-// Curated list of common/legit BNB Chain tokens (lowercased BEP-20 contracts)
-const COMMON_TOKENS_BSC = new Set([
-	// Stablecoins & majors
-	"0x55d398326f99059ff775485246999027b3197955", // USDT
-	"0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // USDC
-	"0xe9e7cea3dedca5984780bafc599bd69add087d56", // BUSD (legacy but common)
-	"0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3", // DAI
-	// Wrapped and pegged assets
-	"0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", // WBNB
-	"0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c", // BTCB
-	"0x2170ed0880ac9a755fd29b2688956bd959f933f8", // ETH (Binance-Peg)
-	// Popular ecosystem tokens
-	"0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82", // CAKE
-	"0x5ca42204cdaa70d5c773946e69de942b85ca6706", // POSI
-	"0xbA2aE424d960c26247Dd6c32edC70B295c744C43".toLowerCase(), // DOGE (BEP-20)
-]);
-
-// Mapping of common token contract -> CoinGecko ID (for fallback pricing by ID)
-const COMMON_TOKEN_ID_BY_ADDRESS = new Map([
-	["0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82", "pancakeswap-token"], // CAKE
-	["0x55d398326f99059ff775485246999027b3197955", "tether"], // USDT
-	["0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", "usd-coin"], // USDC
-	["0xe9e7cea3dedca5984780bafc599bd69add087d56", "binance-usd"], // BUSD
-	["0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3", "dai"], // DAI
-	["0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", "wbnb"], // WBNB
-	["0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c", "binance-bitcoin"], // BTCB
-	["0x2170ed0880ac9a755fd29b2688956bd959f933f8", "ethereum"], // ETH (Peg)
-	["0x5ca42204cdaa70d5c773946e69de942b85ca6706", "position-token"], // POSI
-	["0xba2ae424d960c26247dd6c32edc70b295c744c43", "dogecoin"], // DOGE (BEP-20)
-]);
-
-function isCommonToken(address) {
-	return COMMON_TOKENS_BSC.has((address || "").toLowerCase());
-}
+const {
+	COMMON_TOKENS_BSC,
+	COMMON_TOKEN_ID_BY_ADDRESS_BSC,
+	COMMON_TOKEN_DECIMALS_BY_ADDRESS_BSC,
+	COMMON_TOKEN_METADATA_BY_ADDRESS_BSC,
+	isCommonBscToken,
+	isLikelyScamTokenName,
+} = require("./bsc-tokens.constants");
 
 /**
  * Fetch USD prices from CoinGecko for a list of BEP-20 contract addresses
@@ -153,17 +127,6 @@ async function getBscVerifiedContracts(contractAddresses) {
 	}
 }
 
-// Basic name/symbol heuristic filter (no external API needed)
-function isLikelyScamTokenName(name = "", symbol = "") {
-	const n = String(name).toLowerCase();
-	const s = String(symbol).toLowerCase();
-
-	// Domain-like or promo-y keywords commonly seen in airdrop scam tokens
-	const suspiciousPatterns = [".io", ".org", ".net", ".online", "swap", "dividend", "tracker", "airdrop", "promo", "get rich"];
-
-	return suspiciousPatterns.some((p) => n.includes(p) || s.includes(p));
-}
-
 const getBalance = async (params) => {
 	try {
 		const address = params.id;
@@ -232,13 +195,15 @@ const getTokens = async (params) => {
 		const bscVerifiedSet = await getBscVerifiedContracts(contractAddresses);
 
 		// Fallback: fetch prices by CoinGecko ID for common tokens missing from contract-based map
-		const missingCommonAddrs = contractAddresses.map((a) => (a || "").toLowerCase()).filter((a) => isCommonToken(a) && !coingeckoPriceMap.has(a));
-		const idsToFetch = missingCommonAddrs.map((a) => COMMON_TOKEN_ID_BY_ADDRESS.get(a)).filter(Boolean);
+		const missingCommonAddrs = contractAddresses
+			.map((a) => (a || "").toLowerCase())
+			.filter((a) => isCommonBscToken(a) && !coingeckoPriceMap.has(a));
+		const idsToFetch = missingCommonAddrs.map((a) => COMMON_TOKEN_ID_BY_ADDRESS_BSC.get(a)).filter(Boolean);
 		if (idsToFetch.length > 0) {
 			const idPrices = await getCoinGeckoPricesForIds(idsToFetch);
 			// Merge into contract price map
 			missingCommonAddrs.forEach((addr) => {
-				const id = COMMON_TOKEN_ID_BY_ADDRESS.get(addr);
+				const id = COMMON_TOKEN_ID_BY_ADDRESS_BSC.get(addr);
 				const usd = id ? idPrices.get(id) : 0;
 				if (usd && usd > 0) coingeckoPriceMap.set(addr, usd);
 			});
@@ -250,14 +215,14 @@ const getTokens = async (params) => {
 		// Keep tokens that are either BscScan-verified OR present on CoinGecko (have price)
 		const visibleTokens = formattedTokens
 			// Always keep curated common tokens even if CoinGecko price is unavailable
-			.filter((t) => isCommonToken(t.address) || Number(t._price) > 0)
+			.filter((t) => isCommonBscToken(t.address) || Number(t._price) > 0)
 			// Allow common tokens to bypass heuristic name filter
-			.filter((t) => isCommonToken(t.address) || !isLikelyScamTokenName(t.name, t.symbol))
+			.filter((t) => isCommonBscToken(t.address) || !isLikelyScamTokenName(t.name, t.symbol))
 			.filter((t) => {
 				const addr = (t.address || "").toLowerCase();
 				const hasCgPrice = Number(t._price) > 0;
 				const isVerified = bscVerifiedSet.has(addr);
-				const isCommon = isCommonToken(addr);
+				const isCommon = isCommonBscToken(addr);
 				// If API key present: allow Verified OR CG-priced OR curated common list
 				// If no API key: allow CG-priced OR curated common list
 				return bscscanApiKey ? isVerified || hasCgPrice || isCommon : hasCgPrice || isCommon;
