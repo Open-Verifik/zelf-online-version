@@ -11,8 +11,12 @@ const { get_ApiKey } = require("../../Solana/modules/oklink");
 const baseUrl = "https://polygonscan.com";
 const instance = getCleanInstance(30000);
 const polygonscanApiKey = process.env.POLYGONSCAN_API_KEY || process.env.ETHERSCAN_API_KEY || config?.etherscan?.apiKey;
-const polygonscanApiUrl = process.env.POLYGONSCAN_API_URL || "https://api.polygonscan.com/api";
-const polygonRpcUrl = process.env.POLYGON_RPC_URL || "https://polygon-rpc.com";
+const polygonscanApiUrl = process.env.POLYGONSCAN_API_URL || process.env.ETHERSCAN_V2_API || "https://api.etherscan.io/v2/api";
+const etherscanChains = require("../../etherscan/chains.json");
+const POLYGON_CHAIN_ID = (etherscanChains && etherscanChains["polygon-mainnet"]) || 137;
+const { getVerification, setVerification } = require("../../etherscan/modules/verification-cache.module");
+const polygonRpcUrl = process.env.POLYGON_RPC_URL; // QuickNode only, no public RPCs
+const POLYGONSCAN_BATCH_DELAY_MS = Number(process.env.POLYGONSCAN_BATCH_DELAY_MS || 350);
 
 // Debug helper (enable by setting DEBUG_POLYGON=1)
 const dbgPolygon = (...args) => {
@@ -22,109 +26,25 @@ const dbgPolygon = (...args) => {
 	}
 };
 
-// Curated list of common Polygon tokens (lowercased)
-const COMMON_TOKENS_POLYGON = new Set([
-	// Stables & majors
-	"0x2791bca1f2de4661ed88a30c99a7a9449aa84174", // USDC
-	"0xc2132d05d31c914a87c6611c10748aeb04b58e8f", // USDT
-	"0x3c499c542cef5e3811e1192ce70d8cc03d5c3359", // USDC (native)
-	"0x8f3cf7ad23cd3cadbd9735aff958023239c6a063", // DAI
-	// Wrapped
-	"0x7ceb23fd6bc0add59e62ac25578270cff1b9f619", // WETH
-	"0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270", // WMATIC
-	"0x1bfd67037b42cf73acf2047067bd4f2c47d9bfd6", // WBTC
-	// Blue-chips / ecosystem
-	"0xd6df932a45c0f255f85145f286ea0b292b21c90b", // AAVE
-	"0x53e0bca35ec356bd5dddfebbd1fc0fd03fabad39", // LINK
-	"0x0b3f868e0be5597d5db7feb59e1cadbb0fdda50a", // SUSHI
-	"0xb33eaad8d922b1083446dc23f610c2567fb5180f", // UNI
-	"0x172370d5cd63279efa6d502dab29171933a610af", // CRV
-	"0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3", // BAL
-	"0x831753dd7087cac61ab5644b308642cc1c33dc13", // QUICK (legacy)
-	"0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4", // MANA
-	"0xbbba073c31bf03b8acf7c28ef0738decf3695683", // SAND
-	"0x385eeac5cb2d6e39bddc9f3c5f1a0ad31dc72d31", // GHST
-	"0xa3fa99a148fa48d14ed51d610c367c61876997f1", // MAI
-	"0x2e1ad108ff1d8c782fcbbb89aad783ac49586756", // TUSD
-]);
-
-// Mapping common token address -> CoinGecko ID for fallback by ID
-const COMMON_TOKEN_ID_BY_ADDRESS_POLYGON = new Map([
-	["0x2791bca1f2de4661ed88a30c99a7a9449aa84174", "usd-coin"],
-	["0xc2132d05d31c914a87c6611c10748aeb04b58e8f", "tether"],
-	["0x3c499c542cef5e3811e1192ce70d8cc03d5c3359", "usd-coin"],
-	["0x8f3cf7ad23cd3cadbd9735aff958023239c6a063", "dai"],
-	["0x7ceb23fd6bc0add59e62ac25578270cff1b9f619", "weth"],
-	["0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270", "wmatic"],
-	["0x1bfd67037b42cf73acf2047067bd4f2c47d9bfd6", "wrapped-bitcoin"],
-	["0xd6df932a45c0f255f85145f286ea0b292b21c90b", "aave"],
-	["0x53e0bca35ec356bd5dddfebbd1fc0fd03fabad39", "chainlink"],
-	["0x0b3f868e0be5597d5db7feb59e1cadbb0fdda50a", "sushi"],
-	["0xb33eaad8d922b1083446dc23f610c2567fb5180f", "uniswap"],
-	["0x172370d5cd63279efa6d502dab29171933a610af", "curve-dao-token"],
-	["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3", "balancer"],
-	["0x831753dd7087cac61ab5644b308642cc1c33dc13", "quick"],
-	["0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4", "decentraland"],
-	["0xbbba073c31bf03b8acf7c28ef0738decf3695683", "the-sandbox"],
-	["0x385eeac5cb2d6e39bddc9f3c5f1a0ad31dc72d31", "aavegotchi"],
-	["0xa3fa99a148fa48d14ed51d610c367c61876997f1", "mai"],
-	["0x2e1ad108ff1d8c782fcbbb89aad783ac49586756", "true-usd"],
-]);
-
-// Decimals for curated tokens (for polygonscan fallback formatting)
-const COMMON_TOKEN_DECIMALS_BY_ADDRESS_POLYGON = new Map([
-	["0x2791bca1f2de4661ed88a30c99a7a9449aa84174", 6], // USDC (bridged)
-	["0x3c499c542cef5e3811e1192ce70d8cc03d5c3359", 6], // USDC (native)
-	["0xc2132d05d31c914a87c6611c10748aeb04b58e8f", 6], // USDT
-	["0x8f3cf7ad23cd3cadbd9735aff958023239c6a063", 18], // DAI
-	["0x7ceb23fd6bc0add59e62ac25578270cff1b9f619", 18], // WETH
-	["0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270", 18], // WMATIC
-	["0x1bfd67037b42cf73acf2047067bd4f2c47d9bfd6", 8], // WBTC
-	["0xd6df932a45c0f255f85145f286ea0b292b21c90b", 18], // AAVE
-	["0x53e0bca35ec356bd5dddfebbd1fc0fd03fabad39", 18], // LINK
-	["0x0b3f868e0be5597d5db7feb59e1cadbb0fdda50a", 18], // SUSHI
-	["0xb33eaad8d922b1083446dc23f610c2567fb5180f", 18], // UNI
-	["0x172370d5cd63279efa6d502dab29171933a610af", 18], // CRV
-	["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3", 18], // BAL
-	["0x831753dd7087cac61ab5644b308642cc1c33dc13", 18], // QUICK
-	["0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4", 18], // MANA
-	["0xbbba073c31bf03b8acf7c28ef0738decf3695683", 18], // SAND
-	["0x385eeac5cb2d6e39bddc9f3c5f1a0ad31dc72d31", 18], // GHST
-	["0xa3fa99a148fa48d14ed51d610c367c61876997f1", 18], // MAI
-	["0x2e1ad108ff1d8c782fcbbb89aad783ac49586756", 18], // TUSD
-]);
-
-// Basic metadata for curated tokens
-const COMMON_TOKEN_METADATA_BY_ADDRESS_POLYGON = new Map([
-	[
-		"0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
-		{ symbol: "USDC", name: "USD Coin", image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png" },
-	],
-	[
-		"0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
-		{ symbol: "USDC", name: "USD Coin", image: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png" },
-	],
-	[
-		"0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
-		{ symbol: "USDT", name: "Tether", image: "https://s2.coinmarketcap.com/static/img/coins/64x64/825.png" },
-	],
-	[
-		"0x8f3cf7ad23cd3cadbd9735aff958023239c6a063",
-		{ symbol: "DAI", name: "Dai", image: "https://s2.coinmarketcap.com/static/img/coins/64x64/4943.png" },
-	],
-]);
-
-function isCommonPolygonToken(address) {
-	return COMMON_TOKENS_POLYGON.has((address || "").toLowerCase());
+// Simple async sleep helper for batch spacing
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Heuristic filter (same as BNB)
-function isLikelyScamTokenName(name = "", symbol = "") {
-	const n = String(name).toLowerCase();
-	const s = String(symbol).toLowerCase();
-	const suspiciousPatterns = [".io", ".org", ".net", ".online", "swap", "dividend", "tracker", "airdrop", "promo", "get rich"];
-	return suspiciousPatterns.some((p) => n.includes(p) || s.includes(p));
-}
+// Global request counters for external scanner calls
+let polygonscanRequestsGlobal = 0;
+const polygonscanRequestBreakdown = { verification: 0, tokenBalance: 0, tx: 0 };
+
+const {
+	COMMON_TOKENS_POLYGON,
+	COMMON_TOKEN_ID_BY_ADDRESS_POLYGON,
+	COMMON_TOKEN_DECIMALS_BY_ADDRESS_POLYGON,
+	COMMON_TOKEN_METADATA_BY_ADDRESS_POLYGON,
+	isCommonPolygonToken,
+	isLikelyScamTokenName,
+	USDC_BRIDGED,
+	USDC_NATIVE,
+} = require("./polygon-tokens.constants");
 
 async function getCoinGeckoPricesForPolygonContracts(contractAddresses) {
 	try {
@@ -179,20 +99,32 @@ async function getPolygonscanVerifiedContracts(contractAddresses) {
 			return new Set();
 		}
 		const unique = Array.from(new Set((contractAddresses || []).map((a) => (a || "").toLowerCase()))).filter(Boolean);
-		const concurrency = 5;
+		const concurrency = 3; // reduce concurrency to ease rate limits
 		const verified = new Set();
 		for (let i = 0; i < unique.length; i += concurrency) {
 			const batch = unique.slice(i, i + concurrency);
 			const results = await Promise.all(
 				batch.map(async (address) => {
+					// Try cache first
 					try {
-						const url = `${polygonscanApiUrl}?module=contract&action=getsourcecode&address=${address}&apikey=${polygonscanApiKey}`;
+						const cached = await getVerification(POLYGON_CHAIN_ID, address);
+						if (cached && typeof cached.isVerified === "boolean") {
+							if (cached.isVerified) return address;
+							return null;
+						}
+					} catch (_) {}
+					try {
+						const url = `${polygonscanApiUrl}?chainid=${POLYGON_CHAIN_ID}&module=contract&action=getsourcecode&address=${address}&apikey=${polygonscanApiKey}`;
+						polygonscanRequestsGlobal++;
+						polygonscanRequestBreakdown.verification++;
 						const { data } = await instance.get(url);
 						const item = Array.isArray(data?.result) ? data.result[0] : undefined;
 						const abi = item?.ABI;
 						if (abi && typeof abi === "string" && abi !== "Contract source code not verified") {
+							await setVerification(POLYGON_CHAIN_ID, address, true, "etherscan");
 							return address;
 						}
+						await setVerification(POLYGON_CHAIN_ID, address, false, "etherscan");
 					} catch (err) {
 						// skip individual errors
 					}
@@ -200,6 +132,8 @@ async function getPolygonscanVerifiedContracts(contractAddresses) {
 				})
 			);
 			results.filter(Boolean).forEach((addr) => verified.add(addr));
+			// space batches
+			if (i + concurrency < unique.length) await sleep(POLYGONSCAN_BATCH_DELAY_MS);
 		}
 		return verified;
 	} catch (error) {
@@ -226,12 +160,46 @@ async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 				"latest",
 			],
 		};
+		if (!polygonRpcUrl) throw new Error("POLYGON_RPC_URL missing");
 		const { data: rpc } = await instance.post(polygonRpcUrl, payload);
 		const hex = rpc?.result || "0x0";
 		return hex === "0x" ? "0x0" : hex;
 	} catch (error) {
 		dbgPolygon("rpc_balance_error", polygonRpcUrl, contractAddress, error?.message || error);
 		return "0x0";
+	}
+}
+
+// Batch ERC-20 balances via eth_call (multicall style without onchain Multicall)
+async function getErc20BalancesViaRpcBatch(contracts, userAddress) {
+	if (!Array.isArray(contracts) || contracts.length === 0) return new Map();
+	if (!polygonRpcUrl) return new Map();
+	const methodId = "0x70a08231";
+	const addressHex = String(userAddress).toLowerCase().replace(/^0x/, "");
+	const calls = contracts.map((c) => ({
+		jsonrpc: "2.0",
+		id: Math.floor(Math.random() * 1e9),
+		method: "eth_call",
+		params: [{ to: c, data: methodId + "000000000000000000000000" + addressHex }, "latest"],
+	}));
+	try {
+		const results = await Promise.all(
+			calls.map((payload) =>
+				instance
+					.post(polygonRpcUrl, payload)
+					.then((r) => r.data)
+					.catch(() => null)
+			)
+		);
+		const map = new Map();
+		for (let i = 0; i < contracts.length; i++) {
+			const res = results[i];
+			const hex = res?.result || "0x0";
+			map.set(String(contracts[i]).toLowerCase(), hex === "0x" ? "0x0" : hex);
+		}
+		return map;
+	} catch (_) {
+		return new Map();
 	}
 }
 
@@ -298,8 +266,10 @@ async function getOklinkTransactions(address, page, show, price) {
 async function getPolygonscanTransactions(address, page, show, price) {
 	try {
 		const apikey = polygonscanApiKey ? `&apikey=${polygonscanApiKey}` : "";
-		const url = `${polygonscanApiUrl}?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=${page}&offset=${show}&sort=desc${apikey}`;
+		const url = `${polygonscanApiUrl}?chainid=${POLYGON_CHAIN_ID}&module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=${page}&offset=${show}&sort=desc${apikey}`;
 		const { data } = await instance.get(url);
+		polygonscanRequestsGlobal++;
+		polygonscanRequestBreakdown.tx++;
 		if (data?.status === "1" && Array.isArray(data?.result)) {
 			const txs = data.result.map((tx) => {
 				const value = Number(tx.value || 0) / Math.pow(10, 18);
@@ -354,11 +324,7 @@ async function getOklinkFormattedTokens(address, limit = 100) {
 					const rawAmount = Number(tok.holdingAmount || 0);
 					const amount = rawAmount / Math.pow(10, decimals);
 					let price = Number(tok.price || 0);
-					if (
-						(!price || price === 0) &&
-						(addr.toLowerCase() === "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" ||
-							addr.toLowerCase() === "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359")
-					) {
+					if ((!price || price === 0) && (addr.toLowerCase() === USDC_BRIDGED || addr.toLowerCase() === USDC_NATIVE)) {
 						price = 1;
 					}
 					const fiatBalance = amount * price;
@@ -424,8 +390,6 @@ const getBalance = async (params) => {
 			"firstTokenAddresses",
 			erc20Items.slice(0, 10).map((it) => String(it?.token?.address || "").toLowerCase())
 		);
-		const USDC_BRIDGED = "0x2791bca1f2de4661ed88a30c99a7a9449aa84174";
-		const USDC_NATIVE = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";
 		dbgPolygon("polygonscanApiCfg", {
 			url: polygonscanApiUrl,
 			keyPresent: Boolean(polygonscanApiKey),
@@ -470,10 +434,7 @@ const getBalance = async (params) => {
 
 					let finalPrice = price;
 					// For curated stables, force $1.00 if price unavailable
-					if (
-						(!finalPrice || finalPrice === 0) &&
-						(addr === "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" || addr === "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359")
-					) {
+					if ((!finalPrice || finalPrice === 0) && (addr === USDC_BRIDGED || addr === USDC_NATIVE)) {
 						finalPrice = 1;
 					}
 					const fiatBalance = amount * finalPrice;
@@ -547,74 +508,47 @@ const getBalance = async (params) => {
 		}
 		dbgPolygon("forcedFromItems", forcedFromItems);
 
-		// Polygonscan balance fallback for curated tokens not present in Blockscout items
+		// Curated tokens not present in Blockscout items → fetch balances via QuickNode RPC batch only
 		const curatedMissingFromItems = Array.from(COMMON_TOKENS_POLYGON)
 			.map((a) => a.toLowerCase())
 			.filter((a) => !erc20ByAddress.has(a));
 
 		if (curatedMissingFromItems.length > 0) {
-			const concurrency = 4;
-			for (let i = 0; i < curatedMissingFromItems.length; i += concurrency) {
-				const batch = curatedMissingFromItems.slice(i, i + concurrency);
-				const results = await Promise.all(
-					batch.map(async (contract) => {
-						try {
-							// Try Polygonscan if API key set, else JSON-RPC fallback
-							let raw = "0x0";
-							if (polygonscanApiKey) {
-								const url = `${polygonscanApiUrl}?module=account&action=tokenbalance&contractaddress=${contract}&address=${formatedAddress}&tag=latest&apikey=${polygonscanApiKey}`;
-								const { data: balData } = await instance.get(url);
-								dbgPolygon("polygonscanTokenBalance", contract, {
-									status: balData?.status,
-									message: balData?.message,
-									sample: balData?.result ? String(balData.result).slice(0, 24) : null,
-								});
-								raw = balData?.result || "0x0";
-							}
-
-							if (!polygonscanApiKey || raw === "0x0" || raw === "0") {
-								raw = await getErc20BalanceViaRpc(contract, formatedAddress);
-							}
-							if (!raw || raw === "0") return null;
-							// raw may be hex; convert
-							const numericRaw = typeof raw === "string" && raw.startsWith("0x") ? parseInt(raw, 16) : Number(raw);
-							if (!numericRaw) return null;
-							const decimals = COMMON_TOKEN_DECIMALS_BY_ADDRESS_POLYGON.get(contract) || 18;
-							const amount = Number(numericRaw) / Math.pow(10, decimals);
-							if (amount <= 0) return null;
-							const id = COMMON_TOKEN_ID_BY_ADDRESS_POLYGON.get(contract);
-							let price = 0;
-							if (id) {
-								const idPrices = await getCoinGeckoPricesForIds([id]);
-								price = idPrices.get(id) || 0;
-							}
-							if ((!price || price === 0) && (contract === USDC_BRIDGED || contract === USDC_NATIVE)) {
-								price = 1;
-							}
-							const fiatBalance = amount * price;
-							const meta = COMMON_TOKEN_METADATA_BY_ADDRESS_POLYGON.get(contract) || {};
-							return {
-								_amount: amount,
-								_fiatBalance: fiatBalance.toFixed(Math.min(decimals, 8)),
-								_price: Number(price),
-								address: contract,
-								amount: amount.toFixed(Math.min(decimals, 12)),
-								decimals: decimals,
-								fiatBalance: fiatBalance,
-								image: meta.image || "",
-								name: meta.name || "",
-								price: price,
-								symbol: meta.symbol || "",
-								tokenType: "ERC-20",
-							};
-						} catch (e) {
-							return null;
-						}
-					})
-				);
-				results.filter(Boolean).forEach((t) => tokens.push(t));
-				dbgPolygon("polygonscanFallbackAdded", results.filter(Boolean).length, batch);
+			const rpcBalances = await getErc20BalancesViaRpcBatch(curatedMissingFromItems, formatedAddress);
+			const added = [];
+			for (const contract of curatedMissingFromItems) {
+				const raw = rpcBalances.get(contract) || "0x0";
+				const numericRaw = typeof raw === "string" && raw.startsWith("0x") ? parseInt(raw, 16) : Number(raw);
+				if (!numericRaw) continue;
+				const decimals = COMMON_TOKEN_DECIMALS_BY_ADDRESS_POLYGON.get(contract) || 18;
+				const amount = Number(numericRaw) / Math.pow(10, decimals);
+				if (amount <= 0) continue;
+				const id = COMMON_TOKEN_ID_BY_ADDRESS_POLYGON.get(contract);
+				let price = 0;
+				if (id) {
+					const idPrices = await getCoinGeckoPricesForIds([id]);
+					price = idPrices.get(id) || 0;
+				}
+				if ((!price || price === 0) && (contract === USDC_BRIDGED || contract === USDC_NATIVE)) price = 1;
+				const fiatBalance = amount * price;
+				const meta = COMMON_TOKEN_METADATA_BY_ADDRESS_POLYGON.get(contract) || {};
+				tokens.push({
+					_amount: amount,
+					_fiatBalance: fiatBalance.toFixed(Math.min(decimals, 8)),
+					_price: Number(price),
+					address: contract,
+					amount: amount.toFixed(Math.min(decimals, 12)),
+					decimals: decimals,
+					fiatBalance: fiatBalance,
+					image: meta.image || "",
+					name: meta.name || "",
+					price: price,
+					symbol: meta.symbol || "",
+					tokenType: "ERC-20",
+				});
+				added.push(contract);
 			}
+			dbgPolygon("rpcFallbackAdded", added.length, added);
 		}
 
 		// De-duplicate and sort again
@@ -644,6 +578,7 @@ const getBalance = async (params) => {
 		const maticAmount = Number(nativeRaw) / Math.pow(10, maticDecimals);
 		const maticFiatBalance = maticAmount * price;
 
+		dbgPolygon("polygonscanRequests", polygonscanRequestsGlobal, polygonscanRequestBreakdown);
 		const response = {
 			address,
 			balance: maticAmount.toFixed(maticDecimals),
