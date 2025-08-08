@@ -1,15 +1,16 @@
+require("dotenv").config();
 const cheerio = require("cheerio");
 const moment = require("moment");
-require("dotenv").config();
 const urlBase = process.env.MICROSERVICES_BOGOTA_URL;
 const token = process.env.MICROSERVICES_BOGOTA_TOKEN;
 const { getCleanInstance } = require("../../../Core/axios");
+const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 
 const baseUrl = "https://polygonscan.com";
 const instance = getCleanInstance(30000);
-const polygonscanApiKey = process.env.POLYGONSCAN_API_KEY;
+const polygonscanApiKey = process.env.POLYGONSCAN_API_KEY || process.env.ETHERSCAN_API_KEY || config?.etherscan?.apiKey;
 const polygonscanApiUrl = process.env.POLYGONSCAN_API_URL || "https://api.polygonscan.com/api";
 const polygonRpcUrl = process.env.POLYGON_RPC_URL || "https://polygon-rpc.com";
 
@@ -207,11 +208,10 @@ async function getPolygonscanVerifiedContracts(contractAddresses) {
 	}
 }
 
-// Minimal JSON-RPC call to fetch ERC-20 balance via balanceOf(address)
+// Minimal JSON-RPC call to fetch ERC-20 balance via balanceOf(address) using only the configured RPC
 async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 	try {
 		const methodId = "0x70a08231"; // balanceOf(address)
-		// ABI-encode address as 32 bytes (left-padded with zeros, address in the last 20 bytes)
 		const addressHex = String(userAddress).toLowerCase().replace(/^0x/, "");
 		const data = methodId + "000000000000000000000000" + addressHex;
 		const payload = {
@@ -228,9 +228,9 @@ async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 		};
 		const { data: rpc } = await instance.post(polygonRpcUrl, payload);
 		const hex = rpc?.result || "0x0";
-		return hex;
+		return hex === "0x" ? "0x0" : hex;
 	} catch (error) {
-		dbgPolygon("rpc_balance_error", contractAddress, error?.message || error);
+		dbgPolygon("rpc_balance_error", polygonRpcUrl, contractAddress, error?.message || error);
 		return "0x0";
 	}
 }
@@ -426,6 +426,11 @@ const getBalance = async (params) => {
 		);
 		const USDC_BRIDGED = "0x2791bca1f2de4661ed88a30c99a7a9449aa84174";
 		const USDC_NATIVE = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";
+		dbgPolygon("polygonscanApiCfg", {
+			url: polygonscanApiUrl,
+			keyPresent: Boolean(polygonscanApiKey),
+			keyPreview: polygonscanApiKey ? `${polygonscanApiKey.slice(0, 4)}…${polygonscanApiKey.slice(-4)}` : null,
+		});
 		dbgPolygon("blockscoutHasUSDC", {
 			bridged: erc20Items.some((it) => String(it?.token?.address || "").toLowerCase() === USDC_BRIDGED),
 			native: erc20Items.some((it) => String(it?.token?.address || "").toLowerCase() === USDC_NATIVE),
@@ -559,6 +564,11 @@ const getBalance = async (params) => {
 							if (polygonscanApiKey) {
 								const url = `${polygonscanApiUrl}?module=account&action=tokenbalance&contractaddress=${contract}&address=${formatedAddress}&tag=latest&apikey=${polygonscanApiKey}`;
 								const { data: balData } = await instance.get(url);
+								dbgPolygon("polygonscanTokenBalance", contract, {
+									status: balData?.status,
+									message: balData?.message,
+									sample: balData?.result ? String(balData.result).slice(0, 24) : null,
+								});
 								raw = balData?.result || "0x0";
 							}
 
