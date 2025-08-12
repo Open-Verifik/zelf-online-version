@@ -1,17 +1,23 @@
 const cheerio = require("cheerio");
+const moment = require("moment");
 require("dotenv").config();
 const urlBase = process.env.MICROSERVICES_BOGOTA_URL;
 const token = process.env.MICROSERVICES_BOGOTA_TOKEN;
 const { getCleanInstance } = require("../../../Core/axios");
+const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 
 const baseUrl = "https://bscscan.com";
 const instance = getCleanInstance(30000);
-const bscscanApiKey = process.env.BSCSCAN_API_KEY;
-const bscscanApiUrl = process.env.BSCSCAN_API_URL || "https://api.bscscan.com/api";
+const bscscanApiKey = process.env.BSCSCAN_API_KEY || process.env.ETHERSCAN_API_KEY || config?.etherscan?.apiKey;
+const etherscanV2ApiUrl = process.env.ETHERSCAN_V2_API || "https://api.etherscan.io/v2/api";
+const etherscanChains = require("../../etherscan/chains.json");
+const BSC_CHAIN_ID = (etherscanChains && (etherscanChains["bsc-mainnet"] || etherscanChains["bsc"])) || 56;
 const bscRpcUrl = process.env.BSC_RPC_URL; // QuickNode only
 const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 6);
+const BSC_TOKENS_PRIMARY_TIMEOUT_MS = Number(process.env.BSC_TOKENS_PRIMARY_TIMEOUT_MS || 4000);
+const BSCSCAN_BATCH_DELAY_MS = Number(process.env.BSCSCAN_BATCH_DELAY_MS || 350);
 
 // Debug helper (enable by setting DEBUG_BSC=1)
 const dbgBsc = (...args) => {
@@ -34,6 +40,15 @@ const {
 	DAI,
 	WBNB,
 } = require("./bsc-tokens.constants");
+const { getVerification, setVerification } = require("../../etherscan/modules/verification-cache.module");
+
+// Request counters for scanners
+let bscscanRequestsGlobal = 0;
+const bscscanRequestBreakdown = { verification: 0, tx: 0 };
+
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Fetch USD prices from CoinGecko for a list of BEP-20 contract addresses
@@ -235,7 +250,7 @@ async function getBscVerifiedContracts(contractAddresses) {
 
 		const uniqueAddresses = Array.from(new Set((contractAddresses || []).map((addr) => (addr || "").toLowerCase()))).filter(Boolean);
 
-		const concurrency = 5;
+		const concurrency = 3; // reduce to ease rate limits
 		const verified = new Set();
 
 		for (let i = 0; i < uniqueAddresses.length; i += concurrency) {
@@ -244,13 +259,25 @@ async function getBscVerifiedContracts(contractAddresses) {
 			const results = await Promise.all(
 				batch.map(async (address) => {
 					try {
-						const url = `${bscscanApiUrl}?module=contract&action=getsourcecode&address=${address}&apikey=${bscscanApiKey}`;
+						// cache first
+						try {
+							const cached = await getVerification(BSC_CHAIN_ID, address);
+							if (cached && typeof cached.isVerified === "boolean") {
+								if (cached.isVerified) return address;
+								return null;
+							}
+						} catch (_) {}
+						const url = `${etherscanV2ApiUrl}?chainid=${BSC_CHAIN_ID}&module=contract&action=getsourcecode&address=${address}&apikey=${bscscanApiKey}`;
+						bscscanRequestsGlobal++;
+						bscscanRequestBreakdown.verification++;
 						const { data } = await instance.get(url);
 						const item = Array.isArray(data?.result) ? data.result[0] : undefined;
 						const abi = item?.ABI;
 						if (abi && typeof abi === "string" && abi !== "Contract source code not verified") {
+							await setVerification(BSC_CHAIN_ID, address, true, "etherscan");
 							return address;
 						}
+						await setVerification(BSC_CHAIN_ID, address, false, "etherscan");
 					} catch (err) {
 						// Ignore per-address errors to avoid failing the whole batch
 					}
@@ -259,6 +286,7 @@ async function getBscVerifiedContracts(contractAddresses) {
 			);
 
 			results.filter(Boolean).forEach((addr) => verified.add(addr));
+			if (i + concurrency < uniqueAddresses.length) await sleep(BSCSCAN_BATCH_DELAY_MS);
 		}
 
 		return verified;
@@ -271,10 +299,12 @@ async function getBscVerifiedContracts(contractAddresses) {
 const getBalance = async (params) => {
 	try {
 		const address = params.id;
+		const tStart = Date.now();
 		const { price } = await getTickerPrice({ symbol: "BNB" });
 
 		// Native balance: NodeReal → RPC fallback
 		let nativeWei = 0;
+		let tNativeStart = Date.now();
 		try {
 			const { data } = await instance.get(`https://bsc-explorer-api.nodereal.io/api/token/getBalance?address=${address}`);
 			nativeWei = Number(BigInt(data?.data || 0));
@@ -282,14 +312,21 @@ const getBalance = async (params) => {
 			dbgBsc("nodereal_balance_down_use_rpc");
 			nativeWei = await getNativeBalanceViaRpc(address);
 		}
+		dbgBsc("native_balance_ms", Date.now() - tNativeStart);
 
 		// Tokens: NodeReal → OKLink → curated RPC batch
 		let tokens = [];
+		let used = "nodereal";
+		const tTokensStart = Date.now();
 		try {
-			tokens = await getTokens({ id: address });
+			const p = getTokens({ id: address });
+			const fallback = new Promise((resolve) => setTimeout(() => resolve(null), BSC_TOKENS_PRIMARY_TIMEOUT_MS));
+			const res = await Promise.race([p, fallback]);
+			tokens = res || [];
 		} catch (_) {
 			dbgBsc("nodereal_tokens_down_try_oklink");
 			tokens = await getOklinkFormattedTokens(address, 100);
+			used = "oklink";
 		}
 
 		if (!tokens || tokens.length === 0) {
@@ -329,7 +366,9 @@ const getBalance = async (params) => {
 				added.push(contract);
 			}
 			dbgBsc("rpcFallbackAdded", added.length, added);
+			used = "rpc_curated";
 		}
+		dbgBsc("tokens_source", used, { ms: Date.now() - tTokensStart });
 
 		const BSCValue = Number(nativeWei) / 1e18;
 		const fiatBalance = BSCValue * price;
@@ -346,6 +385,8 @@ const getBalance = async (params) => {
 		});
 
 		const transactions = await getTransactionsList({ id: address }, { show: "10" });
+
+		dbgBsc("bscscanRequests", bscscanRequestsGlobal, bscscanRequestBreakdown, { totalMs: Date.now() - tStart });
 
 		return {
 			address,
@@ -538,28 +579,121 @@ const getTransactionStatus = async (params) => {
  * @param {Object} params
  * @returns
  */
-const getTransactionsList = async (params, query) => {
-	const address = params.id;
-	const show = query.show;
-
+// OKLink native transactions
+async function getOklinkTransactions(address, page, show, price) {
 	try {
-		const { data } = await instance.get(`${urlBase}/api/evm-tx/bsc-transactions?address=${address}&show=${show}`, {
+		const t = Date.now();
+		const url = `https://www.oklink.com/api/explorer/v2/bsc/addresses/${address}/transactionsByClassfy/condition?offset=${page}&limit=${show}&address=${address}&nonzeroValue=false&t=${t}`;
+		const { data } = await instance.get(url, {
 			headers: {
-				Authorization: `Bearer ${token}`,
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 			},
 		});
+		if ((data?.code === "0" || data?.code === 0) && data?.data?.hits) {
+			const hits = data.data.hits;
+			const transactions = hits.map((tx) => {
+				const value = Number(tx.value || 0);
+				const fiatValue = value * Number(price || 0);
+				const traffic = String(tx.from || "").toLowerCase() === String(address).toLowerCase() ? "OUT" : "IN";
+				return {
+					age: tx.blocktime ? moment(tx.blocktime * 1000).fromNow() : "",
+					amount: value ? String(value) : "0",
+					asset: "BNB",
+					block: String(tx.blockHeight || ""),
+					date: tx.blocktime ? moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss") : "",
+					fiatAmount: fiatValue.toFixed(2),
+					from: tx.from,
+					hash: tx.hash,
+					method: tx.method || "Transfer",
+					to: tx.to,
+					traffic,
+					txnFee: tx.fee ? String(Number(tx.fee)) : "0",
+				};
+			});
+			return { pagination: { records: String(transactions.length), pages: "1", page: String(page) }, transactions };
+		}
+		return null;
+	} catch (error) {
+		dbgBsc("oklink_tx_error", error?.message || error);
+		return null;
+	}
+}
 
-		return {
-			pagination: { records: "0", pages: "0", page: "0" },
-			transactions: data,
-		};
+// Etherscan v2 transactions (BSC chainid=56)
+async function getBscscanTransactions(address, page, show, price) {
+	try {
+		const apikey = bscscanApiKey ? `&apikey=${bscscanApiKey}` : "";
+		const url = `${etherscanV2ApiUrl}?chainid=${BSC_CHAIN_ID}&module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=${page}&offset=${show}&sort=desc${apikey}`;
+		const { data } = await instance.get(url);
+		bscscanRequestsGlobal++;
+		bscscanRequestBreakdown.tx++;
+		if (data?.status === "1" && Array.isArray(data?.result)) {
+			const txs = data.result.map((tx) => {
+				const value = Number(tx.value || 0) / Math.pow(10, 18);
+				const fiatValue = value * Number(price || 0);
+				const traffic = String(tx.from || "").toLowerCase() === String(address).toLowerCase() ? "OUT" : "IN";
+				let txnFee = "0";
+				const gasUsed = Number(tx.gasUsed || 0);
+				const gasPrice = Number(tx.gasPrice || 0);
+				if (gasUsed && gasPrice) txnFee = ((gasUsed * gasPrice) / Math.pow(10, 18)).toFixed(8);
+				return {
+					age: tx.timeStamp ? moment(Number(tx.timeStamp) * 1000).fromNow() : "",
+					amount: value ? String(value) : "0",
+					asset: "BNB",
+					block: String(tx.blockNumber || ""),
+					date: tx.timeStamp ? moment(Number(tx.timeStamp) * 1000).format("YYYY-MM-DD HH:mm:ss") : "",
+					fiatAmount: fiatValue.toFixed(2),
+					from: tx.from,
+					hash: tx.hash,
+					method: tx.methodId ? "Contract Interaction" : "Transfer",
+					to: tx.to,
+					traffic,
+					txnFee,
+				};
+			});
+			return { pagination: { records: String(txs.length), pages: "1", page: String(page) }, transactions: txs };
+		}
+		return null;
+	} catch (error) {
+		dbgBsc("bscscan_tx_error", error?.message || error);
+		return null;
+	}
+}
+
+const getTransactionsList = async (params, query) => {
+	const address = params.id;
+	const page = query.page || 0;
+	const show = query.show || 10;
+
+	try {
+		// Price for fiat amounts
+		let price = 0;
+		try {
+			const p = await getTickerPrice({ symbol: "BNB" });
+			price = Number(p?.price || 0);
+		} catch (_) {}
+
+		// Try OKLink first
+		let resp = await getOklinkTransactions(address, page, show, price);
+		if (resp && resp.transactions && resp.transactions.length > 0) return resp;
+
+		// Fallback to Etherscan v2 (BSC)
+		resp = await getBscscanTransactions(address, page, show, price);
+		if (resp && resp.transactions && resp.transactions.length > 0) return resp;
+
+		// Final fallback: internal microservice
+		try {
+			const { data } = await instance.get(`${urlBase}/api/evm-tx/bsc-transactions?address=${address}&show=${show}`, {
+				headers: token ? { Authorization: `Bearer ${token}` } : {},
+			});
+			return { pagination: { records: String(data?.length || 0), pages: "1", page: String(page) }, transactions: data || [] };
+		} catch (_) {}
+
+		return { pagination: { records: "0", pages: "0", page: String(page) }, transactions: [] };
 	} catch (error) {
 		console.error({ error });
-
-		return {
-			pagination: { records: "0", pages: "0", page: "0" },
-			transactions: [],
-		};
+		return { pagination: { records: "0", pages: "0", page: String(page) }, transactions: [] };
 	}
 };
 

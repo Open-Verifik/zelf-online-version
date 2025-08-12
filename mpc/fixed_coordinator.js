@@ -1,17 +1,20 @@
 const WebSocket = require("ws");
 
 class FixedCoordinator {
-	constructor(port = 8080) {
-		this.port = port;
+	constructor(port = 8088) {
+		// allow env overrides for orchestration via API
+		const envPort = parseInt(process.env.MPC_PORT || "", 10);
+		this.port = Number.isFinite(envPort) ? envPort : port;
 		this.parties = new Map();
 		this.polynomials = new Map();
 		this.completedParties = new Set();
-		this.threshold = 2;
-		this.totalParties = 3;
-		this.sessionId = `fixed_dkg_${Date.now()}`;
+		this.threshold = parseInt(process.env.MPC_THRESHOLD || "2", 10) || 2;
+		this.totalParties = parseInt(process.env.MPC_TOTAL_PARTIES || "3", 10) || 3;
+		this.sessionId = process.env.MPC_SESSION_ID || `fixed_dkg_${Date.now()}`;
 
 		this.setupWebSocket();
-		console.log(`Fixed Coordinator running on ws://localhost:${port}`);
+		console.log(`Fixed Coordinator started on port ${this.port}`);
+		console.log(`Fixed Coordinator running on ws://localhost:${this.port}`);
 		console.log(`Session ID: ${this.sessionId}`);
 	}
 
