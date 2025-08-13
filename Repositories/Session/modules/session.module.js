@@ -177,13 +177,9 @@ const encryptContent = async (message) => {
 const _getPrivateKey = async (authUser) => {
 	const pgpRecord = await PGPKeyModule.findKey(null, authUser);
 
-	console.log({ pgpRecord, authUser });
-
 	if (!pgpRecord) throw new Error("key_not_found");
 
 	const privateKey = await PGPKeyModule.decryptKey(pgpRecord.type, pgpRecord.key);
-
-	console.log({ privateKey });
 
 	return privateKey;
 };
@@ -199,13 +195,11 @@ const sessionDecrypt = async (content, authUser) => {
 
 		return decryptedContent;
 	} catch (exception) {
-		console.error({ exception, authUser, privateKeyToDecrypt: privateKey, content });
 		throw new Error("decryption_failed");
 	}
 };
 
 const walletEncrypt = async (content, identifier, password = "") => {
-	// get the secretKey
 	let pgpRecord = await PGPKeyModule.findKey(identifier);
 
 	const payload = {
