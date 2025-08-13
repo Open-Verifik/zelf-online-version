@@ -226,8 +226,8 @@ function formatTransactions(transfers, address) {
 			from_token_account: tx.from,
 			to_token_account: address,
 			status: tx.status,
-			asset: tx.tokenName ? tx.tokenName : "SOL",
-			timestamp: tx.timestamp, // Keep original timestamp for sorting
+			asset: tx.tokenSymbol || tx.tokenName || "SOL",
+			timestamp: tx.timestamp, // Keep original timestamp for sorting,
 		}));
 
 		// Sort by timestamp (newest first)
