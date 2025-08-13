@@ -48,16 +48,21 @@ const _saveKey = async (type = "session", identifier, privateKey, publicKey, use
 	return publicKey;
 };
 
-const findKey = async (identifier) => {
-	const pgpRecord = await MongoORM.buildQuery(
-		{
-			where_identifier: identifier,
-			findOne: true,
-		},
-		Model,
-		null,
-		[]
-	);
+const findKey = async (identifier, authUser) => {
+	const queryParams = {
+		findOne: true,
+	};
+
+	if (authUser) {
+		const identifiers = [authUser.identifier, authUser.ip].filter(Boolean);
+		if (identifiers.length) {
+			queryParams.in_identifier = identifiers;
+		}
+	} else {
+		queryParams.where_identifier = identifier;
+	}
+
+	const pgpRecord = await MongoORM.buildQuery(queryParams, Model, null, []);
 
 	return pgpRecord;
 };
