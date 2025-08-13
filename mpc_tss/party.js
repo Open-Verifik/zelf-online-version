@@ -22,6 +22,11 @@ class TSSEcdsaParty {
 		this.rng = null;
 		this.precompute = null;
 		this.participants = [];
+		// In-memory message queues and waiters for DKLS transport
+		this._tssQueues = Object.create(null); // key -> string[]
+		this._tssWaiters = Object.create(null); // key -> Array<fn>
+		// Install DKLS JS bridge for Node environment
+		this.installJsBridge();
 		this.connect();
 	}
 
@@ -36,6 +41,67 @@ class TSSEcdsaParty {
 
 	ensureDir(dir) {
 		if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+	}
+
+	normalizeKind(k) {
+		if (!k) return "";
+		const s = String(k);
+		const i = s.lastIndexOf("~");
+		return i >= 0 ? s.slice(i + 1) : s;
+	}
+
+	enqueueTssMsg(key, payload) {
+		const waiters = this._tssWaiters[key];
+		if (waiters && waiters.length > 0) {
+			const resolve = waiters.shift();
+			resolve(payload);
+			return;
+		}
+		const q = this._tssQueues[key] || (this._tssQueues[key] = []);
+		q.push(payload);
+	}
+
+	installJsBridge() {
+		const self = this;
+		// js_send_msg(session, from, to, kind, payload) => Promise<number>
+		globalThis.js_send_msg = function (session, from, to, kind, payload) {
+			return new Promise((resolve) => {
+				try {
+					if (self.ws && self.ws.readyState === self.ws.OPEN) {
+						self.send({ type: "tss_msg", sessionId: session, from, to, kind, payload });
+					}
+					resolve(1);
+				} catch (_) {
+					resolve(0);
+				}
+			});
+		};
+
+		// js_read_msg(session, from, to, kind) => Promise<string>
+		globalThis.js_read_msg = function (session, from, to, kind) {
+			return new Promise((resolve) => {
+				const normKind = self.normalizeKind(kind);
+				const key1 = `_tssq_${to}_${from}_${normKind}`;
+				const key2 = `_tssq_${from}_${to}_${normKind}`;
+				for (const key of [key1, key2]) {
+					const q = self._tssQueues[key];
+					if (q && q.length > 0) {
+						const msg = q.shift();
+						return resolve(msg);
+					}
+				}
+				(self._tssWaiters[key1] || (self._tssWaiters[key1] = [])).push(resolve);
+				(self._tssWaiters[key2] || (self._tssWaiters[key2] = [])).push(resolve);
+				setTimeout(() => {
+					const stillWaiting =
+						(self._tssWaiters[key1] && self._tssWaiters[key1].includes(resolve)) ||
+						(self._tssWaiters[key2] && self._tssWaiters[key2].includes(resolve));
+					if (stillWaiting) {
+						console.warn(`[PARTY ${self.partyIndex}] Still waiting for TSS message: ${key1} or ${key2}`);
+					}
+				}, 30000);
+			});
+		};
 	}
 
 	partyMnemonicFile() {
@@ -114,6 +180,22 @@ class TSSEcdsaParty {
 				.catch((e) => {
 					this.send({ type: "tss_error", partyIndex: this.partyIndex, error: `setup_failed: ${e.message}` });
 				});
+			return;
+		}
+		if (type === "tss_msg") {
+			try {
+				const toIdx = data.to ?? this.partyIndex;
+				const normKind = this.normalizeKind(data.kind || "");
+				const key = `_tssq_${toIdx}_${data.from}_${normKind}`;
+				const payload = String(data.payload || "");
+				const waiters = this._tssWaiters[key];
+				if (waiters && waiters.length > 0) {
+					const r = waiters.shift();
+					r(payload);
+				} else {
+					this.enqueueTssMsg(key, payload);
+				}
+			} catch (_) {}
 			return;
 		}
 		if (type === "tss_setup") {

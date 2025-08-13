@@ -1,0 +1,274 @@
+---
+alwaysApply: true
+---
+
+# Koa.js API Guidelines for Node.js 23+ (CommonJS) with MPC TSS Integration
+
+## Overview
+Guidelines for building secure, scalable REST APIs using **Koa v2** on **Node.js 23+ (target 24 LTS)** in **CommonJS** style, aligning with the current codebase. Includes patterns for JWT auth, Swagger docs, MongoDB via Mongoose, route organization, and MPC TSS orchestration.
+
+## Scope
+- **Applies to**: All API work under `server.js`, `Routes/*`, and `Repositories/*/routes/*`.
+- **Always Apply**: True
+- **Date**: August 12, 2025
+
+## Guidelines
+
+### Environment
+- Use **Node.js 23+ (20 LTS preferred)** with **Koa v2.x**.
+- Use **CommonJS** modules (`require`/`module.exports`).
+- Load environment via `dotenv` in `Core/config.js`. Do not read `process.env` directly in modules; import from `Core/config`.
+- Entry point is `server.js`.
+
+### RESTful API Design
+- Follow REST conventions (resourceful URLs, proper HTTP verbs, idempotency where applicable).
+- Prefix all API routes with `/api` using `config.basePath(path)` (e.g., `config.basePath('/bsc') => /api/bsc`).
+- Keep resource-specific routes under `Repositories/<name>/routes/*.js`.
+
+### Koa Usage and Server Composition
+- Core middleware: `koa-bodyparser`, `@koa/cors`, and `@koa/router`.
+- JWT auth: `koa-jwt` using `config.JWT_SECRET` (and `config.SUPERADMIN_JWT_SECRET` for privileged flows as needed).
+- Order of middleware in `server.js`:
+  1. `bodyParser`, `cors` and global error handler for JWT (map to 401 with `{ error: string }`).
+  2. Mount unprotected routes first.
+  3. `koa-jwt` authentication middleware.
+  4. Mount protected routes.
+- Serve Swagger docs from `server.js` at `/docs` (UI) and `/swagger.json`.
+- Graceful shutdown: close HTTP server then disconnect Mongoose (see `server.js`).
+
+### Routing Conventions
+- Use `@koa/router`.
+- `Routes/unprotected.js` and `Routes/protected.js` each create a `new Router()` and export it.
+- Protected router composes repository routes via a loader (see `Routes/protected-repositories.js`).
+- Repository route files export a function `(server) => { ... }` where `server` is a `Router` instance; register endpoints with `server.get/post/...`.
+- Build paths with `config.basePath('<segment>')` to ensure `/api` prefix. Example (simplified):
+  ```js
+  // Repositories/bnb/routes/binance-smart-chain.route.js
+  const config = require("../../../Core/config");
+  module.exports = (server) => {
+    const PATH_BSC = config.basePath('/bsc');
+    server.get(`${PATH_BSC}/address/:id`, Controller.address);
+  };
+  ```
+
+### Validation and Middleware
+- Use `joi` (and `@joi/date` when needed) in per-repository middleware for request validation (e.g., `Middleware.validateToken`, `Middleware.validateAddressTransactions`).
+- Keep middleware pure and reusable; attach them per-route as in existing modules.
+
+### Middleware Architecture Pattern (ZNS-inspired)
+- Prefer composing routes from focused middlewares that each do one thing. Typical stack, inspired by `Repositories/ZelfNameService/modules/zns.v2.module.js`:
+  - Validation: validate body/params/query (`joi`).
+  - Session decryption: use `SessionModule.sessionDecrypt` to decrypt `password`, `mnemonic`, `faceBase64` coming from session-scoped tokens.
+  - Business guards:
+    - Duplicate checks via `ZNSSearchModule.searchZelfName` with 404/409 semantics.
+    - Referral validation for `referralZelfName` against mainnet records.
+  - Enrichment:
+    - Wallet derivation when needed (ETH/BTC/SOL/SUI) using wallet helper modules.
+    - Price calculation with `ZNSPartsModule.calculateZelfNamePrice`.
+    - Preview/proof generation or parsing via `preview`, `encrypt`, `decrypt`, `OfflineProofModule`.
+  - Orchestration:
+    - Build `dataToEncrypt` and call `encrypt`/`encryptQR`.
+    - Assemble `publicData` and `metadata` objects consistently.
+  - Storage side effects:
+    - IPFS: `IPFSModule.insert({ base64, name, metadata, pinIt: true })` then `ZNSPartsModule.formatIPFSRecord`.
+    - Arweave: `ArweaveModule.zelfNameRegistration(base64, { hasPassword, zelfProof, publicData })` (skip via `config.zelfProof.skipArweave`).
+    - Walrus (when applicable): `WalrusModule.zelfNameRegistration(image, { publicData })` and persist `blobId` in `metadata.extraParams.walrus`.
+    - Always remove `zelfProof` from `ipfs.publicData` before responding.
+  - Tokenization:
+    - Issue duration-bound JWTs using `jwt.sign({ zelfName, exp }, config.JWT_SECRET)`; common expiries: 30 days for holds, 1 month for decrypt flows.
+  - Response shaping:
+    - Return `{ data, error: null }` on success; include privacy-gated fields only in development (`config.env === 'development'`).
+  - Error mapping:
+    - Throw `Error` with `.status` (404 not found, 409 conflict) then map to HTTP via `ctx.throw`/global handler.
+
+Example route composition:
+```js
+const Router = require('@koa/router');
+const router = new Router();
+const PATH = config.basePath('/zns');
+
+router.post(
+  `${PATH}/lease`,
+  validateLeaseBody,                 // joi
+  decryptSessionFields,              // SessionModule.sessionDecrypt
+  guardDuplicateZelfName,            // ZNSSearchModule.searchZelfName
+  enrichWalletsAndPrice,             // helpers + ZNSPartsModule.calculateZelfNamePrice
+  orchestrateProofAndStorage,        // encrypt/encryptQR + IPFS/Arweave/Walrus
+  issueDurationToken,                // jwt.sign
+  sendStandardResponse               // sets { data, error: null }
+);
+```
+
+### Error Handling
+- Prefer `ctx.throw(status, message)` inside controllers/middleware.
+- Normalize error responses to `{ error: string }` (current convention). Example unauthorized response: `{ error: "Protected resource, use Authorization header to get access" }`.
+- Log operational errors using `Core/loggin.serverLog` or `console` where appropriate.
+
+Business error semantics (ZNS-inspired):
+- 404: resource not found (e.g., zelfName not found, coinbase charge id missing).
+- 409: conflict/validation/business rule violation (e.g., zelfName already taken, password invalid, mismatched zelfProof, nothing to sync).
+
+### Swagger / OpenAPI
+- Use `swagger-jsdoc` configured in `swagger.js`.
+- Annotate routes with JSDoc comments in `Routes/*` and `Repositories/*/routes/*.js`.
+- Security schemes available: `bearerAuth` (JWT) and `apiKey` via `x-api-key` header (for specific client flows).
+- Documentation is served at `/docs` and JSON at `/swagger.json`.
+
+### Database
+- Use **Mongoose** via `Core/database` and connection settings from `Core/config`.
+- Initialize the DB during server start; handle connection errors and exit if unrecoverable.
+- On shutdown signals, close HTTP server first, then disconnect Mongoose (see `cleanup()` in `server.js`).
+
+### MPC TSS Integration
+- Use `@toruslabs/tss-lib` and the orchestration scripts in `mpc_tss/` (`coordinator.js`, `party.js`).
+- Do not expose private key material; TSS flows should run as separate jobs/processes and return opaque identifiers to clients if long-running.
+- If integrating from API routes, trigger orchestration via internal services and respond quickly (e.g., 202 Accepted + job id), then provide a status endpoint.
+- Keep browser demos (`mpc_tss/web-demo/`) isolated from server code.
+
+ZNS flows and long-running work:
+- Heavy operations (proof generation, network writes) should avoid blocking the request path when possible; use background jobs and return a job id when latency is high. For synchronous flows, preserve current sequence from modules but monitor latency and timeouts.
+
+### Security
+- Enable CORS with `@koa/cors`.
+- Validate all inputs with middleware (Joi) and sanitize external data.
+- Use JWT for protected routes; reserve `SUPERADMIN_JWT_SECRET` for super-admin scopes.
+- Support `x-api-key` where specified in Swagger for client management endpoints.
+
+### Configuration and Environment
+- Centralize configuration in `Core/config.js`. Common keys:
+  - `PORT`, `BASE_URL`, `MONGODB_URI`/`MONGODB_URI_PROD`
+  - `CONNECTION_KEY` (JWT), `SUPER_ADMINS_JWT_SECRET`
+  - `FRONTEND_KEY`, `ZELF_PROOF_URL`, `ZELF_PROOF_API_KEY`
+  - Service-specific keys (e.g., `OKLINK_API_KEY`, `MAILGUN_API_KEY`, etc.)
+- Always compose API paths with `config.basePath()`.
+
+### Responses
+- Existing endpoints may return plain strings; prefer JSON for new endpoints.
+- Recommended minimal shape for new endpoints:
+  ```json
+  { "data": <payload>, "error": null }
+  ```
+  For errors, return:
+  ```json
+  { "error": "Message here" }
+  ```
+
+Privacy gates (ZNS-inspired):
+- Only include sensitive `metadata` (e.g., mnemonic, zkProof, secret keys) in responses when `config.env === 'development'` and strictly for debugging.
+- In all environments, strip sensitive fields from `publicData` before returning; never expose private key material.
+
+### Performance and Ops
+- Avoid blocking operations in request handlers; offload heavy work to background jobs.
+- Use connection pooling for MongoDB (configured in `Core/config.js`).
+- Add rate limiting when needed (none globally enforced today).
+
+### Coding Style
+- Plain JavaScript (no TypeScript) with clear, descriptive names.
+- Prefer small, focused modules per repository with controller/middleware separation, matching current layout.# Koa.js API Guidelines for Node.js 23+ (CommonJS) with MPC TSS Integration
+
+## Overview
+Guidelines for building secure, scalable REST APIs using **Koa v2** on **Node.js 23+ (target 24 LTS)** in **CommonJS** style, aligning with the current codebase. Includes patterns for JWT auth, Swagger docs, MongoDB via Mongoose, route organization, and MPC TSS orchestration.
+
+## Scope
+- **Applies to**: All API work under `server.js`, `Routes/*`, and `Repositories/*/routes/*`.
+- **Always Apply**: True
+- **Date**: August 12, 2025
+
+## Guidelines
+
+### Environment
+- Use **Node.js 23+ (20 LTS preferred)** with **Koa v2.x**.
+- Use **CommonJS** modules (`require`/`module.exports`).
+- Load environment via `dotenv` in `Core/config.js`. Do not read `process.env` directly in modules; import from `Core/config`.
+- Entry point is `server.js`.
+
+### RESTful API Design
+- Follow REST conventions (resourceful URLs, proper HTTP verbs, idempotency where applicable).
+- Prefix all API routes with `/api` using `config.basePath(path)` (e.g., `config.basePath('/bsc') => /api/bsc`).
+- Keep resource-specific routes under `Repositories/<name>/routes/*.js`.
+
+### Koa Usage and Server Composition
+- Core middleware: `koa-bodyparser`, `@koa/cors`, and `@koa/router`.
+- JWT auth: `koa-jwt` using `config.JWT_SECRET` (and `config.SUPERADMIN_JWT_SECRET` for privileged flows as needed).
+- Order of middleware in `server.js`:
+  1. `bodyParser`, `cors` and global error handler for JWT (map to 401 with `{ error: string }`).
+  2. Mount unprotected routes first.
+  3. `koa-jwt` authentication middleware.
+  4. Mount protected routes.
+- Serve Swagger docs from `server.js` at `/docs` (UI) and `/swagger.json`.
+- Graceful shutdown: close HTTP server then disconnect Mongoose (see `server.js`).
+
+### Routing Conventions
+- Use `@koa/router`.
+- `Routes/unprotected.js` and `Routes/protected.js` each create a `new Router()` and export it.
+- Protected router composes repository routes via a loader (see `Routes/protected-repositories.js`).
+- Repository route files export a function `(server) => { ... }` where `server` is a `Router` instance; register endpoints with `server.get/post/...`.
+- Build paths with `config.basePath('<segment>')` to ensure `/api` prefix. Example (simplified):
+  ```js
+  // Repositories/bnb/routes/binance-smart-chain.route.js
+  const config = require("../../../Core/config");
+  module.exports = (server) => {
+    const PATH_BSC = config.basePath('/bsc');
+    server.get(`${PATH_BSC}/address/:id`, Controller.address);
+  };
+  ```
+
+### Validation and Middleware
+- Use `joi` (and `@joi/date` when needed) in per-repository middleware for request validation (e.g., `Middleware.validateToken`, `Middleware.validateAddressTransactions`).
+- Keep middleware pure and reusable; attach them per-route as in existing modules.
+
+### Error Handling
+- Prefer `ctx.throw(status, message)` inside controllers/middleware.
+- Normalize error responses to `{ error: string }` (current convention). Example unauthorized response: `{ error: "Protected resource, use Authorization header to get access" }`.
+- Log operational errors using `Core/loggin.serverLog` or `console` where appropriate.
+
+### Swagger / OpenAPI
+- Use `swagger-jsdoc` configured in `swagger.js`.
+- Annotate routes with JSDoc comments in `Routes/*` and `Repositories/*/routes/*.js`.
+- Security schemes available: `bearerAuth` (JWT) and `apiKey` via `x-api-key` header (for specific client flows).
+- Documentation is served at `/docs` and JSON at `/swagger.json`.
+
+### Database
+- Use **Mongoose** via `Core/database` and connection settings from `Core/config`.
+- Initialize the DB during server start; handle connection errors and exit if unrecoverable.
+- On shutdown signals, close HTTP server first, then disconnect Mongoose (see `cleanup()` in `server.js`).
+
+### MPC TSS Integration
+- Use `@toruslabs/tss-lib` and the orchestration scripts in `mpc_tss/` (`coordinator.js`, `party.js`).
+- Do not expose private key material; TSS flows should run as separate jobs/processes and return opaque identifiers to clients if long-running.
+- If integrating from API routes, trigger orchestration via internal services and respond quickly (e.g., 202 Accepted + job id), then provide a status endpoint.
+- Keep browser demos (`mpc_tss/web-demo/`) isolated from server code.
+
+### Security
+- Enable CORS with `@koa/cors`.
+- Validate all inputs with middleware (Joi) and sanitize external data.
+- Use JWT for protected routes; reserve `SUPERADMIN_JWT_SECRET` for super-admin scopes.
+- Support `x-api-key` where specified in Swagger for client management endpoints.
+
+### Configuration and Environment
+- Centralize configuration in `Core/config.js`. Common keys:
+  - `PORT`, `BASE_URL`, `MONGODB_URI`/`MONGODB_URI_PROD`
+  - `CONNECTION_KEY` (JWT), `SUPER_ADMINS_JWT_SECRET`
+  - `FRONTEND_KEY`, `ZELF_PROOF_URL`, `ZELF_PROOF_API_KEY`
+  - Service-specific keys (e.g., `OKLINK_API_KEY`, `MAILGUN_API_KEY`, etc.)
+- Always compose API paths with `config.basePath()`.
+
+### Responses
+- Existing endpoints may return plain strings; prefer JSON for new endpoints.
+- Recommended minimal shape for new endpoints:
+  ```json
+  { "data": <payload>, "error": null }
+  ```
+  For errors, return:
+  ```json
+  { "error": "Message here" }
+  ```
+
+### Performance and Ops
+- Avoid blocking operations in request handlers; offload heavy work to background jobs.
+- Use connection pooling for MongoDB (configured in `Core/config.js`).
+- Add rate limiting when needed (none globally enforced today).
+
+### Coding Style
+- Plain JavaScript (no TypeScript) with clear, descriptive names.
+- Prefer small, focused modules per repository with controller/middleware separation, matching current layout.

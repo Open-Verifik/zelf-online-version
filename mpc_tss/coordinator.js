@@ -70,6 +70,33 @@ class TSSEcdsaCoordinator {
 			return;
 		}
 
+		// DKLS intra-party messaging (Node-only bus)
+		if (type === "tss_msg") {
+			// Mirror semantics: route to all other parties, or to a specific 'to' if provided
+			const { to, from, kind, payload, sessionId } = data;
+			const sid = sessionId || this.sessionId;
+			const bytes = typeof payload === "string" ? payload.length : 0;
+			try {
+				if (typeof to === "number") {
+					const dest = this.parties.get(to);
+					if (dest) {
+						console.log(`[COORD tss_msg] ${sid} ${from}->${to} kind=${kind} bytes=${bytes}`);
+						dest.ws.send(JSON.stringify({ type: "tss_msg", to, from, kind, payload, sessionId: sid }));
+					}
+				} else {
+					console.log(`[COORD tss_msg] ${sid} ${from}->all kind=${kind} bytes=${bytes}`);
+					for (const [idx, party] of this.parties.entries()) {
+						if (idx !== from) {
+							party.ws.send(JSON.stringify({ type: "tss_msg", to: idx, from, kind, payload, sessionId: sid }));
+						}
+					}
+				}
+			} catch (_) {
+				// ignore routing errors in demo
+			}
+			return;
+		}
+
 		if (type === "public_commitment") {
 			const { partyIndex, publicKey } = data;
 			this.commitments.set(partyIndex, publicKey);
