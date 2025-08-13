@@ -105,7 +105,7 @@ const decryptContent = async (type = "session", privateKey, content) => {
 
 	const decryptedPrivateKey = await openpgp.decryptKey({
 		privateKey: _privateKey,
-		passphrase: type === "session" ? passphrase : globalPassphrase,
+		passphrase: ["session", "general"].includes(type) ? passphrase : globalPassphrase,
 	});
 
 	const message = await openpgp.readMessage({
