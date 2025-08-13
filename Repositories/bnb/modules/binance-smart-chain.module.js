@@ -1,7 +1,10 @@
 const cheerio = require("cheerio");
+
 require("dotenv").config();
+
 const urlBase = process.env.MICROSERVICES_BOGOTA_URL;
 const token = process.env.MICROSERVICES_BOGOTA_TOKEN;
+
 const { getCleanInstance } = require("../../../Core/axios");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
@@ -55,14 +58,16 @@ async function getCoinGeckoPricesForContracts(contractAddresses) {
 			const url = `https://api.coingecko.com/api/v3/simple/token_price/binance-smart-chain?contract_addresses=${chunk.join(
 				","
 			)}&vs_currencies=usd`;
+
 			const { data } = await instance.get(url);
 
 			// data is an object keyed by lowercased contract address
 			Object.entries(data || {}).forEach(([address, value]) => {
 				const usd = value && typeof value.usd === "number" ? value.usd : 0;
-				if (usd > 0) {
-					priceMap.set(address.toLowerCase(), usd);
-				}
+
+				if (!usd) return;
+
+				priceMap.set(address.toLowerCase(), usd);
 			});
 		}
 
@@ -70,6 +75,7 @@ async function getCoinGeckoPricesForContracts(contractAddresses) {
 	} catch (error) {
 		// If CoinGecko fails (rate limits, network), return empty to avoid breaking the flow
 		console.error({ coingecko_price_fetch_error: error?.message || error });
+
 		return new Map();
 	}
 }
@@ -77,21 +83,29 @@ async function getCoinGeckoPricesForContracts(contractAddresses) {
 async function getCoinGeckoPricesForIds(ids) {
 	try {
 		if (!Array.isArray(ids) || ids.length === 0) return new Map();
+
 		const unique = Array.from(new Set(ids.filter(Boolean)));
 		const chunkSize = 100;
 		const priceMap = new Map();
+
 		for (let i = 0; i < unique.length; i += chunkSize) {
 			const chunk = unique.slice(i, i + chunkSize);
 			const url = `https://api.coingecko.com/api/v3/simple/price?ids=${chunk.join(",")}&vs_currencies=usd`;
 			const { data } = await instance.get(url);
+
 			Object.entries(data || {}).forEach(([id, value]) => {
 				const usd = value && typeof value.usd === "number" ? value.usd : 0;
-				if (usd > 0) priceMap.set(id, usd);
+
+				if (!usd) return;
+
+				priceMap.set(id, usd);
 			});
 		}
+
 		return priceMap;
 	} catch (error) {
 		console.error({ coingecko_id_price_fetch_error: error?.message || error });
+
 		return new Map();
 	}
 }
@@ -101,47 +115,57 @@ async function getOklinkFormattedTokens(address, limit = 100) {
 	try {
 		const t = Date.now();
 		const url = `https://www.oklink.com/api/explorer/v2/bsc/addresses/${address}/tokens?offset=0&limit=${limit}&t=${t}`;
+
 		const { data } = await instance.get(url, {
 			headers: {
 				"X-Apikey": get_ApiKey().getApiKey(),
 				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 			},
 		});
-		if ((data?.code === "0" || data?.code === 0) && Array.isArray(data?.data?.hits)) {
-			const hits = data.data.hits;
-			const formatted = hits
-				.map((tok) => {
-					const addr = String(tok.contractAddress || "").toLowerCase();
-					if (!addr) return null;
-					const decimals = parseInt(tok.decimals || 18);
-					const rawAmount = Number(tok.holdingAmount || 0);
-					const amount = rawAmount / Math.pow(10, decimals);
-					let price = Number(tok.price || 0);
-					if ((!price || price === 0) && (addr === USDT || addr === USDC || addr === BUSD)) price = 1;
-					const fiatBalance = amount * price;
-					const meta = COMMON_TOKEN_METADATA_BY_ADDRESS_BSC.get(addr) || {};
-					return {
-						_amount: amount,
-						_fiatBalance: fiatBalance.toFixed(Math.min(decimals, 8)),
-						_price: price,
-						address: addr,
-						amount: amount.toFixed(Math.min(decimals, 12)),
-						decimals: decimals,
-						fiatBalance: fiatBalance,
-						image: tok.logo || meta.image || "",
-						name: tok.tokenName || tok.symbol || meta.name || "",
-						price: price,
-						symbol: tok.symbol || meta.symbol || "",
-						tokenType: "BEP-20",
-					};
-				})
-				.filter(Boolean)
-				.sort((a, b) => Number(b.fiatBalance) - Number(a.fiatBalance));
-			return formatted;
-		}
-		return [];
+
+		if (!(data?.code === "0" || data?.code === 0) || !Array.isArray(data?.data?.hits)) return [];
+
+		const hits = data.data.hits;
+
+		const formatted = hits
+			.map((tok) => {
+				const addr = String(tok.contractAddress || "").toLowerCase();
+
+				if (!addr) return null;
+
+				const decimals = parseInt(tok.decimals || 18);
+				const rawAmount = Number(tok.holdingAmount || 0);
+				const amount = rawAmount / Math.pow(10, decimals);
+
+				let price = Number(tok.price || 0);
+
+				if ((!price || price === 0) && (addr === USDT || addr === USDC || addr === BUSD)) price = 1;
+
+				const fiatBalance = amount * price;
+				const meta = COMMON_TOKEN_METADATA_BY_ADDRESS_BSC.get(addr) || {};
+
+				return {
+					_amount: amount,
+					_fiatBalance: fiatBalance.toFixed(Math.min(decimals, 8)),
+					_price: price,
+					address: addr,
+					amount: amount.toFixed(Math.min(decimals, 12)),
+					decimals: decimals,
+					fiatBalance: fiatBalance,
+					image: tok.logo || meta.image || "",
+					name: tok.tokenName || tok.symbol || meta.name || "",
+					price: price,
+					symbol: tok.symbol || meta.symbol || "",
+					tokenType: "BEP-20",
+				};
+			})
+			.filter(Boolean)
+			.sort((a, b) => Number(b.fiatBalance) - Number(a.fiatBalance));
+
+		return formatted;
 	} catch (error) {
 		dbgBsc("oklink_tokens_error", error?.message || error);
+
 		return [];
 	}
 }
@@ -150,20 +174,25 @@ async function getOklinkFormattedTokens(address, limit = 100) {
 async function getBep20BalanceViaRpc(contractAddress, userAddress) {
 	try {
 		if (!bscRpcUrl) throw new Error("BSC_RPC_URL missing");
+
 		const methodId = "0x70a08231"; // balanceOf(address)
 		const addressHex = String(userAddress).toLowerCase().replace(/^0x/, "");
 		const data = methodId + "000000000000000000000000" + addressHex;
+
 		const payload = {
 			jsonrpc: "2.0",
 			id: Math.floor(Math.random() * 1e6),
 			method: "eth_call",
 			params: [{ to: contractAddress, data }, "latest"],
 		};
+
 		const { data: rpc } = await instance.post(bscRpcUrl, payload);
 		const hex = rpc?.result || "0x0";
+
 		return hex === "0x" ? "0x0" : hex;
 	} catch (error) {
 		dbgBsc("rpc_balance_error", bscRpcUrl, contractAddress, error?.message || error);
+
 		return "0x0";
 	}
 }
@@ -171,15 +200,19 @@ async function getBep20BalanceViaRpc(contractAddress, userAddress) {
 // Batch BEP-20 balances via eth_call
 async function getBep20BalancesViaRpcBatch(contracts, userAddress) {
 	if (!Array.isArray(contracts) || contracts.length === 0) return new Map();
+
 	if (!bscRpcUrl) return new Map();
+
 	const methodId = "0x70a08231";
 	const addressHex = String(userAddress).toLowerCase().replace(/^0x/, "");
+
 	const calls = contracts.map((c) => ({
 		jsonrpc: "2.0",
 		id: Math.floor(Math.random() * 1e9),
 		method: "eth_call",
 		params: [{ to: c, data: methodId + "000000000000000000000000" + addressHex }, "latest"],
 	}));
+
 	try {
 		const results = await Promise.all(
 			calls.map((payload) =>
@@ -189,12 +222,16 @@ async function getBep20BalancesViaRpcBatch(contracts, userAddress) {
 					.catch(() => null)
 			)
 		);
+
 		const map = new Map();
+
 		for (let i = 0; i < contracts.length; i++) {
 			const res = results[i];
 			const hex = res?.result || "0x0";
+
 			map.set(String(contracts[i]).toLowerCase(), hex === "0x" ? "0x0" : hex);
 		}
+
 		return map;
 	} catch (_) {
 		return new Map();
@@ -205,18 +242,23 @@ async function getBep20BalancesViaRpcBatch(contracts, userAddress) {
 async function getNativeBalanceViaRpc(userAddress) {
 	try {
 		if (!bscRpcUrl) throw new Error("BSC_RPC_URL missing");
+
 		const payload = {
 			jsonrpc: "2.0",
 			id: Math.floor(Math.random() * 1e6),
 			method: "eth_getBalance",
 			params: [userAddress, "latest"],
 		};
+
 		const { data: rpc } = await instance.post(bscRpcUrl, payload);
+
 		const hex = rpc?.result || "0x0";
 		const wei = hex && typeof hex === "string" && hex.startsWith("0x") ? parseInt(hex, 16) : Number(hex || 0);
+
 		return Number(wei);
 	} catch (error) {
 		dbgBsc("rpc_native_balance_error", userAddress, error?.message || error);
+
 		return 0;
 	}
 }
@@ -228,10 +270,7 @@ async function getNativeBalanceViaRpc(userAddress) {
  */
 async function getBscVerifiedContracts(contractAddresses) {
 	try {
-		if (!bscscanApiKey) {
-			// No API key → skip verification filtering
-			return new Set();
-		}
+		if (!bscscanApiKey) return new Set();
 
 		const uniqueAddresses = Array.from(new Set((contractAddresses || []).map((addr) => (addr || "").toLowerCase()))).filter(Boolean);
 
@@ -246,14 +285,16 @@ async function getBscVerifiedContracts(contractAddresses) {
 					try {
 						const url = `${bscscanApiUrl}?module=contract&action=getsourcecode&address=${address}&apikey=${bscscanApiKey}`;
 						const { data } = await instance.get(url);
-						const item = Array.isArray(data?.result) ? data.result[0] : undefined;
+						const item = Array.isArray(data?.result) ? data.result[0] : null;
 						const abi = item?.ABI;
-						if (abi && typeof abi === "string" && abi !== "Contract source code not verified") {
-							return address;
-						}
+
+						if (!abi || typeof abi !== "string" || abi === "Contract source code not verified") return null;
+
+						return address;
 					} catch (err) {
 						// Ignore per-address errors to avoid failing the whole batch
 					}
+
 					return null;
 				})
 			);
@@ -264,6 +305,7 @@ async function getBscVerifiedContracts(contractAddresses) {
 		return verified;
 	} catch (error) {
 		console.error({ bscscan_verification_error: error?.message || error });
+
 		return new Set();
 	}
 }
@@ -275,16 +317,20 @@ const getBalance = async (params) => {
 
 		// Native balance: NodeReal → RPC fallback
 		let nativeWei = 0;
+
 		try {
 			const { data } = await instance.get(`https://bsc-explorer-api.nodereal.io/api/token/getBalance?address=${address}`);
+
 			nativeWei = Number(BigInt(data?.data || 0));
 		} catch (_) {
 			dbgBsc("nodereal_balance_down_use_rpc");
+
 			nativeWei = await getNativeBalanceViaRpc(address);
 		}
 
 		// Tokens: NodeReal → OKLink → curated RPC batch
 		let tokens = [];
+
 		try {
 			tokens = await getTokens({ id: address });
 		} catch (_) {
@@ -296,22 +342,33 @@ const getBalance = async (params) => {
 			const curated = Array.from(COMMON_TOKENS_BSC).slice(0, CURATED_RPC_FALLBACK_MAX);
 			const rpcBalances = await getBep20BalancesViaRpcBatch(curated, address);
 			const added = [];
+
 			for (const contract of curated) {
 				const raw = rpcBalances.get(contract) || "0x0";
 				const numericRaw = typeof raw === "string" && raw.startsWith("0x") ? parseInt(raw, 16) : Number(raw);
+
 				if (!numericRaw) continue;
+
 				const decimals = COMMON_TOKEN_DECIMALS_BY_ADDRESS_BSC.get(contract) || 18;
 				const amount = Number(numericRaw) / Math.pow(10, decimals);
+
 				if (amount <= 0) continue;
+
 				const id = COMMON_TOKEN_ID_BY_ADDRESS_BSC.get(contract);
+
 				let p = 0;
+
 				if (id) {
 					const idPrices = await getCoinGeckoPricesForIds([id]);
+
 					p = idPrices.get(id) || 0;
 				}
+
 				if ((!p || p === 0) && (contract === USDT || contract === USDC || contract === BUSD)) p = 1;
+
 				const fiatBalance = amount * p;
 				const meta = COMMON_TOKEN_METADATA_BY_ADDRESS_BSC.get(contract) || {};
+
 				tokens.push({
 					_amount: amount,
 					_fiatBalance: fiatBalance.toFixed(Math.min(decimals, 8)),
@@ -379,14 +436,19 @@ const getTokens = async (params) => {
 		const missingCommonAddrs = contractAddresses
 			.map((a) => (a || "").toLowerCase())
 			.filter((a) => isCommonBscToken(a) && !coingeckoPriceMap.has(a));
+
 		const idsToFetch = missingCommonAddrs.map((a) => COMMON_TOKEN_ID_BY_ADDRESS_BSC.get(a)).filter(Boolean);
-		if (idsToFetch.length > 0) {
+
+		if (idsToFetch.length) {
 			const idPrices = await getCoinGeckoPricesForIds(idsToFetch);
-			// Merge into contract price map
+
 			missingCommonAddrs.forEach((addr) => {
 				const id = COMMON_TOKEN_ID_BY_ADDRESS_BSC.get(addr);
 				const usd = id ? idPrices.get(id) : 0;
-				if (usd && usd > 0) coingeckoPriceMap.set(addr, usd);
+
+				if (!usd) return;
+
+				coingeckoPriceMap.set(addr, usd);
 			});
 		}
 
@@ -406,6 +468,7 @@ const getTokens = async (params) => {
 				const isCommon = isCommonBscToken(addr);
 				// If API key present: allow Verified OR CG-priced OR curated common list
 				// If no API key: allow CG-priced OR curated common list
+
 				return bscscanApiKey ? isVerified || hasCgPrice || isCommon : hasCgPrice || isCommon;
 			})
 			.sort((a, b) => Number(b.fiatBalance) - Number(a.fiatBalance));
@@ -469,8 +532,9 @@ const getGasTracker = async () => {
 		const highTime = $("#divHighPrice > div.text-muted").text().replace(/\n/g, "").trim().trim();
 
 		const featuredActions = [];
+
 		$("#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr").each(
-			(index, element) => {
+			(_index, element) => {
 				const action = $(element).find("td span").text().trim();
 				const low = $(element).find("td").eq(1).text().replace("$", "").trim();
 				const average = $(element).find("td").eq(2).text().replace("$", "").trim();

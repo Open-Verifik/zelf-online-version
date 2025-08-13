@@ -54,15 +54,19 @@ const getAddress = async (params) => {
 
 		data.tokenHoldings = await getTokens({ id: address }, { page: 0, show: 10 });
 
-		data.tokenHoldings.tokens.unshift({
-			tokenType: "SOL",
-			fiatBalance: fia,
-			symbol: "SOL",
-			name: "Solana",
-			price: data.account.price,
-			amount: data.balance,
-			image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
-		});
+		const hasSolToken = data.tokenHoldings?.tokens?.some((token) => token.tokenType === "SOL");
+
+		if (!hasSolToken) {
+			data.tokenHoldings.tokens.unshift({
+				amount: data.balance,
+				fiatBalance: fia,
+				image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+				name: "Solana",
+				price: data.account.price,
+				symbol: "SOL",
+				tokenType: "SOL",
+			});
+		}
 
 		const { transactions } = await getTransactions({ id: address }, { page: 0, show: 10 });
 

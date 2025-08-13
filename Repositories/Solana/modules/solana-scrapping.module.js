@@ -5,10 +5,10 @@ const oklink = require("./oklink");
 const solscan = require("./solscan");
 const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
+
 /**
  * @param {*} params
  */
-
 const getAddress = async (params) => {
 	let response;
 	let source;
@@ -25,8 +25,10 @@ const getAddress = async (params) => {
 		default:
 			const solscanResponse = await solscan.getAddress(params);
 			const oklinkResponse = await oklink.getAddress(params);
+
 			response = solscanResponse || oklinkResponse;
 			source = solscanResponse ? "solscan" : oklinkResponse ? "oklink" : null;
+
 			break;
 	}
 
