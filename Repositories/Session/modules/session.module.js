@@ -187,14 +187,15 @@ const _getPrivateKey = async (authUser) => {
 const sessionDecrypt = async (content, authUser) => {
 	if (!content) return null;
 
+	let privateKey = null;
 	try {
-		const privateKey = await _getPrivateKey(authUser);
+		privateKey = await _getPrivateKey(authUser);
 
 		const decryptedContent = await PGPKeyModule.decryptContent("session", privateKey, content);
 
 		return decryptedContent;
 	} catch (exception) {
-		console.error({ exception, authUser, privateKeyToDecrypt: privateKey });
+		console.error({ exception, authUser, privateKeyToDecrypt: privateKey, content });
 		throw new Error("decryption_failed");
 	}
 };
