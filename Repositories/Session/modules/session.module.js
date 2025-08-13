@@ -177,9 +177,13 @@ const encryptContent = async (message) => {
 const _getPrivateKey = async (authUser) => {
 	const pgpRecord = await PGPKeyModule.findKey(authUser.identifier);
 
+	console.log({ pgpRecord });
+
 	if (!pgpRecord) throw new Error("key_not_found");
 
 	const privateKey = await PGPKeyModule.decryptKey(pgpRecord.type, pgpRecord.key);
+
+	console.log({ privateKey });
 
 	return privateKey;
 };
