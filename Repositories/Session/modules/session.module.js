@@ -194,7 +194,7 @@ const sessionDecrypt = async (content, authUser) => {
 
 		return decryptedContent;
 	} catch (exception) {
-		console.error({ exception });
+		console.error({ exception, authUser, privateKeyToDecrypt: privateKey });
 		throw new Error("decryption_failed");
 	}
 };
