@@ -157,12 +157,12 @@ document.addEventListener("DOMContentLoaded", function () {
 				const copyButtonId = `copy${chain.displayName.replace(/\s+/g, "")}Address`;
 
 				cardDiv.innerHTML = `
-					<div class="card-address-container name">
-						<div class="card-address">
-							<p>${chain.displayName} Address</p>
-							<span id="${chain.key}">${shortenedAddress}</span>
-						</div>
-						<div class="card-copy-action" id="${copyButtonId}">
+                    <div class="card-address-container name">
+                        <div class="card-address">
+                            <span class="chain-pill">${chain.displayName}</span>
+                            <span id="${chain.key}">${shortenedAddress}</span>
+                        </div>
+                        <div class="card-copy-action" id="${copyButtonId}">
 							<span>COPY</span>
 							<div style="width: 24px; height: 24px; position: relative">
 								<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -183,6 +183,8 @@ document.addEventListener("DOMContentLoaded", function () {
 				const copyButton = cardDiv.querySelector(`#${copyButtonId}`);
 				copyButton.addEventListener("click", function () {
 					_writeToClipboard(address);
+					copyButton.classList.add("copied");
+					setTimeout(() => copyButton.classList.remove("copied"), 600);
 				});
 			}
 		});
@@ -208,12 +210,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			const copyButtonId = `copy${chainName.charAt(0).toUpperCase() + chainName.slice(1).toLowerCase()}Address`;
 
 			cardDiv.innerHTML = `
-				<div class="card-address-container name">
-					<div class="card-address">
-						<p>${displayName} Address</p>
-						<span id="${addressKey}">${shortenedAddress}</span>
-					</div>
-					<div class="card-copy-action" id="${copyButtonId}">
+                <div class="card-address-container name">
+                    <div class="card-address">
+                        <span class="chain-pill">${displayName}</span>
+                        <span id="${addressKey}">${shortenedAddress}</span>
+                    </div>
+                    <div class="card-copy-action" id="${copyButtonId}">
 						<span>COPY</span>
 						<div style="width: 24px; height: 24px; position: relative">
 							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -234,6 +236,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			const copyButton = cardDiv.querySelector(`#${copyButtonId}`);
 			copyButton.addEventListener("click", function () {
 				_writeToClipboard(address);
+				copyButton.classList.add("copied");
+				setTimeout(() => copyButton.classList.remove("copied"), 600);
 			});
 		});
 	}
