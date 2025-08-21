@@ -11,6 +11,11 @@ const WalrusModule = require("../../Walrus/modules/walrus.module");
  * @returns {Object} Search results from different sources
  */
 const searchZelfName = async (params, authUser) => {
+	// check if its missing .zelf extension if so, add it
+	if (!params.zelfName.endsWith(".zelf")) {
+		params.zelfName = `${params.zelfName}.zelf`;
+	}
+
 	const query = params.zelfName ? { key: "zelfName", value: params.zelfName } : { key: params.key, value: params.value };
 
 	query.value = query.key === "zelfName" ? query.value.toLowerCase() : query.value;
@@ -22,9 +27,9 @@ const searchZelfName = async (params, authUser) => {
 	};
 
 	// Search in primary source (Arweave)
-	searchResult.ipfs = await _searchInIPFS(params.environment, query, authUser, true);
+	searchResult.ipfs = params.environment === "arweave" ? [] : await _searchInIPFS(params.environment, query, authUser, true);
 
-	if (searchResult.ipfs.available) return searchResult.ipfs;
+	if (searchResult.ipfs?.available) return searchResult.ipfs;
 
 	searchResult.ipfs = searchResult.ipfs;
 

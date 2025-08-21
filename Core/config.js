@@ -83,6 +83,7 @@ const configuration = {
 		_zk: process.env.ZELF1 || "_",
 	},
 	arwave: {
+		env: process.env.ARWAVE_ENV || "production",
 		key: process.env.ARWAVE_KEY,
 		owner: process.env.ARWEAVE_OWNER,
 		n: process.env.ARWAVE_N,
@@ -107,6 +108,10 @@ const configuration = {
 		parentName: process.env.ARWEAVE_PARENT_NAME,
 		processId: process.env.ARWEAVE_PROCESS_ID,
 		transactionId: process.env.ARWEAVE_TRANSACTION_ID,
+	},
+	arns: {
+		processId: process.env.ARNS_PROCESS_ID,
+		index_transaction_id: process.env.ARNS_INDEX_TRANSACTION_ID,
 	},
 	walrus: {
 		network: process.env.WALRUS_NETWORK || "testnet",

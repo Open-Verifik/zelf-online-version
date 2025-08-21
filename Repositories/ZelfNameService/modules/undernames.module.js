@@ -1,12 +1,14 @@
 const { ARIO, ArweaveSigner, ANT } = require("@ar.io/sdk");
 const config = require("../../../Core/config");
 
-const ario = ARIO.init({ processId: "qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE" });
+//qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE
+ARIO.init({ processId: config.arns.processId });
 
 // create under name logic here
 const createUnderName = async (payload) => {
 	const { parentName, undername } = payload;
-	const processId = config.arwave.processId;
+
+	const processId = config.arns.processId;
 
 	const walletKey = {
 		kty: "RSA",
@@ -31,9 +33,18 @@ const createUnderName = async (payload) => {
 		processId,
 	});
 
-	// const owner = await ant.getOwner();
+	const owner = await ant.getOwner();
 
-	// const records = await ant.getRecords();
+	console.log({ owner });
+
+	const records = await ant.getRecords();
+
+	console.log({ records });
+
+	return {
+		records,
+		owner,
+	};
 
 	try {
 		// Create the under name

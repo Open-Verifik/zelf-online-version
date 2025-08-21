@@ -7,12 +7,14 @@ const axios = require("axios");
 const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 
-const owner = config.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
+const owner = config.arwave.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
 
 const graphql = `${arweaveUrl}/graphql`;
 
 const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 	const { zelfProof, hasPassword, publicData } = zelfNameObject;
+
+	const env = config.arwave.env;
 
 	/**
 	 * Generate a key from the arweave wallet.
@@ -20,14 +22,14 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 
 	const jwk = {
 		kty: "RSA",
-		n: config.env === "development" ? config.arwave.hold.n : config.arwave.n,
-		e: config.env === "development" ? config.arwave.hold.e : config.arwave.e,
-		d: config.env === "development" ? config.arwave.hold.d : config.arwave.d,
-		p: config.env === "development" ? config.arwave.hold.p : config.arwave.p,
-		q: config.env === "development" ? config.arwave.hold.q : config.arwave.q,
-		dp: config.env === "development" ? config.arwave.hold.dp : config.arwave.dp,
-		dq: config.env === "development" ? config.arwave.hold.dq : config.arwave.dq,
-		qi: config.env === "development" ? config.arwave.hold.qi : config.arwave.qi,
+		n: env === "development" ? config.arwave.hold.n : config.arwave.n,
+		e: env === "development" ? config.arwave.hold.e : config.arwave.e,
+		d: env === "development" ? config.arwave.hold.d : config.arwave.d,
+		p: env === "development" ? config.arwave.hold.p : config.arwave.p,
+		q: env === "development" ? config.arwave.hold.q : config.arwave.q,
+		dp: env === "development" ? config.arwave.hold.dp : config.arwave.dp,
+		dq: env === "development" ? config.arwave.hold.dq : config.arwave.dq,
+		qi: env === "development" ? config.arwave.hold.qi : config.arwave.qi,
 		kid: "2011-04-29",
 	};
 

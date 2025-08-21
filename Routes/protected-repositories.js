@@ -3,6 +3,7 @@ module.exports = (server) => {
 	require("../Repositories/Avalanche/routes/avalanche-scrapping.route")(server);
 	require("../Repositories/api-mina/routes/mina-scrapping.route")(server);
 	require("../Repositories/dataAnalytics/routes/dataAnalytics.route")(server);
+	require("../Repositories/Arweave/routes/ar-io-arns.routes")(server);
 	//B
 	require("../Repositories/bnb/routes/binance-smart-chain.route")(server);
 	require("../Repositories/binance/routes/binance.route")(server);
