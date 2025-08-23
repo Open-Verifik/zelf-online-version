@@ -19,6 +19,7 @@ const encrypt = async (data) => {
 
 		return { zelfProof };
 	} catch (exception) {
+		console.log({ exception });
 		const _error = exception.response?.data;
 
 		let error = new Error(_error?.message || "Something went wrong");
