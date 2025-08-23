@@ -81,6 +81,8 @@ const encryptQRCode = async (data) => {
 
 		return { zelfQR };
 	} catch (exception) {
+		console.error({ exception });
+
 		return exception?.message;
 	}
 };
