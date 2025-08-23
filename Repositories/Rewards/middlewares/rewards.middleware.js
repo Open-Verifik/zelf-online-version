@@ -2,7 +2,7 @@ const Joi = require("joi");
 
 // Utility function to normalize zelfName with .zelf suffix
 const normalizeZelfName = (zelfName) => {
-	return zelfName.endsWith(".zelf") ? zelfName : `${zelfName}.zelf`;
+	return zelfName?.endsWith(".zelf") ? zelfName : `${zelfName}.zelf`;
 };
 
 const dailyRewardsValidation = async (ctx, next) => {
