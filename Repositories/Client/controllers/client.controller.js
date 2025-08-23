@@ -45,7 +45,7 @@ const auth = async (ctx) => {
 		const data = await Module.auth(
 			{
 				...ctx.request.body,
-				apiKey: ctx.headers["x-api-key"],
+				apiKey: ctx.headers["x-api-key"] || ctx.request.body.apiKey,
 			},
 			ctx.state.user
 		);
