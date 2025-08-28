@@ -38,7 +38,21 @@ const _handleWebhook = async (event) => {
 		attributes[attributeKey] = event.subscriber_attributes[attributeKey].value;
 	}
 
-	const zelfNameRecords = await ZelfNameServiceModule.previewZelfName({ zelfName: attributes.zelfName, environment: "both" }, {});
+	const previewQuery = {
+		key: "zelfName",
+		value: attributes.zelfName,
+		environment: "both",
+	};
+
+	if (!previewQuery.value) {
+		const error = new Error("zelfName_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const zelfNameRecords = await ZelfNameServiceModule.previewZelfName(previewQuery, {});
+
+	console.log({ event, zelfNameRecords, previewQuery });
 
 	if (!zelfNameRecords.length) {
 		const error = new Error("zelfName_not_found");
