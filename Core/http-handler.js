@@ -128,15 +128,17 @@ const tryCatchLog = async (status = "failed", message, code, exception, ctx = nu
 
 		headerMessage += `\n---\n*🚀 Error logged by Verifik Backend System*`;
 
+		console.log({ headerMessage });
+
 		// Check Discord character limit (2000 chars) and truncate if necessary
 		const DISCORD_LIMIT = 1900; // Leave some buffer
 		if (headerMessage.length > DISCORD_LIMIT) {
 			headerMessage = headerMessage.substring(0, DISCORD_LIMIT - 50) + "\n\n... *[Message truncated due to length]*";
 		}
 
-		await axios.post(config.discord.tryCatchURL, {
-			content: headerMessage,
-		});
+		// await axios.post(config.discord.tryCatchURL, {
+		// 	content: headerMessage,
+		// });
 	} catch (exception) {
 		console.error("Error in tryCatchLog:", exception);
 		return false;
@@ -146,9 +148,9 @@ const tryCatchLog = async (status = "failed", message, code, exception, ctx = nu
 };
 
 const errorHandler = (exception, ctx = null, optionalMessage) => {
-	if (config.env === "development") {
-		console.error({ exception });
-	}
+	// if (config.env === "development") {
+	console.error({ exception });
+	// }
 
 	// Handle MongoDB validation errors
 	if (exception && exception.keyPattern && MongoError.includes(exception.name)) {

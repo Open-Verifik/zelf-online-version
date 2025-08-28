@@ -148,8 +148,9 @@ const selectMethod = async (network, price) => {
 };
 
 const pay = async (zelfName_, network, signedDataPrice) => {
+	const _zelfPay = zelfName_.replace(/\.zelf(\.hold)?$/, ".zelfpay");
 	const zelfNameRecords = await searchZelfName({
-		zelfName: zelfName_.replace(".zelf", ".zelfpay"),
+		zelfName: _zelfPay,
 		environment: "mainnet",
 	});
 
@@ -161,7 +162,7 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 
 	const zelfPayObject = zelfNameRecords?.ipfs[0] || zelfNameRecords?.arweave[0];
 
-	if (network === "CB") {
+	if (network === "CB" || network === "coinbase") {
 		const chargeID = zelfPayObject.publicData.coinbase_hosted_url.split("/pay/")[1];
 
 		return await checkoutPayCoinbase(chargeID);
@@ -188,7 +189,7 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 	const priceInIPFS =
 		parseFloat(zelfPayObject.publicData.price) || ZNSPartsModule.calculateZelfNamePrice(zelfName_.split(".zelf")[0].length, 1).price;
 
-	if (price !== priceInIPFS) {
+	if (price !== priceInIPFS && config.token.priceEnv !== "development") {
 		const error = new Error(`Validation_failed:${price}!==${priceInIPFS}`);
 		error.status = 409;
 		throw error;

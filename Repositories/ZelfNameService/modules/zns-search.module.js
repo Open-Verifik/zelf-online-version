@@ -12,7 +12,7 @@ const WalrusModule = require("../../Walrus/modules/walrus.module");
  */
 const searchZelfName = async (params, authUser) => {
 	// check if its missing .zelf extension if so, add it
-	if (params.zelfName && !params.zelfName?.endsWith(".zelf")) {
+	if (params.zelfName && !params.zelfName?.includes(".zelf") && !params.zelfName?.endsWith(".zelfpay")) {
 		params.zelfName = `${params.zelfName}.zelf`;
 	}
 
