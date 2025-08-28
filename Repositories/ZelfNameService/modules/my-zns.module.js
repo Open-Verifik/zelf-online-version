@@ -46,6 +46,12 @@ const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
 };
 
 const renewMyZelfName = async (params, authUser) => {
+	if (!authUser || !authUser.zelfName) {
+		const error = new Error("zelfName_not_authenticated");
+		error.status = 404;
+		throw error;
+	}
+
 	let payment;
 
 	switch (params.network) {
@@ -81,7 +87,7 @@ const renewMyZelfName = async (params, authUser) => {
 			payment,
 			confirmed: true,
 			zelfName: authUser.zelfName,
-			reward: await getPurchaseReward(authUser.zelfName.replace(".hold", "")),
+			reward: await getPurchaseReward(authUser.zelfName?.replace(".hold", "")),
 		};
 	}
 
