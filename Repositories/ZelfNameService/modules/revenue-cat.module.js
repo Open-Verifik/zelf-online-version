@@ -50,9 +50,11 @@ const _handleWebhook = async (event) => {
 		throw error;
 	}
 
-	const zelfNameRecords = await ZelfNameServiceModule.previewZelfName(previewQuery, {});
+	const previewResult = await ZelfNameServiceModule.previewZelfName(previewQuery, {});
 
-	console.log({ event, zelfNameRecords, previewQuery });
+	const zelfNameRecords = previewResult.arweave ? previewResult.arweave : previewResult.ipfs ? previewResult.ipfs : previewResult;
+
+	console.log({ event, zelfNameRecords, previewQuery, previewResult });
 
 	if (!zelfNameRecords.length) {
 		const error = new Error("zelfName_not_found");
