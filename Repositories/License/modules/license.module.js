@@ -92,11 +92,15 @@ const createOrUpdateLicense = async (body, jwt) => {
 
 		if (myLicense) {
 			// we will delete the previous license
-			// await IPFS.unPinFiles([myLicense.ipfs_pin_hash]);
+			await IPFS.unPinFiles([myLicense.ipfs_pin_hash]);
 		}
+
+		if (myLicense?.metadata.keyvalues.domain === body.domain) throw new Error("409:domain_already_registered");
 
 		const licenseMetadata = {
 			type: "license",
+			subscriptionId: "free",
+			previousDomain: myLicense?.metadata.keyvalues.domain || "",
 			domain: body.domain,
 			owner: jwt.email,
 			zelfProof: zelfAccount.metadata.keyvalues.zelfProof,
