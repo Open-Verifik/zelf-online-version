@@ -2,7 +2,7 @@ module.exports = (server) => {
 	//A
 	//B
 	//C
-	require("../Repositories/Client/routes/client.route")(server);
+	require("../Repositories/Client/routes/unprotected-client.route")(server);
 	//D
 	//E
 	//F

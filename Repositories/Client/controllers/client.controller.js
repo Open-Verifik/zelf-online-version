@@ -1,4 +1,5 @@
 const Module = require("../modules/client.module");
+const { errorHandler } = require("../../../Core/http-handler");
 
 const get = async (ctx) => {
 	try {
@@ -29,14 +30,18 @@ const show = async (ctx) => {
 
 const create = async (ctx) => {
 	try {
-		const data = await Module.create(ctx.request.body, ctx.state.user);
+		const data = await Module.create(ctx.request.body);
 
-		ctx.body = data;
+		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 

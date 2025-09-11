@@ -4,13 +4,25 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const config = require("../../../Core/config");
 const moment = require("moment");
+const IPFSModule = require("../../IPFS/modules/ipfs.module");
+const zelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
+const { generateMnemonic } = require("../../Wallet/modules/helpers");
+const OfflineProofModule = require("../../Mina/offline-proof");
 
 const get = async (params = {}, authUser = {}) => {
-	const queryParams = {
-		...params,
-	};
+	if (params.email) {
+		const emailRecord = await IPFSModule.get({ key: "email", value: params.email });
 
-	return await MongoORM.buildQuery(queryParams, Model, null, []);
+		if (emailRecord.length) return emailRecord[0];
+	}
+
+	if (params.phone) {
+		const phoneRecord = await IPFSModule.get({ key: "phone", value: params.phone });
+
+		if (phoneRecord.length) return phoneRecord[0];
+	}
+
+	throw new Error("404:client_not_found");
 };
 
 const show = async (params = {}, authUser = {}) => {
@@ -30,25 +42,87 @@ const show = async (params = {}, authUser = {}) => {
 	return await MongoORM.buildQuery(queryParams, Model, null, populates);
 };
 
-const create = async (data, authUser) => {
-	const apiKey = `client_${crypto.randomBytes(12).toString("hex").slice(0, 24)}`;
+const create = async (data) => {
+	const emailRecord = await IPFSModule.get({ key: "email", value: data.email });
 
-	const record = new Model({
-		name: data.name || "NA",
-		status: data.status || "joined",
-		avatar: data.avatar || null,
-		countryCode: data.countryCode,
-		phone: data.phone,
-		email: data.email,
-		active: true,
-		apiKey,
+	if (emailRecord.length) throw new Error("403:email_already_exists");
+
+	const phoneRecord = await IPFSModule.get({ key: "phone", value: data.phone });
+
+	if (phoneRecord.length) throw new Error("403:phone_already_exists");
+
+	const apiKey = `zk_${crypto.randomBytes(12).toString("hex").slice(0, 24)}`;
+
+	const zkProof = await OfflineProofModule.createProof(apiKey);
+
+	const { zelfProof } = await zelfProofModule.encrypt({
+		publicData: {
+			email: data.email,
+			company: data.company,
+			countryCode: data.countryCode,
+			phone: data.phone,
+		},
+		faceBase64: data.faceBase64,
+		metadata: {
+			apiKey,
+			zkProof,
+			mnemonic: generateMnemonic(12),
+		},
+		// password: data.password || undefined,
+		identifier: data.email,
+		requireLiveness: true,
+		tolerance: data.tolerance || "REGULAR",
+		verifierKey: config.zelfEncrypt.serverKey,
 	});
 
-	await record.save();
+	// Create JSON data structure for IPFS storage
+	const clientData = {
+		email: data.email,
+		company: data.company,
+		countryCode: data.countryCode,
+		phone: data.phone,
+		language: data.language || "en",
+		zelfProof,
+		createdAt: new Date().toISOString(),
+		version: "1.0.0",
+	};
+
+	// Convert to JSON string and then to base64
+	const jsonData = JSON.stringify(clientData, null, 2);
+
+	const base64Data = Buffer.from(jsonData).toString("base64");
+
+	// Pin the JSON data to IPFS
+	const zelfAccount = await IPFSModule.insert(
+		{
+			base64: base64Data,
+			metadata: {
+				email: data.email,
+				phone: data.phone,
+				company: data.company,
+				countryCode: data.countryCode,
+				zelfProof,
+				type: "client_account",
+				subscriptionId: "free",
+			},
+			name: `${data.email}.account`,
+			pinIt: true,
+		},
+		{ pro: true }
+	);
 
 	return {
-		...record._doc,
-		apiKey,
+		zelfProof,
+		zelfAccount,
+		ipfsHash: zelfAccount.cid,
+		token: jwt.sign(
+			{
+				email: data.email,
+				zkProof,
+				exp: moment().add(1, "day").unix(),
+			},
+			config.JWT_SECRET
+		),
 	};
 };
 
@@ -71,37 +145,30 @@ const update = async (data, authUser) => {
 const destroy = async (data, authUser) => {};
 
 const auth = async (data, authUser) => {
-	const { apiKey, email } = data;
+	const { email, countryCode, phone, faceBase64 } = data;
 
-	const client = await get({
-		where_email: email,
-		findOne: true,
+	const zelfAccount = await get({ email, countryCode, phone });
+
+	const metadata = zelfAccount.metadata.keyvalues;
+
+	const decryptedZelfAccount = await zelfProofModule.decrypt({
+		zelfProof: metadata.zelfProof,
+		faceBase64,
+		verifierKey: config.zelfEncrypt.serverKey,
 	});
 
-	if (!client) {
-		const error = new Error("client_not_found");
-		error.status = 404;
-		throw error;
-	}
-
-	const isKeyValid = await client.isValidApiKey(apiKey);
-
-	if (!isKeyValid) {
-		const error = new Error("client_invalid_api_key");
-		error.status = 403;
-		throw error;
-	}
-
-	let tokenDuration = 30;
-
-	if (email.includes(config.revenueCat.allowedEmail)) tokenDuration = 700;
+	if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
 
 	return {
+		zelfProof: metadata.zelfProof,
+		zelfAccount,
+		ipfsHash: zelfAccount.cid,
+		zkProof: decryptedZelfAccount.metadata.zkProof,
+		apiKey: decryptedZelfAccount.metadata.apiKey,
 		token: jwt.sign(
 			{
-				clientId: client._id,
-				email,
-				exp: moment().add(tokenDuration, "day").unix(),
+				email: data.email,
+				exp: moment().add(1, "day").unix(),
 			},
 			config.JWT_SECRET
 		),

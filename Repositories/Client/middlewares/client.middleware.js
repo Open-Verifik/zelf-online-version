@@ -10,6 +10,8 @@ const schemas = {
 		phone: string().required(),
 		email: string().required(),
 		language: stringEnum(["en", "es"]),
+		company: string().required(),
+		faceBase64: string().required(),
 	},
 	update: {},
 	destroy: {},
@@ -45,14 +47,6 @@ const getValidation = async (ctx, next) => {
 const showValidation = async (ctx, next) => {
 	const apiKey = ctx.headers["x-api-key"];
 
-	if (!apiKey || apiKey !== configuration.SUPERADMIN_JWT_SECRET) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "ApiKey not valid" };
-
-		return;
-	}
-
 	const valid = validate(schemas.show, ctx.request.body);
 
 	if (valid.error) {
@@ -67,16 +61,6 @@ const showValidation = async (ctx, next) => {
 };
 
 const createValidation = async (ctx, next) => {
-	const apiKey = ctx.headers["x-api-key"];
-
-	if (!apiKey || apiKey !== configuration.SUPERADMIN_JWT_SECRET) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "ApiKey not valid" };
-
-		return;
-	}
-
 	const valid = validate(schemas.create, ctx.request.body);
 
 	if (valid.error) {
@@ -91,16 +75,6 @@ const createValidation = async (ctx, next) => {
 };
 
 const destroyValidation = async (ctx, next) => {
-	const apiKey = ctx.headers["x-api-key"];
-
-	if (!apiKey || apiKey !== configuration.SUPERADMIN_JWT_SECRET) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "ApiKey not valid" };
-
-		return;
-	}
-
 	const valid = validate(schemas.destroy, ctx.request.body);
 
 	if (valid.error) {
@@ -115,16 +89,6 @@ const destroyValidation = async (ctx, next) => {
 };
 
 const updateValidation = async (ctx, next) => {
-	const apiKey = ctx.headers["x-api-key"];
-
-	if (!apiKey || apiKey !== configuration.SUPERADMIN_JWT_SECRET) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "ApiKey not valid" };
-
-		return;
-	}
-
 	const valid = validate(schemas.update, ctx.request.body);
 
 	if (valid.error) {
@@ -139,16 +103,6 @@ const updateValidation = async (ctx, next) => {
 };
 
 const authValidation = async (ctx, next) => {
-	const apiKey = ctx.headers["x-api-key"];
-
-	if (!apiKey) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "Missing key" };
-
-		return;
-	}
-
 	const valid = validate(schemas.auth, ctx.request.body);
 
 	if (valid.error) {
@@ -156,18 +110,6 @@ const authValidation = async (ctx, next) => {
 
 		ctx.body = { validationError: valid.error.message };
 
-		return;
-	}
-
-	await next();
-};
-
-const revenueCatWebhookValidation = async (ctx) => {
-	const valid = validate(schemas.revenueCatWebhook, ctx.request.body?.event);
-
-	if (valid.error) {
-		ctx.status = 409;
-		ctx.body = { validationError: valid.error.message };
 		return;
 	}
 

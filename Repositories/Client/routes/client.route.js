@@ -5,7 +5,20 @@ const Middleware = require("../middlewares/client.middleware");
 const primaryKey = "id";
 const base = "/clients";
 
-/**
+module.exports = (server) => {
+	const PATH = config.basePath(base);
+
+	// Routes
+	server.post(`${PATH}/auth`, Middleware.authValidation, Controller.auth);
+	server.put(`${PATH}/:${primaryKey}`, Middleware.updateValidation, Controller.update);
+	server.del(`${PATH}/:${primaryKey}`, Middleware.destroyValidation, Controller.destroy);
+};
+
+/*
+ * =============================================================================
+ * SWAGGER DOCUMENTATION
+ * =============================================================================
+ *
  * @swagger
  * components:
  *   schemas:
@@ -89,341 +102,259 @@ const base = "/clients";
  *           example: "en"
  *     AuthClientRequest:
  *       type: object
- *       required: [email]
  *       properties:
  *         email:
  *           type: string
  *           format: email
- *           description: Client email for authentication
+ *           description: Client email for authentication (required if phone not provided)
  *           example: "john.doe@example.com"
+ *         countryCode:
+ *           type: string
+ *           description: Country code (required if email not provided)
+ *           example: "+1"
+ *         phone:
+ *           type: string
+ *           description: Phone number (required if email not provided)
+ *           example: "5551234567"
+ *         faceBase64:
+ *           type: string
+ *           description: Base64 encoded face image for biometric verification
+ *           example: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ..."
+ *         masterPassword:
+ *           type: string
+ *           description: Master password for biometric verification
+ *           example: "mySecurePassword123"
+ *
+ * @swagger
+ * /api/clients/{id}:
+ *   get:
+ *     summary: Get client by ID
+ *     description: Retrieve a specific client by their ID (requires API key)
+ *     tags: [Client]
+ *     security:
+ *       - apiKey: []
+ *     parameters:
+ *       - in: header
+ *         name: x-api-key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: API key for authentication
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Client ID
+ *     responses:
+ *       200:
+ *         description: Client retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Client'
+ *       403:
+ *         description: API key not valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 validationError:
+ *                   type: string
+ *                   example: "ApiKey not valid"
+ *       409:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 validationError:
+ *                   type: string
+ *                   example: "Validation error message"
+ *
+ * @swagger
+ * /api/clients/auth:
+ *   post:
+ *     summary: Authenticate client with biometric verification
+ *     description: Authenticate a client using email OR phone number with optional biometric verification (requires API key)
+ *     tags: [Client]
+ *     security:
+ *       - apiKey: []
+ *     parameters:
+ *       - in: header
+ *         name: x-api-key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: API key for authentication
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthClientRequest'
+ *     responses:
+ *       200:
+ *         description: Client authenticated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     token:
+ *                       type: string
+ *                       description: JWT authentication token
+ *                     zelfProof:
+ *                       type: string
+ *                       description: Zelf proof for biometric verification
+ *                     zelfAccount:
+ *                       type: object
+ *                       description: User account data from IPFS
+ *       400:
+ *         description: Validation error - missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 validationError:
+ *                   type: string
+ *                   example: "Either email or countryCode + phone must be provided"
+ *       403:
+ *         description: Missing or invalid API key, or biometric verification failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 validationError:
+ *                   type: string
+ *                   example: "Missing key"
+ *       404:
+ *         description: Client not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 validationError:
+ *                   type: string
+ *                   example: "Client not found"
+ *
+ * @swagger
+ * /api/clients/{id}:
+ *   put:
+ *     summary: Update client
+ *     description: Update an existing client's information (requires API key)
+ *     tags: [Client]
+ *     security:
+ *       - apiKey: []
+ *     parameters:
+ *       - in: header
+ *         name: x-api-key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: API key for authentication
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Client ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateClientRequest'
+ *     responses:
+ *       200:
+ *         description: Client updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   description: Update result
+ *       403:
+ *         description: API key not valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 validationError:
+ *                   type: string
+ *                   example: "ApiKey not valid"
+ *       409:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 validationError:
+ *                   type: string
+ *                   example: "Validation error message"
+ *
+ * @swagger
+ * /api/clients/{id}:
+ *   delete:
+ *     summary: Delete client
+ *     description: Delete a client by their ID (requires API key)
+ *     tags: [Client]
+ *     security:
+ *       - apiKey: []
+ *     parameters:
+ *       - in: header
+ *         name: x-api-key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: API key for authentication
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Client ID
+ *     responses:
+ *       200:
+ *         description: Client deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   description: Delete result
+ *       403:
+ *         description: API key not valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 validationError:
+ *                   type: string
+ *                   example: "ApiKey not valid"
+ *       409:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 validationError:
+ *                   type: string
+ *                   example: "Validation error message"
  */
-
-module.exports = (server) => {
-	const PATH = config.basePath(base);
-
-	/**
-	 * @swagger
-	 * /api/clients:
-	 *   get:
-	 *     summary: Get all clients
-	 *     description: Retrieve a list of all clients (requires API key)
-	 *     tags: [Client]
-	 *     security:
-	 *       - apiKey: []
-	 *     parameters:
-	 *       - in: header
-	 *         name: x-api-key
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *         description: API key for authentication
-	 *     responses:
-	 *       200:
-	 *         description: List of clients retrieved successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: array
-	 *               items:
-	 *                 $ref: '#/components/schemas/Client'
-	 *       403:
-	 *         description: API key not valid
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "ApiKey not valid"
-	 *       409:
-	 *         description: Validation error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "Validation error message"
-	 */
-	server.get(PATH, Middleware.getValidation, Controller.get);
-
-	/**
-	 * @swagger
-	 * /api/clients/{id}:
-	 *   get:
-	 *     summary: Get client by ID
-	 *     description: Retrieve a specific client by their ID (requires API key)
-	 *     tags: [Client]
-	 *     security:
-	 *       - apiKey: []
-	 *     parameters:
-	 *       - in: header
-	 *         name: x-api-key
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *         description: API key for authentication
-	 *       - in: path
-	 *         name: id
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *         description: Client ID
-	 *     responses:
-	 *       200:
-	 *         description: Client retrieved successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/Client'
-	 *       403:
-	 *         description: API key not valid
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "ApiKey not valid"
-	 *       409:
-	 *         description: Validation error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "Validation error message"
-	 */
-	server.get(`${PATH}/:${primaryKey}`, Middleware.showValidation, Controller.show);
-
-	/**
-	 * @swagger
-	 * /api/clients:
-	 *   post:
-	 *     summary: Create new client
-	 *     description: Create a new client with the provided information (requires API key)
-	 *     tags: [Client]
-	 *     security:
-	 *       - apiKey: []
-	 *     parameters:
-	 *       - in: header
-	 *         name: x-api-key
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *         description: API key for authentication
-	 *     requestBody:
-	 *       required: true
-	 *       content:
-	 *         application/json:
-	 *           schema:
-	 *             $ref: '#/components/schemas/CreateClientRequest'
-	 *     responses:
-	 *       200:
-	 *         description: Client created successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/Client'
-	 *       403:
-	 *         description: API key not valid
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "ApiKey not valid"
-	 *       409:
-	 *         description: Validation error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "Validation error message"
-	 */
-	server.post(`${PATH}`, Middleware.createValidation, Controller.create);
-
-	/**
-	 * @swagger
-	 * /api/clients/auth:
-	 *   post:
-	 *     summary: Authenticate client
-	 *     description: Authenticate a client using email (requires API key)
-	 *     tags: [Client]
-	 *     security:
-	 *       - apiKey: []
-	 *     parameters:
-	 *       - in: header
-	 *         name: x-api-key
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *         description: API key for authentication
-	 *     requestBody:
-	 *       required: true
-	 *       content:
-	 *         application/json:
-	 *           schema:
-	 *             $ref: '#/components/schemas/AuthClientRequest'
-	 *     responses:
-	 *       200:
-	 *         description: Client authenticated successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 data:
-	 *                   type: object
-	 *                   description: Authentication result
-	 *       403:
-	 *         description: Missing or invalid API key
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "Missing key"
-	 *       409:
-	 *         description: Validation error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "Validation error message"
-	 */
-	server.post(`${PATH}/auth`, Middleware.authValidation, Controller.auth);
-
-	/**
-	 * @swagger
-	 * /api/clients/{id}:
-	 *   put:
-	 *     summary: Update client
-	 *     description: Update an existing client's information (requires API key)
-	 *     tags: [Client]
-	 *     security:
-	 *       - apiKey: []
-	 *     parameters:
-	 *       - in: header
-	 *         name: x-api-key
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *         description: API key for authentication
-	 *       - in: path
-	 *         name: id
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *         description: Client ID
-	 *     requestBody:
-	 *       required: true
-	 *       content:
-	 *         application/json:
-	 *           schema:
-	 *             $ref: '#/components/schemas/UpdateClientRequest'
-	 *     responses:
-	 *       200:
-	 *         description: Client updated successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 data:
-	 *                   type: object
-	 *                   description: Update result
-	 *       403:
-	 *         description: API key not valid
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "ApiKey not valid"
-	 *       409:
-	 *         description: Validation error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "Validation error message"
-	 */
-	server.put(`${PATH}/:${primaryKey}`, Middleware.updateValidation, Controller.update);
-
-	/**
-	 * @swagger
-	 * /api/clients/{id}:
-	 *   delete:
-	 *     summary: Delete client
-	 *     description: Delete a client by their ID (requires API key)
-	 *     tags: [Client]
-	 *     security:
-	 *       - apiKey: []
-	 *     parameters:
-	 *       - in: header
-	 *         name: x-api-key
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *         description: API key for authentication
-	 *       - in: path
-	 *         name: id
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *         description: Client ID
-	 *     responses:
-	 *       200:
-	 *         description: Client deleted successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 data:
-	 *                   type: object
-	 *                   description: Delete result
-	 *       403:
-	 *         description: API key not valid
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "ApiKey not valid"
-	 *       409:
-	 *         description: Validation error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 validationError:
-	 *                   type: string
-	 *                   example: "Validation error message"
-	 */
-	server.del(`${PATH}/:${primaryKey}`, Middleware.destroyValidation, Controller.destroy);
-};
