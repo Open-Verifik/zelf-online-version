@@ -237,8 +237,8 @@ const errorHandler = (exception, ctx = null, optionalMessage) => {
 			break;
 	}
 
-	if (config.env !== "development") {
-		tryCatchLog(status, message, code, exception, ctx);
+	if (config.env !== "development" && status !== 404) {
+		// tryCatchLog(status, message, code, exception, ctx);
 	}
 
 	return {

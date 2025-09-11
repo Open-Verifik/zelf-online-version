@@ -25,6 +25,7 @@ module.exports = (server) => {
 	//J
 	//K
 	//L
+	require("../Repositories/License/routes/license.route")(server);
 	require("../Repositories/Lifi/routes/lifi.route")(server);
 	//M
 	//N

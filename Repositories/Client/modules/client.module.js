@@ -85,6 +85,7 @@ const create = async (data) => {
 		zelfProof,
 		createdAt: new Date().toISOString(),
 		version: "1.0.0",
+		name: data.name,
 	};
 
 	// Convert to JSON string and then to base64
@@ -110,6 +111,8 @@ const create = async (data) => {
 		},
 		{ pro: true }
 	);
+
+	zelfAccount.metadata.name = data.name;
 
 	return {
 		zelfProof,
@@ -158,6 +161,13 @@ const auth = async (data, authUser) => {
 	});
 
 	if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
+
+	// from the zelfAccount.url we should get the json from that then asisgn the name to the zelfAccount.metadata.keyvalues.name
+	const jsonData = await axios.get(zelfAccount.url);
+
+	console.log({ jsonData, zelfAccount, metadata: zelfAccount.metadata });
+
+	zelfAccount.metadata.keyvalues.name = jsonData.name;
 
 	return {
 		zelfProof: metadata.zelfProof,
