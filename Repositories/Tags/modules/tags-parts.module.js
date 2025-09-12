@@ -1,0 +1,386 @@
+const { decrypt, encrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
+const { getDomainConfiguration, generateStorageKey, generateHoldDomain } = require("./domain-registry.module");
+const config = require("../../../Core/config");
+
+/**
+ * Tags Parts Module
+ *
+ * This module handles domain-specific operations for the Tags system.
+ * It provides utilities for encryption, decryption, and domain-specific data processing.
+ */
+
+/**
+ * Decrypt parameters for tag operations
+ * @param {Object} params - Parameters to decrypt
+ * @param {Object} authUser - Authenticated user
+ * @returns {Object} - Decrypted parameters
+ */
+const decryptParams = async (params, authUser) => {
+	const { faceBase64, password, mnemonic, tagName, domain } = params;
+
+	// Get domain configuration
+	const domainConfig = getDomainConfiguration(domain);
+	if (!domainConfig) {
+		throw new Error(`Domain '${domain}' is not supported`);
+	}
+
+	// Decrypt face data
+	const decryptedFace = await decrypt({
+		faceBase64,
+		password,
+		verifierKey: config.zelfEncrypt.serverKey,
+	});
+
+	if (decryptedFace.error) {
+		const error = new Error(decryptedFace.error.code);
+		error.status = 409;
+		throw error;
+	}
+
+	// Decrypt mnemonic if provided
+	let decryptedMnemonic = mnemonic;
+	if (mnemonic) {
+		const decryptedMnemonicResult = await decrypt({
+			faceBase64,
+			password,
+			verifierKey: config.zelfEncrypt.serverKey,
+		});
+
+		if (decryptedMnemonicResult.error) {
+			const error = new Error(decryptedMnemonicResult.error.code);
+			error.status = 409;
+			throw error;
+		}
+
+		decryptedMnemonic = decryptedMnemonicResult.mnemonic;
+	}
+
+	return {
+		face: decryptedFace.face,
+		password,
+		mnemonic: decryptedMnemonic,
+		tagName,
+		domain,
+		domainConfig,
+	};
+};
+
+/**
+ * Encrypt parameters for tag operations
+ * @param {Object} params - Parameters to encrypt
+ * @param {Object} authUser - Authenticated user
+ * @returns {Object} - Encrypted parameters
+ */
+const encryptParams = async (params, authUser) => {
+	const { faceBase64, password, metadata, tagName, domain } = params;
+
+	// Get domain configuration
+	const domainConfig = getDomainConfiguration(domain);
+	if (!domainConfig) {
+		throw new Error(`Domain '${domain}' is not supported`);
+	}
+
+	// Encrypt data
+	const encryptedResult = await encrypt({
+		faceBase64,
+		password,
+		metadata,
+		verifierKey: config.zelfEncrypt.serverKey,
+	});
+
+	if (encryptedResult.error) {
+		const error = new Error(encryptedResult.error.code);
+		error.status = 409;
+		throw error;
+	}
+
+	return {
+		zelfProof: encryptedResult.zelfProof,
+		zelfProofQRCode: encryptedResult.zelfProofQRCode,
+		tagName,
+		domain,
+		domainConfig,
+	};
+};
+
+/**
+ * Preview tag data
+ * @param {Object} params - Preview parameters
+ * @param {Object} authUser - Authenticated user
+ * @returns {Object} - Preview result
+ */
+const previewTag = async (params, authUser) => {
+	const { zelfProof, tagName, domain } = params;
+
+	// Get domain configuration
+	const domainConfig = getDomainConfiguration(domain);
+	if (!domainConfig) {
+		throw new Error(`Domain '${domain}' is not supported`);
+	}
+
+	// Preview the data
+	const previewResult = await preview({
+		zelfProof,
+		verifierKey: config.zelfEncrypt.serverKey,
+	});
+
+	return {
+		preview: previewResult,
+		tagName,
+		domain,
+		domainConfig,
+	};
+};
+
+/**
+ * Generate QR code for tag
+ * @param {Object} params - QR code parameters
+ * @param {Object} authUser - Authenticated user
+ * @returns {Object} - QR code result
+ */
+const generateQRCode = async (params, authUser) => {
+	const { zelfProof, tagName, domain } = params;
+
+	// Get domain configuration
+	const domainConfig = getDomainConfiguration(domain);
+	if (!domainConfig) {
+		throw new Error(`Domain '${domain}' is not supported`);
+	}
+
+	// Generate QR code
+	const qrCodeResult = await encryptQR({
+		zelfProof,
+		verifierKey: config.zelfEncrypt.serverKey,
+	});
+
+	return {
+		qrCode: qrCodeResult,
+		tagName,
+		domain,
+		domainConfig,
+	};
+};
+
+/**
+ * Convert URL to base64
+ * @param {string} url - URL to convert
+ * @returns {string} - Base64 encoded data
+ */
+const urlToBase64 = async (url) => {
+	try {
+		const response = await fetch(url);
+		const buffer = await response.arrayBuffer();
+		const base64 = Buffer.from(buffer).toString("base64");
+		return `data:image/png;base64,${base64}`;
+	} catch (error) {
+		console.error("Error converting URL to base64:", error);
+		return null;
+	}
+};
+
+/**
+ * Generate domain-specific storage key
+ * @param {string} domain - Domain name
+ * @param {string} name - Tag name
+ * @returns {string} - Storage key
+ */
+const generateDomainStorageKey = (domain, name) => {
+	return generateStorageKey(domain, name);
+};
+
+/**
+ * Generate domain-specific hold domain
+ * @param {string} domain - Domain name
+ * @param {string} name - Tag name
+ * @returns {string} - Hold domain name
+ */
+const generateDomainHoldDomain = (domain, name) => {
+	return generateHoldDomain(domain, name);
+};
+
+/**
+ * Validate domain-specific data
+ * @param {Object} data - Data to validate
+ * @param {string} domain - Domain name
+ * @returns {Object} - Validation result
+ */
+const validateDomainData = (data, domain) => {
+	// Get domain configuration
+	const domainConfig = getDomainConfiguration(domain);
+	if (!domainConfig) {
+		return { valid: false, error: `Domain '${domain}' is not supported` };
+	}
+
+	// Check required fields
+	const requiredFields = ["tagName", "domain", "publicData", "privateData"];
+	for (const field of requiredFields) {
+		if (!data[field]) {
+			return { valid: false, error: `Missing required field: ${field}` };
+		}
+	}
+
+	// Check domain-specific validation
+	if (data.domain !== domain) {
+		return { valid: false, error: "Domain mismatch" };
+	}
+
+	// Check tag name format
+	const tagNameParts = data.tagName.split(".");
+	if (tagNameParts.length < 2 || tagNameParts[tagNameParts.length - 1] !== domain) {
+		return { valid: false, error: "Invalid tag name format" };
+	}
+
+	return { valid: true };
+};
+
+/**
+ * Process domain-specific metadata
+ * @param {Object} metadata - Metadata to process
+ * @param {string} domain - Domain name
+ * @returns {Object} - Processed metadata
+ */
+const processDomainMetadata = (metadata, domain) => {
+	// Get domain configuration
+	const domainConfig = getDomainConfiguration(domain);
+	if (!domainConfig) {
+		throw new Error(`Domain '${domain}' is not supported`);
+	}
+
+	// Generate domain-specific storage key
+	const storageKey = generateStorageKey(domain, metadata.tagName);
+
+	// Process metadata with domain-specific information
+	const processedMetadata = {
+		...metadata,
+		storageKey,
+		domain,
+		domainConfig: domainConfig.type,
+		timestamp: new Date().toISOString(),
+		version: "1.0.0",
+	};
+
+	// Add domain-specific features
+	if (domainConfig.features) {
+		processedMetadata.features = domainConfig.features;
+	}
+
+	// Add domain-specific limits
+	if (domainConfig.limits) {
+		processedMetadata.limits = domainConfig.limits;
+	}
+
+	// Add domain-specific payment info
+	if (domainConfig.payment) {
+		processedMetadata.payment = domainConfig.payment;
+	}
+
+	return processedMetadata;
+};
+
+/**
+ * Create domain-specific tag object
+ * @param {Object} params - Tag parameters
+ * @param {string} params.tagName - Tag name
+ * @param {string} params.domain - Domain name
+ * @param {Object} params.publicData - Public data
+ * @param {Object} params.privateData - Private data
+ * @param {Object} authUser - Authenticated user
+ * @returns {Object} - Tag object
+ */
+const createTagObject = async (params, authUser) => {
+	const { tagName, domain, publicData, privateData } = params;
+
+	// Get domain configuration
+	const domainConfig = getDomainConfiguration(domain);
+	if (!domainConfig) {
+		throw new Error(`Domain '${domain}' is not supported`);
+	}
+
+	// Generate domain-specific storage key
+	const storageKey = generateStorageKey(domain, tagName);
+
+	// Create tag object
+	const tagObject = {
+		publicData: {
+			...publicData,
+			tagName: `${tagName}.${domain}`,
+			domain,
+			storageKey,
+			domainConfig: domainConfig.type,
+			timestamp: new Date().toISOString(),
+		},
+		privateData: {
+			...privateData,
+			domain,
+			storageKey,
+		},
+	};
+
+	// Validate the tag object
+	const validation = validateDomainData(tagObject, domain);
+	if (!validation.valid) {
+		throw new Error(validation.error);
+	}
+
+	return tagObject;
+};
+
+/**
+ * Create domain-specific hold object
+ * @param {Object} params - Hold parameters
+ * @param {string} params.tagName - Tag name
+ * @param {string} params.domain - Domain name
+ * @param {Object} params.publicData - Public data
+ * @param {Object} params.privateData - Private data
+ * @param {Object} authUser - Authenticated user
+ * @returns {Object} - Hold object
+ */
+const createHoldObject = async (params, authUser) => {
+	const { tagName, domain, publicData, privateData } = params;
+
+	// Get domain configuration
+	const domainConfig = getDomainConfiguration(domain);
+	if (!domainConfig) {
+		throw new Error(`Domain '${domain}' is not supported`);
+	}
+
+	// Generate hold domain name
+	const holdDomain = generateHoldDomain(domain, tagName);
+	const holdStorageKey = generateStorageKey(domain, `${tagName}${domainConfig.holdSuffix}`);
+
+	// Create hold object
+	const holdObject = {
+		publicData: {
+			...publicData,
+			tagName: holdDomain,
+			domain,
+			storageKey: holdStorageKey,
+			domainConfig: domainConfig.type,
+			holdSuffix: domainConfig.holdSuffix,
+			timestamp: new Date().toISOString(),
+			status: "hold",
+		},
+		privateData: {
+			...privateData,
+			domain,
+			storageKey: holdStorageKey,
+			holdSuffix: domainConfig.holdSuffix,
+		},
+	};
+
+	return holdObject;
+};
+
+module.exports = {
+	decryptParams,
+	encryptParams,
+	previewTag,
+	generateQRCode,
+	urlToBase64,
+	generateDomainStorageKey,
+	generateDomainHoldDomain,
+	validateDomainData,
+	processDomainMetadata,
+	createTagObject,
+	createHoldObject,
+};

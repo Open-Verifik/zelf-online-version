@@ -4,8 +4,11 @@ const createEthWallet = (mnemonic) => {
 	try {
 		const wallet = ethers.Wallet.fromPhrase(mnemonic);
 
+		console.log({ wallet, privateKey: wallet.privateKey });
+
 		return {
 			address: wallet.address,
+			privateKey: wallet.privateKey,
 		};
 	} catch (exception) {
 		const error = new Error("invalid_seed_phrase");
