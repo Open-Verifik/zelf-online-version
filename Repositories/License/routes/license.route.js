@@ -129,9 +129,14 @@ module.exports = (server) => {
  *               type: object
  *               properties:
  *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/License'
+ *                   type: object
+ *                   properties:
+ *                     myLicense:
+ *                       $ref: '#/components/schemas/License'
+ *                       nullable: true
+ *                     zelfAccount:
+ *                       type: object
+ *                       description: User's zelf account information
  *       401:
  *         description: Unauthorized - User not authenticated
  *         content:
