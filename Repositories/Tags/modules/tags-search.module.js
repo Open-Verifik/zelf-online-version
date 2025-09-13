@@ -68,6 +68,7 @@ const searchTag = async (params, authUser) => {
  */
 const searchIPFS = async (params, authUser) => {
 	const { tagName, key, value, domainConfig, type } = params;
+
 	if (!domainConfig?.storage?.ipfsEnabled) return [];
 
 	const ipfsRecords = [];

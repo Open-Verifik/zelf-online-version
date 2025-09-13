@@ -3,6 +3,7 @@ const RevenueCatModule = require("../modules/revenue-cat.module");
 const { updateOldTagObject } = require("../modules/my-tags.module");
 const TagsRecoveryModule = require("../modules/tags-recovery.module");
 const { getDomainConfiguration } = require("../modules/domain-registry.module");
+const HttpHandler = require("../../../Core/http-handler");
 
 /**
  * Standard error handler for controllers
@@ -111,7 +112,11 @@ const leaseTag = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -134,7 +139,10 @@ const leaseRecovery = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -149,7 +157,10 @@ const zelfPay = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -196,7 +207,10 @@ const leaseConfirmation = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -219,7 +233,10 @@ const previewTag = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -234,7 +251,10 @@ const previewZelfProof = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -257,7 +277,10 @@ const decryptTag = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -287,7 +310,10 @@ const purchaseRewards = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -302,7 +328,10 @@ const referralRewards = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -325,7 +354,10 @@ const update = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 

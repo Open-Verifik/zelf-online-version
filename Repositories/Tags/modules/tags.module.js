@@ -418,9 +418,8 @@ const _findDuplicatedTag = async (tagName, domain, storage, domainConfig) => {
 		domain,
 		domainConfig,
 		storageKey,
+		environment: "all",
 	};
-
-	console.log({ searchParams });
 
 	const result = await TagsSearchModule.searchTag(searchParams);
 
@@ -429,10 +428,6 @@ const _findDuplicatedTag = async (tagName, domain, storage, domainConfig) => {
 		error.status = 409;
 		throw error;
 	}
-
-	console.log({ result });
-
-	throw new Error("409:stop_here");
 };
 
 /**
