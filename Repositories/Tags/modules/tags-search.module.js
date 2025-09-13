@@ -1,6 +1,7 @@
 const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const { getDomainConfiguration, isDomainActive } = require("./domain-registry.module");
+const TagsPartsModule = require("./tags-parts.module");
 
 /**
  * Tags Search Module
@@ -43,6 +44,9 @@ const searchTag = async (params, authUser) => {
 		} else if (ipfsResults.length > 0) {
 			combinedResults.tagObject = ipfsResults[0];
 		}
+
+		if (!combinedResults.tagObject.zelfProofQRCode)
+			combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
 
 		if (combinedResults.available) {
 			combinedResults.price = domainConfig.getPrice(tagName, "1");

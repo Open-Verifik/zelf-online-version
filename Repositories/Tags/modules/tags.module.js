@@ -107,7 +107,7 @@ const leaseTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value, environment, type, duration, domainConfig } = params;
+	const { tagName, domain, key, value, environment, type, domainConfig } = params;
 
 	const _domainConfig = domainConfig || getDomainConfig(domain);
 
@@ -117,8 +117,8 @@ const searchTag = async (params, authUser) => {
 			domain,
 			key,
 			value,
-			environment,
-			type,
+			environment: environment || "all",
+			type: type || "both",
 			domainConfig: _domainConfig,
 		},
 		authUser
@@ -133,15 +133,15 @@ const searchTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const decryptTag = async (params, authUser) => {
-	const { tagName, domain } = params;
+	const { tagName, domain, zelfProof } = params;
+
 	const domainConfig = getDomainConfig(domain);
 
-	const tagObjects = await _findTag({ tagName: `${tagName}.${domain}`, domain }, "both", authUser);
+	const searchResult = await searchTag({ tagName, domain, domainConfig, environment: "all" }, authUser);
 
-	const tagObject = {
-		...(tagObjects.arweave?.[0] || {}),
-		...(tagObjects.ipfs?.[0] || {}),
-	};
+	if (searchResult.available) return searchResult;
+
+	const tagObject = searchResult.tagObject;
 
 	const { face, password } = await _decryptParams(params, authUser);
 
@@ -149,12 +149,14 @@ const decryptTag = async (params, authUser) => {
 		addServerPassword: Boolean(params.addServerPassword),
 		faceBase64: face,
 		password,
-		zelfProof: tagObject.publicData.zelfProof || params.zelfProof,
+		zelfProof: tagObject.publicData.zelfProof || zelfProof,
 	});
 
 	if (decryptedZelfProof.error) {
 		const error = new Error(decryptedZelfProof.error.code);
+
 		error.status = 409;
+
 		throw error;
 	}
 
@@ -179,13 +181,10 @@ const decryptTag = async (params, authUser) => {
 		}
 	}
 
-	if (!tagObject.zelfProofQRCode) tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(tagObject.url);
-
 	return {
 		...tagObject,
 		domain,
-		domainConfig,
-		decryptedZelfProof: {
+		metadata: {
 			mnemonic,
 			zkProof,
 			solanaSecretKey,
@@ -501,6 +500,14 @@ const _createWalletsFromPhrase = async (params) => {
  * @param {Object} authUser
  */
 const _decryptParams = async (params, authUser) => {
+	if (params.removePGP) {
+		return {
+			password: params.password,
+			mnemonic: params.mnemonic,
+			face: params.faceBase64,
+		};
+	}
+
 	const { faceBase64, password } = params;
 
 	const decryptedFace = await decrypt({
@@ -665,3 +672,7 @@ module.exports = {
 	_createWalletsFromPhrase,
 	_decryptParams,
 };
+
+//TODO bugs
+
+// [x] fix bug duration yearly = but it should be 1, 2, 3, 4, 5 or lifetime

@@ -10,14 +10,14 @@ module.exports = (server) => {
 	const PATH = config.basePath(base);
 
 	// Route definitions
-	server.get(`${PATH}/search`, Middleware.getValidation, Controller.searchTag);
-	server.get(`${PATH}/preview`, Middleware.previewValidation, Controller.previewTag);
+	server.get(`${PATH}/search`, Middleware.getValidation, Controller.searchTag); // [x]
+	server.get(`${PATH}/preview`, Middleware.previewValidation, Controller.previewTag); // [x]
 	server.get(`${PATH}/zelfpay`, Middleware.zelfPayValidation, Controller.zelfPay);
-	server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseTag);
+	server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseTag); // [x]
 	server.post(`${PATH}/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery);
 	server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOfflineTag);
 	server.post(`${PATH}/lease-confirmation`, Middleware.leaseConfirmationValidation, Controller.leaseConfirmation);
-	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof);
+	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof); // [x]
 	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptTag);
 	server.post(`${PATH}/revenue-cat`, Middleware.revenueCatWebhookValidation, Controller.revenueCatWebhook);
 	server.post(`${PATH}/purchase-rewards`, Middleware.referralRewardsValidation, Controller.purchaseRewards);

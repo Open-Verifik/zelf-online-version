@@ -616,9 +616,7 @@ const previewZelfProofValidation = async (ctx, next) => {
  * @param {*} next - Next middleware
  */
 const decryptValidation = async (ctx, next) => {
-	const payload = Object.assign(ctx.request.query, ctx.request.body);
-
-	const { faceBase64, password, tagName, domain, addServerPassword, os, captchaToken } = payload;
+	const { faceBase64, password, tagName, domain, addServerPassword, os, captchaToken } = ctx.request.body;
 
 	const valid = validate(schemas.decrypt, {
 		faceBase64,
