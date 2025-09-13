@@ -1,3 +1,4 @@
+const config = require("../../../Core/config");
 /**
  * Domain Class
  *
@@ -41,6 +42,8 @@ class Domain {
 				yearly: 0.1,
 				lifetime: 0.2,
 			},
+			rewardPrice: domainData.payment?.rewardPrice || 10,
+			whitelist: domainData.payment?.whitelist || "",
 			pricingTable: domainData.payment?.pricingTable || {},
 		};
 
@@ -78,7 +81,7 @@ class Domain {
 	 * @param {string} duration - Duration ('1', '2', '3', '4', '5', 'lifetime')
 	 * @returns {number} - Price in cents
 	 */
-	getPrice(tagName, duration = "1") {
+	getPrice(tagName, duration = "1", referralTagName = "") {
 		const splitTagName = tagName.split(".");
 
 		const length = splitTagName[0].length;
@@ -97,6 +100,51 @@ class Domain {
 		} else {
 			throw new Error("Invalid name length. Length must be between 1 and 27.");
 		}
+
+		// Adjust price for development environment
+		price = config.token.priceEnv === "development" ? price / 30 : price;
+
+		const priceWithoutDiscount = Number(price);
+
+		let discount = 10;
+		let discountType = "percentage";
+
+		const whitelist = this.payment.whitelist || "";
+
+		if (whitelist.length && referralTagName && whitelist.includes(referralTagName)) {
+			const referralDiscounts = this.payment.whitelist.split(",");
+
+			const referralDiscount = referralDiscounts.find((discount) => {
+				const [name] = discount.split(":");
+				return name === referralTagName || name === `${referralTagName}.zelf`;
+			});
+
+			if (referralDiscount) {
+				const [tagName, amount] = referralDiscount.split(":");
+
+				if (amount.includes("%")) {
+					discountType = "percentage";
+					discount = parseInt(amount);
+					price = price - price * (discount / 100);
+				} else {
+					discount = parseInt(amount);
+					discountType = "amount";
+					price = price - discount;
+				}
+			}
+		} else if (referralTagName) {
+			price = price - price * 0.1;
+		}
+
+		// Round up to 2 decimal places
+		return {
+			price: Math.max(Math.ceil(price * 100) / 100, 0),
+			currency: "USD",
+			reward: Math.max(Math.ceil((price / this.payment.rewardPrice) * 100) / 100, 0),
+			discount,
+			priceWithoutDiscount,
+			discountType,
+		};
 
 		return price;
 	}

@@ -40,32 +40,38 @@ const get = async (data) => {
 	return _formatSearchResults(result);
 };
 
+const _formatRecord = (item) => {
+	const formattedResult = {
+		id: item.id || item.ID,
+		url: item.url,
+		ipfs_pin_hash: item.ipfs_pin_hash || item.ipfsHash,
+		size: item.size || item.PinSize,
+		user_id: item.user_id,
+		date_pinned: item.date_pinned || item.Timestamp,
+		date_unpinned: item.date_unpinned,
+		publicData: item.metadata?.keyvalues || item.metadata,
+	};
+
+	console.log({ item, formattedResult });
+
+	if (formattedResult.publicData.extraParams) {
+		const extraParams = JSON.parse(formattedResult.publicData.extraParams);
+
+		Object.assign(formattedResult.publicData, extraParams);
+
+		delete formattedResult.publicData.extraParams;
+	}
+
+	return formattedResult;
+};
+
 const _formatSearchResults = (result) => {
 	const formattedResults = [];
 
 	for (let index = 0; index < result.length; index++) {
 		const item = result[index];
 
-		const formattedResult = {
-			id: item.id,
-			url: item.url,
-			ipfs_pin_hash: item.ipfs_pin_hash,
-			size: item.size,
-			user_id: item.user_id,
-			date_pinned: item.date_pinned,
-			date_unpinned: item.date_unpinned,
-			publicData: item.metadata.keyvalues,
-		};
-
-		if (formattedResult.publicData.extraParams) {
-			const extraParams = JSON.parse(formattedResult.publicData.extraParams);
-
-			Object.assign(formattedResult.publicData, extraParams);
-
-			delete formattedResult.publicData.extraParams;
-		}
-
-		formattedResults.push(formattedResult);
+		formattedResults.push(_formatRecord(item));
 	}
 
 	return formattedResults;
@@ -356,4 +362,6 @@ module.exports = {
 	update,
 	deleteTag,
 	getDomainStats,
+	formatResults: _formatSearchResults,
+	formatRecord: _formatRecord,
 };

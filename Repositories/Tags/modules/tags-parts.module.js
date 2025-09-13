@@ -362,6 +362,30 @@ const createHoldObject = async (params, authUser) => {
 	return holdObject;
 };
 
+const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainConfig) => {
+	const { price, reward, discount, discountType } = domainConfig.getPrice(tagObject.tagName, "1", payload.referralTagName);
+
+	const { eth, btc, solana, sui } = addresses;
+
+	tagObject.price = price;
+	tagObject.reward = reward;
+	tagObject.discount = discount;
+	tagObject.discountType = discountType;
+	tagObject.ethAddress = eth.address;
+	tagObject.btcAddress = btc.address;
+	tagObject.solanaAddress = solana.address;
+	tagObject.suiAddress = sui.address;
+	tagObject.hasPassword = `${Boolean(payload.password)}`;
+};
+
+const _generateZelfProof = async (dataToEncrypt, tagObject) => {
+	tagObject.zelfProof = await encrypt(dataToEncrypt);
+
+	if (!tagObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
+
+	tagObject.zelfProofQRCode = await encryptQR(dataToEncrypt);
+};
+
 module.exports = {
 	decryptParams,
 	encryptParams,
@@ -373,4 +397,6 @@ module.exports = {
 	processDomainMetadata,
 	createTagObject,
 	createHoldObject,
+	assignProperties,
+	generateZelfProof: _generateZelfProof,
 };
