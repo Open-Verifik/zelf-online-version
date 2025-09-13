@@ -16,12 +16,14 @@ const config = require("../../../Core/config");
  * @returns {Object} - Decrypted parameters
  */
 const decryptParams = async (params, authUser) => {
-	const { faceBase64, password, mnemonic, tagName, domain } = params;
+	const { faceBase64, password, mnemonic, tagName, domain, removePGP } = params;
 
-	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
-	if (!domainConfig) {
-		throw new Error(`Domain '${domain}' is not supported`);
+	if (removePGP) {
+		return {
+			face: faceBase64,
+			password,
+			mnemonic,
+		};
 	}
 
 	// Decrypt face data
@@ -61,7 +63,6 @@ const decryptParams = async (params, authUser) => {
 		mnemonic: decryptedMnemonic,
 		tagName,
 		domain,
-		domainConfig,
 	};
 };
 
@@ -176,16 +177,6 @@ const urlToBase64 = async (url) => {
 		console.error("Error converting URL to base64:", error);
 		return null;
 	}
-};
-
-/**
- * Generate domain-specific storage key
- * @param {string} domain - Domain name
- * @param {string} name - Tag name
- * @returns {string} - Storage key
- */
-const generateDomainStorageKey = (domain, name) => {
-	return generateStorageKey(domain, name);
 };
 
 /**
@@ -377,7 +368,6 @@ module.exports = {
 	previewTag,
 	generateQRCode,
 	urlToBase64,
-	generateDomainStorageKey,
 	generateDomainHoldDomain,
 	validateDomainData,
 	processDomainMetadata,

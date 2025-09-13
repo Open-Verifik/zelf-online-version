@@ -15,23 +15,8 @@ const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance
 const { addReferralReward, addPurchaseReward } = require("./tags-token.module");
 const { initTagUpdates, updateTags } = require("./sync-tag-records.module");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
-const { generateStorageKey, generateHoldDomain } = require("./domain-registry.module");
+const { generateHoldDomain } = require("./domain-registry.module");
 const { getDomainConfig } = require("../config/supported-domains");
-
-/**
- * Generate domain-specific storage key
- * @param {string} domain - Domain name
- * @param {string} name - Tag name
- * @returns {string} - Storage key
- */
-const generateDomainStorageKey = (domain, name) => {
-	try {
-		return generateStorageKey(domain, name);
-	} catch (error) {
-		console.error(`Error generating storage key for ${domain}:`, error);
-		return generateStorageKey("zelf", name); // Fallback to zelf
-	}
-};
 
 /**
  * Generate domain-specific hold domain
@@ -55,9 +40,10 @@ const generateDomainHoldDomain = (domain, name) => {
  */
 const leaseTag = async (params, authUser) => {
 	const { tagName, domain, duration, referralTagName } = params;
+
 	const domainConfig = getDomainConfig(domain);
 
-	await _findDuplicatedTag(tagName, domain, "both", authUser);
+	await _findDuplicatedTag(tagName, domain, "both", domainConfig);
 
 	const referralTagObject = await _validateReferral(referralTagName, authUser, domain);
 
@@ -69,6 +55,17 @@ const leaseTag = async (params, authUser) => {
 		...params,
 		mnemonic: decryptedParams.mnemonic,
 	});
+
+	return {
+		eth,
+		btc,
+		solana,
+		sui,
+		zkProof,
+		mnemonic,
+		tagName,
+		domain,
+	};
 
 	const dataToEncrypt = {
 		publicData: {
@@ -184,10 +181,6 @@ const searchTag = async (params, authUser) => {
 		},
 		authUser
 	);
-
-	if (result.available) {
-		result.price = domainConfig.getPrice(tagName, duration);
-	}
 
 	return result;
 };
@@ -320,7 +313,7 @@ const leaseOfflineTag = async (params, authUser) => {
 	const { tagName, domain, zelfProof, zelfProofQRCode } = params;
 	const domainConfig = getDomainConfig(domain);
 
-	await _findDuplicatedTag(tagName, domain, "both", authUser);
+	await _findDuplicatedTag(tagName, domain, "both", domainConfig);
 
 	const offlineProof = await OfflineProofModule.createOfflineProof({
 		zelfProof,
@@ -480,23 +473,22 @@ const updateTag = async (params, authUser) => {
  * @param {string} tagName
  * @param {string} domain
  * @param {string} storage
- * @param {Object} authUser
+ * @param {Object} domainConfig
  */
-const _findDuplicatedTag = async (tagName, domain, storage, authUser) => {
-	const domainConfig = getDomainConfig(domain);
-	const storageKey = generateDomainStorageKey(domain, tagName);
+const _findDuplicatedTag = async (tagName, domain, storage, domainConfig) => {
+	const storageKey = domainConfig.storage.keyPrefix;
 
 	const searchParams = {
-		tagName: `${tagName}.${domain}`,
+		tagName,
 		domain,
 		domainConfig,
 		storageKey,
 	};
 
-	const result = await TagsSearchModule.searchTag(searchParams, authUser);
+	const result = await TagsSearchModule.searchTag(searchParams);
 
 	if (result.available === false) {
-		const error = new Error("Tag already exists");
+		const error = new Error("409:tag_already_exists");
 		error.status = 409;
 		throw error;
 	}
@@ -511,7 +503,7 @@ const _findDuplicatedTag = async (tagName, domain, storage, authUser) => {
 const _findTag = async (params, storage, authUser) => {
 	const { tagName, domain } = params;
 	const domainConfig = getDomainConfig(domain);
-	const storageKey = generateDomainStorageKey(domain, tagName);
+	const storageKey = domainConfig.storage.keyPrefix;
 
 	const searchParams = {
 		tagName,
@@ -533,7 +525,7 @@ const _validateReferral = async (referralTagName, authUser, domain = "zelf") => 
 	if (!referralTagName) return null;
 
 	const domainConfig = getDomainConfig(domain);
-	const storageKey = generateDomainStorageKey(domain, referralTagName);
+	const storageKey = domainConfig.storage.keyPrefix;
 
 	const searchParams = {
 		tagName: `${referralTagName}.${domain}`,
@@ -556,17 +548,18 @@ const _validateReferral = async (referralTagName, authUser, domain = "zelf") => 
  * @param {Object} params
  */
 const _createWalletsFromPhrase = async (params) => {
-	const { mnemonic } = params;
+	const _mnemonic = params.type === "import" ? params.mnemonic : generateMnemonic(params.wordsCount);
 
-	const eth = await createEthWallet(mnemonic);
-	const btc = await createBTCWallet(mnemonic);
-	const solana = await createSolanaWallet(mnemonic);
-	const sui = await generateSuiWalletFromMnemonic(mnemonic);
+	const wordsArray = _mnemonic.split(" ");
 
-	const zkProof = await WalrusModule.createZkProof({
-		mnemonic,
-		verifierKey: config.zelfEncrypt.serverKey,
-	});
+	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
+
+	const eth = await createEthWallet(_mnemonic);
+	const btc = await createBTCWallet(_mnemonic);
+	const solana = await createSolanaWallet(_mnemonic);
+	const sui = await generateSuiWalletFromMnemonic(_mnemonic);
+
+	const zkProof = await OfflineProofModule.createProof(_mnemonic);
 
 	return {
 		eth,
@@ -574,7 +567,7 @@ const _createWalletsFromPhrase = async (params) => {
 		solana,
 		sui,
 		zkProof,
-		mnemonic,
+		mnemonic: _mnemonic,
 	};
 };
 
@@ -748,7 +741,6 @@ module.exports = {
 	saveHoldTagInIPFS,
 	// Utility functions
 	getDomainConfig,
-	generateDomainStorageKey,
 	generateDomainHoldDomain,
 	_findDuplicatedTag,
 	_findTag,

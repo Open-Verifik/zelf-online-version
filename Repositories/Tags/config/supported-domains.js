@@ -469,18 +469,6 @@ const getDomainStorageConfig = (domain) => {
 };
 
 /**
- * Generate storage key for domain
- * @param {string} domain - Domain name
- * @param {string} name - Tag name
- * @returns {string} - Storage key
- */
-const generateStorageKey = (domain) => {
-	const storageConfig = getDomainStorageConfig(domain);
-	return storageConfig.keyPrefix;
-	// return `${storageConfig.keyPrefix}:${name}:${domain}`;
-};
-
-/**
  * Generate hold domain name
  * @param {string} domain - Domain name
  * @param {string} name - Tag name
@@ -539,7 +527,6 @@ module.exports = {
 	getByOwner,
 	supportsFeature,
 	getDomainStorageConfig,
-	generateStorageKey,
 	generateHoldDomain,
 	getDomainPaymentMethods,
 	getDomainCurrencies,

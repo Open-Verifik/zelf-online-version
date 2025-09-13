@@ -9,7 +9,6 @@ const {
 	getByOwner,
 	supportsFeature,
 	getDomainStorageConfig,
-	generateStorageKey,
 	generateHoldDomain,
 	getDomainPaymentMethods,
 	getDomainCurrencies,
@@ -241,8 +240,6 @@ module.exports = {
 	isArweaveEnabled,
 	isBackupEnabled,
 
-	// Storage utilities
-	generateStorageKey,
 	generateHoldDomain,
 	getHoldSuffix,
 

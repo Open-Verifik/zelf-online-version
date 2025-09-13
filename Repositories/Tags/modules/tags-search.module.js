@@ -44,6 +44,10 @@ const searchTag = async (params, authUser) => {
 			combinedResults.tagObject = ipfsResults[0];
 		}
 
+		if (combinedResults.available) {
+			combinedResults.price = domainConfig.getPrice(tagName, "1");
+		}
+
 		return combinedResults;
 	} catch (error) {
 		console.error("Error searching tag:", error);
