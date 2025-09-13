@@ -58,20 +58,6 @@ const handleOldTagUpdate = async (data, domain = "zelf") => {
 };
 
 /**
- * Get domain-specific configuration
- * @param {string} domain - Domain name
- * @returns {Object} - Domain configuration
- */
-const getDomainConfig = (domain) => {
-	try {
-		return getDomainConfiguration(domain);
-	} catch (error) {
-		console.error(`Error getting domain config for ${domain}:`, error);
-		return getDomainConfiguration("zelf"); // Fallback to zelf
-	}
-};
-
-/**
  * Search for a tag (v2)
  * @param {Object} ctx - Koa context
  * @returns {Object} - Search results
@@ -80,14 +66,11 @@ const searchTag = async (ctx) => {
 	try {
 		const { extractedDomain, extractedName } = ctx.state;
 
-		const domainConfig = getDomainConfig(extractedDomain);
-
 		// Add domain context to request
 		const requestData = {
 			...ctx.request.query,
 			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.query.tagName,
 			domain: extractedDomain,
-			domainConfig,
 			environment: ctx.request.query.environment,
 			type: ctx.request.query.type || "both",
 		};
@@ -103,9 +86,6 @@ const searchTag = async (ctx) => {
 			return;
 		}
 
-		// // Handle old tag objects update
-		// data = await handleOldTagUpdate(data, extractedDomain);
-
 		ctx.body = { data };
 	} catch (error) {
 		handleError(ctx, error);
@@ -120,13 +100,11 @@ const searchTag = async (ctx) => {
 const leaseTag = async (ctx) => {
 	try {
 		const { extractedDomain, extractedName } = ctx.state;
-		const domainConfig = getDomainConfig(extractedDomain);
 
 		const requestData = {
 			...ctx.request.body,
 			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
 			domain: extractedDomain,
-			domainConfig,
 		};
 
 		const data = await Module.leaseTag(requestData, ctx.state.user);
@@ -145,13 +123,11 @@ const leaseTag = async (ctx) => {
 const leaseRecovery = async (ctx) => {
 	try {
 		const { extractedDomain, extractedName } = ctx.state;
-		const domainConfig = getDomainConfig(extractedDomain);
 
 		const requestData = {
 			...ctx.request.body,
 			newTagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.newTagName,
 			domain: extractedDomain,
-			domainConfig,
 		};
 
 		const data = await TagsRecoveryModule.leaseRecovery(requestData, ctx.state.user);
@@ -185,7 +161,6 @@ const zelfPay = async (ctx) => {
 const leaseOfflineTag = async (ctx) => {
 	try {
 		const { extractedDomain, extractedName } = ctx.state;
-		const domainConfig = getDomainConfig(extractedDomain);
 
 		const requestData = {
 			...ctx.request.body,
@@ -210,13 +185,11 @@ const leaseOfflineTag = async (ctx) => {
 const leaseConfirmation = async (ctx) => {
 	try {
 		const { extractedDomain, extractedName } = ctx.state;
-		const domainConfig = getDomainConfig(extractedDomain);
 
 		const requestData = {
 			...ctx.request.body,
 			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
 			domain: extractedDomain,
-			domainConfig,
 		};
 
 		const data = await Module.leaseConfirmation(requestData, ctx.state.user);
@@ -235,13 +208,11 @@ const leaseConfirmation = async (ctx) => {
 const previewTag = async (ctx) => {
 	try {
 		const { extractedDomain, extractedName } = ctx.state;
-		const domainConfig = getDomainConfig(extractedDomain);
 
 		const requestData = {
 			...ctx.request.body,
 			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
 			domain: extractedDomain,
-			domainConfig,
 		};
 
 		const data = await Module.previewTag(requestData, ctx.state.user);
@@ -275,13 +246,11 @@ const previewZelfProof = async (ctx) => {
 const decryptTag = async (ctx) => {
 	try {
 		const { extractedDomain, extractedName } = ctx.state;
-		const domainConfig = getDomainConfig(extractedDomain);
 
 		const requestData = {
 			...ctx.request.body,
 			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
 			domain: extractedDomain,
-			domainConfig,
 		};
 
 		const data = await Module.decryptTag(requestData, ctx.state.user);
@@ -345,13 +314,11 @@ const referralRewards = async (ctx) => {
 const update = async (ctx) => {
 	try {
 		const { extractedDomain, extractedName } = ctx.state;
-		const domainConfig = getDomainConfig(extractedDomain);
 
 		const requestData = {
 			...ctx.request.body,
 			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.params.tagName,
 			domain: extractedDomain,
-			domainConfig,
 		};
 
 		const data = await Module.updateTag(requestData, ctx.state.user);
@@ -379,5 +346,4 @@ module.exports = {
 	// Utility functions
 	handleZelfPayLogic,
 	handleOldTagUpdate,
-	getDomainConfig,
 };

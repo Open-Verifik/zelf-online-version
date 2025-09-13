@@ -7,7 +7,6 @@ const {
 	getByType,
 	getActiveDomains,
 	getByOwner,
-	getDomainPrice,
 	supportsFeature,
 	getDomainStorageConfig,
 	generateStorageKey,
@@ -226,9 +225,6 @@ module.exports = {
 	getDomainsByType: getByType,
 	getActiveDomains,
 	getDomainsByOwner: getByOwner,
-
-	// Domain properties
-	getDomainPrice,
 	getDomainType: getType,
 	getDomainStatus: getStatus,
 	getDomainOwner: getOwner,

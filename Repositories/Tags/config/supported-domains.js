@@ -1,6 +1,8 @@
+const { Domain } = require("../modules/domain.class");
+
 /**
  * Supported Domains Configuration
- * This file defines all supported domain types and their configurations
+ * This file defines all supported domain types and their configurations using Domain class instances
  *
  * Domain Configuration Structure:
  * - type: "official" | "custom" | "community" | "enterprise"
@@ -19,9 +21,9 @@
 
 const SUPPORTED_DOMAINS = {
 	// Official Zelf domain (existing functionality)
-	zelf: {
+	zelf: new Domain({
+		name: "zelf",
 		type: "official",
-		price: 0,
 		holdSuffix: ".hold",
 		status: "active",
 		owner: "zelf-team",
@@ -78,10 +80,10 @@ const SUPPORTED_DOMAINS = {
 			version: "1.0.0",
 			documentation: "https://docs.zelf.world",
 		},
-	},
-
+	}),
 	// Avalanche community domain
-	avax: {
+	avax: new Domain({
+		name: "avax",
 		type: "custom",
 		price: 100, // $1.00 in cents
 		holdSuffix: ".hold",
@@ -141,10 +143,10 @@ const SUPPORTED_DOMAINS = {
 			documentation: "https://docs.avax.zelf.world",
 			community: "avalanche",
 		},
-	},
-
+	}),
 	// Bitcoin community domain
-	btc: {
+	btc: new Domain({
+		name: "btc",
 		type: "custom",
 		price: 50, // $0.50 in cents
 		holdSuffix: ".hold",
@@ -204,9 +206,10 @@ const SUPPORTED_DOMAINS = {
 			documentation: "https://docs.btc.zelf.world",
 			community: "bitcoin",
 		},
-	},
+	}),
 	// Tech community domain
-	tech: {
+	tech: new Domain({
+		name: "tech",
 		type: "custom",
 		price: 75, // $0.75 in cents
 		holdSuffix: ".hold",
@@ -266,10 +269,10 @@ const SUPPORTED_DOMAINS = {
 			documentation: "https://docs.tech.zelf.world",
 			community: "tech",
 		},
-	},
-
+	}),
 	// Enterprise domain example
-	bdag: {
+	bdag: new Domain({
+		name: "bdag",
 		type: "enterprise",
 		price: 500, // $5.00 in cents
 		holdSuffix: ".hold",
@@ -330,7 +333,7 @@ const SUPPORTED_DOMAINS = {
 			enterprise: "blockDAG",
 			support: "enterprise",
 		},
-	},
+	}),
 };
 
 /**
@@ -438,39 +441,6 @@ const getByOwner = (owner) => {
 };
 
 /**
- * Get domain price with discounts
- * @param {string} tagName - Tag name
- * @param {string} duration - Duration ('yearly', 'lifetime')
- * @returns {number} - Price in cents
- */
-const getDomainPrice = (tagName, duration = "1") => {
-	const splitTagName = tagName.split(".");
-	const domain = splitTagName[1];
-	const length = splitTagName[0].length;
-
-	const config = getDomainConfig(domain);
-
-	console.log(config, domain, splitTagName, length);
-
-	if (!config) return 0;
-
-	if (!["1", "2", "3", "4", "5", "lifetime"].includes(`${duration}`))
-		throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
-
-	let price = 24;
-
-	if (length >= 6 && length <= 15) {
-		price = config.payment.pricingTable["6-15"][duration];
-	} else if (config.pricingTable[length]) {
-		price = config.pricingTable[length][duration];
-	} else {
-		throw new Error("Invalid name length. Length must be between 1 and 27.");
-	}
-
-	return price;
-};
-
-/**
  * Check if domain supports feature
  * @param {string} domain - Domain name
  * @param {string} feature - Feature name
@@ -567,7 +537,6 @@ module.exports = {
 	getByType,
 	getActiveDomains,
 	getByOwner,
-	getDomainPrice,
 	supportsFeature,
 	getDomainStorageConfig,
 	generateStorageKey,

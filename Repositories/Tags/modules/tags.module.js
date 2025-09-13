@@ -10,29 +10,13 @@ const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
 const { decrypt, encrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
-const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const config = require("../../../Core/config");
-const jwt = require("jsonwebtoken");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
 const { addReferralReward, addPurchaseReward } = require("./tags-token.module");
-const { createUnderName } = require("./undernames.module");
 const { initTagUpdates, updateTags } = require("./sync-tag-records.module");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
-const { getDomainConfiguration, generateStorageKey, generateHoldDomain, getDomainPrice } = require("./domain-registry.module");
-
-/**
- * Get domain-specific configuration
- * @param {string} domain - Domain name
- * @returns {Object} - Domain configuration
- */
-const getDomainConfig = (domain) => {
-	try {
-		return getDomainConfiguration(domain);
-	} catch (error) {
-		console.error(`Error getting domain config for ${domain}:`, error);
-		return getDomainConfiguration("zelf"); // Fallback to zelf
-	}
-};
+const { generateStorageKey, generateHoldDomain } = require("./domain-registry.module");
+const { getDomainConfig } = require("../config/supported-domains");
 
 /**
  * Generate domain-specific storage key
@@ -202,7 +186,7 @@ const searchTag = async (params, authUser) => {
 	);
 
 	if (result.available) {
-		result.price = getDomainPrice(tagName, duration);
+		result.price = domainConfig.getPrice(tagName, duration);
 	}
 
 	return result;
