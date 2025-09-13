@@ -572,15 +572,13 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 		metadata.extraParams.referralSolanaAddress = referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress;
 	}
 
-	// tagObject.walrus = await WalrusModule.tagRegistration(tagObject.zelfProofQRCode, {
-	// 	hasPassword: metadata.hasPassword,
-	// 	zelfProof: metadata.zelfProof,
-	// 	publicData: metadata,
-	// 	domain,
-	// 	domainConfig,
-	// });
+	tagObject.walrus = await WalrusModule.tagRegistration(
+		tagObject.zelfProofQRCode,
+		{ hasPassword: metadata.hasPassword, zelfProof: metadata.zelfProof, publicData: metadata },
+		domainConfig
+	);
 
-	// metadata.extraParams.walrus = tagObject.walrus.blobId;
+	metadata.extraParams.walrus = tagObject.walrus.blobId;
 	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
 	tagObject.ipfs = await IPFSModule.insert(

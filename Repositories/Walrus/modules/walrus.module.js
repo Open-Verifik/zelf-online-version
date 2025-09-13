@@ -101,6 +101,8 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 		let privateKeyData;
 		try {
 			privateKeyData = await getWalrusKeyFromMnemonic(config.walrus.privateKey);
+
+			console.log({ privateKeyData });
 		} catch (error) {
 			return {
 				skipped: true,
@@ -193,6 +195,183 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 			blobId: uploadResult.blobId,
 			sizeBytes: fileSize,
 			zelfName: zelfName,
+		});
+
+		// Clean up temporary file
+		fs.unlinkSync(tempFilePath);
+
+		// Attempt to store metadata on Sui blockchain
+		// const metadataResult = await storeBlobMetadataOnSui(
+		// 	uploadResult.blobId,
+		// 	{
+		// 		...metadata,
+		// 		uploadTimestamp: new Date().toISOString(),
+		// 		sizeBytes: fileSize,
+		// 		network: WALRUS_NETWORK,
+		// 	},
+		// 	keypair
+		// );
+
+		// Create metadata object on Sui blockchain
+		// This would require a custom smart contract deployment
+		// For now, we'll return the blob ID and construct URLs
+
+		return {
+			success: true,
+			blobId: uploadResult.blobId,
+			// Direct URL for fetching the blob
+			publicUrl: getPublicBlobUrl(uploadResult.blobId),
+			// Explorer URL for viewing blob details
+			explorerUrl: getExplorerBlobUrl(uploadResult.blobId),
+			// Metadata for reference
+			metadata: {
+				...metadata,
+				uploadTimestamp: new Date().toISOString(),
+				sizeBytes: fileSize,
+				network: WALRUS_NETWORK,
+			},
+			// Sui metadata storage result
+			// suiMetadata: metadataResult,
+			// Storage details
+			storage: {
+				epochs: 5,
+				network: WALRUS_NETWORK,
+				deletable: false,
+			},
+			// Full upload result for debugging
+			uploadResult,
+		};
+	} catch (error) {
+		console.error("Error uploading to Walrus:", error);
+		return {
+			skipped: true,
+			reason: "Upload failed",
+			error: error.message,
+		};
+	}
+};
+
+const tagRegistration = async (zelfProofQRCode, tagObject, domainConfig) => {
+	const { zelfProof, hasPassword, publicData } = tagObject;
+
+	const tagName = publicData[domainConfig.getTagKey()];
+
+	try {
+		// Check if Walrus is available
+		if (!walrusAvailable) {
+			return {
+				skipped: true,
+				reason: "Walrus client not available",
+				error: "Walrus SDK initialization failed",
+			};
+		}
+
+		// Check if private key is configured
+		if (!config.walrus.privateKey) {
+			return {
+				skipped: true,
+				reason: "WALRUS_PRIVATE_KEY not configured",
+				error: "Please add WALRUS_PRIVATE_KEY to your .env file",
+			};
+		}
+
+		// Get private key from mnemonic
+		let privateKeyData;
+		try {
+			privateKeyData = await getWalrusKeyFromMnemonic(config.walrus.privateKey);
+
+			console.log({ privateKeyData });
+		} catch (error) {
+			return {
+				skipped: true,
+				reason: "Failed to derive private key from mnemonic",
+				error: error.message,
+			};
+		}
+
+		// Validate and convert private key
+		let privateKeyBuffer;
+		try {
+			const privateKeyHex = privateKeyData.privateKeyHex.replace(/^0x/, ""); // Remove 0x prefix if present
+
+			// Check if it's a valid hex string
+			if (!/^[0-9a-fA-F]+$/.test(privateKeyHex)) {
+				return {
+					skipped: true,
+					reason: "Invalid private key format",
+					error: "Private key must be a valid hex string (64 characters)",
+				};
+			}
+
+			// Check length (should be 64 hex characters = 32 bytes)
+			if (privateKeyHex.length !== 64) {
+				return {
+					skipped: true,
+					reason: "Invalid private key length",
+					error: `Private key must be 64 hex characters (got ${privateKeyHex.length})`,
+				};
+			}
+
+			privateKeyBuffer = Buffer.from(privateKeyHex, "hex");
+		} catch (error) {
+			return {
+				skipped: true,
+				reason: "Private key conversion failed",
+				error: `Failed to convert private key: ${error.message}`,
+			};
+		}
+
+		// Create keypair from config
+		const keypair = Ed25519Keypair.fromSecretKey(privateKeyBuffer);
+
+		// Convert base64 string to a buffer
+		const base64Data = zelfProofQRCode.replace(/^data:image\/\w+;base64,/, "");
+		const buffer = Buffer.from(base64Data, "base64");
+		const fileSize = buffer.length;
+
+		// Create temporary file
+		const tempFilePath = path.join(__dirname, `${tagName}.png`);
+		fs.writeFileSync(tempFilePath, buffer);
+
+		// Prepare metadata for Sui object
+		const metadata = {
+			zelfProof,
+			contentType: "image/png",
+			fileName: `${tagName}.png`,
+			...publicData,
+		};
+
+		// Check file size limit (100KB similar to Arweave)
+		if (fileSize > 100 * 1024) {
+			console.log("Skipping upload because the file size is greater than 100KB", {
+				fileInKb: fileSize / 1024,
+				fileInMb: fileSize / 1024 / 1024,
+			});
+
+			// Clean up temporary file
+			fs.unlinkSync(tempFilePath);
+
+			return {
+				skipped: true,
+				reason: "File size exceeds 100KB limit",
+			};
+		}
+
+		// Upload blob to Walrus
+		const blob = new Uint8Array(buffer);
+		console.log(`📤 Uploading ${tagName}.png to Walrus (${fileSize} bytes)`);
+
+		const uploadResult = await walrusClient.writeBlob({
+			blob,
+			deletable: false,
+			epochs: 5, // Store for 5 epochs (10 days on testnet)
+			signer: keypair,
+		});
+
+		console.log(`✅ Successfully uploaded to Walrus:`, {
+			blobId: uploadResult.blobId,
+			sizeBytes: fileSize,
+			tagName: tagName,
 		});
 
 		// Clean up temporary file
@@ -388,6 +567,59 @@ const getImageSizeInfo = async (dataUrl) => {
 	}
 };
 
+/**
+ * Save a Walrus blob as a local file
+ * @param {string} blobId - The Walrus blob ID
+ * @param {string} outputPath - Optional custom output path (defaults to retrieved-{shortId}.png)
+ * @returns {object} Result object with file path and metadata
+ */
+const saveBlobAsFile = async (blobId, outputPath = null) => {
+	try {
+		console.log(`💾 Saving Walrus blob as file: ${blobId}`);
+
+		// Get the base64 data from Walrus
+		const base64Data = await walrusIDToBase64(blobId);
+
+		// Extract just the base64 content (remove data:image/png;base64, prefix)
+		const base64Content = base64Data.split(",")[1];
+
+		// Convert to buffer
+		const buffer = Buffer.from(base64Content, "base64");
+
+		// Generate filename if not provided
+		const filename = outputPath || `retrieved-${blobId.substring(0, 8)}.png`;
+
+		// Save to file
+		fs.writeFileSync(filename, buffer);
+
+		// Get file stats
+		const stats = fs.statSync(filename);
+
+		console.log(`✅ Blob saved successfully as: ${filename}`);
+
+		return {
+			success: true,
+			blobId,
+			filePath: filename,
+			absolutePath: path.resolve(filename),
+			fileSize: stats.size,
+			fileSizeKB: Math.round(stats.size / 1024),
+			savedAt: new Date().toISOString(),
+			// URLs for reference
+			publicUrl: getPublicBlobUrl(blobId),
+			explorerUrl: getExplorerBlobUrl(blobId),
+		};
+	} catch (error) {
+		console.error(`❌ Failed to save blob as file: ${blobId}`, error);
+		return {
+			success: false,
+			blobId,
+			error: error.message,
+			filePath: null,
+		};
+	}
+};
+
 // Removed fetchBlobWithFallback - only Walrus SDK readBlob works
 
 /**
@@ -522,8 +754,8 @@ const getPublicBlobUrl = (blobId) => {
 	if (!blobId) {
 		throw new Error("blobId is required");
 	}
-	// Return the primary URL as the public URL
-	return `${walrusUrls.primary}/${blobId}`;
+	// Return the primary URL as the public URL using correct Walrus API format
+	return `${walrusUrls.primary}/v1/blobs/${blobId}`;
 };
 
 // Helper function to get all available URLs for a blob
@@ -533,9 +765,9 @@ const getAllBlobUrls = (blobId) => {
 	}
 
 	return {
-		primary: `${walrusUrls.primary}/${blobId}`,
-		alternatives: walrusUrls.alternatives.map((url) => `${url}/${blobId}`),
-		fallback: `${walrusUrls.fallback}/${blobId}`,
+		primary: `${walrusUrls.primary}/v1/blobs/${blobId}`,
+		alternatives: walrusUrls.alternatives.map((url) => `${url}/v1/blobs/${blobId}`),
+		fallback: `${walrusUrls.fallback}/v1/blobs/${blobId}`,
 	};
 };
 
@@ -665,6 +897,7 @@ const testConnection = async () => {
 
 module.exports = {
 	zelfNameRegistration,
+	tagRegistration,
 	search,
 	walrusIDToBase64,
 	walrusIDToBase64WithWorkaround,
@@ -678,6 +911,7 @@ module.exports = {
 	getBlobMetadataFromSui,
 	prepareImageForFrontend,
 	getImageSizeInfo,
+	saveBlobAsFile,
 	getExplorerUrls,
 	identifyIdType,
 	testConnection,

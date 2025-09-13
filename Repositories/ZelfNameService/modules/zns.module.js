@@ -1,5 +1,5 @@
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
-const axios = require("axios");
+
 const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
