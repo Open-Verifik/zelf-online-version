@@ -89,6 +89,7 @@ const searchTag = async (ctx) => {
 			domain: extractedDomain,
 			domainConfig,
 			environment: ctx.request.query.environment,
+			type: ctx.request.query.type || "both",
 		};
 
 		let data = await Module.searchTag(requestData, ctx.state.user);

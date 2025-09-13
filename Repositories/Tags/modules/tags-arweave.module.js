@@ -327,13 +327,7 @@ const searchInArweave = async (key, value) => {
 
 	const searchResults = result.data?.data?.transactions?.edges;
 
-	if (!searchResults || !searchResults.length) {
-		return {
-			key,
-			value,
-			available: true,
-		};
-	}
+	if (!searchResults || !searchResults.length) return [];
 
 	return formatSearchResults(searchResults);
 };

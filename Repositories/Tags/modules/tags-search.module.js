@@ -20,13 +20,13 @@ const { getDomainConfiguration, isDomainActive } = require("./domain-registry.mo
  * @returns {Object} - Search results
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value, domainConfig, environment } = params;
+	const { tagName, domain, key, value, domainConfig, environment, type } = params;
 
 	try {
 		// Search in both IPFS and Arweave
 		const [ipfsResults, arweaveResults] = await Promise.all([
 			["ipfs", "all"].includes(environment) ? searchIPFS(params, authUser) : [],
-			["arweave", "all"].includes(environment) ? searchArweave(params, authUser) : [],
+			["arweave", "all"].includes(environment) && ["both", "mainnet"].includes(type) ? searchArweave(params, authUser) : [],
 		]);
 
 		// Combine results
@@ -35,8 +35,6 @@ const searchTag = async (params, authUser) => {
 			arweave: arweaveResults,
 			available: ipfsResults.length === 0 && arweaveResults.length === 0,
 			tagName: tagName,
-			domain: domain,
-			domainConfig: domainConfig,
 		};
 
 		// If results found, return the first one
@@ -65,22 +63,25 @@ const searchTag = async (params, authUser) => {
  * @returns {Array} - IPFS search results
  */
 const searchIPFS = async (params, authUser) => {
+	const { tagName, key, value, domainConfig, type } = params;
+	if (!domainConfig?.storage?.ipfsEnabled) return [];
+
+	const ipfsRecords = [];
+
 	try {
-		const { tagName, domain, key, value, domainConfig } = params;
+		switch (type) {
+			case "hold":
+				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName, key, value, domainConfig })));
+			case "mainnet":
+				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName, key, value, domainConfig })));
+			default:
+				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName, key, value, domainConfig })));
 
-		if (!domainConfig?.storage?.ipfsEnabled) return [];
-
-		// Search by different criteria
-		if (tagName) {
-			return await TagsIPFSModule.get({ tagName, domain, domainConfig });
+				// now also query adding .hold to the tagName
+				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: `${tagName}.hold`, key, value, domainConfig })));
 		}
 
-		if (key && value) {
-			return await TagsIPFSModule.get({ key, value, domainConfig });
-		}
-
-		// Search by domain
-		return await TagsIPFSModule.searchByDomain({ domain, key, value }, authUser);
+		return ipfsRecords;
 	} catch (error) {
 		console.error("Error searching IPFS:", error);
 		return [];
