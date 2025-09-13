@@ -429,6 +429,10 @@ const _findDuplicatedTag = async (tagName, domain, storage, domainConfig) => {
 		error.status = 409;
 		throw error;
 	}
+
+	console.log({ result });
+
+	throw new Error("409:stop_here");
 };
 
 /**
