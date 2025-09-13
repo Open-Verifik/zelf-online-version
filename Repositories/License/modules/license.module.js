@@ -81,8 +81,6 @@ const createOrUpdateLicense = async (body, jwt) => {
 	try {
 		const { myLicense, zelfAccount } = await getMyLicense(jwt);
 
-		console.log({ myLicense, zelfAccount, zelfProof: zelfAccount.metadata.keyvalues.zelfProof });
-
 		// now we should validate if the zelfAccount is the owner of the license with the decrypted zelfProof
 		const decryptedZelfProof = await decrypt({
 			zelfProof: zelfAccount.metadata.keyvalues.zelfProof,

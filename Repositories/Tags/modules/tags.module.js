@@ -18,6 +18,8 @@ const WalrusModule = require("../../Walrus/modules/walrus.module");
 const { generateHoldDomain } = require("./domain-registry.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const TagsIPFSModule = require("./tags-ipfs.module");
+const { Domain } = require("./domain.class");
+const tagsArweaveModule = require("./tags-arweave.module");
 
 /**
  * Generate domain-specific hold domain
@@ -44,9 +46,14 @@ const leaseTag = async (params, authUser) => {
 
 	const domainConfig = getDomainConfig(domain);
 
+	if (!domainConfig) throw new Error(`Unsupported domain: ${domain}`);
+
+	// Get tag key using the method
+	const tagKey = domainConfig.getTagKey();
+
 	await _findDuplicatedTag(tagName, domain, "both", domainConfig);
 
-	const referralTagObject = await _validateReferral(referralTagName, authUser, domain);
+	const referralTagObject = await _validateReferral(referralTagName, authUser, domainConfig);
 
 	const decryptedParams = await TagsPartsModule.decryptParams(params, authUser);
 
@@ -62,7 +69,7 @@ const leaseTag = async (params, authUser) => {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
-			[domainConfig.storage.keyPrefix]: tagName,
+			[tagKey]: tagName,
 			domain,
 		},
 		metadata: {
@@ -81,7 +88,7 @@ const leaseTag = async (params, authUser) => {
 		duration,
 	};
 
-	TagsPartsModule.assignProperties(tagObject, dataToEncrypt, { eth, btc, solana, sui }, { ...params, password }, domainConfig);
+	TagsPartsModule.assignProperties(tagObject, dataToEncrypt, { eth, btc, solana, sui }, { ...params, password, referralTagObject }, domainConfig);
 
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
 
@@ -411,13 +418,10 @@ const updateTag = async (params, authUser) => {
  * @param {Object} domainConfig
  */
 const _findDuplicatedTag = async (tagName, domain, storage, domainConfig) => {
-	const storageKey = domainConfig.storage.keyPrefix;
-
 	const searchParams = {
 		tagName,
 		domain,
 		domainConfig,
-		storageKey,
 		environment: "all",
 	};
 
@@ -439,13 +443,11 @@ const _findDuplicatedTag = async (tagName, domain, storage, domainConfig) => {
 const _findTag = async (params, storage, authUser) => {
 	const { tagName, domain } = params;
 	const domainConfig = getDomainConfig(domain);
-	const storageKey = domainConfig.storage.keyPrefix;
 
 	const searchParams = {
 		tagName,
 		domain,
 		domainConfig,
-		storageKey,
 	};
 
 	return await TagsSearchModule.searchTag(searchParams, authUser);
@@ -455,26 +457,24 @@ const _findTag = async (params, storage, authUser) => {
  * Validate referral
  * @param {string} referralTagName
  * @param {Object} authUser
- * @param {string} domain
+ * @param {Domain} domainConfig
  */
-const _validateReferral = async (referralTagName, authUser, domain = "zelf") => {
+const _validateReferral = async (referralTagName, authUser, domainConfig) => {
 	if (!referralTagName) return null;
 
-	const domainConfig = getDomainConfig(domain);
-	const storageKey = domainConfig.storage.keyPrefix;
+	const domain = domainConfig.name;
 
 	const searchParams = {
-		tagName: `${referralTagName}.${domain}`,
+		tagName: referralTagName.includes(".") ? referralTagName : `${referralTagName}.${domain}`,
 		domain,
 		domainConfig,
-		storageKey,
+
+		environment: "all",
 	};
 
 	const result = await TagsSearchModule.searchTag(searchParams, authUser);
 
-	if (result.available === false) {
-		return result.tagObject;
-	}
+	if (result.available === false) return result.tagObject;
 
 	return null;
 };
@@ -541,20 +541,19 @@ const _decryptParams = async (params, authUser) => {
  * @param {Object} authUser - Authenticated user
  */
 const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUser) => {
-	const tagName = tagObject[domainConfig.storage.keyPrefix];
+	const storageKey = domainConfig.getTagKey();
+
+	const tagName = tagObject[storageKey];
 
 	const domain = tagObject.domain || "zelf";
-	const storageKey = domainConfig.storage.keyPrefix;
 
 	const metadata = {
-		hasPassword: tagObject.hasPassword,
 		zelfProof: tagObject.zelfProof,
 		[storageKey]: tagName,
 		domain,
 		ethAddress: tagObject.ethAddress,
 		solanaAddress: tagObject.solanaAddress,
 		btcAddress: tagObject.btcAddress,
-		suiAddress: tagObject.suiAddress,
 		extraParams: {
 			origin: tagObject.origin || "online",
 			price: tagObject.price,
@@ -562,6 +561,8 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 			expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
 			type: "mainnet",
+			suiAddress: tagObject.suiAddress,
+			hasPassword: tagObject.hasPassword,
 		},
 	};
 
@@ -571,15 +572,15 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 		metadata.extraParams.referralSolanaAddress = referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress;
 	}
 
-	tagObject.walrus = await WalrusModule.tagRegistration(tagObject.zelfProofQRCode, {
-		hasPassword: metadata.hasPassword,
-		zelfProof: metadata.zelfProof,
-		publicData: metadata,
-		domain,
-		domainConfig,
-	});
+	// tagObject.walrus = await WalrusModule.tagRegistration(tagObject.zelfProofQRCode, {
+	// 	hasPassword: metadata.hasPassword,
+	// 	zelfProof: metadata.zelfProof,
+	// 	publicData: metadata,
+	// 	domain,
+	// 	domainConfig,
+	// });
 
-	metadata.extraParams.walrus = tagObject.walrus.blobId;
+	// metadata.extraParams.walrus = tagObject.walrus.blobId;
 	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
 	tagObject.ipfs = await IPFSModule.insert(
@@ -593,17 +594,12 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 	);
 
 	tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
-	delete tagObject.ipfs.publicData.zelfProof;
 
-	if (!tagObject.publicData) tagObject.publicData = {};
-	tagObject.publicData = Object.assign(tagObject.publicData, tagObject.ipfs.publicData);
-
-	tagObject.arweave = await ArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
+	tagObject.arweave = await tagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
 		hasPassword: metadata.hasPassword,
 		zelfProof: metadata.zelfProof,
 		publicData: metadata,
-		domain,
-		domainConfig,
+		fileName: tagName,
 	});
 };
 
@@ -620,13 +616,13 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, aut
 
 	const holdSuffix = _domainConfig?.holdSuffix || ".hold";
 
-	const storageKey = _domainConfig.storage.keyPrefix;
+	const tagKey = _domainConfig.getTagKey();
 
-	const holdName = `${tagObject[storageKey]}${holdSuffix}`;
+	const holdName = `${tagObject[tagKey]}${holdSuffix}`;
 
 	const metadata = {
 		zelfProof: tagObject.zelfProof,
-		[storageKey]: holdName,
+		[tagKey]: holdName,
 		domain,
 		ethAddress: tagObject.ethAddress,
 		btcAddress: tagObject.btcAddress,
@@ -644,7 +640,7 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, aut
 	};
 
 	if (referralTagObject) {
-		metadata.extraParams.referralTagName = referralTagObject.publicData?.[storageKey] || referralTagObject.metadata?.[storageKey];
+		metadata.extraParams.referralTagName = referralTagObject.publicData?.[tagKey] || referralTagObject.metadata?.[tagKey];
 
 		metadata.extraParams.referralSolanaAddress = referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress;
 	}

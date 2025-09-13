@@ -103,9 +103,6 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 		};
 	}
 
-	/**
-	 * Post the temporary file to the Turbo service with metadata.
-	 */
 	const uploadResult = await turboAuthClient.uploadFile({
 		fileStreamFactory: () => fs.createReadStream(tempFilePath),
 		fileSizeFactory: () => fileSize,

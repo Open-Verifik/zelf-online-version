@@ -19,7 +19,6 @@ const getETHPrice = async () => {
 			});
 
 			if (response.data && response.data.ethereum && response.data.ethereum.usd) {
-				console.log(`✅ Got ETH price from CoinGecko: $${response.data.ethereum.usd}`);
 				return response.data.ethereum.usd.toString();
 			}
 		} catch (coinGeckoError) {

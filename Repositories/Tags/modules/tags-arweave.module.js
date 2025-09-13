@@ -14,21 +14,13 @@ const owner = config.arwave.env === "development" ? config.arwave.hold.owner : c
 const graphql = `${arweaveUrl}/graphql`;
 
 /**
- * Tags Arweave Module
- *
- * This module handles Arweave operations for the Tags system with multi-domain support.
- * It extends the existing Arweave functionality to work with different domain types
- * and .hold states while maintaining compatibility with existing ZNS logic.
- */
-
-/**
  * Register tag on Arweave
  * @param {string} tagProofQRCode - Tag proof QR code
  * @param {Object} tagObject - Tag object data
- * @param {string} domain - Domain name
+ * @param {string} fileName - File name
  * @returns {Object} - Arweave registration result
  */
-const tagRegistration = async (tagProofQRCode, tagObject, domain) => {
+const tagRegistration = async (tagProofQRCode, tagObject, fileName) => {
 	const { zelfProof, hasPassword, publicData } = tagObject;
 
 	const env = config.arwave.env;
@@ -58,213 +50,80 @@ const tagRegistration = async (tagProofQRCode, tagObject, domain) => {
 	});
 
 	// Convert base64 string to a buffer
-	const base64Data = tagProofQRCode.split(",")[1];
-	const buffer = Buffer.from(base64Data, "base64");
-
-	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
-	const storageKey = generateStorageKey(domain, publicData.tagName);
-
-	// Enhanced metadata with domain information
-	const enhancedMetadata = {
-		...publicData,
-		storageKey,
-		domain,
-		domainConfig: domainConfig?.type || "custom",
-		timestamp: new Date().toISOString(),
-		arweaveOwner: owner,
-	};
-
-	// Create the data item
-	const dataItem = await turboAuthClient.createDataItem({
-		data: buffer,
-		tags: [
-			{ name: "Content-Type", value: "image/png" },
-			{ name: "App-Name", value: "zelf-tags" },
-			{ name: "App-Version", value: "1.0.0" },
-			{ name: "Tag-Name", value: publicData.tagName },
-			{ name: "Domain", value: domain },
-			{ name: "Storage-Key", value: storageKey },
-			{ name: "Domain-Type", value: domainConfig?.type || "custom" },
-			{ name: "Timestamp", value: new Date().toISOString() },
-		],
-	});
-
-	// Upload the data item
-	const uploadResult = await turboAuthClient.uploadDataItem(dataItem);
-
-	return {
-		...uploadResult,
-		url: `${arweaveUrl}/${uploadResult.id}`,
-		explorerUrl: `${explorerUrl}/${uploadResult.id}`,
-		metadata: enhancedMetadata,
-	};
-};
-
-/**
- * Register hold domain on Arweave
- * @param {string} tagProofQRCode - Tag proof QR code
- * @param {Object} tagObject - Tag object data
- * @param {string} domain - Domain name
- * @param {string} name - Tag name
- * @returns {Object} - Arweave registration result
- */
-const holdDomainRegistration = async (tagProofQRCode, tagObject, domain, name) => {
-	const { zelfProof, hasPassword, publicData } = tagObject;
-
-	const env = config.arwave.env;
-
-	/**
-	 * Generate a key from the arweave wallet.
-	 */
-	const jwk = {
-		kty: "RSA",
-		n: env === "development" ? config.arwave.hold.n : config.arwave.n,
-		e: env === "development" ? config.arwave.hold.e : config.arwave.e,
-		d: env === "development" ? config.arwave.hold.d : config.arwave.d,
-		p: env === "development" ? config.arwave.hold.p : config.arwave.p,
-		q: env === "development" ? config.arwave.hold.q : config.arwave.q,
-		dp: env === "development" ? config.arwave.hold.dp : config.arwave.dp,
-		dq: env === "development" ? config.arwave.hold.dq : config.arwave.dq,
-		qi: env === "development" ? config.arwave.hold.qi : config.arwave.qi,
-		kid: "2011-04-29",
-	};
-
-	/**
-	 * Use the arweave key to create an authenticated turbo client
-	 */
-	const turboAuthClient = TurboFactory.authenticated({
-		privateKey: jwk,
-		...productionTurboConfiguration,
-	});
-
 	// Convert base64 string to a buffer
-	const base64Data = tagProofQRCode.split(",")[1];
+	const base64Data = tagProofQRCode.replace(/^data:image\/\w+;base64,/, "");
+
 	const buffer = Buffer.from(base64Data, "base64");
 
-	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
-	const holdSuffix = domainConfig?.holdSuffix || ".hold";
-	const holdDomain = `${name}${holdSuffix}.${domain}`;
-	const storageKey = generateStorageKey(domain, `${name}${holdSuffix}`);
+	const fileSize = buffer.length;
 
-	// Enhanced metadata for hold domain
-	const enhancedMetadata = {
-		...publicData,
-		storageKey,
-		domain,
-		holdDomain,
-		holdSuffix,
-		domainConfig: domainConfig?.type || "custom",
-		timestamp: new Date().toISOString(),
-		arweaveOwner: owner,
-		status: "hold",
-	};
+	const tempFilePath = path.join(__dirname, `${fileName}.png`);
 
-	// Create the data item
-	const dataItem = await turboAuthClient.createDataItem({
-		data: buffer,
-		tags: [
-			{ name: "Content-Type", value: "image/png" },
-			{ name: "App-Name", value: "zelf-tags" },
-			{ name: "App-Version", value: "1.0.0" },
-			{ name: "Tag-Name", value: holdDomain },
-			{ name: "Domain", value: domain },
-			{ name: "Storage-Key", value: storageKey },
-			{ name: "Domain-Type", value: domainConfig?.type || "custom" },
-			{ name: "Hold-Status", value: "hold" },
-			{ name: "Timestamp", value: new Date().toISOString() },
-		],
-	});
+	fs.writeFileSync(tempFilePath, buffer);
 
-	// Upload the data item
-	const uploadResult = await turboAuthClient.uploadDataItem(dataItem);
+	const tags = [
+		{
+			name: "Content-Type",
+			value: "image/png",
+		},
+		{
+			name: "zelfProof",
+			value: zelfProof,
+		},
+	];
 
-	return {
-		...uploadResult,
-		url: `${arweaveUrl}/${uploadResult.id}`,
-		explorerUrl: `${explorerUrl}/${uploadResult.id}`,
-		metadata: enhancedMetadata,
-	};
-};
+	if (hasPassword) {
+		tags.push({
+			name: "hasPassword",
+			value: hasPassword,
+		});
+	}
 
-/**
- * Insert tag data into Arweave
- * @param {Object} data - Tag data
- * @param {string} data.base64 - Base64 encoded data
- * @param {Object} data.metadata - Tag metadata
- * @param {string} data.name - Tag name
- * @param {string} data.domain - Domain name
- * @param {Object} authUser - Authenticated user
- * @returns {Object} - Arweave upload result
- */
-const insert = async (data, authUser) => {
-	const { base64, metadata, name, domain } = data;
+	const publicKeys = Object.keys(publicData);
 
-	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
-	const storageKey = generateStorageKey(domain, name);
+	for (let index = 0; index < publicKeys.length; index++) {
+		const publicKey = publicKeys[index];
 
-	// Enhanced metadata with domain information
-	const enhancedMetadata = {
-		...metadata,
-		storageKey,
-		domain,
-		domainConfig: domainConfig?.type || "custom",
-		timestamp: new Date().toISOString(),
-		arweaveOwner: owner,
-	};
+		if (publicKey === "zelfProof" || publicKey === "hasPassword") {
+			continue;
+		}
 
-	// Create the data item
-	const dataItem = await turboAuthClient.createDataItem({
-		data: Buffer.from(base64, "base64"),
-		tags: [
-			{ name: "Content-Type", value: "application/json" },
-			{ name: "App-Name", value: "zelf-tags" },
-			{ name: "App-Version", value: "1.0.0" },
-			{ name: "Tag-Name", value: `${name}.${domain}` },
-			{ name: "Domain", value: domain },
-			{ name: "Storage-Key", value: storageKey },
-			{ name: "Domain-Type", value: domainConfig?.type || "custom" },
-			{ name: "Timestamp", value: new Date().toISOString() },
-		],
-	});
+		tags.push({
+			name: publicKey,
+			value: `${publicData[publicKey]}`,
+		});
+	}
+
+	// if the size is greater than 100kb, we need to skip the upload
+	if (fileSize > 100 * 1024) {
+		console.info("skipping upload because the file size is greater than 100kb", {
+			fileInKb: fileSize / 1024,
+			fileInMb: fileSize / 1024 / 1024,
+		});
+
+		return {
+			skipped: true,
+		};
+	}
 
 	// Upload the data item
-	const uploadResult = await turboAuthClient.uploadDataItem(dataItem);
+	const uploadResult = await turboAuthClient.uploadFile({
+		fileStreamFactory: () => fs.createReadStream(tempFilePath),
+		fileSizeFactory: () => fileSize,
+		dataItemOpts: {
+			tags,
+		},
+	});
 
-	return {
+	// Clean up the temporary file after upload
+	fs.unlinkSync(tempFilePath);
+
+	return formatCreatedRecord({
 		...uploadResult,
+		publicData,
 		url: `${arweaveUrl}/${uploadResult.id}`,
 		explorerUrl: `${explorerUrl}/${uploadResult.id}`,
-		metadata: enhancedMetadata,
-	};
-};
-
-/**
- * Search for tags by domain
- * @param {Object} params - Search parameters
- * @param {string} params.domain - Domain name
- * @param {string} params.key - Search key
- * @param {string} params.value - Search value
- * @param {Object} authUser - Authenticated user
- * @returns {Array} - Search results
- */
-const searchByDomain = async (params, authUser) => {
-	const { domain, key, value, domainConfig } = params;
-
-	// Get domain configuration
-	const _domainConfig = domainConfig || getDomainConfiguration(domain);
-
-	if (!_domainConfig) throw new Error("Domain not supported");
-
-	// Search by domain-specific criteria
-	const searchParams = {
-		key: key || "Domain",
-		value: value || domain,
-	};
-
-	return await searchInArweave(searchParams.key, searchParams.value);
+	});
 };
 
 /**
@@ -279,7 +138,7 @@ const searchByStorageKey = async (params) => {
 
 	const _domainConfig = domainConfig || getDomainConfiguration(domain);
 
-	return await searchInArweave(_domainConfig.storage.keyPrefix, tagName);
+	return await searchInArweave(_domainConfig.getTagKey(), tagName);
 };
 
 /**
@@ -371,43 +230,43 @@ const formatSearchResults = (searchResults) => {
 	return formattedResults;
 };
 
-/**
- * Get domain statistics from Arweave
- * @param {string} domain - Domain name
- * @param {Object} authUser - Authenticated user
- * @returns {Object} - Domain statistics
- */
-const getDomainStats = async (domain, authUser) => {
+const arweaveIDToBase64 = async (id) => {
 	try {
-		// Get all tags for this domain
-		const domainTags = await searchInArweave("Domain", domain);
+		const encryptedResponse = await axios.get(`${arweaveUrl}/${id}`, {
+			responseType: "arraybuffer",
+		});
 
-		// Get hold domains for this domain
-		const holdDomains = await searchInArweave("Hold-Status", "hold");
-		const domainHoldDomains = holdDomains.filter((tag) => tag.tags.some((t) => t.name === "Domain" && t.value === domain));
+		if (encryptedResponse?.data) {
+			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
 
-		return {
-			domain,
-			totalTags: domainTags.length,
-			holdDomains: domainHoldDomains.length,
-			activeTags: domainTags.length - domainHoldDomains.length,
-		};
+			return `data:image/png;base64,${base64Image}`;
+		}
 	} catch (exception) {
-		console.error("Error getting domain stats:", exception);
-		return {
-			domain,
-			totalTags: 0,
-			holdDomains: 0,
-			activeTags: 0,
-		};
+		console.error({ VWEx: exception });
+
+		return exception?.message;
 	}
+};
+
+const formatCreatedRecord = (record) => {
+	const formattedRecord = {
+		...record,
+		publicData: record.publicData || {},
+	};
+
+	if (record.publicData.extraParams) {
+		const extraParams = JSON.parse(record.publicData.extraParams);
+
+		Object.assign(formattedRecord.publicData, extraParams);
+
+		delete formattedRecord.publicData.extraParams;
+	}
+
+	return formattedRecord;
 };
 
 module.exports = {
 	tagRegistration,
-	holdDomainRegistration,
-	insert,
-	searchByDomain,
 	searchByStorageKey,
-	getDomainStats,
+	arweaveIDToBase64,
 };

@@ -20,7 +20,6 @@ const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 
 const dbgBsc = (...args) => {
 	if (process.env.DEBUG_BSC === "1") {
 		// eslint-disable-next-line no-console
-		console.log("[BSC]", ...args);
 	}
 };
 

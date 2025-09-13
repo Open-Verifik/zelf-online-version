@@ -107,30 +107,22 @@ class Domain {
 		const priceWithoutDiscount = Number(price);
 
 		let discount = 10;
+
 		let discountType = "percentage";
 
-		const whitelist = this.payment.whitelist || "";
+		const whitelist = this.payment.whitelist || {};
 
-		if (whitelist.length && referralTagName && whitelist.includes(referralTagName)) {
-			const referralDiscounts = this.payment.whitelist.split(",");
+		if (Object.keys(whitelist).length && referralTagName && whitelist[referralTagName]) {
+			const amount = whitelist[referralTagName];
 
-			const referralDiscount = referralDiscounts.find((discount) => {
-				const [name] = discount.split(":");
-				return name === referralTagName || name === `${referralTagName}.zelf`;
-			});
-
-			if (referralDiscount) {
-				const [tagName, amount] = referralDiscount.split(":");
-
-				if (amount.includes("%")) {
-					discountType = "percentage";
-					discount = parseInt(amount);
-					price = price - price * (discount / 100);
-				} else {
-					discount = parseInt(amount);
-					discountType = "amount";
-					price = price - discount;
-				}
+			if (amount.includes("%")) {
+				discountType = "percentage";
+				discount = parseInt(amount);
+				price = price - price * (discount / 100);
+			} else {
+				discount = parseInt(amount);
+				discountType = "amount";
+				price = price - discount;
 			}
 		} else if (referralTagName) {
 			price = price - price * 0.1;
@@ -145,28 +137,6 @@ class Domain {
 			priceWithoutDiscount,
 			discountType,
 		};
-
-		return price;
-	}
-
-	/**
-	 * Get discounted price
-	 * @param {number} tagLength - Length of tag name
-	 * @param {string} duration - Duration
-	 * @returns {number} - Discounted price in cents
-	 */
-	getDiscountedPrice(tagLength, duration = "1") {
-		const basePrice = this.getPrice(tagLength, duration);
-
-		if (duration === "lifetime" && this.payment.discounts.lifetime) {
-			return Math.round(basePrice * (1 - this.payment.discounts.lifetime));
-		}
-
-		if (duration === "yearly" && this.payment.discounts.yearly) {
-			return Math.round(basePrice * (1 - this.payment.discounts.yearly));
-		}
-
-		return basePrice;
 	}
 
 	/**
@@ -333,6 +303,14 @@ class Domain {
 	static fromAPI(apiResponse) {
 		return new Domain(apiResponse);
 	}
+
+	/**
+	 * Get the tag key for this domain
+	 * @returns {string} - The tag key (storage.keyPrefix)
+	 */
+	getTagKey() {
+		return this.storage.keyPrefix;
+	}
 }
 
 /**
@@ -398,40 +376,6 @@ class DomainFactory {
 	}
 
 	/**
-	 * Get all domains
-	 * @returns {Array} - Array of all Domain instances
-	 */
-	getAllDomains() {
-		return Array.from(this.domains.values());
-	}
-
-	/**
-	 * Get active domains only
-	 * @returns {Array} - Array of active Domain instances
-	 */
-	getActiveDomains() {
-		return this.getAllDomains().filter((domain) => domain.isActive());
-	}
-
-	/**
-	 * Get domains by type
-	 * @param {string} type - Domain type
-	 * @returns {Array} - Array of Domain instances of specified type
-	 */
-	getDomainsByType(type) {
-		return this.getAllDomains().filter((domain) => domain.type === type);
-	}
-
-	/**
-	 * Get domains by owner
-	 * @param {string} owner - Domain owner
-	 * @returns {Array} - Array of Domain instances owned by specified owner
-	 */
-	getDomainsByOwner(owner) {
-		return this.getAllDomains().filter((domain) => domain.owner === owner);
-	}
-
-	/**
 	 * Check if domain exists
 	 * @param {string} name - Domain name
 	 * @returns {boolean} - True if domain exists
@@ -475,38 +419,6 @@ class DomainFactory {
 	 */
 	getDomainCount() {
 		return this.domains.size;
-	}
-
-	/**
-	 * Get active domain count
-	 * @returns {number} - Number of active domains
-	 */
-	getActiveDomainCount() {
-		return this.getActiveDomains().length;
-	}
-
-	/**
-	 * Search domains by criteria
-	 * @param {Object} criteria - Search criteria
-	 * @returns {Array} - Array of matching Domain instances
-	 */
-	searchDomains(criteria) {
-		return this.getAllDomains().filter((domain) => {
-			return Object.entries(criteria).every(([key, value]) => {
-				if (key === "features") {
-					return value.every((feature) => domain.supportsFeature(feature));
-				}
-				return domain[key] === value;
-			});
-		});
-	}
-
-	/**
-	 * Export all domains to JSON
-	 * @returns {Array} - Array of domain JSON objects
-	 */
-	exportToJSON() {
-		return this.getAllDomains().map((domain) => domain.toJSON());
 	}
 
 	/**

@@ -49,6 +49,10 @@ const SUPPORTED_DOMAINS = {
 				yearly: 0.2, // 20% discount for yearly
 				lifetime: 0.5, // 50% discount for lifetime
 			},
+			whitelist: {
+				"zelfmedellin2025.zelf": 24,
+				"zelfbogota2025.zelf": 25,
+			},
 			pricingTable: {
 				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
 				2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
@@ -110,6 +114,10 @@ const SUPPORTED_DOMAINS = {
 			discounts: {
 				yearly: 0.15, // 15% discount for yearly
 				lifetime: 0.3, // 30% discount for lifetime
+			},
+			whitelist: {
+				"privacy.avax": "24$",
+				"security.avax": "25%",
 			},
 			pricingTable: {
 				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },

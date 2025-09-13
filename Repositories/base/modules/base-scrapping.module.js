@@ -51,7 +51,6 @@ const getLatestBlock = async () => {
 		);
 		return parseInt(response.data.result, 16);
 	} catch (error) {
-		console.log("Failed to get latest block:", error.message);
 		return 0;
 	}
 };
@@ -88,7 +87,7 @@ const getAddress = async (query) => {
 				);
 				ethBalance = balanceResponse.data.result ? (parseInt(balanceResponse.data.result, 16) / Math.pow(10, 18)).toString() : "0";
 			} catch (error) {
-				console.log("Base balance fetch failed:", error.message);
+				console.error("Base balance fetch failed:", error.message);
 			}
 
 			// Get ETH price
@@ -111,7 +110,7 @@ const getAddress = async (query) => {
 				tokens = tokensData.tokens || [];
 				totalFiatBalance = tokensData.totalFiatBalance || 0;
 			} catch (error) {
-				console.log("Base tokens fetch failed:", error.message);
+				console.error("Base tokens fetch failed:", error.message);
 				// Continue with empty tokens array if API fails
 			}
 
@@ -134,8 +133,6 @@ const getAddress = async (query) => {
 			// Get transactions with controlled timeout
 			let transactions = [];
 			try {
-				console.log("Fetching transactions with controlled timeout...");
-
 				// Create a timeout promise for transaction fetching
 				const transactionTimeoutPromise = new Promise((_, reject) => {
 					setTimeout(() => reject(new Error("Transaction fetch timeout")), 6000);
@@ -149,9 +146,7 @@ const getAddress = async (query) => {
 
 				const transactionsData = await Promise.race([transactionDataPromise, transactionTimeoutPromise]);
 				transactions = transactionsData.transactions || [];
-				console.log(`Found ${transactions.length} transactions via OKLink API`);
 			} catch (error) {
-				console.log("Transaction fetch failed:", error.message);
 				// Add error message as a transaction entry
 				transactions = [
 					{
@@ -264,13 +259,9 @@ const getTokens = async (params, query) => {
 			};
 		}
 
-		// If OKLink fails, try to get some common Base tokens via RPC
-		console.log("OKLink token API failed, trying RPC fallback for common tokens...");
-
 		try {
 			const commonTokens = await getCommonBaseTokens(address);
 			if (commonTokens.length > 0) {
-				console.log(`Found ${commonTokens.length} common tokens via RPC`);
 				const tokenHoldings = baseFormatter.formatTokenHoldings(commonTokens);
 				const totalFiatBalance = commonTokens.reduce((sum, token) => sum + (token.fiatBalance || 0), 0);
 
@@ -282,7 +273,7 @@ const getTokens = async (params, query) => {
 				};
 			}
 		} catch (fallbackError) {
-			console.log("RPC fallback also failed:", fallbackError.message);
+			console.error("RPC fallback also failed:", fallbackError.message);
 		}
 
 		return {
@@ -316,7 +307,7 @@ const getTransactionsList = async (query) => {
 			const priceData = await getTickerPrice({ symbol: "ETH" });
 			price = priceData.price || "3000.00000000";
 		} catch (priceError) {
-			console.log("Price fetch failed, using default:", priceError.message);
+			console.error("Price fetch failed, using default:", priceError.message);
 		}
 
 		// Try OKLink API first (it might work with the right endpoint)
@@ -324,44 +315,38 @@ const getTransactionsList = async (query) => {
 		let source;
 
 		try {
-			console.log("Trying OKLink API...");
 			const oklinkResponse = await getOKLinkTransactions(address, page, show, price);
 			if (oklinkResponse && oklinkResponse.transactions && oklinkResponse.transactions.length > 0) {
 				response = oklinkResponse;
 				source = "oklink";
-				console.log(`Found ${oklinkResponse.transactions.length} transactions via OKLink`);
 			}
 		} catch (oklinkError) {
-			console.log("OKLink failed:", oklinkError.message);
+			console.error("OKLink failed:", oklinkError.message);
 		}
 
 		// Try BaseScan API as fallback
 		if (!response) {
 			try {
-				console.log("Trying BaseScan API...");
 				const baseScanResponse = await getBaseScanTransactions(address, page, show, price);
 				if (baseScanResponse && baseScanResponse.transactions && baseScanResponse.transactions.length > 0) {
 					response = baseScanResponse;
 					source = "basescan";
-					console.log(`Found ${baseScanResponse.transactions.length} transactions via BaseScan`);
 				}
 			} catch (baseScanError) {
-				console.log("BaseScan failed:", baseScanError.message);
+				console.error("BaseScan failed:", baseScanError.message);
 			}
 		}
 
 		// Try RPC fallback for transaction count
 		if (!response) {
 			try {
-				console.log("Trying RPC fallback...");
 				const rpcResponse = await getRPCTransactionCount(address, price);
 				if (rpcResponse) {
 					response = rpcResponse;
 					source = "rpc";
-					console.log("Using RPC transaction count fallback");
 				}
 			} catch (rpcError) {
-				console.log("RPC fallback failed:", rpcError.message);
+				console.error("RPC fallback failed:", rpcError.message);
 			}
 		}
 
@@ -372,7 +357,7 @@ const getTransactionsList = async (query) => {
 		}
 
 		// If no transactions found from external APIs, return empty result
-		console.log("No transactions found from external APIs");
+		console.error("No transactions found from external APIs");
 		return { pagination: { records: "0", pages: "0", page: "0" }, transactions: [] };
 	} catch (error) {
 		console.error("Error getting Base transactions:", error.message || "Unknown error");
@@ -452,7 +437,7 @@ const getTransactionStatus = async (params) => {
 				hash: id,
 			};
 		} catch (scrapeError) {
-			console.log("BaseScan scraping failed:", scrapeError.message);
+			console.error("BaseScan scraping failed:", scrapeError.message);
 		}
 
 		// Final fallback: RPC call
@@ -486,7 +471,7 @@ const getTransactionStatus = async (params) => {
 				};
 			}
 		} catch (rpcError) {
-			console.log("Base RPC transaction fetch failed:", rpcError.message);
+			console.error("Base RPC transaction fetch failed:", rpcError.message);
 		}
 
 		return { error: "Transaction not found" };
@@ -526,7 +511,7 @@ const getPortfolioSummary = async (params) => {
 			const priceData = await getTickerPrice({ symbol: "ETH" });
 			ethPrice = priceData.price || "0";
 		} catch (error) {
-			console.log("Portfolio summary ETH data fetch failed:", error.message);
+			console.error("Portfolio summary ETH data fetch failed:", error.message);
 		}
 
 		// Get all tokens
@@ -555,7 +540,7 @@ const getPortfolioSummary = async (params) => {
 			);
 			transactionCount = nonceResponse.data.result ? parseInt(nonceResponse.data.result, 16) : 0;
 		} catch (error) {
-			console.log("Transaction count fetch failed:", error.message);
+			console.error("Transaction count fetch failed:", error.message);
 		}
 
 		return {
@@ -640,7 +625,7 @@ const getBaseScanTransactions = async (address, page, show, price) => {
 
 		return null;
 	} catch (error) {
-		console.log("BaseScan transactions failed:", error.message);
+		console.error("BaseScan transactions failed:", error.message);
 		return null;
 	}
 };

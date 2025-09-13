@@ -165,8 +165,6 @@ const auth = async (data, authUser) => {
 	// from the zelfAccount.url we should get the json from that then asisgn the name to the zelfAccount.metadata.keyvalues.name
 	const jsonData = await axios.get(zelfAccount.url);
 
-	console.log({ jsonData, zelfAccount, metadata: zelfAccount.metadata });
-
 	zelfAccount.metadata.keyvalues.name = jsonData.name;
 
 	return {

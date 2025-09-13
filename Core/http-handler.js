@@ -128,8 +128,6 @@ const tryCatchLog = async (status = "failed", message, code, exception, ctx = nu
 
 		headerMessage += `\n---\n*🚀 Error logged by Verifik Backend System*`;
 
-		console.log({ headerMessage });
-
 		// Check Discord character limit (2000 chars) and truncate if necessary
 		const DISCORD_LIMIT = 1900; // Leave some buffer
 		if (headerMessage.length > DISCORD_LIMIT) {

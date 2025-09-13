@@ -363,7 +363,15 @@ const createHoldObject = async (params, authUser) => {
 };
 
 const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainConfig) => {
-	const { price, reward, discount, discountType } = domainConfig.getPrice(tagObject[domainConfig.storage.keyPrefix], "1", payload.referralTagName);
+	const { referralTagObject } = payload;
+
+	const referralTagName = referralTagObject?.publicData?.[domainConfig.storage.keyPrefix].split(".")[0];
+
+	const { price, reward, discount, discountType } = domainConfig.getPrice(
+		tagObject[domainConfig.storage.keyPrefix],
+		"1",
+		referralTagName ? `${referralTagName}.${domainConfig.name}` : ""
+	);
 
 	const { eth, btc, solana, sui } = addresses;
 
