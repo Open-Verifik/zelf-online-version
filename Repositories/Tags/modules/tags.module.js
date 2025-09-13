@@ -329,75 +329,6 @@ const createZelfPay = async (tagObject, authUser, domain = "zelf") => {
 };
 
 /**
- * update tag
- * @param {Object} params
- * @param {Object} authUser
- */
-const updateTag = async (params, authUser) => {
-	const { tagName, domain, duration } = params;
-	const domainConfig = getDomainConfig(domain);
-
-	const tagObjects = await _findTag({ tagName: `${tagName}.${domain}`, domain }, "both", authUser);
-
-	const tagObject = {
-		...(tagObjects.arweave?.[0] || {}),
-		...(tagObjects.ipfs?.[0] || {}),
-	};
-
-	if (!tagObject.publicData) {
-		const error = new Error("Tag not found");
-		error.status = 404;
-		throw error;
-	}
-
-	// Update expiration date
-	const newExpiresAt = moment(tagObject.publicData.expiresAt).add(duration, "year").toISOString();
-
-	// Update the tag object
-	tagObject.publicData.expiresAt = newExpiresAt;
-	tagObject.publicData.updatedAt = moment().toISOString();
-
-	// Store updated version in IPFS
-	const ipfsResult = await IPFSModule.insert(
-		{
-			base64: Buffer.from(JSON.stringify(tagObject, null, 2)).toString("base64"),
-			metadata: {
-				...tagObject.publicData,
-				type: "tag",
-				domain,
-			},
-			name: `${tagName}.${domain}`,
-			pinIt: true,
-		},
-		{ pro: true }
-	);
-
-	// Store updated version in Arweave
-	const arweaveResult = await ArweaveModule.insert(
-		{
-			base64: Buffer.from(JSON.stringify(tagObject, null, 2)).toString("base64"),
-			metadata: {
-				...tagObject.publicData,
-				type: "tag",
-				domain,
-			},
-			name: `${tagName}.${domain}`,
-		},
-		{ pro: true }
-	);
-
-	return {
-		tagName: `${tagName}.${domain}`,
-		domain,
-		domainConfig,
-		ipfs: ipfsResult,
-		arweave: arweaveResult,
-		expiresAt: newExpiresAt,
-		updatedAt: tagObject.publicData.updatedAt,
-	};
-};
-
-/**
  * Find duplicated tag
  * @param {string} tagName
  * @param {string} domain
@@ -663,7 +594,6 @@ module.exports = {
 	leaseConfirmation,
 	zelfPay,
 	createZelfPay,
-	updateTag,
 	// Utility functions
 	getDomainConfig,
 	generateDomainHoldDomain,

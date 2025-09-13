@@ -45,12 +45,12 @@ const searchTag = async (params, authUser) => {
 			combinedResults.tagObject = ipfsResults[0];
 		}
 
-		if (!combinedResults.tagObject.zelfProofQRCode)
-			combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
-
 		if (combinedResults.available) {
 			combinedResults.price = domainConfig.getPrice(tagName, "1");
 		}
+
+		if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
+			combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
 
 		return combinedResults;
 	} catch (error) {

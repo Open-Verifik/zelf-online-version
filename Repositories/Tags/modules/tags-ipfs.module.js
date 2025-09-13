@@ -1,6 +1,7 @@
 const IPFS = require("../../../Core/ipfs");
 const config = require("../../../Core/config");
-const { getDomainConfiguration, generateStorageKey } = require("./domain-registry.module");
+const { getDomainConfig } = require("../config/supported-domains");
+const { generateStorageKey } = require("./domain-registry.module");
 
 /**
  * Tags IPFS Module
@@ -107,29 +108,35 @@ const show = async (data, authUser) => {
  * @returns {Object} - IPFS upload result
  */
 const insert = async (data, authUser) => {
-	const { base64, metadata, name, pinIt, domain } = data;
+	const { base64, metadata, name, pinIt } = data;
 
-	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
+	if ((authUser.pro || config.env === "development") && pinIt) return await IPFS.pinFile(base64, name, null, metadata);
 
-	// Generate domain-specific storage key
-	const storageKey = generateStorageKey(domain, name);
+	return await IPFS.upload(base64, name, null, metadata);
+};
 
-	// Enhanced metadata with domain information
-	const enhancedMetadata = {
-		...metadata,
-		storageKey,
-		domain,
-		domainConfig: domainConfig?.type || "custom",
-		timestamp: new Date().toISOString(),
-	};
+/**
+ * Insert tag data into IPFS
+ * @param {Object} data - Tag data
+ * @param {string} data.base64 - Base64 encoded data
+ * @param {Object} data.metadata - Tag metadata
+ * @param {string} data.name - Tag name
+ * @param {boolean} data.pinIt - Whether to pin the file
+ * @param {string} data.domain - Domain name
+ * @param {Object} authUser - Authenticated user
+ * @returns {Object} - IPFS upload result
+ */
+const tagRegistration = async (data, authUser) => {
+	const { base64, metadata, name, pinIt } = data;
 
-	// Check if user has pro access or is in development
+	let record = null;
 	if ((authUser.pro || config.env === "development") && pinIt) {
-		return await IPFS.pinFile(base64, name, null, enhancedMetadata);
+		record = await IPFS.pinFile(base64, name, null, metadata);
+	} else {
+		record = await IPFS.upload(base64, name, null, metadata);
 	}
 
-	return await IPFS.upload(base64, name, null, enhancedMetadata);
+	return _formatRecord(record);
 };
 
 /**
@@ -140,11 +147,11 @@ const insert = async (data, authUser) => {
 const unPinFiles = async (CIDs = []) => {
 	try {
 		const unpinnedFiles = await IPFS.unPinFiles(CIDs);
+
 		return unpinnedFiles;
-	} catch (exception) {
-		console.error("Error unpinning files:", exception);
-		return { success: false, error: exception.message };
-	}
+	} catch (exception) {}
+
+	return null;
 };
 
 /**
@@ -160,7 +167,8 @@ const searchByDomain = async (params, authUser) => {
 	const { domain, key, value } = params;
 
 	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
+	const domainConfig = getDomainConfig(domain);
+
 	if (!domainConfig) {
 		throw new Error("Domain not supported");
 	}
@@ -352,6 +360,7 @@ module.exports = {
 	get,
 	show,
 	insert,
+	tagRegistration,
 	unPinFiles,
 	searchByDomain,
 	searchByStorageKey,

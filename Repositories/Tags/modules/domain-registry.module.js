@@ -32,15 +32,6 @@ const {
  */
 
 /**
- * Get domain configuration by domain name
- * @param {string} domain - Domain name (e.g., 'avax', 'btc')
- * @returns {Object|null} - Domain configuration or null if not found
- */
-const getDomainConfiguration = (domain) => {
-	return getDomainConfig(domain);
-};
-
-/**
  * Get domain metadata
  * @param {string} domain - Domain name
  * @returns {Object} - Domain metadata
@@ -217,7 +208,7 @@ const getValidationRules = (domain) => {
 
 module.exports = {
 	// Core domain methods
-	getDomainConfiguration,
+	getDomainConfiguration: getDomainConfig,
 	isDomainSupported: isSupported,
 	isDomainActive,
 	getAllSupportedDomains,

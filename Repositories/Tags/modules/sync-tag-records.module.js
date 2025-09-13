@@ -102,7 +102,7 @@ const updateTags = async (tagObject, tagsToAdd) => {
 		await TagsIPFSModule.unPinFiles([tagObject.ipfsHash || tagObject.ipfs_pin_hash]);
 	}
 
-	const ipfs = await TagsIPFSModule.insert(
+	const ipfs = await TagsIPFSModule.tagRegistration(
 		{
 			base64: zelfProofQRCode,
 			name: tagName,
@@ -118,6 +118,7 @@ const updateTags = async (tagObject, tagsToAdd) => {
 			hasPassword: metadata.hasPassword,
 			zelfProof: metadata.zelfProof,
 			publicData: metadata,
+			fileName: tagName,
 		});
 	}
 
