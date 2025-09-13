@@ -631,18 +631,6 @@ const _getZelfNameForCaptcha = (zelfName) => {
 	return zelfName.split(".zelf")[0].replace(".", "_");
 };
 
-const zelfPayValidation = async (ctx, next) => {
-	const { zelfProof } = ctx.request.query;
-
-	if (!zelfProof) {
-		ctx.status = 409;
-		ctx.body = { validationError: "Missing ZelfProof" };
-		return;
-	}
-
-	await next();
-};
-
 module.exports = {
 	getValidation,
 	leaseValidation,
@@ -658,5 +646,4 @@ module.exports = {
 	referralRewardsValidation,
 	//update
 	updateValidation,
-	zelfPayValidation,
 };
