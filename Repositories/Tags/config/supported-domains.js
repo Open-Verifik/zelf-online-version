@@ -47,6 +47,26 @@ const SUPPORTED_DOMAINS = {
 				yearly: 0.2, // 20% discount for yearly
 				lifetime: 0.5, // 50% discount for lifetime
 			},
+			pricingTable: {
+				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
+				2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
+				3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
+				4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
+				5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
+				"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
+				16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
+				17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
+				18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
+				19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
+				20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
+				21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
+				22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
+				23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
+				24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
+				25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
+				26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
+				27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
+			},
 		},
 		limits: {
 			maxTagsPerUser: 10,
@@ -88,6 +108,26 @@ const SUPPORTED_DOMAINS = {
 			discounts: {
 				yearly: 0.15, // 15% discount for yearly
 				lifetime: 0.3, // 30% discount for lifetime
+			},
+			pricingTable: {
+				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
+				2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
+				3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
+				4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
+				5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
+				"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
+				16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
+				17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
+				18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
+				19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
+				20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
+				21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
+				22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
+				23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
+				24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
+				25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
+				26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
+				27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
 			},
 		},
 		limits: {
@@ -132,6 +172,26 @@ const SUPPORTED_DOMAINS = {
 				yearly: 0.1, // 10% discount for yearly
 				lifetime: 0.25, // 25% discount for lifetime
 			},
+			pricingTable: {
+				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
+				2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
+				3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
+				4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
+				5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
+				"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
+				16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
+				17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
+				18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
+				19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
+				20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
+				21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
+				22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
+				23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
+				24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
+				25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
+				26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
+				27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
+			},
 		},
 		limits: {
 			maxTagsPerUser: 3,
@@ -145,7 +205,6 @@ const SUPPORTED_DOMAINS = {
 			community: "bitcoin",
 		},
 	},
-
 	// Tech community domain
 	tech: {
 		type: "custom",
@@ -174,6 +233,26 @@ const SUPPORTED_DOMAINS = {
 			discounts: {
 				yearly: 0.25, // 25% discount for yearly
 				lifetime: 0.4, // 40% discount for lifetime
+			},
+			pricingTable: {
+				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
+				2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
+				3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
+				4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
+				5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
+				"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
+				16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
+				17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
+				18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
+				19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
+				20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
+				21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
+				22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
+				23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
+				24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
+				25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
+				26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
+				27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
 			},
 		},
 		limits: {
@@ -217,6 +296,26 @@ const SUPPORTED_DOMAINS = {
 			discounts: {
 				yearly: 0.3, // 30% discount for yearly
 				lifetime: 0.5, // 50% discount for lifetime
+			},
+			pricingTable: {
+				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
+				2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
+				3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
+				4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
+				5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
+				"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
+				16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
+				17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
+				18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
+				19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
+				20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
+				21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
+				22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
+				23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
+				24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
+				25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
+				26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
+				27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
 			},
 		},
 		limits: {
@@ -340,18 +439,35 @@ const getByOwner = (owner) => {
 
 /**
  * Get domain price with discounts
- * @param {string} domain - Domain name
+ * @param {string} tagName - Tag name
  * @param {string} duration - Duration ('yearly', 'lifetime')
  * @returns {number} - Price in cents
  */
-const getDomainPrice = (domain, duration = "yearly") => {
+const getDomainPrice = (tagName, duration = "1") => {
+	const splitTagName = tagName.split(".");
+	const domain = splitTagName[1];
+	const length = splitTagName[0].length;
+
 	const config = getDomainConfig(domain);
+
+	console.log(config, domain, splitTagName, length);
+
 	if (!config) return 0;
 
-	const basePrice = config.price;
-	const discount = config.payment?.discounts?.[duration] || 0;
+	if (!["1", "2", "3", "4", "5", "lifetime"].includes(`${duration}`))
+		throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
 
-	return Math.round(basePrice * (1 - discount));
+	let price = 24;
+
+	if (length >= 6 && length <= 15) {
+		price = config.payment.pricingTable["6-15"][duration];
+	} else if (config.pricingTable[length]) {
+		price = config.pricingTable[length][duration];
+	} else {
+		throw new Error("Invalid name length. Length must be between 1 and 27.");
+	}
+
+	return price;
 };
 
 /**

@@ -1,12 +1,12 @@
 const {
 	SUPPORTED_DOMAINS,
 	getDomainConfig,
-	isDomainSupported,
+	isSupported,
 	isDomainActive,
 	getAllSupportedDomains,
-	getDomainsByType,
+	getByType,
 	getActiveDomains,
-	getDomainsByOwner,
+	getByOwner,
 	getDomainPrice,
 	supportsFeature,
 	getDomainStorageConfig,
@@ -53,109 +53,113 @@ const getDomainMetadata = (domain) => {
 };
 
 /**
- * Check if domain is in maintenance
+ * Get domain features
  * @param {string} domain - Domain name
- * @returns {boolean} - True if domain is in maintenance
+ * @returns {Array} - Array of supported features
  */
-const isDomainInMaintenance = (domain) => {
+const getFeatures = (domain) => {
 	const config = getDomainConfig(domain);
-	return config?.status === "maintenance";
+	return config?.features || [];
 };
 
 /**
- * Check if domain is in beta
+ * Get domain description
  * @param {string} domain - Domain name
- * @returns {boolean} - True if domain is in beta
+ * @returns {string} - Domain description
  */
-const isDomainInBeta = (domain) => {
+const getDescription = (domain) => {
 	const config = getDomainConfig(domain);
-	return config?.status === "beta";
+	return config?.description || "";
 };
 
 /**
- * Get domain launch date
+ * Get domain owner
  * @param {string} domain - Domain name
- * @returns {string|null} - Launch date or null
+ * @returns {string} - Domain owner
  */
-const getDomainLaunchDate = (domain) => {
-	const metadata = getDomainMetadata(domain);
-	return metadata.launchDate || null;
+const getOwner = (domain) => {
+	const config = getDomainConfig(domain);
+	return config?.owner || "";
 };
 
 /**
- * Get domain version
+ * Get domain type
  * @param {string} domain - Domain name
- * @returns {string|null} - Version or null
+ * @returns {string} - Domain type
  */
-const getDomainVersion = (domain) => {
-	const metadata = getDomainMetadata(domain);
-	return metadata.version || null;
+const getType = (domain) => {
+	const config = getDomainConfig(domain);
+	return config?.type || "";
 };
 
 /**
- * Get domain documentation URL
+ * Get domain status
  * @param {string} domain - Domain name
- * @returns {string|null} - Documentation URL or null
+ * @returns {string} - Domain status
  */
-const getDomainDocumentation = (domain) => {
-	const metadata = getDomainMetadata(domain);
-	return metadata.documentation || null;
+const getStatus = (domain) => {
+	const config = getDomainConfig(domain);
+	return config?.status || "";
 };
 
 /**
- * Get domain community
+ * Get hold suffix for domain
  * @param {string} domain - Domain name
- * @returns {string|null} - Community or null
+ * @returns {string} - Hold suffix
  */
-const getDomainCommunity = (domain) => {
-	const metadata = getDomainMetadata(domain);
-	return metadata.community || null;
+const getHoldSuffix = (domain) => {
+	const config = getDomainConfig(domain);
+	return config?.holdSuffix || ".hold";
 };
 
 /**
- * Get domain enterprise info
+ * Get pricing table for domain
  * @param {string} domain - Domain name
- * @returns {string|null} - Enterprise info or null
+ * @returns {Object} - Pricing table
  */
-const getDomainEnterprise = (domain) => {
-	const metadata = getDomainMetadata(domain);
-	return metadata.enterprise || null;
+const getPricingTable = (domain) => {
+	const config = getDomainConfig(domain);
+	return config?.payment?.pricingTable || {};
 };
 
 /**
- * Get domain support level
+ * Get discounts for domain
  * @param {string} domain - Domain name
- * @returns {string|null} - Support level or null
+ * @returns {Object} - Discount configuration
  */
-const getDomainSupport = (domain) => {
-	const metadata = getDomainMetadata(domain);
-	return metadata.support || null;
+const getDiscounts = (domain) => {
+	const config = getDomainConfig(domain);
+	return config?.payment?.discounts || {};
 };
 
 /**
- * Validate domain and name combination
+ * Check if domain has IPFS enabled
  * @param {string} domain - Domain name
- * @param {string} name - Tag name
- * @returns {Object} - Validation result
+ * @returns {boolean} - True if IPFS is enabled
  */
-const validateDomainAndName = async (domain, name) => {
-	// Check if domain is supported
-	if (!isDomainSupported(domain)) {
-		return { valid: false, error: `Domain '${domain}' is not supported` };
-	}
+const isIPFSEnabled = (domain) => {
+	const config = getDomainConfig(domain);
+	return config?.storage?.ipfsEnabled || false;
+};
 
-	// Check if domain is active
-	if (!isDomainActive(domain)) {
-		return { valid: false, error: `Domain '${domain}' is not active` };
-	}
+/**
+ * Check if domain has Arweave enabled
+ * @param {string} domain - Domain name
+ * @returns {boolean} - True if Arweave is enabled
+ */
+const isArweaveEnabled = (domain) => {
+	const config = getDomainConfig(domain);
+	return config?.storage?.arweaveEnabled || false;
+};
 
-	// Check if domain is in maintenance
-	if (isDomainInMaintenance(domain)) {
-		return { valid: false, error: `Domain '${domain}' is currently in maintenance` };
-	}
-
-	// Validate the name against domain rules
-	return await validateDomainName(domain, name);
+/**
+ * Check if domain has backup enabled
+ * @param {string} domain - Domain name
+ * @returns {boolean} - True if backup is enabled
+ */
+const isBackupEnabled = (domain) => {
+	const config = getDomainConfig(domain);
+	return config?.storage?.backupEnabled || false;
 };
 
 /**
@@ -168,56 +172,100 @@ const getDomainStats = (domain) => {
 	if (!config) return null;
 
 	return {
-		domain,
+		name: domain,
 		type: config.type,
 		status: config.status,
+		owner: config.owner,
 		price: config.price,
-		features: config.features.length,
-		paymentMethods: config.payment?.methods?.length || 0,
-		currencies: config.payment?.currencies?.length || 0,
-		limits: config.limits,
-		metadata: config.metadata,
+		features: config.features || [],
+		limits: config.limits || {},
+		metadata: config.metadata || {},
 	};
 };
 
 /**
- * Get all domain statistics
- * @returns {Array} - Array of domain statistics
+ * List all domain names
+ * @returns {Array} - Array of domain names
  */
-const getAllDomainStats = () => {
-	return Object.keys(SUPPORTED_DOMAINS).map((domain) => getDomainStats(domain));
+const listDomainNames = () => {
+	return Object.keys(SUPPORTED_DOMAINS);
+};
+
+/**
+ * Get domain count
+ * @returns {number} - Total number of domains
+ */
+const getDomainCount = () => {
+	return Object.keys(SUPPORTED_DOMAINS).length;
+};
+
+/**
+ * Get active domain count
+ * @returns {number} - Number of active domains
+ */
+const getActiveDomainCount = () => {
+	return getActiveDomains().length;
+};
+
+/**
+ * Get validation rules for domain
+ * @param {string} domain - Domain name
+ * @returns {Object} - Validation rules
+ */
+const getValidationRules = (domain) => {
+	const config = getDomainConfig(domain);
+	return config?.validation || {};
 };
 
 module.exports = {
-	// Core domain functions (re-exported from supported-domains)
+	// Core domain methods
 	getDomainConfiguration,
-	isDomainSupported,
+	isDomainSupported: isSupported,
 	isDomainActive,
 	getAllSupportedDomains,
-	getDomainsByType,
+	getDomainsByType: getByType,
 	getActiveDomains,
-	getDomainsByOwner,
+	getDomainsByOwner: getByOwner,
+
+	// Domain properties
 	getDomainPrice,
+	getDomainType: getType,
+	getDomainStatus: getStatus,
+	getDomainOwner: getOwner,
+	getDomainDescription: getDescription,
+	getDomainMetadata,
+
+	// Features and capabilities
 	supportsFeature,
+	getFeatures,
+
+	// Storage configuration
 	getDomainStorageConfig,
+	isIPFSEnabled,
+	isArweaveEnabled,
+	isBackupEnabled,
+
+	// Storage utilities
 	generateStorageKey,
 	generateHoldDomain,
+	getHoldSuffix,
+
+	// Payment configuration
 	getDomainPaymentMethods,
 	getDomainCurrencies,
-	getDomainLimits,
-	validateDomainName,
+	getPricingTable,
+	getDiscounts,
 
-	// Additional domain functions
-	validateDomainAndName,
-	getDomainMetadata,
-	getDomainLaunchDate,
-	getDomainVersion,
-	getDomainDocumentation,
-	getDomainCommunity,
-	getDomainEnterprise,
-	getDomainSupport,
-	isDomainInMaintenance,
-	isDomainInBeta,
+	// Limits and restrictions
+	getDomainLimits,
+
+	// Validation
+	validateDomainName,
+	getValidationRules,
+
+	// Statistics and info
 	getDomainStats,
-	getAllDomainStats,
+	getDomainCount,
+	getActiveDomainCount,
+	listDomainNames,
 };

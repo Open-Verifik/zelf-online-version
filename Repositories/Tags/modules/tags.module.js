@@ -1,10 +1,7 @@
 const moment = require("moment");
-const SessionModule = require("../../Session/modules/session.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const TagsPartsModule = require("./tags-parts.module");
 const TagsSearchModule = require("./tags-search.module");
-const arweaveUrl = `https://arweave.zelf.world`;
-const explorerUrl = `https://viewblock.io/arweave/tx`;
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
 const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
@@ -21,7 +18,7 @@ const { addReferralReward, addPurchaseReward } = require("./tags-token.module");
 const { createUnderName } = require("./undernames.module");
 const { initTagUpdates, updateTags } = require("./sync-tag-records.module");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
-const { getDomainConfiguration, generateStorageKey, generateHoldDomain } = require("./domain-registry.module");
+const { getDomainConfiguration, generateStorageKey, generateHoldDomain, getDomainPrice } = require("./domain-registry.module");
 
 /**
  * Get domain-specific configuration
@@ -187,7 +184,7 @@ const leaseTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value, environment, type } = params;
+	const { tagName, domain, key, value, environment, type, duration } = params;
 
 	const domainConfig = getDomainConfig(domain);
 
@@ -203,6 +200,10 @@ const searchTag = async (params, authUser) => {
 		},
 		authUser
 	);
+
+	if (result.available) {
+		result.price = getDomainPrice(tagName, duration);
+	}
 
 	return result;
 };

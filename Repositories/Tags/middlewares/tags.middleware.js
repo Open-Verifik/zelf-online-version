@@ -127,9 +127,7 @@ const extractDomainAndName = (tagName, domain) => {
  * @returns {Object} - Validation result
  */
 const validateDomainAndName = async (domain, name) => {
-	if (!domain) {
-		return { valid: false, error: "Domain is required" };
-	}
+	if (!domain) return { valid: false, error: "Domain is required" };
 
 	// Check if domain is active
 	const isActive = await isDomainActive(domain);
