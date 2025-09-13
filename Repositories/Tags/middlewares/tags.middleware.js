@@ -559,9 +559,7 @@ const previewValidation = async (ctx, next) => {
  * @param {*} next - Next middleware
  */
 const previewZelfProofValidation = async (ctx, next) => {
-	const payload = Object.assign(ctx.request.query, ctx.request.body);
-
-	const { zelfProof, os, captchaToken } = payload;
+	const { zelfProof, os, captchaToken } = ctx.request.body;
 
 	const valid = validate(schemas.previewZelfProof, {
 		zelfProof,
