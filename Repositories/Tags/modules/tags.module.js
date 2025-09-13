@@ -62,7 +62,7 @@ const leaseTag = async (params, authUser) => {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
-			tagName,
+			[domainConfig.storage.keyPrefix]: tagName,
 			domain,
 		},
 		metadata: {
@@ -77,7 +77,7 @@ const leaseTag = async (params, authUser) => {
 	};
 
 	const tagObject = {
-		tagName,
+		...dataToEncrypt.publicData,
 		duration,
 	};
 
@@ -86,7 +86,7 @@ const leaseTag = async (params, authUser) => {
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
 
 	if (tagObject.price === 0) {
-		await confirmFreeTag(tagObject, referralTagObject, authUser);
+		await confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
 	} else {
 		await saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
 	}
@@ -420,6 +420,8 @@ const _findDuplicatedTag = async (tagName, domain, storage, domainConfig) => {
 		storageKey,
 	};
 
+	console.log({ searchParams });
+
 	const result = await TagsSearchModule.searchTag(searchParams);
 
 	if (result.available === false) {
@@ -536,17 +538,19 @@ const _decryptParams = async (params, authUser) => {
  * Confirm free tag (for recovery)
  * @param {Object} tagObject - Tag object
  * @param {Object} referralTagObject - Referral tag object
+ * @param {Object} domainConfig - Domain config
  * @param {Object} authUser - Authenticated user
  */
-const confirmFreeTag = async (tagObject, referralTagObject, authUser) => {
-	const tagName = tagObject.tagName.replace(".hold", "");
+const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUser) => {
+	const tagName = tagObject[domainConfig.storage.keyPrefix];
+
 	const domain = tagObject.domain || "zelf";
-	const domainConfig = getDomainConfig(domain);
+	const storageKey = domainConfig.storage.keyPrefix;
 
 	const metadata = {
 		hasPassword: tagObject.hasPassword,
 		zelfProof: tagObject.zelfProof,
-		tagName,
+		[storageKey]: tagName,
 		domain,
 		ethAddress: tagObject.ethAddress,
 		solanaAddress: tagObject.solanaAddress,
@@ -563,7 +567,7 @@ const confirmFreeTag = async (tagObject, referralTagObject, authUser) => {
 	};
 
 	if (referralTagObject) {
-		metadata.extraParams.referralTagName = referralTagObject.publicData?.tagName || referralTagObject.metadata?.tagName;
+		metadata.extraParams.referralTagName = referralTagObject.publicData?.[storageKey] || referralTagObject.metadata?.[storageKey];
 		metadata.extraParams.referralDomain = referralTagObject.publicData?.domain || referralTagObject.metadata?.domain || domain;
 		metadata.extraParams.referralSolanaAddress = referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress;
 	}
@@ -582,14 +586,14 @@ const confirmFreeTag = async (tagObject, referralTagObject, authUser) => {
 	tagObject.ipfs = await IPFSModule.insert(
 		{
 			base64: tagObject.zelfProofQRCode,
-			name: tagName,
+			name: tagObject[storageKey],
 			metadata,
 			pinIt: true,
 		},
 		{ ...authUser, pro: true }
 	);
 
-	tagObject.ipfs = await TagsPartsModule.formatIPFSRecord(tagObject.ipfs, true);
+	tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
 	delete tagObject.ipfs.publicData.zelfProof;
 
 	if (!tagObject.publicData) tagObject.publicData = {};
@@ -617,11 +621,13 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, aut
 
 	const holdSuffix = _domainConfig?.holdSuffix || ".hold";
 
-	const holdName = `${tagObject.tagName}${holdSuffix}`;
+	const storageKey = _domainConfig.storage.keyPrefix;
+
+	const holdName = `${tagObject[storageKey]}${holdSuffix}`;
 
 	const metadata = {
 		zelfProof: tagObject.zelfProof,
-		tagName: holdName,
+		[storageKey]: holdName,
 		domain,
 		ethAddress: tagObject.ethAddress,
 		btcAddress: tagObject.btcAddress,
@@ -639,7 +645,7 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, aut
 	};
 
 	if (referralTagObject) {
-		metadata.extraParams.referralTagName = referralTagObject.publicData?.tagName || referralTagObject.metadata?.tagName;
+		metadata.extraParams.referralTagName = referralTagObject.publicData?.[storageKey] || referralTagObject.metadata?.[storageKey];
 
 		metadata.extraParams.referralSolanaAddress = referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress;
 	}
@@ -670,9 +676,6 @@ module.exports = {
 	zelfPay,
 	createZelfPay,
 	updateTag,
-	// Recovery functions
-	confirmFreeTag,
-	saveHoldTagInIPFS,
 	// Utility functions
 	getDomainConfig,
 	generateDomainHoldDomain,

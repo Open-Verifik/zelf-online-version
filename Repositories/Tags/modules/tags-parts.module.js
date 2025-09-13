@@ -363,7 +363,7 @@ const createHoldObject = async (params, authUser) => {
 };
 
 const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainConfig) => {
-	const { price, reward, discount, discountType } = domainConfig.getPrice(tagObject.tagName, "1", payload.referralTagName);
+	const { price, reward, discount, discountType } = domainConfig.getPrice(tagObject[domainConfig.storage.keyPrefix], "1", payload.referralTagName);
 
 	const { eth, btc, solana, sui } = addresses;
 

@@ -52,8 +52,6 @@ const _formatRecord = (item) => {
 		publicData: item.metadata?.keyvalues || item.metadata,
 	};
 
-	console.log({ item, formattedResult });
-
 	if (formattedResult.publicData.extraParams) {
 		const extraParams = JSON.parse(formattedResult.publicData.extraParams);
 
