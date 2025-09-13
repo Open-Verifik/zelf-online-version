@@ -15,7 +15,7 @@ const graphql = `${arweaveUrl}/graphql`;
 
 /**
  * Tags Arweave Module
- * 
+ *
  * This module handles Arweave operations for the Tags system with multi-domain support.
  * It extends the existing Arweave functionality to work with different domain types
  * and .hold states while maintaining compatibility with existing ZNS logic.
@@ -200,7 +200,7 @@ const holdDomainRegistration = async (tagProofQRCode, tagObject, domain, name) =
  */
 const insert = async (data, authUser) => {
 	const { base64, metadata, name, domain } = data;
-	
+
 	// Get domain configuration
 	const domainConfig = getDomainConfiguration(domain);
 	const storageKey = generateStorageKey(domain, name);
@@ -252,7 +252,7 @@ const insert = async (data, authUser) => {
  */
 const searchByDomain = async (params, authUser) => {
 	const { domain, key, value } = params;
-	
+
 	// Get domain configuration
 	const domainConfig = getDomainConfiguration(domain);
 	if (!domainConfig) {
@@ -265,24 +265,21 @@ const searchByDomain = async (params, authUser) => {
 		value: value || domain,
 	};
 
-	return await searchArweave(searchParams.key, searchParams.value);
+	return await searchInArweave(searchParams.key, searchParams.value);
 };
 
 /**
  * Search for tags by storage key
  * @param {Object} params - Search parameters
- * @param {string} params.domain - Domain name
- * @param {string} params.name - Tag name
+ * @param {string} params.domainConfig - Domain configuration
+ * @param {string} params.tagName - Tag name
  * @param {Object} authUser - Authenticated user
  * @returns {Array} - Search results
  */
 const searchByStorageKey = async (params, authUser) => {
-	const { domain, name } = params;
-	
-	// Generate domain-specific storage key
-	const storageKey = generateStorageKey(domain, name);
-	
-	return await searchArweave("Storage-Key", storageKey);
+	const { tagName, domainConfig } = params;
+
+	return await searchInArweave(domainConfig.storage.keyPrefix, tagName);
 };
 
 /**
@@ -295,16 +292,16 @@ const searchByStorageKey = async (params, authUser) => {
  */
 const getHoldDomain = async (params, authUser) => {
 	const { domain, name } = params;
-	
+
 	// Get domain configuration
 	const domainConfig = getDomainConfiguration(domain);
 	const holdSuffix = domainConfig?.holdSuffix || ".hold";
-	
+
 	// Generate hold domain name
 	const holdDomain = `${name}${holdSuffix}.${domain}`;
-	
+
 	// Search for hold domain data
-	return await searchArweave("Tag-Name", holdDomain);
+	return await searchInArweave("Tag-Name", holdDomain);
 };
 
 /**
@@ -313,47 +310,87 @@ const getHoldDomain = async (params, authUser) => {
  * @param {string} value - Search value
  * @returns {Array} - Search results
  */
-const searchArweave = async (key, value) => {
-	try {
-		const query = `
-			query {
-				transactions(
-					first: 100,
-					tags: [
-						{ name: "App-Name", values: ["zelf-tags"] },
-						{ name: "${key}", values: ["${value}"] }
-					]
-				) {
-					edges {
-						node {
-							id
-							tags {
-								name
-								value
-							}
-							data {
-								size
-							}
+const searchInArweave = async (key, value) => {
+	if (!key || !value) return null;
+
+	const tagsToSearch = `[{ name: "${key}", values: "${value}" }]`;
+
+	const query = {
+		query: `
+		{
+			 transactions(
+				tags: ${tagsToSearch},
+				owners: ["${owner}"]
+			) {
+				edges {
+					node {
+						id
+						owner {
+							address
+						}
+						data {
+							size
+							type
+						}
+						tags {
+							name
+							value
 						}
 					}
 				}
 			}
-		`;
+		}
+	  `,
+	};
 
-		const response = await axios.post(graphql, { query });
-		const transactions = response.data.data.transactions.edges;
+	const result = await axios.post(graphql, query, {
+		headers: { "Content-Type": "application/json" },
+	});
 
-		return transactions.map(edge => ({
-			id: edge.node.id,
-			url: `${arweaveUrl}/${edge.node.id}`,
-			explorerUrl: `${explorerUrl}/${edge.node.id}`,
-			tags: edge.node.tags,
-			size: edge.node.data.size,
-		}));
-	} catch (error) {
-		console.error("Error searching Arweave:", error);
-		return [];
+	const searchResults = result.data?.data?.transactions?.edges;
+
+	if (!searchResults || !searchResults.length) {
+		return {
+			key,
+			value,
+			available: true,
+		};
 	}
+
+	return formatSearchResults(searchResults);
+};
+
+const formatSearchResults = (searchResults) => {
+	const formattedResults = [];
+
+	for (let index = 0; index < searchResults.length; index++) {
+		const searchResult = searchResults[index];
+
+		const formattedResult = {
+			id: searchResult.node.id,
+			owner: searchResult.node.owner.address,
+			url: `${arweaveUrl}/${searchResult.node.id}`,
+			explorerUrl: `${explorerUrl}/${searchResult.node.id}`,
+			publicData: {},
+			size: searchResult.node.data.size,
+		};
+
+		// it should be an object with key values
+		for (let _index = 0; _index < searchResult.node.tags.length; _index++) {
+			const tag = searchResult.node.tags[_index];
+
+			// for the key zelfProof we should replace al the spaces with +
+			if (tag.name === "zelfProof") {
+				tag.value = tag.value.replace(/ /g, "+");
+			}
+
+			formattedResult.publicData[tag.name] = tag.value;
+		}
+
+		formattedResults.push(formattedResult);
+	}
+
+	return formattedResults;
 };
 
 /**
@@ -365,14 +402,12 @@ const searchArweave = async (key, value) => {
 const getDomainStats = async (domain, authUser) => {
 	try {
 		// Get all tags for this domain
-		const domainTags = await searchArweave("Domain", domain);
-		
+		const domainTags = await searchInArweave("Domain", domain);
+
 		// Get hold domains for this domain
-		const holdDomains = await searchArweave("Hold-Status", "hold");
-		const domainHoldDomains = holdDomains.filter(tag => 
-			tag.tags.some(t => t.name === "Domain" && t.value === domain)
-		);
-		
+		const holdDomains = await searchInArweave("Hold-Status", "hold");
+		const domainHoldDomains = holdDomains.filter((tag) => tag.tags.some((t) => t.name === "Domain" && t.value === domain));
+
 		return {
 			domain,
 			totalTags: domainTags.length,

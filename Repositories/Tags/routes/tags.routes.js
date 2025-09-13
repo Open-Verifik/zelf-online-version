@@ -10,16 +10,15 @@ module.exports = (server) => {
 	const PATH = config.basePath(base);
 
 	// Route definitions
-	server.get(`${PATH}/v2/search`, Middleware.getValidation, Controller.searchTag_v2);
-	server.post(`${PATH}/v2/search`, Middleware.getValidation, Controller.searchTag_v2);
-	server.post(`${PATH}/v2/lease`, Middleware.leaseValidation, Controller.leaseTag_v2);
-	server.post(`${PATH}/v2/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery);
+	server.get(`${PATH}/search`, Middleware.getValidation, Controller.searchTag);
+	server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseTag);
+	server.post(`${PATH}/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery);
 	server.get(`${PATH}/zelfpay`, Middleware.zelfPayValidation, Controller.zelfPay);
-	server.post(`${PATH}/v2/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOfflineTag_v2);
-	server.post(`${PATH}/v2/lease-confirmation`, Middleware.leaseConfirmationValidation, Controller.leaseConfirmation_v2);
-	server.post(`${PATH}/v2/preview`, Middleware.previewValidation, Controller.previewTag_v2);
+	server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOfflineTag);
+	server.post(`${PATH}/lease-confirmation`, Middleware.leaseConfirmationValidation, Controller.leaseConfirmation);
+	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewTag);
 	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof);
-	server.post(`${PATH}/v2/decrypt`, Middleware.decryptValidation, Controller.decryptTag_v2);
+	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptTag);
 	server.post(`${PATH}/revenue-cat`, Middleware.revenueCatWebhookValidation, Controller.revenueCatWebhook);
 	server.post(`${PATH}/purchase-rewards`, Middleware.referralRewardsValidation, Controller.purchaseRewards);
 	server.post(`${PATH}/referral-rewards`, Middleware.referralRewardsValidation, Controller.referralRewards);

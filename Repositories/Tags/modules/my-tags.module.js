@@ -369,11 +369,82 @@ const updateOldTagObject = async (tagObject, domain = "zelf") => {
 	};
 };
 
+/**
+ * Add duration to tag (for RevenueCat webhook)
+ * @param {Object} params - Parameters including tagName, domain, duration, eventID, eventPrice
+ * @param {Object} preview - Tag preview object
+ * @returns {Object} - Updated tag records
+ */
+const addDurationToTag = async (params, preview) => {
+	const { tagName, domain, duration, eventID, eventPrice } = params;
+	const domainConfig = getDomainConfig(domain);
+
+	// Find the tag
+	const searchParams = {
+		tagName: `${tagName}.${domain}`,
+		domain,
+		key: "tagName",
+		value: `${tagName}.${domain}`,
+	};
+
+	const searchResult = await searchTag(searchParams, {});
+
+	if (!searchResult.tagObject) {
+		const error = new Error("Tag not found");
+		error.status = 404;
+		throw error;
+	}
+
+	const tagObject = searchResult.tagObject;
+
+	// Update the tag object with new duration and event info
+	tagObject.publicData.duration = duration;
+	tagObject.publicData.eventID = eventID;
+	tagObject.publicData.eventPrice = eventPrice;
+	tagObject.publicData.renewedAt = moment().toISOString();
+	tagObject.publicData.expiresAt = moment(tagObject.publicData.expiresAt).add(duration, "year").toISOString();
+
+	// Store updated version in IPFS
+	const masterIPFSRecord = await IPFSModule.insert(
+		{
+			base64: Buffer.from(JSON.stringify(tagObject, null, 2)).toString("base64"),
+			metadata: {
+				...tagObject.publicData,
+				type: "tag",
+				domain,
+			},
+			name: `${tagName}.${domain}`,
+			pinIt: true,
+		},
+		{ pro: true }
+	);
+
+	// Store updated version in Arweave
+	const masterArweaveRecord = await ArweaveModule.insert(
+		{
+			base64: Buffer.from(JSON.stringify(tagObject, null, 2)).toString("base64"),
+			metadata: {
+				...tagObject.publicData,
+				type: "tag",
+				domain,
+			},
+			name: `${tagName}.${domain}`,
+		},
+		{ pro: true }
+	);
+
+	return {
+		masterArweaveRecord,
+		masterIPFSRecord,
+	};
+};
+
 module.exports = {
 	renewMyTag,
 	transferMyTag,
 	howToRenewMyTag,
 	updateOldTagObject,
+	addDurationToTag,
 	// Utility functions
 	getDomainConfig,
 	_confirmPaymentWithCoinbase,

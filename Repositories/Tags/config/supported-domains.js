@@ -248,7 +248,7 @@ const getDomainConfig = (domain) => {
  * @param {string} domain - Domain name
  * @returns {boolean} - True if domain is supported
  */
-const isDomainSupported = (domain) => {
+const isSupported = (domain) => {
 	return domain && SUPPORTED_DOMAINS.hasOwnProperty(domain.toLowerCase());
 };
 
@@ -265,7 +265,7 @@ const getAllSupportedDomains = () => {
  * @param {string} type - Domain type ('official', 'custom', 'enterprise')
  * @returns {Array} - Array of domain configurations
  */
-const getDomainsByType = (type) => {
+const getByType = (type) => {
 	return Object.entries(SUPPORTED_DOMAINS)
 		.filter(([_, config]) => config.type === type)
 		.map(([domain, config]) => ({ domain, ...config }));
@@ -332,7 +332,7 @@ const getActiveDomains = () => {
  * @param {string} owner - Domain owner
  * @returns {Array} - Array of domain configurations
  */
-const getDomainsByOwner = (owner) => {
+const getByOwner = (owner) => {
 	return Object.entries(SUPPORTED_DOMAINS)
 		.filter(([_, config]) => config.owner === owner)
 		.map(([domain, config]) => ({ domain, ...config }));
@@ -388,9 +388,10 @@ const getDomainStorageConfig = (domain) => {
  * @param {string} name - Tag name
  * @returns {string} - Storage key
  */
-const generateStorageKey = (domain, name) => {
+const generateStorageKey = (domain) => {
 	const storageConfig = getDomainStorageConfig(domain);
-	return `${storageConfig.keyPrefix}:${name}:${domain}`;
+	return storageConfig.keyPrefix;
+	// return `${storageConfig.keyPrefix}:${name}:${domain}`;
 };
 
 /**
@@ -444,12 +445,12 @@ const getDomainLimits = (domain) => {
 module.exports = {
 	SUPPORTED_DOMAINS,
 	getDomainConfig,
-	isDomainSupported,
+	isSupported,
 	isDomainActive,
 	getAllSupportedDomains,
-	getDomainsByType,
+	getByType,
 	getActiveDomains,
-	getDomainsByOwner,
+	getByOwner,
 	getDomainPrice,
 	supportsFeature,
 	getDomainStorageConfig,

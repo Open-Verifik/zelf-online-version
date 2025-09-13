@@ -22,25 +22,25 @@ const { getDomainConfiguration, generateStorageKey } = require("./domain-registr
  * @returns {Object} - IPFS data
  */
 const get = async (data) => {
-	const { cid, tagName, domain, key, value, expires } = data;
+	const { cid, tagName, domain, key, value, expires, domainConfig } = data;
 
 	if (cid) return await IPFS.retrieve(cid, expires);
 
 	if (tagName) {
-		// Extract domain and name from tagName
-		const parts = tagName.split(".");
-		const extractedDomain = parts[parts.length - 1];
-		const name = parts.slice(0, -1).join(".");
-
 		// Generate domain-specific storage key
-		const storageKey = generateStorageKey(extractedDomain, name);
-		return await IPFS.filter("storageKey", storageKey);
+		const storageKey = domainConfig ? domainConfig.storage.keyPrefix : generateStorageKey(domain);
+
+		console.log({ storageKey });
+
+		return await IPFS.filter(storageKey, tagName);
 	}
 
 	if (key && value) return await IPFS.filter(key, value);
 
 	const error = new Error("Conditions_not_acceptable");
+
 	error.status = 412;
+
 	throw error;
 };
 

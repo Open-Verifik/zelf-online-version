@@ -133,9 +133,8 @@ const validateDomainAndName = async (domain, name) => {
 
 	// Check if domain is active
 	const isActive = await isDomainActive(domain);
-	if (!isActive) {
-		return { valid: false, error: `Domain '${domain}' is not supported or inactive` };
-	}
+
+	if (!isActive) return { valid: false, error: `Domain '${domain}' is not supported or inactive` };
 
 	// Validate name against domain rules
 	if (name) {
@@ -154,9 +153,7 @@ const validateDomainAndName = async (domain, name) => {
  * @param {*} next - Next middleware
  */
 const getValidation = async (ctx, next) => {
-	const payload = Object.assign(ctx.request.query, ctx.request.body);
-
-	const { tagName, domain, key, value, captchaToken, os } = payload;
+	const { tagName, domain, key, value, captchaToken, os } = ctx.request.query;
 
 	const valid = validate(schemas.search, {
 		tagName,
@@ -234,9 +231,7 @@ const getValidation = async (ctx, next) => {
  * @param {*} next - Next middleware
  */
 const leaseValidation = async (ctx, next) => {
-	const payload = Object.assign(ctx.request.query, ctx.request.body);
-
-	const { tagName, domain, faceBase64, type, os, captchaToken } = payload;
+	const { tagName, domain, faceBase64, type, os, captchaToken } = ctx.request.body;
 
 	const valid = validate(schemas.lease, {
 		tagName,
@@ -310,9 +305,7 @@ const leaseValidation = async (ctx, next) => {
  * @param {*} next - Next middleware
  */
 const leaseRecoveryValidation = async (ctx, next) => {
-	const payload = Object.assign(ctx.request.query, ctx.request.body);
-
-	const { zelfProof, newTagName, domain, faceBase64, password, os, captchaToken } = payload;
+	const { zelfProof, newTagName, domain, faceBase64, password, os, captchaToken } = ctx.request.body;
 
 	const valid = validate(schemas.leaseRecovery, {
 		zelfProof,
@@ -387,9 +380,7 @@ const leaseRecoveryValidation = async (ctx, next) => {
  * @param {*} next - Next middleware
  */
 const zelfPayValidation = async (ctx, next) => {
-	const payload = Object.assign(ctx.request.query, ctx.request.body);
-
-	const { zelfProof } = payload;
+	const { zelfProof } = ctx.request.body;
 
 	const valid = validate(schemas.zelfPay, {
 		zelfProof,

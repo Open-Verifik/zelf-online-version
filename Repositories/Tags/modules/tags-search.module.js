@@ -4,7 +4,7 @@ const { getDomainConfiguration, isDomainActive } = require("./domain-registry.mo
 
 /**
  * Tags Search Module
- * 
+ *
  * This module handles search operations for the Tags system with multi-domain support.
  * It provides unified search functionality across IPFS and Arweave for different domain types.
  */
@@ -20,35 +20,17 @@ const { getDomainConfiguration, isDomainActive } = require("./domain-registry.mo
  * @returns {Object} - Search results
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value } = params;
-
-	// Validate domain
-	if (!isDomainActive(domain)) {
-		return {
-			available: false,
-			error: `Domain '${domain}' is not active`,
-			tagName: tagName,
-			domain: domain,
-		};
-	}
-
-	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
-	if (!domainConfig) {
-		return {
-			available: false,
-			error: `Domain '${domain}' is not supported`,
-			tagName: tagName,
-			domain: domain,
-		};
-	}
+	const { tagName, domain, key, value, domainConfig } = params;
 
 	try {
+		const searchResult = {
+			arweave: await searchArweave(params, authUser),
+		};
+
+		return searchResult;
+
 		// Search in both IPFS and Arweave
-		const [ipfsResults, arweaveResults] = await Promise.all([
-			searchIPFS(params, authUser),
-			searchArweave(params, authUser),
-		]);
+		const [ipfsResults, arweaveResults] = await Promise.all([searchIPFS(params, authUser), searchArweave(params, authUser)]);
 
 		// Combine results
 		const combinedResults = {
@@ -87,21 +69,17 @@ const searchTag = async (params, authUser) => {
  */
 const searchIPFS = async (params, authUser) => {
 	try {
-		const { tagName, domain, key, value } = params;
+		const { tagName, domain, key, value, domainConfig } = params;
 
-		// Get domain configuration
-		const domainConfig = getDomainConfiguration(domain);
-		if (!domainConfig?.storage?.ipfsEnabled) {
-			return [];
-		}
+		if (!domainConfig?.storage?.ipfsEnabled) return [];
 
 		// Search by different criteria
 		if (tagName) {
-			return await TagsIPFSModule.get({ tagName, domain });
+			return await TagsIPFSModule.get({ tagName, domain, domainConfig });
 		}
 
 		if (key && value) {
-			return await TagsIPFSModule.get({ key, value });
+			return await TagsIPFSModule.get({ key, value, domainConfig });
 		}
 
 		// Search by domain
@@ -120,25 +98,30 @@ const searchIPFS = async (params, authUser) => {
  */
 const searchArweave = async (params, authUser) => {
 	try {
-		const { tagName, domain, key, value } = params;
+		const { tagName, domain, key, value, domainConfig } = params;
 
 		// Get domain configuration
-		const domainConfig = getDomainConfiguration(domain);
-		if (!domainConfig?.storage?.arweaveEnabled) {
+		const _domainConfig = domainConfig || getDomainConfiguration(domain);
+
+		console.log({ _domainConfig });
+
+		if (!_domainConfig?.storage?.arweaveEnabled) {
 			return [];
 		}
 
 		// Search by different criteria
 		if (tagName) {
-			return await TagsArweaveModule.searchByStorageKey({ domain, name: tagName }, authUser);
+			console.log({ domain, tagName });
+
+			return await TagsArweaveModule.searchByStorageKey({ tagName, domainConfig: _domainConfig }, authUser);
 		}
 
 		if (key && value) {
-			return await TagsArweaveModule.searchByDomain({ domain, key, value }, authUser);
+			return await TagsArweaveModule.searchByDomain({ domain, key, value, domainConfig: _domainConfig }, authUser);
 		}
 
 		// Search by domain
-		return await TagsArweaveModule.searchByDomain({ domain }, authUser);
+		return await TagsArweaveModule.searchByDomain({ domain, domainConfig: _domainConfig }, authUser);
 	} catch (error) {
 		console.error("Error searching Arweave:", error);
 		return [];
@@ -355,11 +338,9 @@ const searchAllDomains = async (params, authUser) => {
 	try {
 		// Get all active domains
 		const activeDomains = require("../config/supported-domains").getActiveDomains();
-		
+
 		// Search across all domains
-		const domainSearches = activeDomains.map(domain => 
-			searchByDomain({ domain: domain.domain, key, value }, authUser)
-		);
+		const domainSearches = activeDomains.map((domain) => searchByDomain({ domain: domain.domain, key, value }, authUser));
 
 		const results = await Promise.all(domainSearches);
 

@@ -1,0 +1,253 @@
+{
+	"testScenarios": [
+		{
+			"name": "Basic Tag Creation - Zelf Domain",
+			"domain": "zelf",
+			"tagName": "testuser",
+			"duration": "yearly",
+			"paymentMethod": "coinbase",
+			"currency": "USD",
+			"expectedPrice": 0,
+			"description": "Test creating a free tag in the zelf domain"
+		},
+		{
+			"name": "Avalanche Domain Tag",
+			"domain": "avax",
+			"tagName": "avaxuser",
+			"duration": "yearly",
+			"paymentMethod": "coinbase",
+			"currency": "USD",
+			"expectedPrice": 85,
+			"description": "Test creating a paid tag in the avax domain ($1.00 base, 15% yearly discount)"
+		},
+		{
+			"name": "Bitcoin Domain Tag",
+			"domain": "btc",
+			"tagName": "btcuser",
+			"duration": "yearly",
+			"paymentMethod": "crypto",
+			"currency": "BTC",
+			"expectedPrice": 45,
+			"description": "Test creating a paid tag in the btc domain ($0.50 base, 10% yearly discount)"
+		},
+		{
+			"name": "Tech Domain Tag",
+			"domain": "tech",
+			"tagName": "techuser",
+			"duration": "lifetime",
+			"paymentMethod": "wallet",
+			"currency": "ETH",
+			"expectedPrice": 45,
+			"description": "Test creating a lifetime tag in the tech domain ($0.75 base, 40% lifetime discount)"
+		},
+		{
+			"name": "Enterprise Domain Tag",
+			"domain": "bdag",
+			"tagName": "enterpriseuser",
+			"duration": "yearly",
+			"paymentMethod": "enterprise",
+			"currency": "USD",
+			"expectedPrice": 350,
+			"description": "Test creating a tag in the enterprise bdag domain ($5.00 base, 30% yearly discount)"
+		}
+	],
+	"holdDomainTests": [
+		{
+			"domain": "avax",
+			"tagName": "holduser",
+			"expectedHoldDomain": "holduser.hold.avax",
+			"description": "Test hold domain generation for avax"
+		},
+		{
+			"domain": "btc",
+			"tagName": "btchold",
+			"expectedHoldDomain": "btchold.hold.btc",
+			"description": "Test hold domain generation for btc"
+		},
+		{
+			"domain": "tech",
+			"tagName": "techhold",
+			"expectedHoldDomain": "techhold.hold.tech",
+			"description": "Test hold domain generation for tech"
+		}
+	],
+	"paymentTests": [
+		{
+			"domain": "avax",
+			"duration": "yearly",
+			"bulkDiscount": 0.1,
+			"earlyBirdDiscount": 0.2,
+			"expectedFinalPrice": 65,
+			"description": "Test payment calculation with bulk and early bird discounts"
+		},
+		{
+			"domain": "btc",
+			"duration": "lifetime",
+			"bulkDiscount": 0.0,
+			"earlyBirdDiscount": 0.0,
+			"expectedFinalPrice": 38,
+			"description": "Test lifetime payment calculation for btc domain"
+		}
+	],
+	"validationTests": [
+		{
+			"domain": "avax",
+			"paymentMethod": "coinbase",
+			"expectedValid": true,
+			"description": "Test valid payment method for avax domain"
+		},
+		{
+			"domain": "avax",
+			"paymentMethod": "paypal",
+			"expectedValid": false,
+			"description": "Test invalid payment method for avax domain"
+		},
+		{
+			"domain": "avax",
+			"currency": "USD",
+			"expectedValid": true,
+			"description": "Test valid currency for avax domain"
+		},
+		{
+			"domain": "avax",
+			"currency": "EUR",
+			"expectedValid": false,
+			"description": "Test invalid currency for avax domain"
+		}
+	],
+	"searchTests": [
+		{
+			"domain": "avax",
+			"tagName": "searchtest",
+			"searchType": "exact",
+			"description": "Test exact tag search"
+		},
+		{
+			"domain": "avax",
+			"searchType": "domain",
+			"limit": 10,
+			"offset": 0,
+			"description": "Test domain-wide tag search"
+		},
+		{
+			"domain": "avax",
+			"tagName": "holdtest",
+			"searchType": "hold",
+			"description": "Test hold domain search"
+		}
+	],
+	"userOperationTests": [
+		{
+			"operation": "getMyTags",
+			"domain": "avax",
+			"limit": 10,
+			"offset": 0,
+			"description": "Test getting user's tags"
+		},
+		{
+			"operation": "transferTag",
+			"domain": "avax",
+			"tagName": "transfertest",
+			"newOwnerEmail": "newowner@example.com",
+			"description": "Test tag transfer"
+		},
+		{
+			"operation": "renewTag",
+			"domain": "avax",
+			"tagName": "renewtest",
+			"duration": "yearly",
+			"description": "Test tag renewal"
+		}
+	],
+	"healthTests": [
+		{
+			"testType": "system",
+			"description": "Test overall system health"
+		},
+		{
+			"testType": "domain",
+			"domain": "avax",
+			"description": "Test avax domain health"
+		},
+		{
+			"testType": "domain",
+			"domain": "btc",
+			"description": "Test btc domain health"
+		},
+		{
+			"testType": "stats",
+			"description": "Test system statistics"
+		}
+	],
+	"errorTests": [
+		{
+			"domain": "invalid",
+			"expectedError": "Domain not supported",
+			"description": "Test invalid domain error"
+		},
+		{
+			"domain": "avax",
+			"tagName": "",
+			"expectedError": "Tag name is required",
+			"description": "Test empty tag name error"
+		},
+		{
+			"domain": "avax",
+			"tagName": "a",
+			"expectedError": "Name must be at least 3 characters",
+			"description": "Test short tag name error"
+		},
+		{
+			"domain": "avax",
+			"tagName": "admin",
+			"expectedError": "Name is reserved",
+			"description": "Test reserved name error"
+		}
+	],
+	"sampleRequests": {
+		"leaseTag": {
+			"method": "POST",
+			"url": "{{base_url}}/tags/lease",
+			"headers": {
+				"Content-Type": "application/json",
+				"Authorization": "Bearer {{jwt_token}}"
+			},
+			"body": {
+				"tagName": "{{tag_name}}",
+				"domain": "{{domain}}",
+				"duration": "yearly",
+				"paymentMethod": "coinbase",
+				"currency": "USD",
+				"faceBase64": "{{face_base64}}",
+				"password": "{{password}}",
+				"mnemonic": "{{mnemonic}}",
+				"referralTagName": ""
+			}
+		},
+		"searchTag": {
+			"method": "GET",
+			"url": "{{base_url}}/tags/search-v2",
+			"headers": {
+				"Authorization": "Bearer {{jwt_token}}"
+			},
+			"params": {
+				"tagName": "{{tag_name}}",
+				"domain": "{{domain}}"
+			}
+		},
+		"calculatePayment": {
+			"method": "POST",
+			"url": "{{base_url}}/tags/calculate-payment",
+			"headers": {
+				"Content-Type": "application/json",
+				"Authorization": "Bearer {{jwt_token}}"
+			},
+			"body": {
+				"domain": "{{domain}}",
+				"duration": "yearly",
+				"bulkDiscount": 0.1,
+				"earlyBirdDiscount": 0.2
+			}
+		}
+	}
+}

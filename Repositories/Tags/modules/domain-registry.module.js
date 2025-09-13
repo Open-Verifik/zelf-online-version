@@ -43,144 +43,6 @@ const getDomainConfiguration = (domain) => {
 };
 
 /**
- * Check if domain is supported
- * @param {string} domain - Domain name
- * @returns {boolean} - True if domain is supported
- */
-const isDomainSupported = (domain) => {
-	return isDomainSupported(domain);
-};
-
-/**
- * Check if domain is active
- * @param {string} domain - Domain name
- * @returns {boolean} - True if domain is active
- */
-const isDomainActive = (domain) => {
-	return isDomainActive(domain);
-};
-
-/**
- * Get all supported domains
- * @returns {Object} - All supported domains
- */
-const getAllSupportedDomains = () => {
-	return getAllSupportedDomains();
-};
-
-/**
- * Get domains by type
- * @param {string} type - Domain type ('official', 'custom', 'enterprise')
- * @returns {Array} - Array of domain configurations
- */
-const getDomainsByType = (type) => {
-	return getDomainsByType(type);
-};
-
-/**
- * Get active domains only
- * @returns {Array} - Array of active domain configurations
- */
-const getActiveDomains = () => {
-	return getActiveDomains();
-};
-
-/**
- * Get domains by owner
- * @param {string} owner - Domain owner
- * @returns {Array} - Array of domain configurations
- */
-const getDomainsByOwner = (owner) => {
-	return getDomainsByOwner(owner);
-};
-
-/**
- * Get domain price with discounts
- * @param {string} domain - Domain name
- * @param {string} duration - Duration ('yearly', 'lifetime')
- * @returns {number} - Price in cents
- */
-const getDomainPrice = (domain, duration = "yearly") => {
-	return getDomainPrice(domain, duration);
-};
-
-/**
- * Check if domain supports feature
- * @param {string} domain - Domain name
- * @param {string} feature - Feature name
- * @returns {boolean} - True if feature is supported
- */
-const supportsFeature = (domain, feature) => {
-	return supportsFeature(domain, feature);
-};
-
-/**
- * Get domain storage configuration
- * @param {string} domain - Domain name
- * @returns {Object} - Storage configuration
- */
-const getDomainStorageConfig = (domain) => {
-	return getDomainStorageConfig(domain);
-};
-
-/**
- * Generate storage key for domain
- * @param {string} domain - Domain name
- * @param {string} name - Tag name
- * @returns {string} - Storage key
- */
-const generateStorageKey = (domain, name) => {
-	return generateStorageKey(domain, name);
-};
-
-/**
- * Generate hold domain name
- * @param {string} domain - Domain name
- * @param {string} name - Tag name
- * @returns {string} - Hold domain name
- */
-const generateHoldDomain = (domain, name) => {
-	return generateHoldDomain(domain, name);
-};
-
-/**
- * Get domain payment methods
- * @param {string} domain - Domain name
- * @returns {Array} - Array of payment methods
- */
-const getDomainPaymentMethods = (domain) => {
-	return getDomainPaymentMethods(domain);
-};
-
-/**
- * Get domain currencies
- * @param {string} domain - Domain name
- * @returns {Array} - Array of supported currencies
- */
-const getDomainCurrencies = (domain) => {
-	return getDomainCurrencies(domain);
-};
-
-/**
- * Get domain limits
- * @param {string} domain - Domain name
- * @returns {Object} - Domain limits
- */
-const getDomainLimits = (domain) => {
-	return getDomainLimits(domain);
-};
-
-/**
- * Validate domain name against domain rules
- * @param {string} domain - Domain name
- * @param {string} name - Name to validate
- * @returns {Object} - Validation result
- */
-const validateDomainName = async (domain, name) => {
-	return await validateDomainName(domain, name);
-};
-
-/**
  * Get domain metadata
  * @param {string} domain - Domain name
  * @returns {Object} - Domain metadata
@@ -327,7 +189,7 @@ const getAllDomainStats = () => {
 };
 
 module.exports = {
-	// Core domain functions
+	// Core domain functions (re-exported from supported-domains)
 	getDomainConfiguration,
 	isDomainSupported,
 	isDomainActive,
@@ -335,26 +197,18 @@ module.exports = {
 	getDomainsByType,
 	getActiveDomains,
 	getDomainsByOwner,
-
-	// Domain validation
-	validateDomainName,
-	validateDomainAndName,
-
-	// Domain pricing and payment
 	getDomainPrice,
-	getDomainPaymentMethods,
-	getDomainCurrencies,
-
-	// Domain features and limits
 	supportsFeature,
-	getDomainLimits,
-
-	// Domain storage
 	getDomainStorageConfig,
 	generateStorageKey,
 	generateHoldDomain,
+	getDomainPaymentMethods,
+	getDomainCurrencies,
+	getDomainLimits,
+	validateDomainName,
 
-	// Domain metadata
+	// Additional domain functions
+	validateDomainAndName,
 	getDomainMetadata,
 	getDomainLaunchDate,
 	getDomainVersion,
@@ -362,12 +216,8 @@ module.exports = {
 	getDomainCommunity,
 	getDomainEnterprise,
 	getDomainSupport,
-
-	// Domain status
 	isDomainInMaintenance,
 	isDomainInBeta,
-
-	// Domain statistics
 	getDomainStats,
 	getAllDomainStats,
 };

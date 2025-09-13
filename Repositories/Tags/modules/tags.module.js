@@ -188,17 +188,22 @@ const leaseTag = async (params, authUser) => {
  */
 const searchTag = async (params, authUser) => {
 	const { tagName, domain, key, value } = params;
+
 	const domainConfig = getDomainConfig(domain);
 
 	const searchParams = {
-		tagName: `${tagName}.${domain}`,
+		tagName,
 		domain,
 		domainConfig,
 		key,
 		value,
 	};
 
+	console.log({ searchParams });
+
 	const result = await TagsSearchModule.searchTag(searchParams, authUser);
+
+	console.log({ result });
 
 	return {
 		...result,
@@ -619,6 +624,134 @@ const _decryptParams = async (params, authUser) => {
 	};
 };
 
+/**
+ * Confirm free tag (for recovery)
+ * @param {Object} tagObject - Tag object
+ * @param {Object} referralTagObject - Referral tag object
+ * @param {Object} authUser - Authenticated user
+ */
+const confirmFreeTag = async (tagObject, referralTagObject, authUser) => {
+	const tagName = tagObject.tagName.replace(".hold", "");
+	const domain = tagObject.domain || "zelf";
+	const domainConfig = getDomainConfig(domain);
+
+	const metadata = {
+		hasPassword: tagObject.hasPassword,
+		zelfProof: tagObject.zelfProof,
+		tagName,
+		domain,
+		domainConfig,
+		ethAddress: tagObject.ethAddress,
+		solanaAddress: tagObject.solanaAddress,
+		btcAddress: tagObject.btcAddress,
+		suiAddress: tagObject.suiAddress,
+		extraParams: {
+			origin: tagObject.origin || "online",
+			price: tagObject.price,
+			duration: tagObject.duration || 1,
+			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+			expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
+			type: "mainnet",
+		},
+	};
+
+	if (referralTagObject) {
+		metadata.extraParams.referralTagName = referralTagObject.publicData?.tagName || referralTagObject.metadata?.tagName;
+		metadata.extraParams.referralDomain = referralTagObject.publicData?.domain || referralTagObject.metadata?.domain || domain;
+		metadata.extraParams.referralSolanaAddress = referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress;
+	}
+
+	tagObject.walrus = await WalrusModule.tagRegistration(tagObject.image, {
+		hasPassword: metadata.hasPassword,
+		zelfProof: metadata.zelfProof,
+		publicData: metadata,
+		domain,
+		domainConfig,
+	});
+
+	metadata.extraParams.walrus = tagObject.walrus.blobId;
+	metadata.extraParams = JSON.stringify(metadata.extraParams);
+
+	tagObject.ipfs = await IPFSModule.insert(
+		{
+			base64: tagObject.image,
+			name: tagName,
+			metadata,
+			pinIt: true,
+		},
+		{ ...authUser, pro: true }
+	);
+
+	tagObject.ipfs = await TagsPartsModule.formatIPFSRecord(tagObject.ipfs, true);
+	delete tagObject.ipfs.publicData.zelfProof;
+
+	if (!tagObject.publicData) tagObject.publicData = {};
+	tagObject.publicData = Object.assign(tagObject.publicData, tagObject.ipfs.publicData);
+
+	tagObject.arweave = await ArweaveModule.tagRegistration(tagObject.image, {
+		hasPassword: metadata.hasPassword,
+		zelfProof: metadata.zelfProof,
+		publicData: metadata,
+		domain,
+		domainConfig,
+	});
+};
+
+/**
+ * Save hold tag in IPFS (for recovery)
+ * @param {Object} tagObject - Tag object
+ * @param {Object} referralTagObject - Referral tag object
+ * @param {Object} authUser - Authenticated user
+ */
+const saveHoldTagInIPFS = async (tagObject, referralTagObject, authUser) => {
+	const domain = tagObject.domain || "zelf";
+	const domainConfig = getDomainConfig(domain);
+	const holdSuffix = domainConfig?.holdSuffix || ".hold";
+	const holdName = `${tagObject.tagName}${holdSuffix}`;
+
+	const metadata = {
+		zelfProof: tagObject.zelfProof,
+		tagName: holdName,
+		domain,
+		domainConfig,
+		hasPassword: tagObject.hasPassword,
+		ethAddress: tagObject.ethAddress,
+		btcAddress: tagObject.btcAddress,
+		solanaAddress: tagObject.solanaAddress,
+		suiAddress: tagObject.suiAddress,
+		extraParams: {
+			duration: tagObject.duration || 1,
+			type: "hold",
+			origin: tagObject.origin || "online",
+			price: tagObject.price,
+			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+			expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
+		},
+	};
+
+	if (referralTagObject) {
+		metadata.extraParams.referralTagName = referralTagObject.publicData?.tagName || referralTagObject.metadata?.tagName;
+		metadata.extraParams.referralDomain = referralTagObject.publicData?.domain || referralTagObject.metadata?.domain || domain;
+		metadata.extraParams.referralSolanaAddress = referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress;
+	}
+
+	metadata.extraParams = JSON.stringify(metadata.extraParams);
+
+	tagObject.ipfs = await IPFSModule.insert(
+		{
+			base64: tagObject.image,
+			name: holdName,
+			metadata,
+			pinIt: true,
+		},
+		{ ...authUser, pro: true }
+	);
+
+	tagObject.ipfs = await TagsPartsModule.formatIPFSRecord(tagObject.ipfs, true);
+	delete tagObject.ipfs.publicData.zelfProof;
+	tagObject.publicData = Object.assign(tagObject.publicData, tagObject.ipfs.publicData);
+};
+
 module.exports = {
 	leaseTag,
 	searchTag,
@@ -630,6 +763,9 @@ module.exports = {
 	zelfPay,
 	createZelfPay,
 	updateTag,
+	// Recovery functions
+	confirmFreeTag,
+	saveHoldTagInIPFS,
 	// Utility functions
 	getDomainConfig,
 	generateDomainStorageKey,
