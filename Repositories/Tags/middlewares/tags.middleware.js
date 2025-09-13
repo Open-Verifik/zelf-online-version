@@ -71,9 +71,6 @@ const schemas = {
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string(),
 	},
-	zelfPay: {
-		zelfProof: string().required(),
-	},
 	revenueCatWebhook: {
 		event: {
 			product_id: string().required(),
@@ -367,33 +364,6 @@ const leaseRecoveryValidation = async (ctx, next) => {
 			};
 			return;
 		}
-	}
-
-	await next();
-};
-
-/**
- * ZelfPay Validation
- * @param {*} ctx - Koa context
- * @param {*} next - Next middleware
- */
-const zelfPayValidation = async (ctx, next) => {
-	const { zelfProof } = ctx.request.body;
-
-	const valid = validate(schemas.zelfPay, {
-		zelfProof,
-	});
-
-	if (valid.error) {
-		ctx.status = 409;
-		ctx.body = { validationError: valid.error.message };
-		return;
-	}
-
-	if (!zelfProof) {
-		ctx.status = 409;
-		ctx.body = { validationError: "Missing ZelfProof" };
-		return;
 	}
 
 	await next();
@@ -812,7 +782,6 @@ module.exports = {
 	getValidation,
 	leaseValidation,
 	leaseRecoveryValidation,
-	zelfPayValidation,
 	leaseOfflineValidation,
 	leaseConfirmationValidation,
 	previewValidation,

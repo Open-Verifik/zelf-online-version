@@ -286,25 +286,6 @@ const leaseConfirmation = async (params, authUser) => {
 };
 
 /**
- * ZelfPay
- * @param {Object} params
- * @param {Object} authUser
- */
-const zelfPay = async (params, authUser) => {
-	const { zelfProof } = params;
-
-	const zelfPayResult = await WalrusModule.createZelfPay({
-		zelfProof,
-		verifierKey: config.zelfEncrypt.serverKey,
-	});
-
-	return {
-		zelfPay: zelfPayResult,
-		zelfProof,
-	};
-};
-
-/**
  * create ZelfPay
  * @param {Object} tagObject
  * @param {Object} authUser
@@ -592,7 +573,6 @@ module.exports = {
 	previewZelfProof,
 	leaseOfflineTag,
 	leaseConfirmation,
-	zelfPay,
 	createZelfPay,
 	// Utility functions
 	getDomainConfig,

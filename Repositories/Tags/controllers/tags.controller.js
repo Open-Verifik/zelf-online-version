@@ -147,24 +147,6 @@ const leaseRecovery = async (ctx) => {
 };
 
 /**
- * ZelfPay for tags
- * @param {Object} ctx - Koa context
- * @returns {Object} - ZelfPay results
- */
-const zelfPay = async (ctx) => {
-	try {
-		const data = await Module.zelfPay(ctx.request.query, ctx.state.user);
-
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
-
-		ctx.status = _exception.status;
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
-};
-
-/**
  * Lease tag offline (v2)
  * @param {Object} ctx - Koa context
  * @returns {Object} - Offline lease results
@@ -365,7 +347,6 @@ module.exports = {
 	searchTag,
 	leaseTag,
 	leaseRecovery,
-	zelfPay,
 	leaseOfflineTag,
 	leaseConfirmation,
 	previewTag,
