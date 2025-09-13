@@ -26,22 +26,49 @@ const get = async (data) => {
 
 	if (cid) return await IPFS.retrieve(cid, expires);
 
+	let result = [];
+
 	if (tagName) {
 		// Generate domain-specific storage key
 		const storageKey = domainConfig ? domainConfig.storage.keyPrefix : generateStorageKey(domain);
 
-		console.log({ storageKey });
-
-		return await IPFS.filter(storageKey, tagName);
+		result = await IPFS.filter(storageKey, tagName);
+	} else if (key && value) {
+		result = await IPFS.filter(key, value);
 	}
 
-	if (key && value) return await IPFS.filter(key, value);
+	return _formatSearchResults(result);
+};
 
-	const error = new Error("Conditions_not_acceptable");
+const _formatSearchResults = (result) => {
+	const formattedResults = [];
 
-	error.status = 412;
+	for (let index = 0; index < result.length; index++) {
+		const item = result[index];
 
-	throw error;
+		const formattedResult = {
+			id: item.id,
+			url: item.url,
+			ipfs_pin_hash: item.ipfs_pin_hash,
+			size: item.size,
+			user_id: item.user_id,
+			date_pinned: item.date_pinned,
+			date_unpinned: item.date_unpinned,
+			publicData: item.metadata.keyvalues,
+		};
+
+		if (formattedResult.publicData.extraParams) {
+			const extraParams = JSON.parse(formattedResult.publicData.extraParams);
+
+			Object.assign(formattedResult.publicData, extraParams);
+
+			delete formattedResult.publicData.extraParams;
+		}
+
+		formattedResults.push(formattedResult);
+	}
+
+	return formattedResults;
 };
 
 /**

@@ -88,9 +88,8 @@ const searchTag = async (ctx) => {
 			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.query.tagName,
 			domain: extractedDomain,
 			domainConfig,
+			environment: ctx.request.query.environment,
 		};
-
-		console.log({ requestData, extractedDomain, extractedName });
 
 		let data = await Module.searchTag(requestData, ctx.state.user);
 
@@ -103,8 +102,8 @@ const searchTag = async (ctx) => {
 			return;
 		}
 
-		// Handle old tag objects update
-		data = await handleOldTagUpdate(data, extractedDomain);
+		// // Handle old tag objects update
+		// data = await handleOldTagUpdate(data, extractedDomain);
 
 		ctx.body = { data };
 	} catch (error) {

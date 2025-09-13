@@ -187,7 +187,7 @@ const leaseTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value } = params;
+	const { tagName, domain, key, value, environment } = params;
 
 	const domainConfig = getDomainConfig(domain);
 
@@ -197,13 +197,10 @@ const searchTag = async (params, authUser) => {
 		domainConfig,
 		key,
 		value,
+		environment,
 	};
 
-	console.log({ searchParams });
-
 	const result = await TagsSearchModule.searchTag(searchParams, authUser);
-
-	console.log({ result });
 
 	return {
 		...result,

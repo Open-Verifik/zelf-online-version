@@ -251,13 +251,12 @@ const insert = async (data, authUser) => {
  * @returns {Array} - Search results
  */
 const searchByDomain = async (params, authUser) => {
-	const { domain, key, value } = params;
+	const { domain, key, value, domainConfig } = params;
 
 	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
-	if (!domainConfig) {
-		throw new Error("Domain not supported");
-	}
+	const _domainConfig = domainConfig || getDomainConfiguration(domain);
+
+	if (!_domainConfig) throw new Error("Domain not supported");
 
 	// Search by domain-specific criteria
 	const searchParams = {
@@ -273,35 +272,14 @@ const searchByDomain = async (params, authUser) => {
  * @param {Object} params - Search parameters
  * @param {string} params.domainConfig - Domain configuration
  * @param {string} params.tagName - Tag name
- * @param {Object} authUser - Authenticated user
  * @returns {Array} - Search results
  */
-const searchByStorageKey = async (params, authUser) => {
-	const { tagName, domainConfig } = params;
+const searchByStorageKey = async (params) => {
+	const { tagName, domainConfig, domain } = params;
 
-	return await searchInArweave(domainConfig.storage.keyPrefix, tagName);
-};
+	const _domainConfig = domainConfig || getDomainConfiguration(domain);
 
-/**
- * Get hold domain data
- * @param {Object} params - Search parameters
- * @param {string} params.domain - Domain name
- * @param {string} params.name - Tag name
- * @param {Object} authUser - Authenticated user
- * @returns {Array} - Hold domain data
- */
-const getHoldDomain = async (params, authUser) => {
-	const { domain, name } = params;
-
-	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
-	const holdSuffix = domainConfig?.holdSuffix || ".hold";
-
-	// Generate hold domain name
-	const holdDomain = `${name}${holdSuffix}.${domain}`;
-
-	// Search for hold domain data
-	return await searchInArweave("Tag-Name", holdDomain);
+	return await searchInArweave(_domainConfig.storage.keyPrefix, tagName);
 };
 
 /**
@@ -387,6 +365,12 @@ const formatSearchResults = (searchResults) => {
 			formattedResult.publicData[tag.name] = tag.value;
 		}
 
+		if (formattedResult.publicData.extraParams) {
+			const extraParams = JSON.parse(formattedResult.publicData.extraParams);
+			Object.assign(formattedResult.publicData, extraParams);
+			delete formattedResult.publicData.extraParams;
+		}
+
 		formattedResults.push(formattedResult);
 	}
 
@@ -431,6 +415,5 @@ module.exports = {
 	insert,
 	searchByDomain,
 	searchByStorageKey,
-	getHoldDomain,
 	getDomainStats,
 };

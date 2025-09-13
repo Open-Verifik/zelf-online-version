@@ -20,17 +20,14 @@ const { getDomainConfiguration, isDomainActive } = require("./domain-registry.mo
  * @returns {Object} - Search results
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value, domainConfig } = params;
+	const { tagName, domain, key, value, domainConfig, environment } = params;
 
 	try {
-		const searchResult = {
-			arweave: await searchArweave(params, authUser),
-		};
-
-		return searchResult;
-
 		// Search in both IPFS and Arweave
-		const [ipfsResults, arweaveResults] = await Promise.all([searchIPFS(params, authUser), searchArweave(params, authUser)]);
+		const [ipfsResults, arweaveResults] = await Promise.all([
+			["ipfs", "all"].includes(environment) ? searchIPFS(params, authUser) : [],
+			["arweave", "all"].includes(environment) ? searchArweave(params, authUser) : [],
+		]);
 
 		// Combine results
 		const combinedResults = {
@@ -43,10 +40,10 @@ const searchTag = async (params, authUser) => {
 		};
 
 		// If results found, return the first one
-		if (ipfsResults.length > 0) {
-			combinedResults.tagObject = ipfsResults[0];
-		} else if (arweaveResults.length > 0) {
+		if (arweaveResults.length > 0) {
 			combinedResults.tagObject = arweaveResults[0];
+		} else if (ipfsResults.length > 0) {
+			combinedResults.tagObject = ipfsResults[0];
 		}
 
 		return combinedResults;
@@ -103,21 +100,15 @@ const searchArweave = async (params, authUser) => {
 		// Get domain configuration
 		const _domainConfig = domainConfig || getDomainConfiguration(domain);
 
-		console.log({ _domainConfig });
-
-		if (!_domainConfig?.storage?.arweaveEnabled) {
-			return [];
-		}
+		if (!_domainConfig?.storage?.arweaveEnabled) return [];
 
 		// Search by different criteria
 		if (tagName) {
-			console.log({ domain, tagName });
-
-			return await TagsArweaveModule.searchByStorageKey({ tagName, domainConfig: _domainConfig }, authUser);
+			return await TagsArweaveModule.searchByStorageKey({ tagName, domainConfig: _domainConfig, domain });
 		}
 
 		if (key && value) {
-			return await TagsArweaveModule.searchByDomain({ domain, key, value, domainConfig: _domainConfig }, authUser);
+			return await TagsArweaveModule.searchByDomain({ domain, key, value, domainConfig: _domainConfig, domain });
 		}
 
 		// Search by domain
