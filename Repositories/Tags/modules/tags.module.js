@@ -107,9 +107,9 @@ const leaseTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value, environment, type, duration } = params;
+	const { tagName, domain, key, value, environment, type, duration, domainConfig } = params;
 
-	const domainConfig = getDomainConfig(domain);
+	const _domainConfig = domainConfig || getDomainConfig(domain);
 
 	const result = await TagsSearchModule.searchTag(
 		{
@@ -119,7 +119,7 @@ const searchTag = async (params, authUser) => {
 			value,
 			environment,
 			type,
-			domainConfig,
+			domainConfig: _domainConfig,
 		},
 		authUser
 	);
@@ -199,32 +199,20 @@ const decryptTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const previewTag = async (params, authUser) => {
-	const { tagName, domain } = params;
-	const domainConfig = getDomainConfig(domain);
+	const domainConfig = getDomainConfig(params.domain);
 
-	const tagObjects = await _findTag({ tagName: `${tagName}.${domain}`, domain }, "both", authUser);
+	const searchResult = await searchTag({ ...params, domainConfig, environment: "all" }, authUser);
 
-	const tagObject = {
-		...(tagObjects.arweave?.[0] || {}),
-		...(tagObjects.ipfs?.[0] || {}),
-	};
-
-	if (!tagObject.publicData) {
-		return {
-			available: true,
-			tagName: `${tagName}.${domain}`,
-			domain,
-			domainConfig,
-		};
+	if (searchResult.available) {
+		return searchResult;
 	}
 
-	return {
-		available: false,
-		tagName: `${tagName}.${domain}`,
-		domain,
-		domainConfig,
-		tagObject,
-	};
+	const previewResult = await preview({
+		zelfProof: searchResult.tagObject.publicData.zelfProof,
+		verifierKey: config.zelfEncrypt.serverKey,
+	});
+
+	return { preview: previewResult, tagObject: searchResult.tagObject };
 };
 
 /**
@@ -673,7 +661,6 @@ module.exports = {
 	getDomainConfig,
 	generateDomainHoldDomain,
 	_findDuplicatedTag,
-	_findTag,
 	_validateReferral,
 	_createWalletsFromPhrase,
 	_decryptParams,
