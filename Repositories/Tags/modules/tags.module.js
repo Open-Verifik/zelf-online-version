@@ -239,25 +239,35 @@ const previewZelfProof = async (params, authUser) => {
  * @param {Object} authUser
  */
 const leaseOfflineTag = async (params, authUser) => {
-	const { tagName, domain, zelfProof, zelfProofQRCode } = params;
+	const { tagName, domain, zelfProof, zelfProofQRCode, referralTagName, sync, syncPassword, syncPublicData } = params;
+
 	const domainConfig = getDomainConfig(domain);
+
+	const tagKey = domainConfig.getTagKey();
 
 	await _findDuplicatedTag(tagName, domain, domainConfig);
 
-	const offlineProof = await OfflineProofModule.createOfflineProof({
-		zelfProof,
-		zelfProofQRCode,
-		tagName: `${tagName}.${domain}`,
-		domain,
-		domainConfig,
-	});
+	const referralTagObject = await _validateReferral(referralTagName, authUser, domainConfig);
 
-	return {
-		tagName: `${tagName}.${domain}`,
-		domain,
-		domainConfig,
-		offlineProof,
-	};
+	const decryptedParams = await TagsPartsModule.decryptParams(params, authUser);
+
+	const { face, password } = decryptedParams;
+
+	let tagRecords = [];
+
+	const { preview } = await previewZelfProof({ zelfProof }, authUser);
+
+	const findExistingTag = await searchTag({ tagName: preview.publicData[tagKey], domain, domainConfig, environment: "all" }, authUser);
+
+	if (findExistingTag.tagObject && (!sync || !syncPublicData || !syncPassword)) {
+		const error = new Error("tag_purchased_already");
+
+		error.status = 409;
+
+		throw error;
+	}
+
+	return { preview, findExistingTag };
 };
 
 /**

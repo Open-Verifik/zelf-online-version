@@ -14,7 +14,7 @@ module.exports = (server) => {
 	server.get(`${PATH}/preview`, Middleware.previewValidation, Controller.previewTag); // [x]
 
 	server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseTag); // [x]
-	server.post(`${PATH}/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery);
+	server.post(`${PATH}/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery); // [x]
 	server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOfflineTag);
 	server.post(`${PATH}/lease-confirmation`, Middleware.leaseConfirmationValidation, Controller.leaseConfirmation);
 	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof); // [x]

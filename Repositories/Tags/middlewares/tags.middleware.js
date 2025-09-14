@@ -366,9 +366,7 @@ const leaseRecoveryValidation = async (ctx, next) => {
  * @param {*} next - Next middleware
  */
 const leaseOfflineValidation = async (ctx, next) => {
-	const payload = Object.assign(ctx.request.query, ctx.request.body);
-
-	const { tagName, domain, zelfProof, zelfProofQRCode } = payload;
+	const { tagName, domain, zelfProof, zelfProofQRCode } = ctx.request.body;
 
 	const valid = validate(schemas.leaseOffline, {
 		tagName,

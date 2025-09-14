@@ -2,7 +2,6 @@ const Module = require("../modules/tags.module");
 const RevenueCatModule = require("../modules/revenue-cat.module");
 const { updateOldTagObject } = require("../modules/my-tags.module");
 const TagsRecoveryModule = require("../modules/tags-recovery.module");
-const { getDomainConfiguration } = require("../modules/domain-registry.module");
 const HttpHandler = require("../../../Core/http-handler");
 
 /**
@@ -159,7 +158,6 @@ const leaseOfflineTag = async (ctx) => {
 			...ctx.request.body,
 			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
 			domain: extractedDomain,
-			domainConfig,
 		};
 
 		const data = await Module.leaseOfflineTag(requestData, ctx.state.user);
