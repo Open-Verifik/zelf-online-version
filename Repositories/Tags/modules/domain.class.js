@@ -117,7 +117,7 @@ class Domain {
 
 		const priceWithoutDiscount = Number(price);
 
-		let discount = 10;
+		let discount = 0;
 
 		let discountType = "percentage";
 
@@ -136,6 +136,7 @@ class Domain {
 				price = price - discount;
 			}
 		} else if (referralTagName) {
+			// default discount 10 %
 			price = price - price * 0.1;
 		}
 

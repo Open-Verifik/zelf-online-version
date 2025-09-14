@@ -239,7 +239,7 @@ const previewZelfProof = async (params, authUser) => {
  * @param {Object} authUser
  */
 const leaseOfflineTag = async (params, authUser) => {
-	const { tagName, domain, zelfProof, zelfProofQRCode, referralTagName, sync, syncPassword, syncPublicData } = params;
+	const { tagName, domain, zelfProof, zelfProofQRCode, referralTagName, sync, syncPassword, syncPublicData, duration } = params;
 
 	const domainConfig = getDomainConfig(domain);
 
@@ -253,21 +253,53 @@ const leaseOfflineTag = async (params, authUser) => {
 
 	const { face, password } = decryptedParams;
 
-	let tagRecords = [];
-
 	const { preview } = await previewZelfProof({ zelfProof }, authUser);
 
 	const findExistingTag = await searchTag({ tagName: preview.publicData[tagKey], domain, domainConfig, environment: "all" }, authUser);
 
-	if (findExistingTag.tagObject && (!sync || !syncPublicData || !syncPassword)) {
-		const error = new Error("tag_purchased_already");
+	if (findExistingTag.tagObject) throw new Error("tag_purchased_already");
+
+	if (sync) {
+		return await _syncOfflineTag(findExistingTag.tagObject, syncPublicData, sync, syncPassword);
+	}
+
+	const { price, reward, discount, discountType } = domainConfig.getPrice(
+		tagName,
+		duration,
+		referralTagObject?.tagObject ? `${referralTagObject.tagObject[tagKey]}` : ""
+	);
+
+	const tagObject = {
+		...preview.publicData,
+		hasPassword: preview.passwordLayer === "WithPassword" ? "true" : "false",
+		duration,
+		zelfProof,
+		zelfProofQRCode,
+		price,
+		reward,
+		discount,
+		discountType,
+	};
+
+	if (price === 0) {
+		await confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
+	} else {
+		await saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
+	}
+
+	return tagObject;
+};
+
+const _syncOfflineTag = async (tagObject, syncPublicData, sync, syncPassword) => {
+	if (tagObject && (!sync || !syncPublicData || !syncPassword)) {
+		const error = new Error(`tag_purchased_already:${findExistingTag.tagObject.publicData[tagKey]}`);
 
 		error.status = 409;
 
 		throw error;
 	}
 
-	return { preview, findExistingTag };
+	// TODO logic to sync tag
 };
 
 /**
