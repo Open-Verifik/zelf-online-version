@@ -118,11 +118,11 @@ const searchArweave = async (params, authUser) => {
 		}
 
 		if (key && value) {
-			return await TagsArweaveModule.searchByDomain({ domain, key, value, domainConfig: _domainConfig, domain });
+			return await TagsArweaveModule.searchByStorageKey({ key, value, domainConfig: _domainConfig, domain });
 		}
 
 		// Search by domain
-		return await TagsArweaveModule.searchByDomain({ domain, domainConfig: _domainConfig }, authUser);
+		return await TagsArweaveModule.searchByDomain({ key: "domain", value: domain, domainConfig: _domainConfig }, authUser);
 	} catch (error) {
 		console.error("Error searching Arweave:", error);
 		return [];

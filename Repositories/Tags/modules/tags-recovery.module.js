@@ -2,21 +2,8 @@ const TagsModule = require("./tags.module");
 const TagsPartsModule = require("./tags-parts.module");
 const SessionModule = require("../../Session/modules/session.module");
 const { decrypt } = require("../../Wallet/modules/encryption");
-const { getDomainConfiguration } = require("./domain-registry.module");
 
-/**
- * Get domain-specific configuration
- * @param {string} domain - Domain name
- * @returns {Object} - Domain configuration
- */
-const getDomainConfig = (domain) => {
-	try {
-		return getDomainConfiguration(domain);
-	} catch (error) {
-		console.error(`Error getting domain config for ${domain}:`, error);
-		return getDomainConfiguration("zelf"); // Fallback to zelf
-	}
-};
+const { getDomainConfig } = require("../config/supported-domains");
 
 /**
  * Lease recovery for Tags
@@ -25,13 +12,22 @@ const getDomainConfig = (domain) => {
  * @author Miguel Trevino
  */
 const leaseRecovery = async (payload, authUser) => {
-	const { zelfProof, newTagName, domain, type, os, addServerPassword, referralTagName } = payload;
+	const { zelfProof, tagName, domain, type, os, addServerPassword, referralTagName } = payload;
 
 	const duration = payload.duration || 1;
-	const tagDomain = domain || "zelf";
-	const domainConfig = getDomainConfig(tagDomain);
 
-	await TagsModule._findDuplicatedTag(newTagName, tagDomain, "both", authUser);
+	const domainConfig = getDomainConfig(domain);
+
+	// try to find if that zelfProof is already inside a record
+	const zelfProofRecord = await TagsModule.searchTag({ key: "zelfProof", value: zelfProof, domain, domainConfig }, authUser);
+
+	if (zelfProofRecord?.tagObject) {
+		return { ...zelfProofRecord.tagObject, message: "Zelf Proof found and is being used by another tag" };
+	}
+
+	const notFound = await TagsModule._findDuplicatedTag(tagName, domain, domainConfig);
+
+	return { notFound, zelfProofRecord };
 
 	const { face, password } = await TagsPartsModule.decryptParams(payload, authUser);
 
@@ -55,8 +51,8 @@ const leaseRecovery = async (payload, authUser) => {
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
 			suiAddress: sui.address,
-			tagName: `${newTagName}.${tagDomain}`,
-			domain: tagDomain,
+			tagName: `${tagName}.${domain}`,
+			domain: domain,
 			domainConfig,
 			origin: "online",
 		},

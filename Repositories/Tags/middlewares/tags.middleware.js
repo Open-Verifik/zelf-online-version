@@ -15,19 +15,19 @@ const schemas = {
 	},
 	leaseOffline: {
 		tagName: string().required(),
-		domain: string(),
+		domain: string().required(),
 		zelfProof: string().required(),
 		zelfProofQRCode: string().required(),
 	},
 	leaseConfirmation: {
 		tagName: string().required(),
-		domain: string(),
+		domain: string().required(),
 		coin: string().required(),
 		network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC"]).required(),
 	},
 	lease: {
 		tagName: string().required(),
-		domain: string(),
+		domain: string().required(),
 		faceBase64: string().required(),
 		type: stringEnum(["create", "import"]).required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
@@ -35,34 +35,25 @@ const schemas = {
 	},
 	leaseRecovery: {
 		zelfProof: string().required(),
-		newTagName: string().required(),
-		domain: string(),
+		tagName: string().required(),
+		domain: string().required(),
 		faceBase64: string().required(),
 		password: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string(),
 	},
-	create: {
-		password: string(),
-		addServerPassword: boolean(),
-		wordsCount: number().required(),
-	},
-	import: {
-		password: string(),
-		mnemonic: string().required(),
-	},
 	decrypt: {
 		faceBase64: string().required(),
 		password: string(),
 		tagName: string().required(),
-		domain: string(),
+		domain: string().required(),
 		addServerPassword: boolean(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string(),
 	},
 	preview: {
 		tagName: string().required(),
-		domain: string(),
+		domain: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		captchaToken: string(),
 	},
@@ -300,17 +291,23 @@ const leaseValidation = async (ctx, next) => {
  * @param {*} next - Next middleware
  */
 const leaseRecoveryValidation = async (ctx, next) => {
-	const { zelfProof, newTagName, domain, faceBase64, password, os, captchaToken } = ctx.request.body;
+	const { zelfProof, tagName, domain, faceBase64, password, os, captchaToken } = ctx.request.body;
 
 	const valid = validate(schemas.leaseRecovery, {
 		zelfProof,
-		newTagName,
+		tagName,
 		domain,
 		faceBase64,
 		password,
 		os,
 		captchaToken,
 	});
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
 
 	const authUser = ctx.state.user;
 
@@ -332,14 +329,8 @@ const leaseRecoveryValidation = async (ctx, next) => {
 		await Session.updateOne({ _id: authUser.session }, { $inc: { leaseCount: 1 } });
 	}
 
-	if (valid.error) {
-		ctx.status = 409;
-		ctx.body = { validationError: valid.error.message };
-		return;
-	}
-
 	// Validate domain and tag name
-	const { domain: extractedDomain, name } = extractDomainAndName(newTagName, domain);
+	const { domain: extractedDomain, name } = extractDomainAndName(tagName, domain);
 	const domainValidation = await validateDomainAndName(extractedDomain, name);
 
 	if (!domainValidation.valid) {

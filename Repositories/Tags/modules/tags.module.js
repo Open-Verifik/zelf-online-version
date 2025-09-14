@@ -51,7 +51,7 @@ const leaseTag = async (params, authUser) => {
 	// Get tag key using the method
 	const tagKey = domainConfig.getTagKey();
 
-	await _findDuplicatedTag(tagName, domain, "both", domainConfig);
+	await _findDuplicatedTag(tagName, domain, domainConfig);
 
 	const referralTagObject = await _validateReferral(referralTagName, authUser, domainConfig);
 
@@ -242,7 +242,7 @@ const leaseOfflineTag = async (params, authUser) => {
 	const { tagName, domain, zelfProof, zelfProofQRCode } = params;
 	const domainConfig = getDomainConfig(domain);
 
-	await _findDuplicatedTag(tagName, domain, "both", domainConfig);
+	await _findDuplicatedTag(tagName, domain, domainConfig);
 
 	const offlineProof = await OfflineProofModule.createOfflineProof({
 		zelfProof,
@@ -316,7 +316,7 @@ const createZelfPay = async (tagObject, authUser, domain = "zelf") => {
  * @param {string} storage
  * @param {Object} domainConfig
  */
-const _findDuplicatedTag = async (tagName, domain, storage, domainConfig) => {
+const _findDuplicatedTag = async (tagName, domain, domainConfig) => {
 	const searchParams = {
 		tagName,
 		domain,
@@ -331,6 +331,8 @@ const _findDuplicatedTag = async (tagName, domain, storage, domainConfig) => {
 		error.status = 409;
 		throw error;
 	}
+
+	return result;
 };
 
 /**

@@ -82,6 +82,17 @@ class Domain {
 	 * @returns {number} - Price in cents
 	 */
 	getPrice(tagName, duration = "1", referralTagName = "") {
+		if (!tagName) {
+			return {
+				price: 0,
+				currency: "USD",
+				reward: 0,
+				discount: 0,
+				priceWithoutDiscount: 0,
+				discountType: "percentage",
+			};
+		}
+
 		const splitTagName = tagName.split(".");
 
 		const length = splitTagName[0].length;

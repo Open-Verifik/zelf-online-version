@@ -131,7 +131,7 @@ const leaseRecovery = async (ctx) => {
 
 		const requestData = {
 			...ctx.request.body,
-			newTagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.newTagName,
+			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
 			domain: extractedDomain,
 		};
 

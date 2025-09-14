@@ -134,11 +134,11 @@ const tagRegistration = async (tagProofQRCode, tagObject, fileName) => {
  * @returns {Array} - Search results
  */
 const searchByStorageKey = async (params) => {
-	const { tagName, domainConfig, domain } = params;
+	const { tagName, domainConfig, domain, key, value } = params;
 
 	const _domainConfig = domainConfig || getDomainConfiguration(domain);
 
-	return await searchInArweave(_domainConfig.getTagKey(), tagName);
+	return key ? await searchInArweave(key, value) : await searchInArweave(_domainConfig.getTagKey(), tagName);
 };
 
 /**
