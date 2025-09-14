@@ -583,6 +583,8 @@ module.exports = {
 	_validateReferral,
 	_createWalletsFromPhrase,
 	_decryptParams,
+	confirmFreeTag,
+	saveHoldTagInIPFS,
 };
 
 //TODO bugs

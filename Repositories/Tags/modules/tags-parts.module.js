@@ -386,12 +386,16 @@ const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainCo
 	tagObject.hasPassword = `${Boolean(payload.password)}`;
 };
 
-const _generateZelfProof = async (dataToEncrypt, tagObject) => {
-	tagObject.zelfProof = await encrypt(dataToEncrypt);
+const _generateZelfProof = async (dataToEncrypt, tagObject, skipZelfProof = false, skipZelfProofQRCode = false) => {
+	if (!skipZelfProof) {
+		tagObject.zelfProof = await encrypt(dataToEncrypt);
 
-	if (!tagObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
+		if (!tagObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
+	}
 
-	tagObject.zelfProofQRCode = await encryptQR(dataToEncrypt);
+	if (!skipZelfProofQRCode) {
+		tagObject.zelfProofQRCode = await encryptQR(dataToEncrypt);
+	}
 };
 
 module.exports = {

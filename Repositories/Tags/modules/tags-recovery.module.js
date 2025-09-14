@@ -25,9 +25,7 @@ const leaseRecovery = async (payload, authUser) => {
 		return { ...zelfProofRecord.tagObject, message: "Zelf Proof found and is being used by another tag" };
 	}
 
-	const notFound = await TagsModule._findDuplicatedTag(tagName, domain, domainConfig);
-
-	return { notFound, zelfProofRecord };
+	const { price } = await TagsModule._findDuplicatedTag(tagName, domain, domainConfig);
 
 	const { face, password } = await TagsPartsModule.decryptParams(payload, authUser);
 
@@ -38,6 +36,8 @@ const leaseRecovery = async (payload, authUser) => {
 		zelfProof,
 	});
 
+	const referralTagObject = await TagsModule._validateReferral(referralTagName, authUser, domainConfig);
+
 	const { eth, btc, solana, sui, zkProof, mnemonic } = await TagsModule._createWalletsFromPhrase({
 		faceBase64: face,
 		password,
@@ -45,53 +45,47 @@ const leaseRecovery = async (payload, authUser) => {
 		mnemonic: decryptedZelfProof.metadata.mnemonic,
 	});
 
+	const tagKey = domainConfig.getTagKey();
+
 	const dataToEncrypt = {
 		publicData: {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
-			suiAddress: sui.address,
-			tagName: `${tagName}.${domain}`,
+			[tagKey]: tagName,
 			domain: domain,
-			domainConfig,
-			origin: "online",
 		},
 		metadata: {
 			mnemonic,
 			solanaSecretKey: solana.secretKey,
-			zkProof,
 		},
 		faceBase64: face,
 		password,
-		_id: `${newTagName}.${tagDomain}`,
+		_id: tagName,
 		tolerance: payload.tolerance,
 		addServerPassword: Boolean(payload.addServerPassword),
 	};
 
-	const referralTagObject = await TagsModule._validateReferral(referralTagName, authUser, tagDomain);
-
 	const tagObject = {
-		tagName: `${newTagName}.${tagDomain}`,
-		domain: tagDomain,
-		domainConfig,
+		...dataToEncrypt.publicData,
 		duration,
 	};
 
-	TagsPartsModule.assignProperties(tagObject, dataToEncrypt, { eth, btc, solana, sui }, { ...payload, password });
+	const skipZelfProof = decryptedZelfProof.publicData[tagKey] === tagName;
 
-	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
+	TagsPartsModule.assignProperties(tagObject, dataToEncrypt, { eth, btc, solana, sui }, { ...payload, password, referralTagObject }, domainConfig);
+
+	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject, decryptedZelfProof.publicData[tagKey] === tagName, false);
+
+	tagObject.zelfProof = skipZelfProof ? zelfProof : tagObject.zelfProof;
 
 	if (tagObject.price === 0) {
-		await TagsModule.confirmFreeTag(tagObject, referralTagObject, authUser);
+		await TagsModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
 	} else {
-		await TagsModule.saveHoldTagInIPFS(tagObject, referralTagObject, authUser);
+		await TagsModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
 	}
 
-	return {
-		...tagObject,
-		hasPassword: Boolean(password),
-		pgp: await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui }, password),
-	};
+	return tagObject;
 };
 
 const _generatePGPKeys = async (dataToEncrypt, addresses, password) => {
