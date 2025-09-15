@@ -89,12 +89,13 @@ const createOrUpdateLicense = async (body, jwt) => {
 			verifierKey: config.zelfEncrypt.serverKey,
 		});
 
+		// validate if the domain being passed is registered or not because we need to compare the domain with the previous domain
+		await _checkIfDomainIsRegistered(body.domain, zelfAccount.metadata.keyvalues.zelfProof);
+
 		if (myLicense) {
 			// we will delete the previous license
 			await IPFS.unPinFiles([myLicense.ipfs_pin_hash]);
 		}
-
-		if (myLicense?.metadata.keyvalues.domain === body.domain) throw new Error("409:domain_already_registered");
 
 		const licenseMetadata = {
 			type: "license",
@@ -284,6 +285,20 @@ const getUserByEmail = async (email) => {
 		console.error("Get user by email error:", error);
 		throw error;
 	}
+};
+
+/**
+ * Check if the domain is registered
+ */
+const _checkIfDomainIsRegistered = async (domain, zelfProof) => {
+	// Search for all licenses with the same zelfProof
+	const domains = await IPFS.get({ key: "domain", value: domain });
+
+	if (!domains.length) return;
+
+	const foundDomain = domains[0];
+
+	if (foundDomain.metadata.keyvalues.zelfProof !== zelfProof) throw new Error("409:domain_already_registered");
 };
 
 module.exports = {
