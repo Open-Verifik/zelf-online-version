@@ -15,7 +15,6 @@ const { Domain } = require("../modules/domain.class");
  * - validation: Name validation rules
  * - storage: Storage configuration
  * - payment: Payment options and methods
- * - limits: Usage limits and restrictions
  * - metadata: Additional domain-specific data
  */
 
@@ -28,7 +27,24 @@ const SUPPORTED_DOMAINS = {
 		status: "active",
 		owner: "zelf-team",
 		description: "Official Zelf domain",
-		features: ["biometric", "wallet", "payment", "recovery", "transfer", "renewal"],
+		limits: {
+			tags: 10000,
+			zelfkeys: 10000,
+		},
+		features: [
+			{
+				name: "Zelf Name System",
+				code: "zns",
+				description: "Encryptions, Decryptions, previews of ZelfProofs",
+				enabled: true,
+			},
+			{
+				name: "Zelf Keys",
+				code: "zelfkeys",
+				description: "Zelf Keys: Passwords, Notes, Credit Cards, etc.",
+				enabled: true,
+			},
+		],
 		validation: {
 			minLength: 3,
 			maxLength: 50,
@@ -40,15 +56,11 @@ const SUPPORTED_DOMAINS = {
 			keyPrefix: "zelfName",
 			ipfsEnabled: true,
 			arweaveEnabled: true,
-			backupEnabled: true,
+			walrusEnabled: true,
 		},
-		payment: {
-			methods: ["coinbase", "crypto", "wallet"],
+		tagPaymentSettings: {
+			methods: ["coinbase", "crypto", "stripe"],
 			currencies: ["USD", "BTC", "ETH", "SOL"],
-			discounts: {
-				yearly: 0.2, // 20% discount for yearly
-				lifetime: 0.5, // 50% discount for lifetime
-			},
 			whitelist: {
 				"zelfmedellin2025.zelf": 24,
 				"zelfbogota2025.zelf": 25,
@@ -74,11 +86,6 @@ const SUPPORTED_DOMAINS = {
 				27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
 			},
 		},
-		limits: {
-			maxTagsPerUser: 10,
-			maxTransferPerDay: 5,
-			maxRenewalPerDay: 3,
-		},
 		metadata: {
 			launchDate: "2023-01-01",
 			version: "1.0.0",
@@ -94,7 +101,24 @@ const SUPPORTED_DOMAINS = {
 		status: "active",
 		owner: "avalanche-community",
 		description: "Avalanche community domain",
-		features: ["biometric", "wallet", "payment", "transfer", "renewal"],
+		limits: {
+			tags: 10000,
+			zelfkeys: 10000,
+		},
+		features: [
+			{
+				name: "Zelf Name System",
+				code: "zns",
+				description: "Encryptions, Decryptions, previews of ZelfProofs",
+				enabled: true,
+			},
+			{
+				name: "Zelf Keys",
+				code: "zelfkeys",
+				description: "Zelf Keys: Passwords, Notes, Credit Cards, etc.",
+				enabled: true,
+			},
+		],
 		validation: {
 			minLength: 3,
 			maxLength: 30,
@@ -106,15 +130,12 @@ const SUPPORTED_DOMAINS = {
 			keyPrefix: "avaxName",
 			ipfsEnabled: true,
 			arweaveEnabled: true,
+			walrusEnabled: true,
 			backupEnabled: false,
 		},
-		payment: {
-			methods: ["coinbase", "crypto", "wallet"],
+		tagPaymentSettings: {
+			methods: ["coinbase", "crypto", "stripe"],
 			currencies: ["USD", "AVAX", "BTC", "ETH"],
-			discounts: {
-				yearly: 0.15, // 15% discount for yearly
-				lifetime: 0.3, // 30% discount for lifetime
-			},
 			whitelist: {
 				"privacy.avax": "24$",
 				"security.avax": "25%",
@@ -140,142 +161,11 @@ const SUPPORTED_DOMAINS = {
 				27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
 			},
 		},
-		limits: {
-			maxTagsPerUser: 5,
-			maxTransferPerDay: 3,
-			maxRenewalPerDay: 2,
-		},
 		metadata: {
 			launchDate: "2024-01-15",
 			version: "1.0.0",
 			documentation: "https://docs.avax.zelf.world",
 			community: "avalanche",
-		},
-	}),
-	// Bitcoin community domain
-	btc: new Domain({
-		name: "btc",
-		type: "custom",
-		price: 50, // $0.50 in cents
-		holdSuffix: ".hold",
-		status: "active",
-		owner: "bitcoin-community",
-		description: "Bitcoin community domain",
-		features: ["biometric", "wallet", "payment", "transfer", "renewal"],
-		validation: {
-			minLength: 3,
-			maxLength: 25,
-			allowedChars: /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
-			reserved: ["www", "api", "admin", "bitcoin", "btc"],
-			customRules: [],
-		},
-		storage: {
-			keyPrefix: "btcName",
-			ipfsEnabled: true,
-			arweaveEnabled: false,
-			backupEnabled: false,
-		},
-		payment: {
-			methods: ["coinbase", "crypto", "wallet"],
-			currencies: ["USD", "BTC", "ETH"],
-			discounts: {
-				yearly: 0.1, // 10% discount for yearly
-				lifetime: 0.25, // 25% discount for lifetime
-			},
-			pricingTable: {
-				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
-				2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
-				3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
-				4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
-				5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
-				"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
-				16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
-				17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
-				18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
-				19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
-				20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
-				21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
-				22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
-				23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
-				24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
-				25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
-				26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
-				27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
-			},
-		},
-		limits: {
-			maxTagsPerUser: 3,
-			maxTransferPerDay: 2,
-			maxRenewalPerDay: 1,
-		},
-		metadata: {
-			launchDate: "2024-02-01",
-			version: "1.0.0",
-			documentation: "https://docs.btc.zelf.world",
-			community: "bitcoin",
-		},
-	}),
-	// Tech community domain
-	tech: new Domain({
-		name: "tech",
-		type: "custom",
-		price: 75, // $0.75 in cents
-		holdSuffix: ".hold",
-		status: "active",
-		owner: "tech-community",
-		description: "Technology community domain",
-		features: ["biometric", "wallet", "payment", "transfer", "renewal"],
-		validation: {
-			minLength: 3,
-			maxLength: 40,
-			allowedChars: /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
-			reserved: ["www", "api", "admin", "tech", "technology"],
-			customRules: [],
-		},
-		storage: {
-			keyPrefix: "techName",
-			ipfsEnabled: true,
-			arweaveEnabled: true,
-			backupEnabled: true,
-		},
-		payment: {
-			methods: ["coinbase", "crypto", "wallet"],
-			currencies: ["USD", "BTC", "ETH", "SOL"],
-			discounts: {
-				yearly: 0.25, // 25% discount for yearly
-				lifetime: 0.4, // 40% discount for lifetime
-			},
-			pricingTable: {
-				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
-				2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
-				3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
-				4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
-				5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
-				"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
-				16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
-				17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
-				18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
-				19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
-				20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
-				21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
-				22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
-				23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
-				24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
-				25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
-				26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
-				27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
-			},
-		},
-		limits: {
-			maxTagsPerUser: 8,
-			maxTransferPerDay: 4,
-			maxRenewalPerDay: 3,
-		},
-		metadata: {
-			launchDate: "2024-03-01",
-			version: "1.0.0",
-			documentation: "https://docs.tech.zelf.world",
-			community: "tech",
 		},
 	}),
 	// Enterprise domain example
@@ -287,7 +177,24 @@ const SUPPORTED_DOMAINS = {
 		status: "active",
 		owner: "blockDAG",
 		description: "blockDAG enterprise domain",
-		features: ["biometric", "wallet", "payment", "enterprise", "transfer", "renewal", "admin"],
+		limits: {
+			tags: 10000,
+			zelfkeys: 10000,
+		},
+		features: [
+			{
+				name: "Zelf Name System",
+				code: "zns",
+				description: "Encryptions, Decryptions, previews of ZelfProofs",
+				enabled: true,
+			},
+			{
+				name: "Zelf Keys",
+				code: "zelfkeys",
+				description: "Zelf Keys: Passwords, Notes, Credit Cards, etc.",
+				enabled: true,
+			},
+		],
 		validation: {
 			minLength: 3,
 			maxLength: 20,
@@ -299,15 +206,11 @@ const SUPPORTED_DOMAINS = {
 			keyPrefix: "bDAGName",
 			ipfsEnabled: true,
 			arweaveEnabled: false, // Enterprise might prefer private storage
-			backupEnabled: true,
+			walrusEnabled: true,
 		},
-		payment: {
-			methods: ["coinbase", "crypto", "wallet", "enterprise"],
+		tagPaymentSettings: {
+			methods: ["coinbase", "crypto", "stripe"],
 			currencies: ["USD", "BTC", "ETH", "SOL"],
-			discounts: {
-				yearly: 0.3, // 30% discount for yearly
-				lifetime: 0.5, // 50% discount for lifetime
-			},
 			pricingTable: {
 				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
 				2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
@@ -328,11 +231,6 @@ const SUPPORTED_DOMAINS = {
 				26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
 				27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
 			},
-		},
-		limits: {
-			maxTagsPerUser: 50,
-			maxTransferPerDay: 20,
-			maxRenewalPerDay: 10,
 		},
 		metadata: {
 			launchDate: "2024-04-01",
@@ -471,6 +369,7 @@ const getDomainStorageConfig = (domain) => {
 			keyPrefix: "tagName",
 			ipfsEnabled: true,
 			arweaveEnabled: true,
+			walrusEnabled: true,
 			backupEnabled: false,
 		}
 	);

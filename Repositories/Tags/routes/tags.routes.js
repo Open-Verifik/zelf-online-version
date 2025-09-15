@@ -17,12 +17,6 @@ module.exports = (server) => {
 	server.post(`${PATH}/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery); // [x]
 	server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOfflineTag); // [x]
 
-	// payment endpoints ( to purchase a/N year(s) or lifetime lease)
-	server.get(`${PATH}/lease-payment-options`, Middleware.leaseOfflineValidation, Controller.leaseOfflineTag); // [x]
-
-	server.post(`${PATH}/lease-payment-confirmation`, Middleware.leaseConfirmationValidation, Controller.leaseConfirmation);
-	// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
 	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof); // [x]
 	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptTag); // [x]
 	server.post(`${PATH}/revenue-cat`, Middleware.revenueCatWebhookValidation, Controller.revenueCatWebhook);

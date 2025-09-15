@@ -104,7 +104,7 @@ const decrypt = async (data) => {
 			os: data.os || "DESKTOP",
 			password: data.password || undefined,
 			senseprint_base_64: data.zelfProof,
-			verifiers_auth_key: data.verifierKey || undefined,
+			verifiers_auth_key: data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
 		});
 
 		return encryptedResponse?.data;

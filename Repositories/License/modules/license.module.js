@@ -76,7 +76,7 @@ const getUserZelfProof = async (userEmail) => {
  * @returns {Object} - License data
  */
 const createOrUpdateLicense = async (body, jwt) => {
-	const { faceBase64 } = body;
+	const { faceBase64, masterPassword, domainConfig } = body;
 
 	try {
 		const { myLicense, zelfAccount } = await getMyLicense(jwt);
@@ -85,6 +85,7 @@ const createOrUpdateLicense = async (body, jwt) => {
 		const decryptedZelfProof = await decrypt({
 			zelfProof: zelfAccount.metadata.keyvalues.zelfProof,
 			faceBase64,
+			password: masterPassword || undefined,
 			verifierKey: config.zelfEncrypt.serverKey,
 		});
 
@@ -103,6 +104,7 @@ const createOrUpdateLicense = async (body, jwt) => {
 			owner: jwt.email,
 			zelfProof: zelfAccount.metadata.keyvalues.zelfProof,
 			expiresAt: moment().add(1, "year").toISOString(),
+			...domainConfig,
 		};
 
 		const jsonData = JSON.stringify({ ...licenseMetadata }, null, 2);
@@ -112,14 +114,23 @@ const createOrUpdateLicense = async (body, jwt) => {
 		const license = await IPFS.insert(
 			{
 				base64: base64Data,
-				metadata: licenseMetadata,
+				metadata: {
+					type: "license",
+					subscriptionId: "free",
+					domain: body.domain,
+					owner: jwt.email,
+					zelfProof: zelfAccount.metadata.keyvalues.zelfProof,
+				},
 				name: `${body.domain}.license`,
 				pinIt: true,
 			},
 			{ pro: true }
 		);
 
-		return license;
+		return {
+			ipfs: license,
+			...licenseMetadata,
+		};
 	} catch (error) {
 		console.error("Create/Update license error:", error);
 		throw error;

@@ -12,11 +12,11 @@ module.exports = (server) => {
 	// transfer tag
 	server.post(`${PATH}/transfer`, Middleware.transferValidation, Controller.transferTag);
 
-	// pay for a tag (new or renew)
-	server.get(`${PATH}/pay`, Middleware.howToRenewValidation, Controller.howToRenewTag);
+	// payment options
+	server.get(`${PATH}/payment-options`, Middleware.howToRenewValidation, Controller.howToRenewTag);
 
-	// renew tag
-	server.post(`${PATH}/renew`, Middleware.renewValidation, Controller.renewTag);
+	// payment confirmation
+	server.post(`${PATH}/payment-confirmation`, Middleware.renewValidation, Controller.renewTag);
 };
 
 /**
