@@ -3,6 +3,7 @@ const RevenueCatModule = require("../modules/revenue-cat.module");
 const { updateOldTagObject } = require("../modules/my-tags.module");
 const TagsRecoveryModule = require("../modules/tags-recovery.module");
 const HttpHandler = require("../../../Core/http-handler");
+const TagsOfflineModule = require("../modules/tags-offline.module");
 
 /**
  * Standard error handler for controllers
@@ -160,7 +161,7 @@ const leaseOfflineTag = async (ctx) => {
 			domain: extractedDomain,
 		};
 
-		const data = await Module.leaseOfflineTag(requestData, ctx.state.user);
+		const data = await TagsOfflineModule.leaseOfflineTag(requestData, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {

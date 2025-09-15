@@ -1,4 +1,5 @@
-const { decrypt, encrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
+const { decrypt, encrypt, preview, encryptQRCode } = require("../../ZelfProof/modules/zelf-proof.module");
+
 const { getDomainConfiguration, generateStorageKey, generateHoldDomain } = require("./domain-registry.module");
 const config = require("../../../Core/config");
 
@@ -16,54 +17,21 @@ const config = require("../../../Core/config");
  * @returns {Object} - Decrypted parameters
  */
 const decryptParams = async (params, authUser) => {
-	const { faceBase64, password, mnemonic, tagName, domain, removePGP } = params;
-
-	if (removePGP) {
+	if (params.removePGP) {
 		return {
-			face: faceBase64,
-			password,
-			mnemonic,
+			face: params.faceBase64,
+			password: params.password,
+			mnemonic: params.mnemonic,
 		};
 	}
 
-	// Decrypt face data
-	const decryptedFace = await decrypt({
-		faceBase64,
-		password,
-		verifierKey: config.zelfEncrypt.serverKey,
-	});
+	const password = await SessionModule.sessionDecrypt(data.password || null, authUser);
 
-	if (decryptedFace.error) {
-		const error = new Error(decryptedFace.error.code);
-		error.status = 409;
-		throw error;
-	}
+	const mnemonic = await SessionModule.sessionDecrypt(data.mnemonic || null, authUser);
 
-	// Decrypt mnemonic if provided
-	let decryptedMnemonic = mnemonic;
-	if (mnemonic) {
-		const decryptedMnemonicResult = await decrypt({
-			faceBase64,
-			password,
-			verifierKey: config.zelfEncrypt.serverKey,
-		});
+	const face = await SessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
 
-		if (decryptedMnemonicResult.error) {
-			const error = new Error(decryptedMnemonicResult.error.code);
-			error.status = 409;
-			throw error;
-		}
-
-		decryptedMnemonic = decryptedMnemonicResult.mnemonic;
-	}
-
-	return {
-		face: decryptedFace.face,
-		password,
-		mnemonic: decryptedMnemonic,
-		tagName,
-		domain,
-	};
+	return { password, mnemonic, face };
 };
 
 /**
@@ -149,7 +117,7 @@ const generateQRCode = async (params, authUser) => {
 	}
 
 	// Generate QR code
-	const qrCodeResult = await encryptQR({
+	const qrCodeResult = await encryptQRCode({
 		zelfProof,
 		verifierKey: config.zelfEncrypt.serverKey,
 	});
@@ -388,13 +356,13 @@ const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainCo
 
 const _generateZelfProof = async (dataToEncrypt, tagObject, skipZelfProof = false, skipZelfProofQRCode = false) => {
 	if (!skipZelfProof) {
-		tagObject.zelfProof = await encrypt(dataToEncrypt);
+		tagObject.zelfProof = (await encrypt(dataToEncrypt))?.zelfProof;
 
 		if (!tagObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
 	}
 
 	if (!skipZelfProofQRCode) {
-		tagObject.zelfProofQRCode = await encryptQR(dataToEncrypt);
+		tagObject.zelfProofQRCode = (await encryptQRCode(dataToEncrypt))?.zelfQR;
 	}
 };
 

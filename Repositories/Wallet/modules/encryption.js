@@ -124,7 +124,7 @@ const preview = async (data) => {
 	try {
 		const encryptedResponse = await axios.post("/vw/preview-wallet", {
 			senseprint_base_64: data.zelfProof,
-			verifiers_auth_key: data.addServerPassword ? config.walletServer.authKey : undefined,
+			verifiers_auth_key: data.addServerPassword ? config.zelfEncrypt.serverKey : data.verifierKey || undefined,
 		});
 
 		return encryptedResponse.data;

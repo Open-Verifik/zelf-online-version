@@ -9,10 +9,20 @@ const encrypt = async (data) => {
 			face_base_64: data.faceBase64,
 			metadata: data.metadata,
 			password: data.password || undefined,
-			record_id: data.identifier,
+			record_id: data.identifier || data.record_id || data._id,
 			require_live_face: data.requireLiveness || true,
 			tolerance: data.tolerance || "REGULAR",
-			verifiers_auth_key: data.verifierKey || undefined,
+			verifiers_auth_key: data.verifierKey || data.addPassword ? config.zelfEncrypt.serverKey : undefined,
+		});
+
+		console.log({
+			cleartext_data: data.publicData,
+			metadata: data.metadata,
+			password: data.password || undefined,
+			record_id: data.identifier || data.record_id || data._id,
+			require_live_face: data.requireLiveness || true,
+			tolerance: data.tolerance || "REGULAR",
+			verifiers_auth_key: data.verifierKey || data.addPassword ? config.zelfEncrypt.serverKey : undefined,
 		});
 
 		const zelfProof = encryptedResponse.data.zelfProof;
@@ -63,7 +73,7 @@ const encryptQRCode = async (data) => {
 				face_base_64: data.faceBase64,
 				metadata: data.metadata,
 				password: data.password || undefined,
-				record_id: data.identifier,
+				record_id: data.identifier || data.record_id || data._id,
 				require_live_face: data.requireLiveness || true,
 				tolerance: data.tolerance || "REGULAR",
 				verifiers_auth_key: data.verifierKey || undefined,
@@ -115,7 +125,7 @@ const preview = async (data) => {
 	try {
 		const encryptedResponse = await axios.post("/zelf/preview", {
 			senseprint_base_64: data.zelfProof,
-			verifiers_auth_key: data.verifierKey || undefined,
+			verifiers_auth_key: data.verifierKey || data.addPassword ? config.zelfEncrypt.serverKey : undefined,
 		});
 
 		return encryptedResponse?.data;

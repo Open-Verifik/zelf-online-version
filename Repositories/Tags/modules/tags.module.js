@@ -1,5 +1,4 @@
 const moment = require("moment");
-const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const TagsPartsModule = require("./tags-parts.module");
 const TagsSearchModule = require("./tags-search.module");
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
@@ -7,19 +6,17 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
-const { decrypt, encrypt, preview, encryptQR } = require("../../Wallet/modules/encryption");
+const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
-const { addReferralReward, addPurchaseReward } = require("./tags-token.module");
 const { initTagUpdates, updateTags } = require("./sync-tag-records.module");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const { generateHoldDomain } = require("./domain-registry.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const TagsIPFSModule = require("./tags-ipfs.module");
-const { Domain } = require("./domain.class");
-const tagsArweaveModule = require("./tags-arweave.module");
+const TagsArweaveModule = require("./tags-arweave.module");
 
 /**
  * Generate domain-specific hold domain
@@ -208,7 +205,7 @@ const previewTag = async (params, authUser) => {
 
 	const previewResult = await preview({
 		zelfProof: searchResult.tagObject.publicData.zelfProof,
-		verifierKey: config.zelfEncrypt.serverKey,
+		addServerPassword: Boolean(params.addServerPassword),
 	});
 
 	return { preview: previewResult, tagObject: searchResult.tagObject };
@@ -224,82 +221,13 @@ const previewZelfProof = async (params, authUser) => {
 
 	const previewResult = await preview({
 		zelfProof,
-		verifierKey: config.zelfEncrypt.serverKey,
+		addServerPassword: Boolean(params.addServerPassword),
 	});
 
 	return {
 		preview: previewResult,
 		zelfProof,
 	};
-};
-
-/**
- * lease offline tag
- * @param {Object} params
- * @param {Object} authUser
- */
-const leaseOfflineTag = async (params, authUser) => {
-	const { tagName, domain, zelfProof, zelfProofQRCode, referralTagName, sync, syncPassword, syncPublicData, duration } = params;
-
-	const domainConfig = getDomainConfig(domain);
-
-	const tagKey = domainConfig.getTagKey();
-
-	await _findDuplicatedTag(tagName, domain, domainConfig);
-
-	const referralTagObject = await _validateReferral(referralTagName, authUser, domainConfig);
-
-	const decryptedParams = await TagsPartsModule.decryptParams(params, authUser);
-
-	const { face, password } = decryptedParams;
-
-	const { preview } = await previewZelfProof({ zelfProof }, authUser);
-
-	const findExistingTag = await searchTag({ tagName: preview.publicData[tagKey], domain, domainConfig, environment: "all" }, authUser);
-
-	if (findExistingTag.tagObject) throw new Error("tag_purchased_already");
-
-	if (sync) {
-		return await _syncOfflineTag(findExistingTag.tagObject, syncPublicData, sync, syncPassword);
-	}
-
-	const { price, reward, discount, discountType } = domainConfig.getPrice(
-		tagName,
-		duration,
-		referralTagObject?.tagObject ? `${referralTagObject.tagObject[tagKey]}` : ""
-	);
-
-	const tagObject = {
-		...preview.publicData,
-		hasPassword: preview.passwordLayer === "WithPassword" ? "true" : "false",
-		duration,
-		zelfProof,
-		zelfProofQRCode,
-		price,
-		reward,
-		discount,
-		discountType,
-	};
-
-	if (price === 0) {
-		await confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
-	} else {
-		await saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
-	}
-
-	return tagObject;
-};
-
-const _syncOfflineTag = async (tagObject, syncPublicData, sync, syncPassword) => {
-	if (tagObject && (!sync || !syncPublicData || !syncPassword)) {
-		const error = new Error(`tag_purchased_already:${findExistingTag.tagObject.publicData[tagKey]}`);
-
-		error.status = 409;
-
-		throw error;
-	}
-
-	// TODO logic to sync tag
 };
 
 /**
@@ -544,7 +472,7 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 
 	tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
 
-	tagObject.arweave = await tagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
+	tagObject.arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
 		hasPassword: metadata.hasPassword,
 		zelfProof: metadata.zelfProof,
 		publicData: metadata,
@@ -615,7 +543,6 @@ module.exports = {
 	decryptTag,
 	previewTag,
 	previewZelfProof,
-	leaseOfflineTag,
 	leaseConfirmation,
 	createZelfPay,
 	// Utility functions

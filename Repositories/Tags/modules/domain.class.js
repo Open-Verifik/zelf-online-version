@@ -95,6 +95,8 @@ class Domain {
 
 		const splitTagName = tagName.split(".");
 
+		referralTagName = referralTagName.replace(".hold", "");
+
 		const length = splitTagName[0].length;
 
 		if (!this.payment.pricingTable) return 0;
