@@ -1,10 +1,10 @@
+const { getDomainConfig, getDomainPrice, getDomainPaymentMethods, getDomainCurrencies, getDomainLimits } = require("../config/supported-domains");
+
 /**
  * Tags Payment Module
  * Handles payment logic for multi-domain tags system
  * Integrates with domain registry for pricing and payment methods
  */
-
-const { getDomainConfig, getDomainPrice, getDomainPaymentMethods, getDomainCurrencies, getDomainLimits } = require("../config/supported-domains");
 
 /**
  * Calculate payment amount for tag creation/renewal
@@ -159,16 +159,16 @@ const processPayment = async (paymentData, authUser) => {
 	// Calculate expected amount
 	const expectedAmount = getDomainPrice(domain, duration);
 	if (amount !== expectedAmount) {
-		return { 
-			success: false, 
-			error: `Amount mismatch. Expected: ${expectedAmount}, Received: ${amount}` 
+		return {
+			success: false,
+			error: `Amount mismatch. Expected: ${expectedAmount}, Received: ${amount}`,
 		};
 	}
 
 	// Process payment based on method
 	try {
 		let paymentResult;
-		
+
 		switch (paymentMethod) {
 			case "coinbase":
 				paymentResult = await processCoinbasePayment(paymentData, authUser);
@@ -198,9 +198,9 @@ const processPayment = async (paymentData, authUser) => {
 			timestamp: new Date().toISOString(),
 		};
 	} catch (error) {
-		return { 
-			success: false, 
-			error: `Payment processing failed: ${error.message}` 
+		return {
+			success: false,
+			error: `Payment processing failed: ${error.message}`,
 		};
 	}
 };
@@ -334,9 +334,9 @@ const checkAffordability = (domain, duration, userWallet) => {
  */
 const calculateBulkDiscount = (basePrice, quantity) => {
 	if (quantity >= 100) return 0.5; // 50% discount for 100+ tags
-	if (quantity >= 50) return 0.3;  // 30% discount for 50+ tags
-	if (quantity >= 20) return 0.2;  // 20% discount for 20+ tags
-	if (quantity >= 10) return 0.1;  // 10% discount for 10+ tags
+	if (quantity >= 50) return 0.3; // 30% discount for 50+ tags
+	if (quantity >= 20) return 0.2; // 20% discount for 20+ tags
+	if (quantity >= 10) return 0.1; // 10% discount for 10+ tags
 	return 0; // No discount
 };
 
@@ -349,12 +349,12 @@ const calculateBulkDiscount = (basePrice, quantity) => {
 const calculateEarlyBirdDiscount = (domain, launchDate) => {
 	const now = new Date();
 	const daysSinceLaunch = Math.floor((now - launchDate) / (1000 * 60 * 60 * 24));
-	
+
 	// 20% discount for first 30 days
 	if (daysSinceLaunch <= 30) return 0.2;
 	// 10% discount for first 90 days
 	if (daysSinceLaunch <= 90) return 0.1;
-	
+
 	return 0; // No discount
 };
 

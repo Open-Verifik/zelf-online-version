@@ -1,10 +1,11 @@
 const { getDomainConfig } = require("../config/supported-domains");
-const { _findDuplicatedTag, _validateReferral, previewZelfProof, searchTag, confirmFreeTag, saveHoldTagInIPFS } = require("./tags.module");
+const { _findDuplicatedTag, _validateReferral, previewZelfProof, searchTag } = require("./tags.module");
 const TagsPartsModule = require("./tags-parts.module");
 const { decrypt } = require("../../ZelfProof/modules/zelf-proof.module");
 const moment = require("moment");
 const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
+const TagsRegistrationModule = require("./tags-registration.module");
 
 const _getExtraPublicData = async (password, zelfProof, syncPublicData) => {
 	if (!password || !zelfProof || !syncPublicData) {
@@ -210,9 +211,9 @@ const leaseOfflineTag = async (params, authUser) => {
 	}
 
 	if (price === 0) {
-		await confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
+		await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
 	} else {
-		await saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
+		await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
 	}
 
 	return tagObject;

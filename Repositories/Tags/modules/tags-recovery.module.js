@@ -2,8 +2,8 @@ const TagsModule = require("./tags.module");
 const TagsPartsModule = require("./tags-parts.module");
 const SessionModule = require("../../Session/modules/session.module");
 const { decrypt } = require("../../Wallet/modules/encryption");
-
 const { getDomainConfig } = require("../config/supported-domains");
+const TagsRegistrationModule = require("./tags-registration.module");
 
 /**
  * Lease recovery for Tags
@@ -80,9 +80,9 @@ const leaseRecovery = async (payload, authUser) => {
 	tagObject.zelfProof = skipZelfProof ? zelfProof : tagObject.zelfProof;
 
 	if (tagObject.price === 0) {
-		await TagsModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
+		await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
 	} else {
-		await TagsModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
+		await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
 	}
 
 	return tagObject;
