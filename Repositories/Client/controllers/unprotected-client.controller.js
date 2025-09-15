@@ -24,10 +24,14 @@ const auth = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error, ctx);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
@@ -37,10 +41,14 @@ const verifyClient = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error, ctx);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 

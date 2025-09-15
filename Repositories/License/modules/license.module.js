@@ -4,6 +4,67 @@ const IPFS = require("../../../Repositories/IPFS/modules/ipfs.module");
 const ClientModule = require("../../Client/modules/client.module");
 const { decrypt } = require("../../ZelfProof/modules/zelf-proof.module");
 const moment = require("moment");
+const fs = require("fs");
+const path = require("path");
+
+// Cache file path for development mode
+const CACHE_FILE_PATH = path.join(__dirname, "../../../cache/official-licenses-cache.json");
+
+/**
+ * Check if cache is valid (less than 1 hour old)
+ * @param {Object} cacheData - Cache data object
+ * @returns {boolean} - Whether cache is valid
+ */
+const isCacheValid = (cacheData) => {
+	if (!cacheData || !cacheData.timestamp) return false;
+
+	const cacheTime = moment(cacheData.timestamp);
+	const oneHourAgo = moment().subtract(1, "hour");
+
+	return cacheTime.isAfter(oneHourAgo);
+};
+
+/**
+ * Load cache from file
+ * @returns {Object|null} - Cache data or null if not found/invalid
+ */
+const loadCache = () => {
+	try {
+		if (!fs.existsSync(CACHE_FILE_PATH)) return null;
+
+		const cacheContent = fs.readFileSync(CACHE_FILE_PATH, "utf8");
+		const cacheData = JSON.parse(cacheContent);
+
+		return isCacheValid(cacheData) ? cacheData : null;
+	} catch (error) {
+		console.error("Error loading cache:", error);
+		return null;
+	}
+};
+
+/**
+ * Save cache to file
+ * @param {Array} licenses - License data to cache
+ */
+const saveCache = (licenses) => {
+	try {
+		// Ensure cache directory exists
+		const cacheDir = path.dirname(CACHE_FILE_PATH);
+		if (!fs.existsSync(cacheDir)) {
+			fs.mkdirSync(cacheDir, { recursive: true });
+		}
+
+		const cacheData = {
+			timestamp: moment().toISOString(),
+			licenses: licenses,
+		};
+
+		fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cacheData, null, 2));
+		console.log("Official licenses cache saved successfully");
+	} catch (error) {
+		console.error("Error saving cache:", error);
+	}
+};
 
 /**
  * Search for license by domain
@@ -14,7 +75,7 @@ const moment = require("moment");
 const searchLicense = async (query, user) => {
 	const { domain } = query;
 
-	const existingLicense = await IPFS.get({ key: "domain", value: domain });
+	const existingLicense = await IPFS.get({ key: "licenseDomain", value: domain });
 
 	if (!existingLicense.length) throw new Error("404:license_not_found");
 
@@ -36,7 +97,7 @@ const getMyLicense = async (jwt) => {
 	const metadata = client.metadata.keyvalues;
 
 	// Search for all licenses with the same zelfProof
-	const myRecords = await IPFS.get({ key: "zelfProof", value: metadata.zelfProof });
+	const myRecords = await IPFS.get({ key: "licenseZelfProof", value: metadata.zelfProof });
 
 	const myLicenses = [];
 
@@ -98,6 +159,8 @@ const createOrUpdateLicense = async (body, jwt) => {
 		}
 
 		const licenseMetadata = {
+			...domainConfig,
+			licenseType: domainConfig.type,
 			type: "license",
 			subscriptionId: "free",
 			previousDomain: myLicense?.metadata.keyvalues.domain || "",
@@ -105,7 +168,6 @@ const createOrUpdateLicense = async (body, jwt) => {
 			owner: jwt.email,
 			zelfProof: zelfAccount.metadata.keyvalues.zelfProof,
 			expiresAt: moment().add(1, "year").toISOString(),
-			...domainConfig,
 		};
 
 		const jsonData = JSON.stringify({ ...licenseMetadata }, null, 2);
@@ -117,10 +179,11 @@ const createOrUpdateLicense = async (body, jwt) => {
 				base64: base64Data,
 				metadata: {
 					type: "license",
-					subscriptionId: "free",
-					domain: body.domain,
-					owner: jwt.email,
-					zelfProof: zelfAccount.metadata.keyvalues.zelfProof,
+					licenseType: domainConfig.type,
+					licenseSubscriptionId: "free",
+					licenseDomain: body.domain,
+					licenseOwner: jwt.email,
+					licenseZelfProof: zelfAccount.metadata.keyvalues.zelfProof,
 				},
 				name: `${body.domain}.license`,
 				pinIt: true,
@@ -131,79 +194,10 @@ const createOrUpdateLicense = async (body, jwt) => {
 		return {
 			ipfs: license,
 			...licenseMetadata,
+			type: licenseMetadata.licenseType,
 		};
 	} catch (error) {
 		console.error("Create/Update license error:", error);
-		throw error;
-	}
-};
-
-/**
- * Create new license
- * @param {Object} licenseData - License data
- * @returns {Object} - Created license
- */
-const createLicense = async (licenseData) => {
-	try {
-		const { domain, faceBase64, zelfProof, userEmail } = licenseData;
-
-		// Create license metadata for IPFS
-		const licenseMetadata = {
-			name: `${domain}.license`,
-			keyvalues: {
-				type: "license",
-				domain: domain,
-				owner: userEmail,
-				zelfProof: zelfProof,
-				createdAt: new Date().toISOString(),
-			},
-		};
-
-		// Store license data in IPFS
-		const ipfsResponse = await IPFS.pinJSONToIPFS({
-			domain,
-			owner: userEmail,
-			zelfProof,
-			createdAt: new Date().toISOString(),
-			metadata: licenseMetadata,
-		});
-
-		return {
-			domain,
-			ipfsHash: ipfsResponse.IpfsHash,
-			owner: userEmail,
-			zelfProof,
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString(),
-		};
-	} catch (error) {
-		console.error("Create license error:", error);
-		throw error;
-	}
-};
-
-/**
- * Update existing license
- */
-const updateLicense = async (licenseData) => {
-	try {
-		const { domain, faceBase64, masterPassword, zelfProof, userEmail, existingIpfsHash } = licenseData;
-
-		// Delete previous IPFS record
-		if (existingIpfsHash) {
-			await IPFS.unpin(existingIpfsHash);
-		}
-
-		// Create new license with updated data
-		return await createLicense({
-			domain,
-			faceBase64,
-			masterPassword,
-			zelfProof,
-			userEmail,
-		});
-	} catch (error) {
-		console.error("Update license error:", error);
 		throw error;
 	}
 };
@@ -292,13 +286,48 @@ const getUserByEmail = async (email) => {
  */
 const _checkIfDomainIsRegistered = async (domain, zelfProof) => {
 	// Search for all licenses with the same zelfProof
-	const domains = await IPFS.get({ key: "domain", value: domain });
+	const domains = await IPFS.get({ key: "licenseDomain", value: domain });
 
 	if (!domains.length) return;
 
 	const foundDomain = domains[0];
 
+	console.log({ foundDomain });
+
 	if (foundDomain.metadata.keyvalues.zelfProof !== zelfProof) throw new Error("409:domain_already_registered");
+};
+
+/**
+ * Load official licenses
+ */
+const loadOfficialLicenses = async () => {
+	const cachedData = loadCache();
+
+	if (cachedData) {
+		console.info("Loading official licenses from cache");
+		return cachedData.licenses;
+	}
+
+	// Fetch from IPFS
+	const officialLicenses = await IPFS.get({ key: "licenseType", value: "official" });
+
+	const licenses = [];
+
+	for (const license of officialLicenses) {
+		const licenseData = await _loadLicenseJSON(license.url);
+		licenses.push(licenseData);
+	}
+
+	saveCache(licenses);
+
+	return licenses;
+};
+
+const _loadLicenseJSON = async (ipfsUrl) => {
+	// from the zelfAccount.url we should get the json from that then asisgn the name to the zelfAccount.metadata.keyvalues.name
+	const jsonData = await axios.get(ipfsUrl);
+
+	return jsonData.data;
 };
 
 module.exports = {
@@ -306,8 +335,7 @@ module.exports = {
 	getMyLicense,
 	createOrUpdateLicense,
 	getUserZelfProof,
-	createLicense,
-	updateLicense,
 	deleteLicense,
 	searchLicenseByHash,
+	loadOfficialLicenses,
 };

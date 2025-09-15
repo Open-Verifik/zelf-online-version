@@ -8,6 +8,7 @@ const DatabaseModule = require("./Core/database");
 const { serverLog } = require("./Core/loggin");
 const mongoose = require("mongoose"); // Add this line
 const swaggerSpec = require("./swagger");
+const { loadOfficialLicenses } = require("./Repositories/License/modules/license.module");
 const app = new Koa();
 app.proxy = true; // Trust the proxy's X-Forwarded-For header
 app.use(bodyParser());
@@ -42,6 +43,8 @@ const server = app.listen(config.port, () => {
 
 		serverLog(`Connected MongoDB`);
 
+		await loadOfficialLicenses();
+
 		// Swagger documentation setup
 		app.use(async (ctx, next) => {
 			if (ctx.path === "/docs") {
@@ -50,7 +53,7 @@ const server = app.listen(config.port, () => {
 					<!DOCTYPE html>
 					<html>
 					<head>
-						<title>Zelf Wallet API Documentation</title>
+						<title>Zelf API Documentation</title>
 						<link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
 						<style>
 							html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }

@@ -12,13 +12,13 @@ const axios = require("axios");
 
 const get = async (params = {}, authUser = {}) => {
 	if (params.email) {
-		const emailRecord = await IPFSModule.get({ key: "email", value: params.email });
+		const emailRecord = await IPFSModule.get({ key: "accountEmail", value: params.email });
 
 		if (emailRecord.length) return emailRecord[0];
 	}
 
 	if (params.phone) {
-		const phoneRecord = await IPFSModule.get({ key: "phone", value: params.phone });
+		const phoneRecord = await IPFSModule.get({ key: "accountPhone", value: params.phone });
 
 		if (phoneRecord.length) return phoneRecord[0];
 	}
@@ -44,11 +44,11 @@ const show = async (params = {}, authUser = {}) => {
 };
 
 const create = async (data) => {
-	const emailRecord = await IPFSModule.get({ key: "email", value: data.email });
+	const emailRecord = await IPFSModule.get({ key: "accountEmail", value: data.email });
 
 	if (emailRecord.length) throw new Error("403:email_already_exists");
 
-	const phoneRecord = await IPFSModule.get({ key: "phone", value: data.phone });
+	const phoneRecord = await IPFSModule.get({ key: "accountPhone", value: data.phone });
 
 	if (phoneRecord.length) throw new Error("403:phone_already_exists");
 
@@ -100,13 +100,13 @@ const create = async (data) => {
 		{
 			base64: base64Data,
 			metadata: {
-				email: data.email,
-				phone: data.phone,
-				company: data.company,
-				countryCode: data.countryCode,
-				zelfProof,
-				type: "client_account",
-				subscriptionId: "free",
+				accountEmail: data.email,
+				accountPhone: data.phone,
+				accountCompany: data.company,
+				accountCountryCode: data.countryCode,
+				accountZelfProof: zelfProof,
+				accountType: "client_account",
+				accountSubscriptionId: "free",
 			},
 			name: `${data.email}.account`,
 			pinIt: true,

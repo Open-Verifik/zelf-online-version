@@ -1,4 +1,5 @@
 const { string, validate, boolean, number, jsonObjectWithMinKeys, stringEnum } = require("../../../Core/JoiUtils");
+const { jwtValidation } = require("./jwt-validation.middleware");
 
 /**
  *   "face_base_64": "face_base_64",
@@ -133,4 +134,5 @@ module.exports = {
 	encryptValidation,
 	decryptValidation,
 	previewValidation,
+	jwtValidation,
 };

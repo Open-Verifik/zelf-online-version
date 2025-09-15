@@ -6,6 +6,15 @@ const Middleware = require("../middlewares/zelf-proof.middleware");
 
 const base = "/zelf-proof";
 
+module.exports = (server) => {
+	const PATH = config.basePath(base);
+
+	server.post(`${PATH}/encrypt`, Middleware.jwtValidation, Middleware.encryptValidation, Controller.encrypt);
+	server.post(`${PATH}/encrypt-qr-code`, Middleware.jwtValidation, Middleware.encryptValidation, Controller.encryptQRCode);
+	server.post(`${PATH}/decrypt`, Middleware.jwtValidation, Middleware.decryptValidation, Controller.decrypt);
+	server.post(`${PATH}/preview`, Middleware.jwtValidation, Middleware.previewValidation, Controller.preview);
+};
+
 /**
  * @swagger
  * components:
@@ -200,178 +209,170 @@ const base = "/zelf-proof";
  *           example: "faceBase64 is required"
  */
 
-module.exports = (server) => {
-	const PATH = config.basePath(base);
+/**
+ * @swagger
+ * /api/zelf-proof/encrypt:
+ *   post:
+ *     summary: Encrypt data with ZelfProof
+ *     description: Create an encrypted ZelfProof using biometric face verification. Supports liveness detection and multiple security levels.
+ *     tags: [ZelfProof - Encryption]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ZelfProofEncryptRequest'
+ *     responses:
+ *       200:
+ *         description: Data encrypted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofEncryptResponse'
+ *       403:
+ *         description: Access forbidden - requires super admin or client privileges
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofValidationError'
+ *       409:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofValidationError'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofError'
+ */
 
-	/**
-	 * @swagger
-	 * /api/zelf-proof/encrypt:
-	 *   post:
-	 *     summary: Encrypt data with ZelfProof
-	 *     description: Create an encrypted ZelfProof using biometric face verification. Supports liveness detection and multiple security levels.
-	 *     tags: [ZelfProof - Encryption]
-	 *     security:
-	 *       - bearerAuth: []
-	 *     requestBody:
-	 *       required: true
-	 *       content:
-	 *         application/json:
-	 *           schema:
-	 *             $ref: '#/components/schemas/ZelfProofEncryptRequest'
-	 *     responses:
-	 *       200:
-	 *         description: Data encrypted successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofEncryptResponse'
-	 *       403:
-	 *         description: Access forbidden - requires super admin or client privileges
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofValidationError'
-	 *       409:
-	 *         description: Validation error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofValidationError'
-	 *       500:
-	 *         description: Internal server error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofError'
-	 */
-	server.post(`${PATH}/encrypt`, Middleware.encryptValidation, Controller.encrypt);
+/**
+ * @swagger
+ * /api/zelf-proof/encrypt-qr-code:
+ *   post:
+ *     summary: Encrypt data with ZelfProof and generate QR code
+ *     description: Create an encrypted ZelfProof with QR code generation for easy sharing and verification.
+ *     tags: [ZelfProof - Encryption]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ZelfProofEncryptRequest'
+ *     responses:
+ *       200:
+ *         description: Data encrypted and QR code generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofEncryptResponse'
+ *       403:
+ *         description: Access forbidden - requires super admin or client privileges
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofValidationError'
+ *       409:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofValidationError'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofError'
+ */
 
-	/**
-	 * @swagger
-	 * /api/zelf-proof/encrypt-qr-code:
-	 *   post:
-	 *     summary: Encrypt data with ZelfProof and generate QR code
-	 *     description: Create an encrypted ZelfProof with QR code generation for easy sharing and verification.
-	 *     tags: [ZelfProof - Encryption]
-	 *     security:
-	 *       - bearerAuth: []
-	 *     requestBody:
-	 *       required: true
-	 *       content:
-	 *         application/json:
-	 *           schema:
-	 *             $ref: '#/components/schemas/ZelfProofEncryptRequest'
-	 *     responses:
-	 *       200:
-	 *         description: Data encrypted and QR code generated successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofEncryptResponse'
-	 *       403:
-	 *         description: Access forbidden - requires super admin or client privileges
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofValidationError'
-	 *       409:
-	 *         description: Validation error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofValidationError'
-	 *       500:
-	 *         description: Internal server error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofError'
-	 */
-	server.post(`${PATH}/encrypt-qr-code`, Middleware.encryptValidation, Controller.encryptQRCode);
+/**
+ * @swagger
+ * /api/zelf-proof/decrypt:
+ *   post:
+ *     summary: Decrypt ZelfProof data
+ *     description: Decrypt a ZelfProof using biometric face verification to access the original data.
+ *     tags: [ZelfProof - Decryption]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ZelfProofDecryptRequest'
+ *     responses:
+ *       200:
+ *         description: Data decrypted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofDecryptResponse'
+ *       403:
+ *         description: Access forbidden - requires super admin or client privileges
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofValidationError'
+ *       409:
+ *         description: Validation error or biometric verification failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofValidationError'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofError'
+ */
 
-	/**
-	 * @swagger
-	 * /api/zelf-proof/decrypt:
-	 *   post:
-	 *     summary: Decrypt ZelfProof data
-	 *     description: Decrypt a ZelfProof using biometric face verification to access the original data.
-	 *     tags: [ZelfProof - Decryption]
-	 *     security:
-	 *       - bearerAuth: []
-	 *     requestBody:
-	 *       required: true
-	 *       content:
-	 *         application/json:
-	 *           schema:
-	 *             $ref: '#/components/schemas/ZelfProofDecryptRequest'
-	 *     responses:
-	 *       200:
-	 *         description: Data decrypted successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofDecryptResponse'
-	 *       403:
-	 *         description: Access forbidden - requires super admin or client privileges
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofValidationError'
-	 *       409:
-	 *         description: Validation error or biometric verification failed
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofValidationError'
-	 *       500:
-	 *         description: Internal server error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofError'
-	 */
-	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decrypt);
-
-	/**
-	 * @swagger
-	 * /api/zelf-proof/preview:
-	 *   post:
-	 *     summary: Preview ZelfProof data
-	 *     description: Preview ZelfProof metadata without full decryption. Useful for validation and basic information retrieval.
-	 *     tags: [ZelfProof - Preview]
-	 *     security:
-	 *       - bearerAuth: []
-	 *     requestBody:
-	 *       required: true
-	 *       content:
-	 *         application/json:
-	 *           schema:
-	 *             $ref: '#/components/schemas/ZelfProofPreviewRequest'
-	 *     responses:
-	 *       200:
-	 *         description: Preview generated successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofPreviewResponse'
-	 *       403:
-	 *         description: Access forbidden - requires super admin or client privileges
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofValidationError'
-	 *       409:
-	 *         description: Validation error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofValidationError'
-	 *       500:
-	 *         description: Internal server error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/ZelfProofError'
-	 */
-	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.preview);
-};
+/**
+ * @swagger
+ * /api/zelf-proof/preview:
+ *   post:
+ *     summary: Preview ZelfProof data
+ *     description: Preview ZelfProof metadata without full decryption. Useful for validation and basic information retrieval.
+ *     tags: [ZelfProof - Preview]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ZelfProofPreviewRequest'
+ *     responses:
+ *       200:
+ *         description: Preview generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofPreviewResponse'
+ *       403:
+ *         description: Access forbidden - requires super admin or client privileges
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofValidationError'
+ *       409:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofValidationError'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ZelfProofError'
+ */

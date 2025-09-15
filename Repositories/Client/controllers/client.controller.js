@@ -7,11 +7,14 @@ const get = async (ctx) => {
 
 		ctx.body = data;
 	} catch (error) {
-		console.error({ error });
+		const _exception = errorHandler(error, ctx);
 
-		ctx.status = error.status || 500;
+		ctx.status = _exception.status || 500;
 
-		ctx.body = { error: error.message };
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
@@ -21,10 +24,14 @@ const show = async (ctx) => {
 
 		ctx.body = data;
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error, ctx);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
@@ -34,7 +41,7 @@ const create = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		const _exception = errorHandler(error);
+		const _exception = errorHandler(error, ctx);
 
 		ctx.status = _exception.status || 500;
 
@@ -57,10 +64,14 @@ const auth = async (ctx) => {
 
 		ctx.body = data;
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error, ctx);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
@@ -70,10 +81,14 @@ const update = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error, ctx);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
@@ -83,10 +98,14 @@ const destroy = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error, ctx);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
