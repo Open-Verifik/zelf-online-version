@@ -39,7 +39,7 @@ const generateDomainHoldDomain = (domain, name) => {
  * @param {Object} authUser
  */
 const leaseTag = async (params, authUser) => {
-	const { tagName, domain, duration, referralTagName } = params;
+	const { tagName, domain, referralTagName } = params;
 
 	const domainConfig = getDomainConfig(domain);
 
@@ -82,7 +82,6 @@ const leaseTag = async (params, authUser) => {
 
 	const tagObject = {
 		...dataToEncrypt.publicData,
-		duration,
 	};
 
 	TagsPartsModule.assignProperties(tagObject, dataToEncrypt, { eth, btc, solana, sui }, { ...params, password, referralTagObject }, domainConfig);
@@ -436,7 +435,7 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 		extraParams: {
 			origin: tagObject.origin || "online",
 			price: tagObject.price,
-			duration: tagObject.duration || 1,
+			duration: 1,
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 			expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
 			type: "mainnet",
@@ -506,7 +505,7 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, aut
 		solanaAddress: tagObject.solanaAddress,
 		extraParams: {
 			hasPassword: tagObject.hasPassword,
-			duration: tagObject.duration || 1,
+			duration: 1,
 			type: "hold",
 			origin: tagObject.origin || "online",
 			price: tagObject.price,
@@ -555,7 +554,3 @@ module.exports = {
 	confirmFreeTag,
 	saveHoldTagInIPFS,
 };
-
-//TODO bugs
-
-// [x] fix bug duration yearly = but it should be 1, 2, 3, 4, 5 or lifetime

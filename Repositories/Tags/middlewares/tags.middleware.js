@@ -12,6 +12,7 @@ const schemas = {
 		value: string(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]),
 		captchaToken: string(),
+		duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]),
 	},
 	leaseOffline: {
 		tagName: string().required(),
