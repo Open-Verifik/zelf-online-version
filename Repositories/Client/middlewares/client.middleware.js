@@ -16,7 +16,12 @@ const schemas = {
 	update: {},
 	destroy: {},
 	auth: {
-		email: string().required(),
+		email: string(),
+		countryCode: string(),
+		phone: string(),
+		faceBase64: string().required(),
+		masterPassword: string().required(),
+		identificationMethod: string().required(),
 	},
 };
 

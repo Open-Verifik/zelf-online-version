@@ -12,7 +12,7 @@ const encrypt = async (data) => {
 			record_id: data.identifier || data.record_id || data._id,
 			require_live_face: data.requireLiveness || true,
 			tolerance: data.tolerance || "REGULAR",
-			verifiers_auth_key: data.verifierKey || data.addPassword ? config.zelfEncrypt.serverKey : undefined,
+			verifiers_auth_key: data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
 		});
 
 		console.log({
@@ -22,7 +22,7 @@ const encrypt = async (data) => {
 			record_id: data.identifier || data.record_id || data._id,
 			require_live_face: data.requireLiveness || true,
 			tolerance: data.tolerance || "REGULAR",
-			verifiers_auth_key: data.verifierKey || data.addPassword ? config.zelfEncrypt.serverKey : undefined,
+			verifiers_auth_key: data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
 		});
 
 		const zelfProof = encryptedResponse.data.zelfProof;
@@ -123,9 +123,15 @@ const decrypt = async (data) => {
 
 const preview = async (data) => {
 	try {
+		console.log({
+			data,
+			senseprint_base_64: data.zelfProof,
+			verifiers_auth_key: data.verifierKey || (data.addServerPassword ? config.zelfEncrypt.serverKey : undefined),
+		});
+
 		const encryptedResponse = await axios.post("/zelf/preview", {
 			senseprint_base_64: data.zelfProof,
-			verifiers_auth_key: data.verifierKey || data.addPassword ? config.zelfEncrypt.serverKey : undefined,
+			verifiers_auth_key: data.verifierKey || (data.addServerPassword ? config.zelfEncrypt.serverKey : undefined),
 		});
 
 		return encryptedResponse?.data;

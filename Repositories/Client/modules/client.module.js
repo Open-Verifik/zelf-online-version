@@ -8,6 +8,7 @@ const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const zelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
 const OfflineProofModule = require("../../Mina/offline-proof");
+const axios = require("axios");
 
 const get = async (params = {}, authUser = {}) => {
 	if (params.email) {
@@ -68,7 +69,7 @@ const create = async (data) => {
 			zkProof,
 			mnemonic: generateMnemonic(12),
 		},
-		// password: data.password || undefined,
+		password: data.masterPassword || undefined,
 		identifier: data.email,
 		requireLiveness: true,
 		tolerance: data.tolerance || "REGULAR",
@@ -86,6 +87,7 @@ const create = async (data) => {
 		createdAt: new Date().toISOString(),
 		version: "1.0.0",
 		name: data.name,
+		hasPassword: data.masterPassword ? "true" : "false",
 	};
 
 	// Convert to JSON string and then to base64
@@ -148,7 +150,7 @@ const update = async (data, authUser) => {
 const destroy = async (data, authUser) => {};
 
 const auth = async (data, authUser) => {
-	const { email, countryCode, phone, faceBase64 } = data;
+	const { email, countryCode, phone, faceBase64, masterPassword } = data;
 
 	const zelfAccount = await get({ email, countryCode, phone });
 
@@ -158,6 +160,7 @@ const auth = async (data, authUser) => {
 		zelfProof: metadata.zelfProof,
 		faceBase64,
 		verifierKey: config.zelfEncrypt.serverKey,
+		password: masterPassword || undefined,
 	});
 
 	if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
@@ -165,7 +168,7 @@ const auth = async (data, authUser) => {
 	// from the zelfAccount.url we should get the json from that then asisgn the name to the zelfAccount.metadata.keyvalues.name
 	const jsonData = await axios.get(zelfAccount.url);
 
-	zelfAccount.metadata.keyvalues.name = jsonData.name;
+	zelfAccount.metadata.keyvalues.name = jsonData.data.name;
 
 	return {
 		zelfProof: metadata.zelfProof,
