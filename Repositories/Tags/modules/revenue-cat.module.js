@@ -54,8 +54,6 @@ const _handleWebhook = async (event) => {
 
 	const tagRecords = previewResult.arweave ? previewResult.arweave : previewResult.ipfs ? previewResult.ipfs : previewResult;
 
-	console.log({ event, tagRecords, previewQuery, previewResult });
-
 	if (!tagRecords.length) {
 		const error = new Error("tagName_not_found");
 		error.status = 404;
