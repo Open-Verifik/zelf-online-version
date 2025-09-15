@@ -103,7 +103,7 @@ const leaseTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value, environment, type, domainConfig } = params;
+	const { tagName, domain, key, value, environment, type, domainConfig, duration } = params;
 
 	const _domainConfig = domainConfig || getDomainConfig(domain);
 
@@ -116,6 +116,7 @@ const searchTag = async (params, authUser) => {
 			environment: environment || "all",
 			type: type || "both",
 			domainConfig: _domainConfig,
+			duration: duration || "1",
 		},
 		authUser
 	);

@@ -21,7 +21,7 @@ const TagsPartsModule = require("./tags-parts.module");
  * @returns {Object} - Search results
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value, domainConfig, environment, type } = params;
+	const { tagName, domain, key, value, domainConfig, environment, type, duration } = params;
 
 	try {
 		// Search in both IPFS and Arweave
@@ -46,7 +46,7 @@ const searchTag = async (params, authUser) => {
 		}
 
 		if (combinedResults.available) {
-			combinedResults.price = domainConfig.getPrice(tagName, "1");
+			combinedResults.price = domainConfig.getPrice(tagName, duration);
 		}
 
 		if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
