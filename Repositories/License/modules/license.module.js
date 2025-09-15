@@ -97,7 +97,7 @@ const getMyLicense = async (jwt) => {
 	const metadata = client.metadata.keyvalues;
 
 	// Search for all licenses with the same zelfProof
-	const myRecords = await IPFS.get({ key: "licenseZelfProof", value: metadata.zelfProof });
+	const myRecords = await IPFS.get({ key: "licenseZelfProof", value: metadata.accountZelfProof });
 
 	const myLicenses = [];
 
@@ -142,16 +142,18 @@ const createOrUpdateLicense = async (body, jwt) => {
 	try {
 		const { myLicense, zelfAccount } = await getMyLicense(jwt);
 
+		const accountZelfProof = zelfAccount.metadata.keyvalues.accountZelfProof;
+
 		// now we should validate if the zelfAccount is the owner of the license with the decrypted zelfProof
 		const decryptedZelfProof = await decrypt({
-			zelfProof: zelfAccount.metadata.keyvalues.zelfProof,
+			zelfProof: accountZelfProof,
 			faceBase64,
 			password: masterPassword || undefined,
 			verifierKey: config.zelfEncrypt.serverKey,
 		});
 
 		// validate if the domain being passed is registered or not because we need to compare the domain with the previous domain
-		await _checkIfDomainIsRegistered(body.domain, zelfAccount.metadata.keyvalues.zelfProof);
+		await _checkIfDomainIsRegistered(body.domain, accountZelfProof);
 
 		if (myLicense) {
 			// we will delete the previous license
@@ -166,7 +168,7 @@ const createOrUpdateLicense = async (body, jwt) => {
 			previousDomain: myLicense?.metadata.keyvalues.domain || "",
 			domain: body.domain,
 			owner: jwt.email,
-			zelfProof: zelfAccount.metadata.keyvalues.zelfProof,
+			zelfProof: accountZelfProof,
 			expiresAt: moment().add(1, "year").toISOString(),
 		};
 
@@ -183,7 +185,7 @@ const createOrUpdateLicense = async (body, jwt) => {
 					licenseSubscriptionId: "free",
 					licenseDomain: body.domain,
 					licenseOwner: jwt.email,
-					licenseZelfProof: zelfAccount.metadata.keyvalues.zelfProof,
+					licenseZelfProof: accountZelfProof,
 				},
 				name: `${body.domain}.license`,
 				pinIt: true,
@@ -249,7 +251,7 @@ const searchLicenseByHash = async (ipfsHash) => {
 				domain: licenseData.metadata.keyvalues.domain,
 				ipfsHash: licenseData.ipfs_pin_hash,
 				owner: licenseData.metadata.keyvalues.owner,
-				zelfProof: licenseData.metadata.keyvalues.zelfProof,
+				zelfProof: licenseData.metadata.keyvalues.licenseZelfProof,
 				createdAt: licenseData.date_pinned,
 				updatedAt: licenseData.date_pinned,
 			};
@@ -292,9 +294,7 @@ const _checkIfDomainIsRegistered = async (domain, zelfProof) => {
 
 	const foundDomain = domains[0];
 
-	console.log({ foundDomain });
-
-	if (foundDomain.metadata.keyvalues.zelfProof !== zelfProof) throw new Error("409:domain_already_registered");
+	if (foundDomain.metadata.keyvalues.licenseZelfProof !== zelfProof) throw new Error("409:domain_already_registered");
 };
 
 /**

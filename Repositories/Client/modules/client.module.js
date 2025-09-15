@@ -157,7 +157,7 @@ const auth = async (data, authUser) => {
 	const metadata = zelfAccount.metadata.keyvalues;
 
 	const decryptedZelfAccount = await zelfProofModule.decrypt({
-		zelfProof: metadata.zelfProof,
+		zelfProof: metadata.accountZelfProof,
 		faceBase64,
 		verifierKey: config.zelfEncrypt.serverKey,
 		password: masterPassword || undefined,
@@ -171,7 +171,7 @@ const auth = async (data, authUser) => {
 	zelfAccount.metadata.keyvalues.name = jsonData.data.name;
 
 	return {
-		zelfProof: metadata.zelfProof,
+		zelfProof: metadata.accountZelfProof,
 		zelfAccount,
 		ipfsHash: zelfAccount.cid,
 		zkProof: decryptedZelfAccount.metadata.zkProof,
