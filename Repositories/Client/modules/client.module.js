@@ -170,6 +170,8 @@ const auth = async (data, authUser) => {
 
 	zelfAccount.metadata.keyvalues.name = jsonData.data.name;
 
+	zelfAccount.metadata = { ...zelfAccount.metadata, ...zelfAccount.metadata.keyvalues, keyvalues: undefined };
+
 	return {
 		zelfProof: metadata.accountZelfProof,
 		zelfAccount,
@@ -179,7 +181,7 @@ const auth = async (data, authUser) => {
 		token: jwt.sign(
 			{
 				email: data.email,
-				exp: moment().add(1, "day").unix(),
+				exp: moment().add(30, "day").unix(),
 			},
 			config.JWT_SECRET
 		),

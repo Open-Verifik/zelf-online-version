@@ -46,16 +46,6 @@ const schemas = {
  * @param {*} next
  */
 const encryptValidation = async (ctx, next) => {
-	const authUser = ctx.state.user;
-
-	if (!authUser.superAdminId && !authUser.clientId) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "Access Forbidden" };
-
-		return;
-	}
-
 	const valid = validate(schemas.encrypt, ctx.request.body);
 
 	if (valid.error) {
@@ -77,16 +67,6 @@ const encryptValidation = async (ctx, next) => {
  * @param {*} next
  */
 const decryptValidation = async (ctx, next) => {
-	const authUser = ctx.state.user;
-
-	if (!authUser.superAdminId && !authUser.clientId) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "Access Forbidden" };
-
-		return;
-	}
-
 	const valid = validate(schemas.decrypt, ctx.request.body);
 
 	if (valid.error) {
@@ -107,16 +87,6 @@ const decryptValidation = async (ctx, next) => {
  * @param {*} next
  */
 const previewValidation = async (ctx, next) => {
-	const authUser = ctx.state.user;
-
-	if (!authUser.superAdminId && !authUser.clientId) {
-		ctx.status = 403;
-
-		ctx.body = { validationError: "Access Forbidden" };
-
-		return;
-	}
-
 	const valid = validate(schemas.preview, ctx.request.body);
 
 	if (valid.error) {
