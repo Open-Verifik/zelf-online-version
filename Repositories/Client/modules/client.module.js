@@ -1,5 +1,3 @@
-const Model = require("../models/client.model");
-const MongoORM = require("../../../Core/mongo-orm");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const config = require("../../../Core/config");
@@ -11,36 +9,74 @@ const OfflineProofModule = require("../../Mina/offline-proof");
 const axios = require("axios");
 
 const get = async (params = {}, authUser = {}) => {
+	// If specific email or phone is provided, get that specific account
 	if (params.email) {
 		const emailRecord = await IPFSModule.get({ key: "accountEmail", value: params.email });
-
 		if (emailRecord.length) return emailRecord[0];
 	}
 
 	if (params.phone) {
 		const phoneRecord = await IPFSModule.get({ key: "accountPhone", value: params.phone });
-
 		if (phoneRecord.length) return phoneRecord[0];
 	}
 
-	throw new Error("404:client_not_found");
+	// If no specific email/phone, return all client accounts with pagination
+	const allClientAccounts = await IPFSModule.get({ key: "accountType", value: "client_account" });
+
+	// Handle pagination if provided
+	const page = params.page || 1;
+	const limit = params.limit || 10;
+	const offset = (page - 1) * limit;
+
+	const paginatedResults = allClientAccounts;
+
+	return {
+		data: paginatedResults,
+		pagination: {
+			page,
+			limit,
+			total: allClientAccounts.length,
+			totalPages: Math.ceil(allClientAccounts.length / limit),
+			hasNext: offset + limit < allClientAccounts.length,
+			hasPrev: page > 1,
+		},
+	};
 };
 
 const show = async (params = {}, authUser = {}) => {
-	let queryParams = {
-		findOne: true,
-		...params,
+	// Use IPFS-based approach instead of MongoDB
+	// If specific email or phone is provided, get that specific account
+	if (params.email) {
+		const emailRecord = await IPFSModule.get({ key: "accountEmail", value: params.email });
+		if (emailRecord.length) return emailRecord[0];
+	}
+
+	if (params.phone) {
+		const phoneRecord = await IPFSModule.get({ key: "accountPhone", value: params.phone });
+		if (phoneRecord.length) return phoneRecord[0];
+	}
+
+	// If no specific identifier, return all client accounts
+	const allClientAccounts = await IPFSModule.get({ key: "accountType", value: "client_account" });
+
+	// Handle pagination if provided
+	const page = params.page || 1;
+	const limit = params.limit || 10;
+	const offset = (page - 1) * limit;
+
+	const paginatedResults = allClientAccounts.slice(offset, offset + limit);
+
+	return {
+		data: paginatedResults,
+		pagination: {
+			page,
+			limit,
+			total: allClientAccounts.length,
+			totalPages: Math.ceil(allClientAccounts.length / limit),
+			hasNext: offset + limit < allClientAccounts.length,
+			hasPrev: page > 1,
+		},
 	};
-
-	if (params.id || params._id) {
-		queryParams.where__id = params.id || params._id;
-	}
-
-	if (authUser?.superAdminId) {
-		queryParams.where__id = authUser.superAdminId;
-	}
-
-	return await MongoORM.buildQuery(queryParams, Model, null, populates);
 };
 
 const create = async (data) => {
@@ -132,23 +168,96 @@ const create = async (data) => {
 };
 
 const update = async (data, authUser) => {
-	const { clientId } = authUser;
+	const { name, email, countryCode, phone, company, faceBase64, masterPassword } = data;
 
-	const record = await Model.findOne({ _id: clientId });
+	// Handle profile update with biometric verification
+	if (faceBase64 && masterPassword) {
+		// Get the current zelfAccount from IPFS using email
+		const zelfAccount = await get({ email });
 
-	if (!record) throw new Error("404");
+		if (!zelfAccount) throw new Error("404:zelf_account_not_found");
 
-	if (data.increaseApiUsage) {
-		if (!record.apiUsage) record.apiUsage = 0;
+		const metadata = zelfAccount.metadata.keyvalues;
 
-		record.apiUsage += 1;
+		// Decrypt the current zelfAccount to validate biometrics
+		const decryptedZelfAccount = await zelfProofModule.decrypt({
+			zelfProof: metadata.accountZelfProof,
+			faceBase64,
+			verifierKey: config.zelfEncrypt.serverKey,
+			password: masterPassword || undefined,
+		});
+
+		if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
+
+		// Unpin the previous IPFS record
+		if (zelfAccount.ipfsHash || zelfAccount.ipfs_pin_hash) {
+			await IPFSModule.unPinFiles([zelfAccount.ipfsHash || zelfAccount.ipfs_pin_hash]);
+		}
+
+		// Create updated client data (same structure as create method)
+		const updatedClientData = {
+			email: email || metadata.email,
+			company: company || metadata.company,
+			countryCode: countryCode || metadata.countryCode,
+			phone: phone || metadata.phone,
+			language: metadata.language || "en",
+			zelfProof: metadata.accountZelfProof, // Keep the same zelfProof
+			createdAt: metadata.createdAt || new Date().toISOString(),
+			version: "1.0.0",
+			name: name || metadata.name,
+			hasPassword: metadata.hasPassword || "false",
+		};
+
+		// Convert to JSON string and then to base64
+		const jsonData = JSON.stringify(updatedClientData, null, 2);
+		const base64Data = Buffer.from(jsonData).toString("base64");
+
+		// Create new IPFS record with updated data (same metadata structure as create)
+		const newIpfsRecord = await IPFSModule.insert(
+			{
+				base64: base64Data,
+				metadata: {
+					accountEmail: updatedClientData.email,
+					accountPhone: updatedClientData.phone,
+					accountCompany: updatedClientData.company,
+					accountCountryCode: updatedClientData.countryCode,
+					accountZelfProof: metadata.accountZelfProof,
+					accountType: "client_account",
+					accountSubscriptionId: "free",
+				},
+				name: `${updatedClientData.email}.account`,
+				pinIt: true,
+			},
+			{ pro: true }
+		);
+
+		// Return updated zelfAccount data
+		return {
+			zelfProof: metadata.accountZelfProof,
+			zelfAccount: {
+				...zelfAccount,
+				ipfsHash: newIpfsRecord.ipfsHash || newIpfsRecord.ipfs_pin_hash,
+				url: newIpfsRecord.url,
+				metadata: {
+					...zelfAccount.metadata,
+					name: updatedClientData.name,
+				},
+			},
+			ipfsHash: newIpfsRecord.ipfsHash || newIpfsRecord.ipfs_pin_hash,
+		};
 	}
 
-	await record.save();
+	throw new Error("400:biometric_verification_required");
 };
 
 const destroy = async (data, authUser) => {};
 
+/**
+ * authenticate a client
+ * @param {Object} data
+ * @param {Object} authUser
+ * @returns {Object}
+ */
 const auth = async (data, authUser) => {
 	const { email, countryCode, phone, faceBase64, masterPassword } = data;
 
