@@ -15,21 +15,10 @@ const encrypt = async (data) => {
 			verifiers_auth_key: data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
 		});
 
-		console.log({
-			cleartext_data: data.publicData,
-			metadata: data.metadata,
-			password: data.password || undefined,
-			record_id: data.identifier || data.record_id || data._id,
-			require_live_face: data.requireLiveness || true,
-			tolerance: data.tolerance || "REGULAR",
-			verifiers_auth_key: data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
-		});
-
 		const zelfProof = encryptedResponse.data.zelfProof;
 
 		return { zelfProof };
 	} catch (exception) {
-		console.log({ exception });
 		const _error = exception.response?.data;
 
 		let error = new Error(_error?.message || "Something went wrong");

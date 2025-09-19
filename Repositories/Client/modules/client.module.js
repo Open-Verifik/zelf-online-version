@@ -9,7 +9,6 @@ const OfflineProofModule = require("../../Mina/offline-proof");
 const axios = require("axios");
 
 const get = async (params = {}, authUser = {}) => {
-	// If specific email or phone is provided, get that specific account
 	if (params.email) {
 		const emailRecord = await IPFSModule.get({ key: "accountEmail", value: params.email });
 
@@ -187,17 +186,12 @@ const update = async (data, authUser) => {
 
 	// validate if the email is taken and it's different from the current email
 	if (email && zelfAccount && metadata.accountEmail !== email) {
-		console.log({ email, metadata: metadata.accountEmail });
-
 		const emailAccount = await get({ email });
-
-		console.log({ emailAccount });
 
 		if (emailAccount) throw new Error("403:email_already_exists");
 	}
 
 	if (phone && zelfAccount && metadata.accountPhone !== phone) {
-		console.log({ phone, metadata: metadata.accountPhone });
 		const phoneAccount = await get({ phone });
 
 		if (phoneAccount) throw new Error("403:phone_already_exists");
@@ -267,6 +261,7 @@ const update = async (data, authUser) => {
 			metadata: newIpfsRecord.metadata,
 		},
 		ipfsHash: newIpfsRecord.IpfsHash,
+		message: "Account updated successfully",
 	};
 };
 
@@ -317,6 +312,106 @@ const auth = async (data, authUser) => {
 	};
 };
 
+/**
+ * Update client password
+ * @param {Object} data
+ * @param {Object} authUser
+ * @returns {Object}
+ */
+const updatePassword = async (data, authUser) => {
+	const { newPassword, confirmPassword, faceBase64, masterPassword } = data;
+
+	// Verify passwords match (this should already be validated in middleware, but double-check)
+	if (newPassword !== confirmPassword) {
+		throw new Error("409:passwords_do_not_match");
+	}
+
+	// Get the current client account
+	const zelfAccount = await get({ email: authUser.email });
+
+	if (!zelfAccount) throw new Error("404:client_not_found");
+
+	const metadata = zelfAccount.metadata.keyvalues;
+
+	// Decrypt the current zelfAccount to verify master password and get current data
+	const decryptedZelfAccount = await zelfProofModule.decrypt({
+		zelfProof: metadata.accountZelfProof,
+		faceBase64,
+		verifierKey: config.zelfEncrypt.serverKey,
+		password: masterPassword,
+	});
+
+	if (!decryptedZelfAccount) throw new Error("409:verification_failed");
+
+	// Update the password in the decrypted account data
+	const updatedAccountData = {
+		...decryptedZelfAccount,
+		metadata: {
+			...decryptedZelfAccount.metadata,
+			hasPassword: "true",
+		},
+	};
+
+	// Re-encrypt the account with the new password
+	const { zelfProof } = await zelfProofModule.encrypt({
+		publicData: {
+			email: metadata.accountEmail,
+			company: metadata.accountCompany,
+			countryCode: metadata.accountCountryCode,
+			phone: metadata.accountPhone,
+		},
+		metadata: decryptedZelfAccount.metadata,
+		identifier: metadata.accountEmail,
+		faceBase64,
+		verifierKey: config.zelfEncrypt.serverKey,
+		password: newPassword,
+	});
+
+	// get the data from the JSON inside the zelfAccount.url
+	const _jsonData = await axios.get(zelfAccount.url);
+
+	const ZelfAccount_JSON = _jsonData.data;
+
+	const newZelfAccountJSON = {
+		...metadata,
+		...ZelfAccount_JSON,
+		zelfProof,
+		hasPassword: "true",
+	};
+
+	// delete the previous ipfs record
+	await IPFSModule.unPinFiles([zelfAccount.ipfsHash]);
+
+	// Convert to JSON string and then to base64
+	const jsonData = JSON.stringify(newZelfAccountJSON, null, 2);
+
+	const base64Data = Buffer.from(jsonData).toString("base64");
+
+	// Create new IPFS record with updated data
+	const newIpfsRecord = await IPFSModule.insert(
+		{
+			base64: base64Data,
+			metadata,
+			name: `${authUser.email}.account`,
+			pinIt: true,
+		},
+		{ pro: true }
+	);
+
+	// Return updated zelfAccount data
+	return {
+		zelfProof,
+		zelfAccount: {
+			...zelfAccount,
+			ipfsHash: newIpfsRecord.IpfsHash,
+			url: newIpfsRecord.url,
+			metadata: newIpfsRecord.metadata,
+		},
+		ipfsHash: newIpfsRecord.IpfsHash,
+		message: "Password updated successfully",
+	};
+};
+
 module.exports = {
 	get,
 	show,
@@ -324,4 +419,5 @@ module.exports = {
 	update,
 	destroy,
 	auth,
+	updatePassword,
 };

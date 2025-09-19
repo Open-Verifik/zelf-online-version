@@ -31,6 +31,12 @@ const schemas = {
 		masterPassword: string().required(),
 		identificationMethod: string().required(),
 	},
+	updatePassword: {
+		newPassword: string().required().min(8),
+		confirmPassword: string().required(),
+		faceBase64: string().required(),
+		masterPassword: string().required(),
+	},
 };
 
 const getValidation = async (ctx, next) => {
@@ -129,6 +135,28 @@ const authValidation = async (ctx, next) => {
 	await next();
 };
 
+const updatePasswordValidation = async (ctx, next) => {
+	const valid = validate(schemas.updatePassword, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	// Additional validation: check if passwords match
+	const { newPassword, confirmPassword } = ctx.request.body;
+	if (newPassword !== confirmPassword) {
+		ctx.status = 409;
+		ctx.body = { validationError: "Passwords do not match" };
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	getValidation,
 	showValidation,
@@ -136,4 +164,5 @@ module.exports = {
 	updateValidation,
 	destroyValidation,
 	authValidation,
+	updatePasswordValidation,
 };

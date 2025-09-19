@@ -109,6 +109,23 @@ const destroy = async (ctx) => {
 	}
 };
 
+const updatePassword = async (ctx) => {
+	try {
+		const data = await Module.updatePassword(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
+	}
+};
+
 module.exports = {
 	get,
 	show,
@@ -116,4 +133,5 @@ module.exports = {
 	update,
 	destroy,
 	auth,
+	updatePassword,
 };
