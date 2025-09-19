@@ -14,6 +14,10 @@ const schemas = {
 		captchaToken: string(),
 		duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]),
 	},
+	searchByDomain: {
+		domain: string().required(),
+		storage: stringEnum(["IPFS", "Arweave", "Walrus"]).required(),
+	},
 	leaseOffline: {
 		tagName: string().required(),
 		domain: string().required(),
@@ -207,6 +211,23 @@ const getValidation = async (ctx, next) => {
 			};
 			return;
 		}
+	}
+
+	await next();
+};
+
+const searchByDomainValidation = async (ctx, next) => {
+	const { domain, storage } = ctx.request.query;
+
+	const valid = validate(schemas.searchByDomain, {
+		domain,
+		storage,
+	});
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
 	}
 
 	await next();
@@ -770,6 +791,7 @@ const updateValidation = async (ctx, next) => {
 
 module.exports = {
 	getValidation,
+	searchByDomainValidation,
 	leaseValidation,
 	leaseRecoveryValidation,
 	leaseOfflineValidation,

@@ -31,26 +31,30 @@ class Domain {
 			keyPrefix: domainData.storage?.keyPrefix || "tagName",
 			ipfsEnabled: domainData.storage?.ipfsEnabled || true,
 			arweaveEnabled: domainData.storage?.arweaveEnabled || true,
+			walrusEnabled: domainData.storage?.walrusEnabled || false,
 			backupEnabled: domainData.storage?.backupEnabled || false,
 		};
 
-		// Payment configuration
+		// Payment configuration - support both old and new structure
+		const paymentData = domainData.tagPaymentSettings || domainData.payment || {};
 		this.payment = {
-			methods: domainData.payment?.methods || ["coinbase", "crypto"],
-			currencies: domainData.payment?.currencies || ["USD"],
-			discounts: domainData.payment?.discounts || {
+			methods: paymentData.methods || ["coinbase", "crypto"],
+			currencies: paymentData.currencies || ["USD"],
+			discounts: paymentData.discounts || {
 				yearly: 0.1,
 				lifetime: 0.2,
 			},
-			rewardPrice: domainData.payment?.rewardPrice || 10,
-			whitelist: domainData.payment?.whitelist || "",
-			pricingTable: domainData.payment?.pricingTable || {},
+			rewardPrice: paymentData.rewardPrice || 10,
+			whitelist: paymentData.whitelist || {},
+			pricingTable: paymentData.pricingTable || {},
 		};
 
-		// Limits
+		// Limits - support both old and new structure
 		this.limits = {
-			maxTagsPerUser: domainData.limits?.maxTagsPerUser || 5,
-			maxTransferPerDay: domainData.limits?.maxTransferPerDay || 3,
+			tags: domainData.limits?.tags || domainData.limits?.maxTagsPerUser || 5,
+			zelfkeys: domainData.limits?.zelfkeys || domainData.limits?.maxTransferPerDay || 3,
+			maxTagsPerUser: domainData.limits?.maxTagsPerUser || domainData.limits?.tags || 5,
+			maxTransferPerDay: domainData.limits?.maxTransferPerDay || domainData.limits?.zelfkeys || 3,
 			maxRenewalPerDay: domainData.limits?.maxRenewalPerDay || 2,
 		};
 
@@ -276,11 +280,11 @@ class Domain {
 			status: this.status,
 			owner: this.owner,
 			description: this.description,
+			limits: this.limits,
 			features: this.features,
 			validation: this.validation,
 			storage: this.storage,
-			payment: this.payment,
-			limits: this.limits,
+			tagPaymentSettings: this.payment,
 			metadata: this.metadata,
 		};
 	}

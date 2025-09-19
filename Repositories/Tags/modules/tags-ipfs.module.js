@@ -43,6 +43,8 @@ const get = async (data) => {
 };
 
 const _formatRecord = (item) => {
+	console.log({ item });
+
 	const formattedResult = {
 		id: item.id || item.ID,
 		url: item.url,
@@ -51,10 +53,10 @@ const _formatRecord = (item) => {
 		user_id: item.user_id,
 		date_pinned: item.date_pinned || item.Timestamp,
 		date_unpinned: item.date_unpinned,
-		publicData: item.metadata?.keyvalues || item.metadata,
+		publicData: item.metadata?.keyvalues || item.metadata || item.keyvalues,
 	};
 
-	if (formattedResult.publicData.extraParams) {
+	if (formattedResult?.publicData?.extraParams) {
 		const extraParams = JSON.parse(formattedResult.publicData.extraParams);
 
 		Object.assign(formattedResult.publicData, extraParams);
@@ -159,28 +161,17 @@ const unPinFiles = async (CIDs = []) => {
  * Search for tags by domain
  * @param {Object} params - Search parameters
  * @param {string} params.domain - Domain name
- * @param {string} params.key - Search key
- * @param {string} params.value - Search value
  * @param {Object} authUser - Authenticated user
  * @returns {Array} - Search results
  */
 const searchByDomain = async (params, authUser) => {
-	const { domain, key, value } = params;
+	const { domain } = params;
 
-	// Get domain configuration
 	const domainConfig = getDomainConfig(domain);
 
-	if (!domainConfig) {
-		throw new Error("Domain not supported");
-	}
+	if (!domainConfig) throw new Error("Domain not supported");
 
-	// Search by domain-specific criteria
-	const searchParams = {
-		key: key || "domain",
-		value: value || domain,
-	};
-
-	return await IPFS.filter(searchParams.key, searchParams.value);
+	return await IPFS.filter("domain", domain);
 };
 
 /**

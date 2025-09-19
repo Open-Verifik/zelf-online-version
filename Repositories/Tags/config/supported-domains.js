@@ -96,7 +96,6 @@ const SUPPORTED_DOMAINS = {
 	avax: new Domain({
 		name: "avax",
 		type: "custom",
-		price: 100, // $1.00 in cents
 		holdSuffix: ".hold",
 		status: "active",
 		owner: "avalanche-community",
@@ -172,7 +171,6 @@ const SUPPORTED_DOMAINS = {
 	bdag: new Domain({
 		name: "bdag",
 		type: "enterprise",
-		price: 500, // $5.00 in cents
 		holdSuffix: ".hold",
 		status: "active",
 		owner: "blockDAG",

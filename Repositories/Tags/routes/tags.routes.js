@@ -11,6 +11,7 @@ module.exports = (server) => {
 
 	// Route definitions
 	server.get(`${PATH}/search`, Middleware.getValidation, Controller.searchTag); // [x]
+	server.get(`${PATH}/search-by-domain`, Middleware.searchByDomainValidation, Controller.searchTagsByDomain); // [x]
 	server.get(`${PATH}/preview`, Middleware.previewValidation, Controller.previewTag); // [x]
 
 	server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseTag); // [x]

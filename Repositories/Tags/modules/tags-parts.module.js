@@ -1,5 +1,5 @@
 const { decrypt, encrypt, preview, encryptQRCode } = require("../../ZelfProof/modules/zelf-proof.module");
-
+const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
 const { getDomainConfiguration, generateStorageKey, generateHoldDomain } = require("./domain-registry.module");
 const config = require("../../../Core/config");
 
@@ -354,16 +354,12 @@ const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainCo
 	tagObject.hasPassword = `${Boolean(payload.password)}`;
 };
 
-const _generateZelfProof = async (dataToEncrypt, tagObject, skipZelfProof = false, skipZelfProofQRCode = false) => {
-	if (!skipZelfProof) {
-		tagObject.zelfProof = (await encrypt(dataToEncrypt))?.zelfProof;
+const _generateZelfProof = async (dataToEncrypt, tagObject) => {
+	const zelfProofQRCode = (await encryptQRCode(dataToEncrypt))?.zelfQR;
 
-		if (!tagObject.zelfProof) throw new Error("409:Wallet_could_not_be_encrypted");
-	}
+	tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(zelfProofQRCode);
 
-	if (!skipZelfProofQRCode) {
-		tagObject.zelfProofQRCode = (await encryptQRCode(dataToEncrypt))?.zelfQR;
-	}
+	tagObject.zelfProofQRCode = zelfProofQRCode;
 };
 
 module.exports = {

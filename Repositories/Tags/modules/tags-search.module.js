@@ -2,6 +2,7 @@ const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const { getDomainConfiguration, isDomainActive } = require("./domain-registry.module");
 const TagsPartsModule = require("./tags-parts.module");
+const { QRZelfProofExtractor } = require("./qr-zelfproof-extractor.module");
 
 /**
  * Tags Search Module
@@ -51,6 +52,22 @@ const searchTag = async (params, authUser) => {
 
 		if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
 			combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
+
+		// Extract ZelfProof from QR code if it's not already present in metadata
+		if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
+			try {
+				const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
+				console.log("extractedZelfProof", extractedZelfProof);
+				if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
+					combinedResults.tagObject.zelfProof = extractedZelfProof;
+					console.log("Successfully extracted ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
+				} else {
+					console.log("Failed to extract valid ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
+				}
+			} catch (error) {
+				console.error("Error extracting ZelfProof from QR code:", error);
+			}
+		}
 
 		return combinedResults;
 	} catch (error) {
@@ -195,7 +212,9 @@ const searchHoldDomain = async (params, authUser) => {
  * @returns {Object} - Domain search results
  */
 const searchByDomain = async (params, authUser) => {
-	const { domain, key, value } = params;
+	const { domain, storage } = params;
+
+	console.log("searchByDomain", params);
 
 	// Validate domain
 	if (!isDomainActive(domain)) {
@@ -206,29 +225,11 @@ const searchByDomain = async (params, authUser) => {
 		};
 	}
 
-	try {
-		// Search in both IPFS and Arweave
-		const [ipfsResults, arweaveResults] = await Promise.all([
-			TagsIPFSModule.searchByDomain({ domain, key, value }, authUser),
-			TagsArweaveModule.searchByDomain({ domain, key, value }, authUser),
-		]);
-
-		// Combine results
-		const combinedResults = {
-			ipfs: ipfsResults,
-			arweave: arweaveResults,
-			domain: domain,
-			totalResults: ipfsResults.length + arweaveResults.length,
-		};
-
-		return combinedResults;
-	} catch (error) {
-		console.error("Error searching by domain:", error);
-		return {
-			available: false,
-			error: error.message,
-			domain: domain,
-		};
+	switch (storage) {
+		case "IPFS":
+			return await TagsIPFSModule.searchByDomain({ domain }, authUser);
+		case "Arweave":
+			return await TagsArweaveModule.searchByDomain({ domain }, authUser);
 	}
 };
 
@@ -274,6 +275,25 @@ const searchByStorageKey = async (params, authUser) => {
 			combinedResults.tagObject = ipfsResults[0];
 		} else if (arweaveResults.length > 0) {
 			combinedResults.tagObject = arweaveResults[0];
+		}
+
+		// Generate QR code and extract ZelfProof if needed
+		if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
+			combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
+
+		// Extract ZelfProof from QR code if it's not already present in metadata
+		if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
+			try {
+				const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
+				if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
+					combinedResults.tagObject.zelfProof = extractedZelfProof;
+					console.log("Successfully extracted ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
+				} else {
+					console.log("Failed to extract valid ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
+				}
+			} catch (error) {
+				console.error("Error extracting ZelfProof from QR code:", error);
+			}
 		}
 
 		return combinedResults;

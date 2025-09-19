@@ -27,7 +27,6 @@ const generateDomainHoldDomain = (domain, name) => {
 	try {
 		return generateHoldDomain(domain, name);
 	} catch (error) {
-		console.error(`Error generating hold domain for ${domain}:`, error);
 		return generateHoldDomain("zelf", name); // Fallback to zelf
 	}
 };

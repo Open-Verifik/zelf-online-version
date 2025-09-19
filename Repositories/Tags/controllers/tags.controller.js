@@ -4,6 +4,7 @@ const { updateOldTagObject } = require("../modules/my-tags.module");
 const TagsRecoveryModule = require("../modules/tags-recovery.module");
 const HttpHandler = require("../../../Core/http-handler");
 const TagsOfflineModule = require("../modules/tags-offline.module");
+const TagsSearchModule = require("../modules/tags-search.module");
 
 /**
  * Standard error handler for controllers
@@ -90,6 +91,30 @@ const searchTag = async (ctx) => {
 		ctx.body = { data };
 	} catch (error) {
 		handleError(ctx, error);
+	}
+};
+
+/**
+ * Search for a tag (v2)
+ * @param {Object} ctx - Koa context
+ * @returns {Object} - Search results
+ */
+const searchTagsByDomain = async (ctx) => {
+	try {
+		const { domain, storage } = ctx.request.query;
+
+		let data = await TagsSearchModule.searchByDomain({ domain, storage }, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = HttpHandler.errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = {
+			message: _exception.message,
+			code: _exception.code,
+		};
 	}
 };
 
@@ -344,6 +369,7 @@ const update = async (ctx) => {
 
 module.exports = {
 	searchTag,
+	searchTagsByDomain,
 	leaseTag,
 	leaseRecovery,
 	leaseOfflineTag,
