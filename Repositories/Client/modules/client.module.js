@@ -208,9 +208,11 @@ const update = async (data, authUser) => {
 		if (phoneAccount) throw new Error("403:phone_already_exists");
 	}
 
+	const accountJSON = await axios.get(zelfAccount.url);
+
 	// Decrypt the current zelfAccount to validate biometrics
 	const decryptedZelfAccount = await zelfProofModule.decrypt({
-		zelfProof: metadata.accountZelfProof,
+		zelfProof: accountJSON.data.zelfProof,
 		faceBase64,
 		verifierKey: config.zelfEncrypt.serverKey,
 		password: masterPassword || undefined,
@@ -230,7 +232,7 @@ const update = async (data, authUser) => {
 		countryCode: cleanCountryCode || metadata.accountCountryCode,
 		phone: phone || metadata.accountPhone,
 		language: metadata.language || "en",
-		zelfProof: metadata.accountZelfProof, // Keep the same zelfProof
+		zelfProof: accountJSON.data.zelfProof, // Keep the same zelfProof
 		createdAt: metadata.createdAt || new Date().toISOString(),
 		version: "1.0.0",
 		name: name || metadata.accountName,
@@ -251,7 +253,6 @@ const update = async (data, authUser) => {
 				accountPhone: updatedClientData.phone,
 				accountCompany: updatedClientData.company,
 				accountCountryCode: updatedClientData.countryCode,
-				accountZelfProof: metadata.accountZelfProof,
 				accountType: "client_account",
 				accountSubscriptionId: "free",
 				accountName: updatedClientData.name,
@@ -264,12 +265,12 @@ const update = async (data, authUser) => {
 
 	// Return updated zelfAccount data
 	return {
-		zelfProof: metadata.accountZelfProof,
+		zelfProof: accountJSON.data.zelfProof,
 		zelfAccount: {
 			...zelfAccount,
 			ipfsHash: newIpfsRecord.IpfsHash,
 			url: newIpfsRecord.url,
-			metadata: newIpfsRecord.publicData,
+			publicData: newIpfsRecord.publicData,
 		},
 		ipfsHash: newIpfsRecord.IpfsHash,
 		message: "Account updated successfully",
@@ -289,10 +290,14 @@ const auth = async (data, authUser) => {
 
 	const zelfAccount = await get({ email, countryCode, phone });
 
-	const metadata = zelfAccount.publicData;
+	const accountJSON = await axios.get(zelfAccount.url);
+
+	console.log({ accountJSON });
+
+	if (!accountJSON.data?.zelfProof) throw new Error("409:account_doesnt_contain_zelf_proof");
 
 	const decryptedZelfAccount = await zelfProofModule.decrypt({
-		zelfProof: metadata.accountZelfProof,
+		zelfProof: accountJSON.data.zelfProof,
 		faceBase64,
 		verifierKey: config.zelfEncrypt.serverKey,
 		password: masterPassword || undefined,
@@ -300,13 +305,10 @@ const auth = async (data, authUser) => {
 
 	if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
 
-	// from the zelfAccount.url we should get the json from that then asisgn the name to the zelfAccount.metadata.name
-	const jsonData = await axios.get(zelfAccount.url);
-
-	zelfAccount.publicData.name = jsonData.data.name;
+	zelfAccount.publicData.name = accountJSON.data.name;
 
 	return {
-		zelfProof: metadata.accountZelfProof,
+		zelfProof: accountJSON.data.zelfProof,
 		zelfAccount,
 		ipfsHash: zelfAccount.cid,
 		zkProof: decryptedZelfAccount.metadata.zkProof,
@@ -340,11 +342,15 @@ const updatePassword = async (data, authUser) => {
 
 	if (!zelfAccount) throw new Error("404:client_not_found");
 
+	const accountJSON = await axios.get(zelfAccount.url);
+
+	if (!accountJSON.data?.zelfProof) throw new Error("409:account_doesnt_contain_zelf_proof");
+
 	const metadata = zelfAccount.publicData;
 
 	// Decrypt the current zelfAccount to verify master password and get current data
 	const decryptedZelfAccount = await zelfProofModule.decrypt({
-		zelfProof: metadata.accountZelfProof,
+		zelfProof: accountJSON.data.zelfProof,
 		faceBase64,
 		verifierKey: config.zelfEncrypt.serverKey,
 		password: masterPassword,
@@ -376,7 +382,7 @@ const updatePassword = async (data, authUser) => {
 		password: newPassword,
 	});
 
-	zelfAccount.publicData.name = jsonData.data.name;
+	zelfAccount.publicData.name = accountJSON.data.name;
 
 	// get the data from the JSON inside the zelfAccount.url
 	const _jsonData = await axios.get(zelfAccount.url);
@@ -416,7 +422,7 @@ const updatePassword = async (data, authUser) => {
 			...zelfAccount,
 			ipfsHash: newIpfsRecord.IpfsHash,
 			url: newIpfsRecord.url,
-			metadata: newIpfsRecord.publicData,
+			publicData: newIpfsRecord.publicData,
 		},
 		ipfsHash: newIpfsRecord.IpfsHash,
 		message: "Password updated successfully",
