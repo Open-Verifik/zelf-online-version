@@ -43,8 +43,6 @@ const get = async (data) => {
 };
 
 const _formatRecord = (item) => {
-	console.log({ item });
-
 	const formattedResult = {
 		id: item.id || item.ID,
 		url: item.url,
@@ -53,7 +51,7 @@ const _formatRecord = (item) => {
 		user_id: item.user_id,
 		date_pinned: item.date_pinned || item.Timestamp,
 		date_unpinned: item.date_unpinned,
-		publicData: item.metadata?.keyvalues || item.metadata || item.keyvalues,
+		publicData: item.publicData || item.metadata?.keyvalues || item.metadata || item.keyvalues,
 	};
 
 	if (formattedResult?.publicData?.extraParams) {

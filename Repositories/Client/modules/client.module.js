@@ -8,6 +8,12 @@ const { generateMnemonic } = require("../../Wallet/modules/helpers");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const axios = require("axios");
 
+/**
+ *
+ * @param {Object} params
+ * @param {Object} authUser
+ * @returns
+ */
 const get = async (params = {}, authUser = {}) => {
 	if (params.email) {
 		const emailRecord = await IPFSModule.get({ key: "accountEmail", value: params.email });
@@ -44,6 +50,12 @@ const get = async (params = {}, authUser = {}) => {
 	};
 };
 
+/**
+ *
+ * @param {Object} params
+ * @param {Object} authUser
+ * @returns
+ */
 const show = async (params = {}, authUser = {}) => {
 	// Use IPFS-based approach instead of MongoDB
 	// If specific email or phone is provided, get that specific account
@@ -155,7 +167,7 @@ const create = async (data) => {
 		{ pro: true }
 	);
 
-	zelfAccount.metadata.name = data.name;
+	zelfAccount.publicData.name = data.name;
 
 	return {
 		zelfProof,
@@ -181,7 +193,7 @@ const update = async (data, authUser) => {
 	// validate if the email is taken and it's different from the current email
 	const zelfAccount = await get({ email: authUser.email });
 
-	const metadata = zelfAccount.metadata.keyvalues;
+	const metadata = zelfAccount.publicData;
 
 	// validate if the email is taken and it's different from the current email
 	if (email && zelfAccount && metadata.accountEmail !== email) {
@@ -257,7 +269,7 @@ const update = async (data, authUser) => {
 			...zelfAccount,
 			ipfsHash: newIpfsRecord.IpfsHash,
 			url: newIpfsRecord.url,
-			metadata: newIpfsRecord.metadata,
+			metadata: newIpfsRecord.publicData,
 		},
 		ipfsHash: newIpfsRecord.IpfsHash,
 		message: "Account updated successfully",
@@ -277,7 +289,7 @@ const auth = async (data, authUser) => {
 
 	const zelfAccount = await get({ email, countryCode, phone });
 
-	const metadata = zelfAccount.metadata.keyvalues;
+	const metadata = zelfAccount.publicData;
 
 	const decryptedZelfAccount = await zelfProofModule.decrypt({
 		zelfProof: metadata.accountZelfProof,
@@ -288,12 +300,10 @@ const auth = async (data, authUser) => {
 
 	if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
 
-	// from the zelfAccount.url we should get the json from that then asisgn the name to the zelfAccount.metadata.keyvalues.name
+	// from the zelfAccount.url we should get the json from that then asisgn the name to the zelfAccount.metadata.name
 	const jsonData = await axios.get(zelfAccount.url);
 
-	zelfAccount.metadata.keyvalues.name = jsonData.data.name;
-
-	zelfAccount.metadata = { ...zelfAccount.metadata, ...zelfAccount.metadata.keyvalues, keyvalues: undefined };
+	zelfAccount.publicData.name = jsonData.data.name;
 
 	return {
 		zelfProof: metadata.accountZelfProof,
@@ -330,7 +340,7 @@ const updatePassword = async (data, authUser) => {
 
 	if (!zelfAccount) throw new Error("404:client_not_found");
 
-	const metadata = zelfAccount.metadata.keyvalues;
+	const metadata = zelfAccount.publicData;
 
 	// Decrypt the current zelfAccount to verify master password and get current data
 	const decryptedZelfAccount = await zelfProofModule.decrypt({
@@ -365,6 +375,8 @@ const updatePassword = async (data, authUser) => {
 		verifierKey: config.zelfEncrypt.serverKey,
 		password: newPassword,
 	});
+
+	zelfAccount.publicData.name = jsonData.data.name;
 
 	// get the data from the JSON inside the zelfAccount.url
 	const _jsonData = await axios.get(zelfAccount.url);
@@ -404,7 +416,7 @@ const updatePassword = async (data, authUser) => {
 			...zelfAccount,
 			ipfsHash: newIpfsRecord.IpfsHash,
 			url: newIpfsRecord.url,
-			metadata: newIpfsRecord.metadata,
+			metadata: newIpfsRecord.publicData,
 		},
 		ipfsHash: newIpfsRecord.IpfsHash,
 		message: "Password updated successfully",

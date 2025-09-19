@@ -148,7 +148,7 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 			pinned: true,
 			web3: true,
 			name: filename,
-			metadata: uploadResponse.keyvalues,
+			publicData: uploadResponse.keyvalues,
 			// Keep backward compatibility with old field names
 			IpfsHash: uploadResponse.cid,
 			Keyvalues: uploadResponse.keyvalues,
@@ -214,11 +214,9 @@ const filter = async (property = "name", value) => {
 		// Use the new Pinata SDK v2.5.0 with JWT authentication
 		if (property === "name") {
 			const nameResponse = await web3Instance.files.public.list().name(value);
+
 			files = nameResponse.files || [];
 		} else {
-			// For keyvalues, use the v3 format with formatMetadataForPinata
-			console.log({ key: property, value });
-
 			const keyvaluesResponse = await web3Instance.files.public.list().keyvalues({ [property]: value });
 
 			files = keyvaluesResponse.files || [];
@@ -237,7 +235,10 @@ const filter = async (property = "name", value) => {
 
 			// Parse metadata keyvalues to simple format
 			if (file.metadata && file.metadata.keyvalues) {
-				file.metadata.keyvalues = parseMetadataFromPinata(file.metadata.keyvalues);
+				file.publicData = parseMetadataFromPinata(file.metadata.keyvalues);
+			} else if (file.keyvalues) {
+				file.publicData = parseMetadataFromPinata(file.keyvalues);
+				delete file.keyvalues;
 			}
 		}
 
