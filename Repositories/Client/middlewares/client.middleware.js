@@ -13,7 +13,15 @@ const schemas = {
 		company: string().required(),
 		faceBase64: string().required(),
 	},
-	update: {},
+	update: {
+		faceBase64: string().required(),
+		masterPassword: string().required(),
+		name: string(),
+		email: string(),
+		countryCode: string(),
+		phone: string(),
+		company: string(),
+	},
 	destroy: {},
 	auth: {
 		email: string(),

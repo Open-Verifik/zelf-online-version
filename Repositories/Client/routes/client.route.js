@@ -9,8 +9,7 @@ module.exports = (server) => {
 	const PATH = config.basePath(base);
 
 	// Routes
-	server.post(`${PATH}/auth`, Middleware.authValidation, Controller.auth);
-	server.put(`${PATH}/:${primaryKey}`, Middleware.updateValidation, Controller.update);
+	server.put(`${PATH}/sync`, Middleware.updateValidation, Controller.update);
 	server.del(`${PATH}/:${primaryKey}`, Middleware.destroyValidation, Controller.destroy);
 };
 

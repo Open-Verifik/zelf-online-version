@@ -80,6 +80,9 @@ const show = async (params = {}, authUser = {}) => {
 };
 
 const create = async (data) => {
+	// Clean country code to remove any flag emojis (e.g., "🇵🇦 +507" -> "+507")
+	const cleanCountryCode = data.countryCode ? data.countryCode.replace(/^[^\d+]*/, "").trim() : data.countryCode;
+
 	const emailRecord = await IPFSModule.get({ key: "accountEmail", value: data.email });
 
 	if (emailRecord.length) throw new Error("403:email_already_exists");
@@ -96,7 +99,7 @@ const create = async (data) => {
 		publicData: {
 			email: data.email,
 			company: data.company,
-			countryCode: data.countryCode,
+			countryCode: cleanCountryCode,
 			phone: data.phone,
 		},
 		faceBase64: data.faceBase64,
@@ -139,7 +142,7 @@ const create = async (data) => {
 				accountEmail: data.email,
 				accountPhone: data.phone,
 				accountCompany: data.company,
-				accountCountryCode: data.countryCode,
+				accountCountryCode: cleanCountryCode,
 				accountZelfProof: zelfProof,
 				accountType: "client_account",
 				accountSubscriptionId: "free",
@@ -170,84 +173,93 @@ const create = async (data) => {
 const update = async (data, authUser) => {
 	const { name, email, countryCode, phone, company, faceBase64, masterPassword } = data;
 
-	// Handle profile update with biometric verification
-	if (faceBase64 && masterPassword) {
-		// Get the current zelfAccount from IPFS using email
-		const zelfAccount = await get({ email });
+	// Clean country code to remove any flag emojis (e.g., "🇵🇦 +507" -> "+507")
+	const cleanCountryCode = countryCode ? countryCode.replace(/^[^\d+]*/, "").trim() : null;
 
-		if (!zelfAccount) throw new Error("404:zelf_account_not_found");
+	// validate if the email is taken and it's different from the current email
+	const zelfAccount = await get({ email: authUser.email });
 
-		const metadata = zelfAccount.metadata.keyvalues;
+	const metadata = zelfAccount.metadata.keyvalues;
 
-		// Decrypt the current zelfAccount to validate biometrics
-		const decryptedZelfAccount = await zelfProofModule.decrypt({
-			zelfProof: metadata.accountZelfProof,
-			faceBase64,
-			verifierKey: config.zelfEncrypt.serverKey,
-			password: masterPassword || undefined,
-		});
+	// validate if the email is taken and it's different from the current email
+	if (email && zelfAccount && metadata.accountEmail !== email) {
+		const emailAccount = await get({ email });
 
-		if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
-
-		// Unpin the previous IPFS record
-		if (zelfAccount.ipfsHash || zelfAccount.ipfs_pin_hash) {
-			await IPFSModule.unPinFiles([zelfAccount.ipfsHash || zelfAccount.ipfs_pin_hash]);
-		}
-
-		// Create updated client data (same structure as create method)
-		const updatedClientData = {
-			email: email || metadata.email,
-			company: company || metadata.company,
-			countryCode: countryCode || metadata.countryCode,
-			phone: phone || metadata.phone,
-			language: metadata.language || "en",
-			zelfProof: metadata.accountZelfProof, // Keep the same zelfProof
-			createdAt: metadata.createdAt || new Date().toISOString(),
-			version: "1.0.0",
-			name: name || metadata.name,
-			hasPassword: metadata.hasPassword || "false",
-		};
-
-		// Convert to JSON string and then to base64
-		const jsonData = JSON.stringify(updatedClientData, null, 2);
-		const base64Data = Buffer.from(jsonData).toString("base64");
-
-		// Create new IPFS record with updated data (same metadata structure as create)
-		const newIpfsRecord = await IPFSModule.insert(
-			{
-				base64: base64Data,
-				metadata: {
-					accountEmail: updatedClientData.email,
-					accountPhone: updatedClientData.phone,
-					accountCompany: updatedClientData.company,
-					accountCountryCode: updatedClientData.countryCode,
-					accountZelfProof: metadata.accountZelfProof,
-					accountType: "client_account",
-					accountSubscriptionId: "free",
-				},
-				name: `${updatedClientData.email}.account`,
-				pinIt: true,
-			},
-			{ pro: true }
-		);
-
-		// Return updated zelfAccount data
-		return {
-			zelfProof: metadata.accountZelfProof,
-			zelfAccount: {
-				...zelfAccount,
-				ipfsHash: newIpfsRecord.ipfsHash || newIpfsRecord.ipfs_pin_hash,
-				url: newIpfsRecord.url,
-				metadata: {
-					...zelfAccount.metadata,
-					name: updatedClientData.name,
-				},
-			},
-			ipfsHash: newIpfsRecord.ipfsHash || newIpfsRecord.ipfs_pin_hash,
-		};
+		if (emailAccount) throw new Error("403:email_already_exists");
 	}
 
-	throw new Error("400:biometric_verification_required");
+	if (phone && zelfAccount && metadata.accountPhone !== phone) {
+		console.log({ phone, metadata: metadata.accountPhone });
+		const phoneAccount = await get({ phone });
+
+		if (phoneAccount) throw new Error("403:phone_already_exists");
+	}
+
+	// Decrypt the current zelfAccount to validate biometrics
+	const decryptedZelfAccount = await zelfProofModule.decrypt({
+		zelfProof: metadata.accountZelfProof,
+		faceBase64,
+		verifierKey: config.zelfEncrypt.serverKey,
+		password: masterPassword || undefined,
+	});
+
+	if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
+
+	// Unpin the previous IPFS record
+	if (zelfAccount.ipfsHash || zelfAccount.ipfs_pin_hash) {
+		await IPFSModule.unPinFiles([zelfAccount.ipfsHash || zelfAccount.ipfs_pin_hash]);
+	}
+
+	// Create updated client data (same structure as create method)
+	const updatedClientData = {
+		email: email || metadata.accountEmail,
+		company: company || metadata.accountCompany,
+		countryCode: cleanCountryCode || metadata.accountCountryCode,
+		phone: phone || metadata.accountPhone,
+		language: metadata.language || "en",
+		zelfProof: metadata.accountZelfProof, // Keep the same zelfProof
+		createdAt: metadata.createdAt || new Date().toISOString(),
+		version: "1.0.0",
+		name: name || metadata.accountName,
+		hasPassword: metadata.hasPassword || "false",
+	};
+
+	// Convert to JSON string and then to base64
+	const jsonData = JSON.stringify(updatedClientData, null, 2);
+
+	const base64Data = Buffer.from(jsonData).toString("base64");
+
+	// Create new IPFS record with updated data (same metadata structure as create)
+	const newIpfsRecord = await IPFSModule.insert(
+		{
+			base64: base64Data,
+			metadata: {
+				accountEmail: updatedClientData.email,
+				accountPhone: updatedClientData.phone,
+				accountCompany: updatedClientData.company,
+				accountCountryCode: updatedClientData.countryCode,
+				accountZelfProof: metadata.accountZelfProof,
+				accountType: "client_account",
+				accountSubscriptionId: "free",
+				accountName: updatedClientData.name,
+			},
+			name: `${updatedClientData.email}.account`,
+			pinIt: true,
+		},
+		{ pro: true }
+	);
+
+	// Return updated zelfAccount data
+	return {
+		zelfProof: metadata.accountZelfProof,
+		zelfAccount: {
+			...zelfAccount,
+			ipfsHash: newIpfsRecord.IpfsHash,
+			url: newIpfsRecord.url,
+			metadata: newIpfsRecord.metadata,
+		},
+		ipfsHash: newIpfsRecord.IpfsHash,
+	};
 };
 
 const destroy = async (data, authUser) => {};
