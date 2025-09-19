@@ -16,6 +16,8 @@ const WalrusModule = require("../../Walrus/modules/walrus.module");
 const { generateHoldDomain } = require("./domain-registry.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const TagsRegistrationModule = require("./tags-registration.module");
+const axios = require("axios");
+const { extractZelfProofFromQR } = require("./qr-zelfproof-extractor.module");
 
 /**
  * Generate domain-specific hold domain
@@ -128,7 +130,7 @@ const searchTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const decryptTag = async (params, authUser) => {
-	const { tagName, domain, zelfProof } = params;
+	const { tagName, domain } = params;
 
 	const domainConfig = getDomainConfig(domain);
 
@@ -144,7 +146,7 @@ const decryptTag = async (params, authUser) => {
 		addServerPassword: Boolean(params.addServerPassword),
 		faceBase64: face,
 		password,
-		zelfProof: tagObject.publicData.zelfProof || zelfProof,
+		zelfProof: tagObject.zelfProof,
 	});
 
 	if (decryptedZelfProof.error) {
