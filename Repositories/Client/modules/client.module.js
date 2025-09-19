@@ -146,7 +146,6 @@ const create = async (data) => {
 				accountPhone: data.phone,
 				accountCompany: data.company,
 				accountCountryCode: cleanCountryCode,
-				accountZelfProof: zelfProof,
 				accountType: "client_account",
 				accountSubscriptionId: "free",
 			},
