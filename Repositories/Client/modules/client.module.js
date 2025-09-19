@@ -12,12 +12,14 @@ const get = async (params = {}, authUser = {}) => {
 	// If specific email or phone is provided, get that specific account
 	if (params.email) {
 		const emailRecord = await IPFSModule.get({ key: "accountEmail", value: params.email });
-		if (emailRecord.length) return emailRecord[0];
+
+		return emailRecord.length ? emailRecord[0] : null;
 	}
 
 	if (params.phone) {
 		const phoneRecord = await IPFSModule.get({ key: "accountPhone", value: params.phone });
-		if (phoneRecord.length) return phoneRecord[0];
+
+		return phoneRecord.length ? phoneRecord[0] : null;
 	}
 
 	// If no specific email/phone, return all client accounts with pagination
@@ -48,12 +50,14 @@ const show = async (params = {}, authUser = {}) => {
 	// If specific email or phone is provided, get that specific account
 	if (params.email) {
 		const emailRecord = await IPFSModule.get({ key: "accountEmail", value: params.email });
-		if (emailRecord.length) return emailRecord[0];
+
+		return emailRecord.length ? emailRecord[0] : null;
 	}
 
 	if (params.phone) {
 		const phoneRecord = await IPFSModule.get({ key: "accountPhone", value: params.phone });
-		if (phoneRecord.length) return phoneRecord[0];
+
+		return phoneRecord.length ? phoneRecord[0] : null;
 	}
 
 	// If no specific identifier, return all client accounts
@@ -183,7 +187,11 @@ const update = async (data, authUser) => {
 
 	// validate if the email is taken and it's different from the current email
 	if (email && zelfAccount && metadata.accountEmail !== email) {
+		console.log({ email, metadata: metadata.accountEmail });
+
 		const emailAccount = await get({ email });
+
+		console.log({ emailAccount });
 
 		if (emailAccount) throw new Error("403:email_already_exists");
 	}
