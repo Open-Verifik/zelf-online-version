@@ -49,11 +49,8 @@ class ZelfProofUtils {
 	 */
 	static async extractZelfProof(base64Image) {
 		try {
-			console.log("Starting ZelfProof extraction...");
-
 			// Check if canvas is available
 			if (!createCanvas || !loadImage) {
-				console.warn("Canvas module not available, cannot extract ZelfProof from QR code");
 				return null;
 			}
 
@@ -102,11 +99,8 @@ class ZelfProofUtils {
 			}
 
 			if (!qrResult) {
-				console.log("No QR code detected in image");
 				return null;
 			}
-
-			console.log("QR code detected, processing result...");
 
 			// Handle jsQR result (preferred)
 			if (jsQR && qrResult.binaryData) {
@@ -119,7 +113,6 @@ class ZelfProofUtils {
 			// Handle jsQR result with text data (when QR contains base64 string)
 			if (jsQR && qrResult.data) {
 				const data = qrResult.data;
-				console.log("QR text data:", data.substring(0, 100) + "...");
 
 				// If it's already base64, return it
 				if (this._isBase64(data)) {
@@ -140,7 +133,6 @@ class ZelfProofUtils {
 			// Handle qrcode-reader result (fallback)
 			if (QrCodeReader && qrResult.result) {
 				let zelfProof = qrResult.result;
-				console.log("QR result from qrcode-reader:", zelfProof);
 
 				// If it's already base64, return it
 				if (this._isBase64(zelfProof)) {

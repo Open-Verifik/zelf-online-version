@@ -31,7 +31,6 @@ const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 
 const _dbgPolygon = (...args) => {
 	if (process.env.DEBUG_POLYGON === "1") {
 		// eslint-disable-next-line no-console
-		console.log("[POLYGON]", ...args);
 	}
 };
 

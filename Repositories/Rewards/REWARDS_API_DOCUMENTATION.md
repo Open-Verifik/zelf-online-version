@@ -330,28 +330,21 @@ async function testRewardsAPI() {
   
   try {
     // Test daily rewards
-    console.log('Testing daily rewards...');
+    
     const dailyResponse = await axios.post(`${BASE_URL}/daily`, {
       zelfName: testZelfName
     });
-    console.log('Daily reward response:', dailyResponse.data);
-    
+   
     // Test first transaction reward
-    console.log('Testing first transaction reward...');
     const firstTxResponse = await axios.post(`${BASE_URL}/first-transaction`, {
       zelfName: testZelfName
     });
-    console.log('First transaction response:', firstTxResponse.data);
     
     // Test reward history
-    console.log('Testing reward history...');
     const historyResponse = await axios.get(`${BASE_URL}/history/${testZelfName}?limit=10`);
-    console.log('History response:', historyResponse.data);
     
     // Test reward stats
-    console.log('Testing reward stats...');
     const statsResponse = await axios.get(`${BASE_URL}/stats/${testZelfName}`);
-    console.log('Stats response:', statsResponse.data);
     
   } catch (error) {
     console.error('Test failed:', error.response?.data || error.message);

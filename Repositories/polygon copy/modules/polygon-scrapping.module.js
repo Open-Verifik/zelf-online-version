@@ -62,18 +62,14 @@ const getAddress = async (query) => {
 					}
 				);
 				maticBalance = balanceResponse.data.result ? (parseInt(balanceResponse.data.result, 16) / Math.pow(10, 18)).toString() : "0";
-			} catch (error) {
-				console.log("Polygon balance fetch failed:", error.message);
-			}
+			} catch (error) {}
 
 			// Get MATIC price
 			let maticPrice = "0";
 			try {
 				const priceData = await getTickerPrice({ symbol: "MATIC" });
 				maticPrice = priceData.price || "0";
-			} catch (error) {
-				console.log("Polygon price fetch failed:", error.message);
-			}
+			} catch (error) {}
 
 			// Calculate fiat balance
 			const fiatBalance = parseFloat(maticBalance) * parseFloat(maticPrice);
@@ -85,9 +81,7 @@ const getAddress = async (query) => {
 				const tokensData = await getTokens({ address }, { show: "100" });
 				tokens = tokensData.tokens || [];
 				totalFiatBalance = tokensData.totalFiatBalance || 0;
-			} catch (error) {
-				console.log("Polygon tokens fetch failed:", error.message);
-			}
+			} catch (error) {}
 
 			// Add native MATIC token to the beginning of tokens array
 			const nativeMaticToken = {
@@ -108,8 +102,6 @@ const getAddress = async (query) => {
 			// Get transactions with controlled timeout
 			let transactions = [];
 			try {
-				console.log("Fetching transactions with controlled timeout...");
-
 				const transactionTimeoutPromise = new Promise((_, reject) => {
 					setTimeout(() => reject(new Error("Transaction fetch timeout")), 6000);
 				});
@@ -122,9 +114,7 @@ const getAddress = async (query) => {
 
 				const transactionsData = await Promise.race([transactionDataPromise, transactionTimeoutPromise]);
 				transactions = transactionsData.transactions || [];
-				console.log(`Found ${transactions.length} transactions via OKLink API`);
 			} catch (error) {
-				console.log("Transaction fetch failed:", error.message);
 				transactions = [
 					{
 						hash: "0x" + "0".repeat(64),

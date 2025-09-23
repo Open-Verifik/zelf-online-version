@@ -66,7 +66,6 @@ const searchTag = async (params, authUser) => {
 
 		return combinedResults;
 	} catch (error) {
-		console.error("Error searching tag:", error);
 		return {
 			available: false,
 			error: error.message,
@@ -276,17 +275,14 @@ const searchByStorageKey = async (params, authUser) => {
 
 		// Extract ZelfProof from QR code if it's not already present in metadata
 		if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
-			try {
-				const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
-				if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
-					combinedResults.tagObject.zelfProof = extractedZelfProof;
-				}
-			} catch (error) {}
+			const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
+			if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
+				combinedResults.tagObject.zelfProof = extractedZelfProof;
+			}
 		}
 
 		return combinedResults;
 	} catch (error) {
-		console.error("Error searching by storage key:", error);
 		return {
 			available: false,
 			error: error.message,
