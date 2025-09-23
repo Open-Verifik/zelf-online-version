@@ -46,10 +46,12 @@ const _formatRecord = (item) => {
 	const formattedResult = {
 		id: item.id || item.ID,
 		url: item.url,
-		ipfs_pin_hash: item.ipfs_pin_hash || item.ipfsHash,
+		ipfs_pin_hash: item.ipfs_pin_hash || item.ipfsHash || item.cid,
+		ipfsHash: item.ipfs_pin_hash || item.ipfsHash || item.cid,
+		cid: item.ipfs_pin_hash || item.ipfsHash || item.cid,
 		size: item.size || item.PinSize,
 		user_id: item.user_id,
-		date_pinned: item.date_pinned || item.Timestamp,
+		date_pinned: item.date_pinned || item.Timestamp || item.created_at,
 		date_unpinned: item.date_unpinned,
 		publicData: item.publicData || item.metadata?.keyvalues || item.metadata || item.keyvalues,
 	};
@@ -346,6 +348,18 @@ const getDomainStats = async (domain, authUser) => {
 	}
 };
 
+const deleteFiles = async (ids = []) => {
+	try {
+		const deletedFiles = await IPFS.deleteFiles(ids);
+
+		return deletedFiles;
+	} catch (exception) {
+		console.error("Error deleting files:", exception);
+	}
+
+	return null;
+};
+
 module.exports = {
 	get,
 	show,
@@ -361,4 +375,5 @@ module.exports = {
 	getDomainStats,
 	formatResults: _formatSearchResults,
 	formatRecord: _formatRecord,
+	deleteFiles,
 };

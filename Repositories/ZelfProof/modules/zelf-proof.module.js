@@ -119,8 +119,6 @@ const preview = async (data) => {
 
 		return encryptedResponse?.data;
 	} catch (exception) {
-		console.error({ _ex: exception, exception: exception.response?.data });
-
 		const error = _formattingError(exception.response?.data);
 
 		let _error = new Error(error.message);
