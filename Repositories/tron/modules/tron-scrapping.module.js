@@ -62,17 +62,13 @@ const getAddress = async (query) => {
 					trxBalance = account.balance ? (account.balance / Math.pow(10, 6)).toString() : "0";
 				}
 			} catch (error) {
-				console.log("Tron balance fetch failed, trying alternative method:", error.message);
-
 				// Try alternative method
 				try {
 					const accountResponse = await instance.get(`${TRONSCAN_API}/account?address=${address}`);
 					if (accountResponse.data && accountResponse.data.balance) {
 						trxBalance = (accountResponse.data.balance / Math.pow(10, 6)).toString();
 					}
-				} catch (altError) {
-					console.log("Alternative Tron balance fetch also failed:", altError.message);
-				}
+				} catch (altError) {}
 			}
 
 			// Get TRX price
@@ -81,9 +77,7 @@ const getAddress = async (query) => {
 				// Try multiple price sources for TRX
 				const priceData = await getTRXPrice();
 				trxPrice = priceData || "0";
-			} catch (error) {
-				console.log("Tron price fetch failed:", error.message);
-			}
+			} catch (error) {}
 
 			// Calculate fiat balance
 			const fiatBalance = parseFloat(trxBalance) * parseFloat(trxPrice);
@@ -95,9 +89,7 @@ const getAddress = async (query) => {
 				const tokensData = await getTokens({ address }, { show: "100" });
 				tokens = tokensData.tokens || [];
 				totalFiatBalance = tokensData.totalFiatBalance || 0;
-			} catch (error) {
-				console.log("Tron tokens fetch failed:", error.message);
-			}
+			} catch (error) {}
 
 			// Add native TRX token to the beginning of tokens array
 			const nativeTrxToken = {
@@ -118,8 +110,6 @@ const getAddress = async (query) => {
 			// Get transactions with controlled timeout
 			let transactions = [];
 			try {
-				console.log("Fetching transactions with controlled timeout...");
-
 				const transactionTimeoutPromise = new Promise((_, reject) => {
 					setTimeout(() => reject(new Error("Transaction fetch timeout")), 6000);
 				});
@@ -132,9 +122,7 @@ const getAddress = async (query) => {
 
 				const transactionsData = await Promise.race([transactionDataPromise, transactionTimeoutPromise]);
 				transactions = transactionsData.transactions || [];
-				console.log(`Found ${transactions.length} transactions via OKLink API`);
 			} catch (error) {
-				console.log("Transaction fetch failed:", error.message);
 				transactions = [
 					{
 						hash: "0x" + "0".repeat(64),
@@ -175,7 +163,6 @@ const getAddress = async (query) => {
 
 			// Validate the response
 			if (!tronFormatter.validateResponse(formattedResponse)) {
-				console.warn("Tron response validation failed, returning empty response");
 				return tronFormatter.getEmptyResponse(address).data;
 			}
 
@@ -184,7 +171,6 @@ const getAddress = async (query) => {
 
 		return await Promise.race([dataPromise, timeoutPromise]);
 	} catch (error) {
-		console.error("Tron getAddress error:", error.message || "Unknown error");
 		const errorResponse = tronFormatter.getErrorResponse(error.message);
 		return errorResponse.data;
 	}
@@ -254,7 +240,7 @@ const getTokens = async (params, query) => {
 		}
 
 		// If OKLink fails, try TronScan API as fallback
-		console.log("OKLink token API failed, trying TronScan fallback...");
+
 		try {
 			const fallbackResponse = await instance.get(`${TRONSCAN_API}/account/tokens?address=${address}&start=0&limit=${query.show || "100"}`);
 
@@ -294,9 +280,7 @@ const getTokens = async (params, query) => {
 					tokens: tokenHoldings.tokens,
 				};
 			}
-		} catch (fallbackError) {
-			console.log("TronScan fallback also failed:", fallbackError.message);
-		}
+		} catch (fallbackError) {}
 
 		return {
 			balance: "0",
@@ -304,7 +288,6 @@ const getTokens = async (params, query) => {
 			tokens: [],
 		};
 	} catch (error) {
-		console.error("Error getting Tron tokens:", error.message || "Unknown error");
 		return {
 			balance: "0",
 			total: 0,
@@ -325,39 +308,29 @@ const getTransactionsList = async (query) => {
 		try {
 			const priceData = await getTRXPrice();
 			price = priceData || "0.33";
-		} catch (priceError) {
-			console.log("Price fetch failed, using default:", priceError.message);
-		}
+		} catch (priceError) {}
 
 		// Try OKLink API first
 		let response;
 		let source;
 
 		try {
-			console.log("Trying OKLink API...");
 			const oklinkResponse = await getOKLinkTransactions(address, page, show, price);
 			if (oklinkResponse && oklinkResponse.transactions && oklinkResponse.transactions.length > 0) {
 				response = oklinkResponse;
 				source = "oklink";
-				console.log(`Found ${oklinkResponse.transactions.length} transactions via OKLink`);
 			}
-		} catch (oklinkError) {
-			console.log("OKLink failed:", oklinkError.message);
-		}
+		} catch (oklinkError) {}
 
 		// Try TronScan API as fallback
 		if (!response) {
 			try {
-				console.log("Trying TronScan API...");
 				const tronScanResponse = await getTronScanTransactions(address, page, show, price);
 				if (tronScanResponse && tronScanResponse.transactions && tronScanResponse.transactions.length > 0) {
 					response = tronScanResponse;
 					source = "tronscan";
-					console.log(`Found ${tronScanResponse.transactions.length} transactions via TronScan`);
 				}
-			} catch (tronScanError) {
-				console.log("TronScan failed:", tronScanError.message);
-			}
+			} catch (tronScanError) {}
 		}
 
 		// Add source to response if response exists
@@ -367,10 +340,8 @@ const getTransactionsList = async (query) => {
 		}
 
 		// If no transactions found from external APIs, return empty result
-		console.log("No transactions found from external APIs");
 		return { pagination: { records: "0", pages: "0", page: "0" }, transactions: [] };
 	} catch (error) {
-		console.error("Error getting Tron transactions:", error.message || "Unknown error");
 		return { pagination: { records: "0", pages: "0", page: "0" }, transactions: [] };
 	}
 };
@@ -397,8 +368,6 @@ const getOKLinkTransactions = async (address, page, show, price) => {
 		});
 
 		if ((data.code === "0" || data.code === 0) && data.data && data.data.hits) {
-			console.log(`✅ OKLink API success! Found ${data.data.hits.length} transactions out of ${data.data.total} total`);
-
 			const rawTransactions = data.data.hits.map((tx) => {
 				const value = parseFloat(tx.value);
 				const fiatValue = value * parseFloat(price);
@@ -441,7 +410,6 @@ const getOKLinkTransactions = async (address, page, show, price) => {
 
 		return null;
 	} catch (error) {
-		console.log("OKLink transactions failed:", error.message);
 		return null;
 	}
 };
@@ -510,7 +478,6 @@ const getTronScanTransactions = async (address, page, show, price) => {
 
 		return null;
 	} catch (error) {
-		console.log("TronScan transactions failed:", error.message);
 		return null;
 	}
 };
@@ -579,13 +546,10 @@ const getTransactionStatus = async (params) => {
 					bandwidth: tx.cost ? tx.cost.net_usage.toString() : "0",
 				};
 			}
-		} catch (tronScanError) {
-			console.log("TronScan transaction fetch failed:", tronScanError.message);
-		}
+		} catch (tronScanError) {}
 
 		return { error: "Transaction not found" };
 	} catch (error) {
-		console.error("Error getting Tron transaction status:", error.message || "Unknown error");
 		return { error: "Failed to fetch transaction status" };
 	}
 };
@@ -610,7 +574,6 @@ const getGasTracker = async (query) => {
 			},
 		};
 	} catch (error) {
-		console.error("Error getting Tron energy tracker:", error.message || "Unknown error");
 		return { error: "Failed to fetch energy tracker data" };
 	}
 };
@@ -641,9 +604,7 @@ const getPortfolioSummary = async (params) => {
 
 			const priceData = await getTRXPrice();
 			trxPrice = priceData || "0";
-		} catch (error) {
-			console.log("Portfolio summary TRX data fetch failed:", error.message);
-		}
+		} catch (error) {}
 
 		// Get all tokens
 		const tokensData = await getTokens({ address }, { show: "100" });
@@ -666,7 +627,6 @@ const getPortfolioSummary = async (params) => {
 			lastUpdated: new Date().toISOString(),
 		};
 	} catch (error) {
-		console.error("Error getting Tron portfolio summary:", error.message || "Unknown error");
 		return { error: "Failed to fetch portfolio summary" };
 	}
 };

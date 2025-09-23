@@ -106,7 +106,7 @@ class QRZelfProofExtractor {
 			// Handle qrcode-reader result (fallback)
 			if (QrCodeReader && qrResult.result) {
 				let zelfProof = qrResult.result;
-				console.log("QR result from qrcode-reader:", zelfProof);
+				// console.info("QR result from qrcode-reader:", zelfProof);
 
 				// If it's already base64, return it
 				if (this._isBase64(zelfProof)) {

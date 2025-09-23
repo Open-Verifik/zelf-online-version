@@ -21,9 +21,7 @@ const getETHPrice = async () => {
 			if (response.data && response.data.ethereum && response.data.ethereum.usd) {
 				return response.data.ethereum.usd.toString();
 			}
-		} catch (coinGeckoError) {
-			console.log("CoinGecko ETH price failed:", coinGeckoError.message);
-		}
+		} catch (coinGeckoError) {}
 
 		// 2. Try Binance Global (reliable ETH price, accessible from USA)
 		try {
@@ -33,12 +31,9 @@ const getETHPrice = async () => {
 			});
 
 			if (response.data && response.data.price) {
-				console.log(`✅ Got ETH price from Binance Global: $${response.data.price}`);
 				return response.data.price;
 			}
-		} catch (binanceGlobalError) {
-			console.log("Binance Global ETH price failed:", binanceGlobalError.message);
-		}
+		} catch (binanceGlobalError) {}
 
 		// 3. Try Coinbase Pro (USA-based exchange)
 		try {
@@ -48,12 +43,9 @@ const getETHPrice = async () => {
 			});
 
 			if (response.data && response.data.price) {
-				console.log(`✅ Got ETH price from Coinbase Pro: $${response.data.price}`);
 				return response.data.price;
 			}
-		} catch (coinbaseError) {
-			console.log("Coinbase Pro ETH price failed:", coinbaseError.message);
-		}
+		} catch (coinbaseError) {}
 
 		// 4. Try CoinMarketCap API
 		try {
@@ -68,12 +60,10 @@ const getETHPrice = async () => {
 
 			if (response.data && response.data.data && response.data.data.ETH) {
 				const price = response.data.data.ETH.quote.USD.price;
-				console.log(`✅ Got ETH price from CoinMarketCap: $${price}`);
+
 				return price.toString();
 			}
-		} catch (cmcError) {
-			console.log("CoinMarketCap ETH price failed:", cmcError.message);
-		}
+		} catch (cmcError) {}
 
 		// 5. Try CryptoCompare as last resort
 		try {
@@ -83,18 +73,13 @@ const getETHPrice = async () => {
 			});
 
 			if (response.data && response.data.USD) {
-				console.log(`✅ Got ETH price from CryptoCompare: $${response.data.USD}`);
 				return response.data.USD.toString();
 			}
-		} catch (cryptoCompareError) {
-			console.log("CryptoCompare ETH price failed:", cryptoCompareError.message);
-		}
+		} catch (cryptoCompareError) {}
 
 		// 6. If all sources fail, return a fallback price close to current market
-		console.log("⚠️ All ETH price sources failed, using fallback price");
 		return "3400"; // Approximate current ETH price
 	} catch (error) {
-		console.log("Error in getETHPrice:", error.message);
 		return "3400"; // Fallback price
 	}
 };

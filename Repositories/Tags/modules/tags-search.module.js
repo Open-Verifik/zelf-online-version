@@ -57,12 +57,9 @@ const searchTag = async (params, authUser) => {
 		if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
 			try {
 				const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
-				console.log("extractedZelfProof", extractedZelfProof);
+
 				if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
 					combinedResults.tagObject.zelfProof = extractedZelfProof;
-					console.log("Successfully extracted ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
-				} else {
-					console.log("Failed to extract valid ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
 				}
 			} catch (error) {
 				console.error("Error extracting ZelfProof from QR code:", error);
@@ -71,7 +68,6 @@ const searchTag = async (params, authUser) => {
 
 		return combinedResults;
 	} catch (error) {
-		console.error("Error searching tag:", error);
 		return {
 			available: false,
 			error: error.message,
@@ -214,8 +210,6 @@ const searchHoldDomain = async (params, authUser) => {
 const searchByDomain = async (params, authUser) => {
 	const { domain, storage } = params;
 
-	console.log("searchByDomain", params);
-
 	// Validate domain
 	if (!isDomainActive(domain)) {
 		return {
@@ -283,22 +277,14 @@ const searchByStorageKey = async (params, authUser) => {
 
 		// Extract ZelfProof from QR code if it's not already present in metadata
 		if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
-			try {
-				const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
-				if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
-					combinedResults.tagObject.zelfProof = extractedZelfProof;
-					console.log("Successfully extracted ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
-				} else {
-					console.log("Failed to extract valid ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
-				}
-			} catch (error) {
-				console.error("Error extracting ZelfProof from QR code:", error);
+			const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
+			if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
+				combinedResults.tagObject.zelfProof = extractedZelfProof;
 			}
 		}
 
 		return combinedResults;
 	} catch (error) {
-		console.error("Error searching by storage key:", error);
 		return {
 			available: false,
 			error: error.message,
