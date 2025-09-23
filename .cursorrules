@@ -96,9 +96,73 @@ import TabItem from '@theme/TabItem';
 - Include Origin headers for CORS validation
 - Test both authenticated and unauthenticated scenarios
 
+## 🔍 **Search Tags API Patterns**
+
+### **Search Endpoint Structure**
+- **Endpoint**: `GET /api/tags/search`
+- **Middleware**: `getValidation` (validates query parameters)
+- **Controller**: `searchTag` (handles search logic)
+- **Module**: `TagsSearchModule.searchTag` (core search functionality)
+
+### **Search Parameters**
+- **Required**: `tagName` (string)
+- **Optional**: `domain`, `key`, `value`, `os`, `captchaToken`, `duration`
+- **Duration Options**: `"1"`, `"2"`, `"3"`, `"4"`, `"5"`, `"lifetime"`
+- **OS Options**: `"DESKTOP"`, `"ANDROID"`, `"IOS"`
+
+### **Search Response Patterns**
+1. **Tag Found** (`available: false`):
+   - Returns `tagObject` with full tag data
+   - Includes `zelfProof`, `zelfProofQRCode`, `publicData`
+   - Contains wallet addresses and metadata
+
+2. **Tag Not Found** (`available: true`):
+   - Returns `price` object with pricing information
+   - Includes `price`, `currency`, `reward`, `discount`, `discountType`
+   - Shows cost to lease the tag
+
+### **Domain-Specific Behavior**
+- **Zelf**: $24 USD (1 year), $210 USD (lifetime)
+- **Avax**: $18 USD (1 year)
+- **BDAG**: Has name length restrictions (max 20 characters)
+- **Multi-domain**: Supports any licensed domain
+
+### **Error Response Patterns**
+- **409 Conflict**: Validation errors (e.g., name too long)
+- **401 Unauthorized**: Missing JWT token
+- **500 Internal Server Error**: Server-side errors (e.g., undefined properties)
+
+### **Test Patterns for Search**
+```javascript
+// Test tag not found with pricing
+const searchParams = {
+  tagName: `newuser${Date.now()}.zelf`,
+  domain: "zelf",
+  os: "DESKTOP",
+  duration: "lifetime"
+};
+
+// Test domain validation
+const searchParams = {
+  tagName: `longname${Date.now()}.bdag`, // Will fail BDAG length check
+  domain: "bdag",
+  os: "DESKTOP"
+};
+
+// Test missing parameters
+const searchParams = {
+  // tagName intentionally missing
+  domain: "zelf",
+  os: "DESKTOP"
+};
+```
+
 ## 📋 **Remember**
 - **Documentation = Production URLs** (`https://api.zelf.world`)
 - **Tests = Local URLs** (`http://localhost:3003`)
 - **Always authenticate** before making API calls
 - **Use tabs** for multi-language examples
 - **Test both success and error** scenarios
+- **Search returns pricing when tag not found**
+- **Different domains have different pricing/validation rules**
+- **Duration parameter affects pricing calculations**

@@ -7,7 +7,7 @@ const { getDomainConfiguration, validateDomainName, isDomainActive } = require("
 const schemas = {
 	search: {
 		tagName: string(),
-		domain: string(),
+		domain: string().required(),
 		key: string(),
 		value: string(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]),
@@ -175,6 +175,12 @@ const getValidation = async (ctx, next) => {
 		// Add extracted domain and name to context for use in controllers
 		ctx.state.extractedDomain = extractedDomain;
 		ctx.state.extractedName = name;
+	}
+
+	if (!tagName && !key && !value) {
+		ctx.status = 409;
+		ctx.body = { validationError: "missing tagName or key or value" };
+		return;
 	}
 
 	// Captcha validation
@@ -437,7 +443,7 @@ const previewValidation = async (ctx, next) => {
 
 	// Captcha validation
 	if (captchaToken) {
-		const captchaResult = await captchaService.verifyCaptcha(captchaToken);
+		const captchaResult = await captchaService.createAssessment(captchaToken, os, "preview");
 
 		if (!captchaResult.success) {
 			ctx.status = 409;

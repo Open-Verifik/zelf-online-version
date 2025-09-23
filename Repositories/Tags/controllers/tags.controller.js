@@ -25,7 +25,7 @@ const handleError = (ctx, error) => {
  * @returns {Object|null} - ZelfPay object or null
  */
 const handleZelfPayLogic = async (data, user, domain = "zelf") => {
-	if (!data || !data.available || !data.tagName.includes("zelfpay")) {
+	if (!data || !data.available || !data.tagName?.includes("zelfpay")) {
 		return null;
 	}
 
@@ -72,7 +72,7 @@ const searchTag = async (ctx) => {
 		const requestData = {
 			...ctx.request.query,
 			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.query.tagName,
-			domain: extractedDomain,
+			domain: extractedDomain || ctx.request.query.domain,
 			environment: ctx.request.query.environment,
 			type: ctx.request.query.type || "both",
 		};
