@@ -33,14 +33,9 @@ describe("Lease Tags API Integration Tests - Real Server", () => {
 			const leaseData = {
 				tagName: `test${Date.now()}`,
 				domain: "avax",
-				duration: "yearly",
-				paymentMethod: "coinbase",
-				currency: "USD",
 				faceBase64: sampleFaceFromJSON.faceBase64,
-				password: sampleFaceFromJSON.password,
 				type: "create",
 				os: "DESKTOP",
-				referralTagName: "",
 				removePGP: true,
 			};
 
@@ -52,14 +47,60 @@ describe("Lease Tags API Integration Tests - Real Server", () => {
 
 			expect(response.body).toHaveProperty("data");
 
-			expect(response.body.data).toHaveProperty("avaxName");
 			expect(response.body.data).toHaveProperty("ethAddress");
 			expect(response.body.data).toHaveProperty("solanaAddress");
 			expect(response.body.data).toHaveProperty("btcAddress");
-			expect(response.body.data).toHaveProperty("avaxName");
 			expect(response.body.data).toHaveProperty("domain");
-			expect(response.body.data).toHaveProperty("zelfProofQRCode");
+			expect(response.body.data).toHaveProperty("price");
+			expect(response.body.data).toHaveProperty("reward");
+			expect(response.body.data).toHaveProperty("discount");
+			expect(response.body.data).toHaveProperty("discountType");
+			expect(response.body.data).toHaveProperty("suiAddress");
+			expect(response.body.data).toHaveProperty("hasPassword");
 			expect(response.body.data).toHaveProperty("zelfProof");
+			expect(response.body.data).toHaveProperty("zelfProofQRCode");
+			expect(response.body.data).toHaveProperty("ipfs");
+		});
+
+		it("should return validation error when tagName is missing", async () => {
+			const leaseData = {
+				// tagName is intentionally missing
+				domain: "avax",
+				faceBase64: sampleFaceFromJSON.faceBase64,
+				type: "create",
+				os: "DESKTOP",
+				removePGP: true,
+			};
+
+			const response = await request(API_BASE_URL)
+				.post("/api/tags/lease")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`)
+				.send(leaseData);
+
+			expect(response.status).toBe(409);
+			expect(response.body).toHaveProperty("validationError");
+			expect(response.body.validationError).toContain("tagName");
+		});
+
+		it("should return unauthorized error when JWT token is missing", async () => {
+			const leaseData = {
+				tagName: `test${Date.now()}`,
+				domain: "avax",
+				faceBase64: sampleFaceFromJSON.faceBase64,
+				type: "create",
+				os: "DESKTOP",
+				removePGP: true,
+			};
+
+			const response = await request(API_BASE_URL)
+				.post("/api/tags/lease")
+				.set("Origin", "https://test.example.com")
+				// Authorization header is intentionally missing
+				.send(leaseData);
+
+			expect(response.status).toBe(401);
+			expect(response.body).toHaveProperty("error");
 		});
 	});
 });

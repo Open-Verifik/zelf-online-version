@@ -1,0 +1,104 @@
+# Zelf Project - Cursor AI Rules
+
+## 🎯 **Project Overview**
+This is the Zelf backend API project - a biometric authentication and wallet management system.
+
+## 📝 **Documentation Rules**
+
+### **API URLs**
+- **Documentation**: Always use `https://api.zelf.world` for API examples
+- **Tests**: Use `http://localhost:3003` for local testing
+- **Never mix**: Don't use localhost URLs in documentation
+
+### **Documentation Standards**
+- Use Docusaurus tab syntax for multi-language examples
+- Include comprehensive examples for: cURL, Node.js, Python, PHP, Rust
+- Document both success and error responses
+- Always include authentication flow (session creation → JWT token → API calls)
+
+## 🧪 **Testing Rules**
+
+### **Test Structure**
+- **Integration Tests**: Test against real running server
+- **Unit Tests**: Test individual modules/controllers
+- **API Tests**: Use `npm run test:lease` for lease-specific tests
+
+### **Test Authentication**
+- Always create a session first using `/api/sessions` endpoint
+- Extract JWT token from session response
+- Use `Authorization: Bearer ${token}` header for authenticated requests
+- Include `Origin: https://test.example.com` header for production environment
+
+### **Test Data**
+- Use unique identifiers with timestamps: `test_${Date.now()}_${Math.random().toString(36).substring(7)}`
+- Use sample face data from `config/0012589021.json` for biometric tests
+- Clean up test data after tests complete
+
+## 🏗️ **Code Standards**
+
+### **File Organization**
+- Tests go in `tests/integration/` for API tests
+- Documentation goes in `zelf-documentation/docs/api/`
+- Use descriptive test names: `should lease a tag with valid data`
+
+### **Error Handling**
+- Test both success and failure scenarios
+- Document error responses with proper HTTP status codes
+- Include validation error messages in tests
+
+## 🚀 **Development Workflow**
+
+### **Running Tests**
+```bash
+# Run specific test
+npm run test:lease
+
+# Run all integration tests
+npm run test:integration
+
+# Run with verbose output
+npx jest tests/integration/leaseTags-api.test.js --verbose --no-coverage
+```
+
+### **Server Management**
+- Server runs on port 3003 locally
+- Use `npm start` to run the server
+- Always ensure server is running before API tests
+
+## 📚 **Documentation Workflow**
+
+### **Creating API Documentation**
+1. Test the endpoint thoroughly
+2. Document all parameters and responses
+3. Create examples in multiple languages
+4. Use proper Docusaurus tab syntax
+5. Include authentication flow
+6. Document error scenarios
+
+### **Tab Structure**
+```markdown
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs>
+<TabItem value="success" label="200 OK" default>
+  <!-- Success response -->
+</TabItem>
+<TabItem value="error" label="400 Bad Request">
+  <!-- Error response -->
+</TabItem>
+</Tabs>
+```
+
+## 🔐 **Security Notes**
+- Always require authentication for protected endpoints
+- Use JWT tokens for session management
+- Include Origin headers for CORS validation
+- Test both authenticated and unauthenticated scenarios
+
+## 📋 **Remember**
+- **Documentation = Production URLs** (`https://api.zelf.world`)
+- **Tests = Local URLs** (`http://localhost:3003`)
+- **Always authenticate** before making API calls
+- **Use tabs** for multi-language examples
+- **Test both success and error** scenarios
