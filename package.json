@@ -81,5 +81,8 @@
 		"biometrics"
 	],
 	"author": "Miguel Trevino",
-	"license": "ISC"
+	"license": "ISC",
+	"devDependencies": {
+		"supertest": "^7.1.4"
+	}
 }

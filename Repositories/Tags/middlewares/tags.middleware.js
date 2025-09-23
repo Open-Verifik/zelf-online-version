@@ -155,28 +155,6 @@ const getValidation = async (ctx, next) => {
 		os,
 	});
 
-	const authUser = ctx.state.user;
-
-	if (authUser.session) {
-		// we will now check if the session is active
-		const session = await Session.findOne({ _id: authUser.session });
-
-		if (session?.status !== "active" || !session?.clientIP) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Session is not active" };
-			return;
-		}
-
-		if (session.searchCount >= config.sessions.searchLimit) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Search limit exceeded" };
-			return;
-		}
-
-		// then after is that we will increment searchCount
-		await Session.updateOne({ _id: authUser.session }, { $inc: { searchCount: 1 } });
-	}
-
 	if (valid.error) {
 		ctx.status = 409;
 		ctx.body = { validationError: valid.error.message };
@@ -250,26 +228,6 @@ const leaseValidation = async (ctx, next) => {
 		captchaToken,
 	});
 
-	const authUser = ctx.state.user;
-
-	if (authUser.session) {
-		const session = await Session.findOne({ _id: authUser.session });
-
-		if (session?.status !== "active" || !session?.clientIP) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Session is not active" };
-			return;
-		}
-
-		if (session.leaseCount >= config.sessions.leaseLimit) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Lease limit exceeded" };
-			return;
-		}
-
-		await Session.updateOne({ _id: authUser.session }, { $inc: { leaseCount: 1 } });
-	}
-
 	if (valid.error) {
 		ctx.status = 409;
 		ctx.body = { validationError: valid.error.message };
@@ -329,26 +287,6 @@ const leaseRecoveryValidation = async (ctx, next) => {
 		ctx.status = 409;
 		ctx.body = { validationError: valid.error.message };
 		return;
-	}
-
-	const authUser = ctx.state.user;
-
-	if (authUser.session) {
-		const session = await Session.findOne({ _id: authUser.session });
-
-		if (session?.status !== "active" || !session?.clientIP) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Session is not active" };
-			return;
-		}
-
-		if (session.leaseCount >= config.sessions.leaseLimit) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Lease limit exceeded" };
-			return;
-		}
-
-		await Session.updateOne({ _id: authUser.session }, { $inc: { leaseCount: 1 } });
 	}
 
 	// Validate domain and tag name
@@ -477,26 +415,6 @@ const previewValidation = async (ctx, next) => {
 		captchaToken,
 	});
 
-	const authUser = ctx.state.user;
-
-	if (authUser.session) {
-		const session = await Session.findOne({ _id: authUser.session });
-
-		if (session?.status !== "active" || !session?.clientIP) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Session is not active" };
-			return;
-		}
-
-		if (session.previewCount >= config.sessions.previewLimit) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Preview limit exceeded" };
-			return;
-		}
-
-		await Session.updateOne({ _id: authUser.session }, { $inc: { previewCount: 1 } });
-	}
-
 	if (valid.error) {
 		ctx.status = 409;
 		ctx.body = { validationError: valid.error.message };
@@ -548,26 +466,6 @@ const previewZelfProofValidation = async (ctx, next) => {
 		captchaToken,
 	});
 
-	const authUser = ctx.state.user;
-
-	if (authUser.session) {
-		const session = await Session.findOne({ _id: authUser.session });
-
-		if (session?.status !== "active" || !session?.clientIP) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Session is not active" };
-			return;
-		}
-
-		if (session.previewCount >= config.sessions.previewLimit) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Preview limit exceeded" };
-			return;
-		}
-
-		await Session.updateOne({ _id: authUser.session }, { $inc: { previewCount: 1 } });
-	}
-
 	if (valid.error) {
 		ctx.status = 409;
 		ctx.body = { validationError: valid.error.message };
@@ -608,26 +506,6 @@ const decryptValidation = async (ctx, next) => {
 		os,
 		captchaToken,
 	});
-
-	const authUser = ctx.state.user;
-
-	if (authUser.session) {
-		const session = await Session.findOne({ _id: authUser.session });
-
-		if (session?.status !== "active" || !session?.clientIP) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Session is not active" };
-			return;
-		}
-
-		if (session.decryptCount >= config.sessions.decryptLimit) {
-			ctx.status = 403;
-			ctx.body = { validationError: "Decrypt limit exceeded" };
-			return;
-		}
-
-		await Session.updateOne({ _id: authUser.session }, { $inc: { decryptCount: 1 } });
-	}
 
 	if (valid.error) {
 		ctx.status = 409;

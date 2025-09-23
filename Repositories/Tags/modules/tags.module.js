@@ -16,8 +16,9 @@ const WalrusModule = require("../../Walrus/modules/walrus.module");
 const { generateHoldDomain } = require("./domain-registry.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const TagsRegistrationModule = require("./tags-registration.module");
-const axios = require("axios");
 const { extractZelfProofFromQR } = require("./qr-zelfproof-extractor.module");
+const SessionModule = require("../../Session/modules/session.module");
+const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
 
 /**
  * Generate domain-specific hold domain
@@ -71,7 +72,6 @@ const leaseTag = async (params, authUser) => {
 		},
 		metadata: {
 			mnemonic,
-			solanaSecretKey: solana.secretKey,
 		},
 		faceBase64: face,
 		password,
@@ -92,6 +92,11 @@ const leaseTag = async (params, authUser) => {
 		await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
 	} else {
 		await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
+	}
+
+	if (!tagObject.zelfProof) {
+		// from ipfs
+		tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
 	}
 
 	return tagObject;

@@ -7,14 +7,10 @@ module.exports = {
 	database: {
 		uri: "mongodb://localhost:27017/zelf_testing",
 		options: {
-			useNewUrlParser: true,
-			useUnifiedTopology: true,
 			// Additional options for test isolation
 			maxPoolSize: 1, // Limit connections for tests
 			serverSelectionTimeoutMS: 5000, // Keep alive for 5 seconds
 			socketTimeoutMS: 45000, // Close sockets after 45 seconds
-			bufferMaxEntries: 0, // Disable mongoose buffering
-			bufferCommands: false, // Disable mongoose buffering
 		},
 	},
 

@@ -1,5 +1,5 @@
 const { Buffer } = require("buffer");
-
+const axios = require("axios");
 // Try to require canvas and jsQR, fallback to alternative if not available
 let createCanvas, loadImage, jsQR;
 try {
@@ -40,6 +40,12 @@ class QRZelfProofExtractor {
 	 * @returns {Promise<string|null>} - Base64 encoded ZelfProof or null if extraction fails
 	 */
 	static async extractZelfProof(base64Image) {
+		if (base64Image.includes("https")) {
+			// get it from axios
+			const response = await axios.get(base64Image);
+			base64Image = response.data;
+		}
+
 		try {
 			// Check if canvas is available
 			if (!createCanvas || !loadImage) {

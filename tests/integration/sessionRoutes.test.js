@@ -66,11 +66,12 @@ describe("Session Routes Integration Tests - Real Data Only", () => {
 			const response = await testApp.post("/api/sessions").send(sessionData).expect(200);
 
 			expect(response.body).toHaveProperty("data");
-			expect(response.body.data).toHaveProperty("identifier", sessionData.identifier);
-			expect(response.body.data).toHaveProperty("status", "active");
-			expect(response.body.data).toHaveProperty("type", "createWallet");
-			expect(response.body.data).toHaveProperty("clientIP");
-			expect(response.body.data).toHaveProperty("globalCount", 0);
+			expect(response.body.data).toHaveProperty("token");
+			expect(response.body.data).toHaveProperty("activatedAt");
+			expect(response.body.data).toHaveProperty("expiresAt");
+			expect(typeof response.body.data.token).toBe("string");
+			expect(typeof response.body.data.activatedAt).toBe("number");
+			expect(typeof response.body.data.expiresAt).toBe("number");
 		});
 
 		it("should create session with web extension flag", async () => {
@@ -82,8 +83,9 @@ describe("Session Routes Integration Tests - Real Data Only", () => {
 
 			const response = await testApp.post("/api/sessions").send(sessionData).expect(200);
 
-			expect(response.body.data).toHaveProperty("isWebExtension", true);
-			expect(response.body.data).toHaveProperty("type", "decryptWallet");
+			expect(response.body.data).toHaveProperty("token");
+			expect(response.body.data).toHaveProperty("activatedAt");
+			expect(response.body.data).toHaveProperty("expiresAt");
 		});
 
 		it("should create session with different types", async () => {
@@ -97,18 +99,23 @@ describe("Session Routes Integration Tests - Real Data Only", () => {
 
 				const response = await testApp.post("/api/sessions").send(sessionData).expect(200);
 
-				expect(response.body.data).toHaveProperty("type", type);
+				expect(response.body.data).toHaveProperty("token");
+				expect(response.body.data).toHaveProperty("activatedAt");
+				expect(response.body.data).toHaveProperty("expiresAt");
 			}
 		});
 
-		it("should handle missing identifier", async () => {
+		it("should handle missing identifier by using clientIP", async () => {
 			const sessionData = {
 				type: "createWallet",
 			};
 
-			const response = await testApp.post("/api/sessions").send(sessionData).expect(500);
+			const response = await testApp.post("/api/sessions").send(sessionData).expect(200);
 
-			expect(response.body).toHaveProperty("error");
+			expect(response.body).toHaveProperty("data");
+			expect(response.body.data).toHaveProperty("token");
+			expect(response.body.data).toHaveProperty("activatedAt");
+			expect(response.body.data).toHaveProperty("expiresAt");
 		});
 
 		it("should include request headers in session creation", async () => {
@@ -129,22 +136,47 @@ describe("Session Routes Integration Tests - Real Data Only", () => {
 			expect(response.body.data.clientIP).toBeTruthy();
 		});
 
-		it("should reject requests in production without origin", async () => {
-			// Temporarily set NODE_ENV to production
-			const originalEnv = process.env.NODE_ENV;
-			process.env.NODE_ENV = "production";
-
+		it("should generate valid JWT token with correct payload", async () => {
 			const sessionData = {
 				identifier: `session_${Date.now()}_${Math.random().toString(36).substring(7)}`,
 				type: "createWallet",
 			};
 
-			const response = await testApp.post("/api/sessions").send(sessionData).expect(403);
+			const response = await testApp.post("/api/sessions").send(sessionData).expect(200);
 
-			expect(response.body).toHaveProperty("error", "rejected");
+			expect(response.body.data).toHaveProperty("token");
+			const token = response.body.data.token;
 
-			// Restore original NODE_ENV
-			process.env.NODE_ENV = originalEnv;
+			// Verify token is a valid JWT format
+			expect(token).toMatch(/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/);
+
+			// Verify expiration is set correctly (should be 10 minutes from activation)
+			const activatedAt = response.body.data.activatedAt;
+			const expiresAt = response.body.data.expiresAt;
+			const expectedExpiration = activatedAt + 10 * 60; // 10 minutes in seconds
+
+			expect(expiresAt).toBe(expectedExpiration);
+		});
+
+		it("should reject requests in production without origin", async () => {
+			// Temporarily set NODE_ENV to production
+			const originalEnv = process.env.NODE_ENV;
+
+			try {
+				process.env.NODE_ENV = "production";
+
+				const sessionData = {
+					identifier: `session_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+					type: "createWallet",
+				};
+
+				const response = await testApp.post("/api/sessions").send(sessionData).expect(403);
+
+				expect(response.body).toHaveProperty("error", "rejected");
+			} finally {
+				// Always restore original NODE_ENV
+				process.env.NODE_ENV = originalEnv;
+			}
 		});
 	});
 
@@ -240,7 +272,9 @@ describe("Session Routes Integration Tests - Real Data Only", () => {
 
 			const createResponse = await testApp.post("/api/sessions").send(sessionData).expect(200);
 
-			expect(createResponse.body.data).toHaveProperty("identifier", sessionData.identifier);
+			expect(createResponse.body.data).toHaveProperty("token");
+			expect(createResponse.body.data).toHaveProperty("activatedAt");
+			expect(createResponse.body.data).toHaveProperty("expiresAt");
 
 			// Step 2: Extract public key
 			const publicKeyResponse = await testApp
@@ -269,33 +303,36 @@ describe("Session Routes Integration Tests - Real Data Only", () => {
 
 		it("should handle multiple sessions concurrently", async () => {
 			const sessions = [];
+			const identifiers = [];
 
 			// Create multiple sessions
 			for (let i = 0; i < 3; i++) {
+				const identifier = `session_${Date.now()}_${i}_${Math.random().toString(36).substring(7)}`;
 				const sessionData = {
-					identifier: `session_${Date.now()}_${i}_${Math.random().toString(36).substring(7)}`,
+					identifier: identifier,
 					type: "general",
 				};
 
 				const response = await testApp.post("/api/sessions").send(sessionData).expect(200);
 
 				sessions.push(response.body.data);
+				identifiers.push(identifier);
 			}
 
 			// Verify all sessions were created
 			expect(sessions).toHaveLength(3);
 			sessions.forEach((session) => {
-				expect(session).toHaveProperty("identifier");
-				expect(session).toHaveProperty("status", "active");
-				expect(session).toHaveProperty("type", "general");
+				expect(session).toHaveProperty("token");
+				expect(session).toHaveProperty("activatedAt");
+				expect(session).toHaveProperty("expiresAt");
 			});
 
 			// Extract public keys for all sessions
-			for (const session of sessions) {
-				const response = await testApp.get("/api/sessions/yek-cilbup").query({ identifier: session.identifier }).expect(200);
+			for (let i = 0; i < sessions.length; i++) {
+				const response = await testApp.get("/api/sessions/yek-cilbup").query({ identifier: identifiers[i] }).expect(200);
 
 				expect(response.body.data).toHaveProperty("publicKey");
-				expect(response.body.data).toHaveProperty("sessionId", session.identifier);
+				expect(response.body.data).toHaveProperty("sessionId", identifiers[i]);
 			}
 		});
 	});
