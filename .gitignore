@@ -12,6 +12,10 @@ facetec_front/node_modules
 Desktop.ini
 .vscode
 
+# Test coverage reports
+coverage/
+coverage-*.json
+*.lcov
 
 Repositories/Wallet/.DS_Store
 Repositories/ZelfProof/.DS_Store

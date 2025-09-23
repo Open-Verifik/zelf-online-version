@@ -44,7 +44,7 @@ module.exports = {
 	// Restore mocks between tests - DISABLED (no mocking policy)
 	restoreMocks: false,
 
-	// Global setup and teardown (optional for unit tests)
-	// globalSetup: "<rootDir>/tests/globalSetup.js",
-	// globalTeardown: "<rootDir>/tests/globalTeardown.js",
+	// Global setup and teardown for integration tests
+	globalSetup: "<rootDir>/tests/globalSetup.js",
+	globalTeardown: "<rootDir>/tests/globalTeardown.js",
 };

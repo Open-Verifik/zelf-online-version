@@ -1,7 +1,14 @@
 {
 	"scripts": {
 		"start": "node server.js",
-		"preinstall": "npx npm-force-resolutions"
+		"preinstall": "npx npm-force-resolutions",
+		"test": "jest",
+		"test:watch": "jest --watch",
+		"test:coverage": "jest --coverage",
+		"test:unit": "jest tests/unit",
+		"test:integration": "jest --config jest.integration.config.js tests/integration",
+		"test:e2e": "jest tests/e2e",
+		"test:ci": "jest --ci --coverage --watchAll=false"
 	},
 	"name": "zelf-wallet",
 	"description": "zelf wallet backend",
