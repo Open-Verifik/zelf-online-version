@@ -112,12 +112,6 @@ const decrypt = async (data) => {
 
 const preview = async (data) => {
 	try {
-		console.log({
-			data,
-			senseprint_base_64: data.zelfProof,
-			verifiers_auth_key: data.verifierKey || (data.addServerPassword ? config.zelfEncrypt.serverKey : undefined),
-		});
-
 		const encryptedResponse = await axios.post("/zelf/preview", {
 			senseprint_base_64: data.zelfProof,
 			verifiers_auth_key: data.verifierKey || (data.addServerPassword ? config.zelfEncrypt.serverKey : undefined),
@@ -125,8 +119,6 @@ const preview = async (data) => {
 
 		return encryptedResponse?.data;
 	} catch (exception) {
-		console.error({ _ex: exception, exception: exception.response?.data });
-
 		const error = _formattingError(exception.response?.data);
 
 		let _error = new Error(error.message);

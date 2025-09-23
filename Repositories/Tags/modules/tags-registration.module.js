@@ -104,8 +104,8 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, aut
 			origin: tagObject.origin || "online",
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 			expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
-			suiAddress: tagObject.suiAddress,
 		},
+		suiAddress: tagObject.suiAddress,
 	};
 
 	if (referralTagObject) {

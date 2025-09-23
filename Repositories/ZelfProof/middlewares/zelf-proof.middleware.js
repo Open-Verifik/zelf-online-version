@@ -49,7 +49,6 @@ const encryptValidation = async (ctx, next) => {
 	const valid = validate(schemas.encrypt, ctx.request.body);
 
 	if (valid.error) {
-		console.log({ valid });
 		ctx.status = 409;
 
 		ctx.body = { validationError: valid.error.message };

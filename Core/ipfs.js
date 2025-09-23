@@ -142,16 +142,16 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 		// Upload the file to Pinata using the new API
 		const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 
+		console.log("uploadResponse", uploadResponse);
 		return {
 			url: `https://${pinataGateway}/ipfs/${uploadResponse.cid}`,
-			...uploadResponse,
+			cid: uploadResponse.cid,
+			ipfs_pin_hash: uploadResponse.cid,
+			ipfsHash: uploadResponse.cid,
 			pinned: true,
 			web3: true,
 			name: filename,
 			publicData: uploadResponse.keyvalues,
-			// Keep backward compatibility with old field names
-			IpfsHash: uploadResponse.cid,
-			Keyvalues: uploadResponse.keyvalues,
 		};
 	} catch (error) {
 		console.error(error);
@@ -253,6 +253,12 @@ const unPinFiles = async (CIDs = []) => {
 	return await web3Instance.unpin(CIDs);
 };
 
+const deleteFiles = async (ids = []) => {
+	const unpin = await web3Instance.files.public.delete(ids);
+
+	return unpin;
+};
+
 module.exports = {
 	upload,
 	retrieve,
@@ -260,4 +266,5 @@ module.exports = {
 	pinFileWindows,
 	filter,
 	unPinFiles,
+	deleteFiles,
 };

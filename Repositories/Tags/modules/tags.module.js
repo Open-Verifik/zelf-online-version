@@ -203,8 +203,12 @@ const previewTag = async (params, authUser) => {
 		return searchResult;
 	}
 
+	const tagObject = searchResult.tagObject;
+
+	const zelfProof = await extractZelfProofFromQR(tagObject.zelfProofQRCode);
+
 	const previewResult = await preview({
-		zelfProof: searchResult.tagObject.publicData.zelfProof,
+		zelfProof,
 		addServerPassword: Boolean(params.addServerPassword),
 	});
 

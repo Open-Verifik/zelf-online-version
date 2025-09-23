@@ -57,16 +57,11 @@ const searchTag = async (params, authUser) => {
 		if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
 			try {
 				const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
-				console.log("extractedZelfProof", extractedZelfProof);
+
 				if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
 					combinedResults.tagObject.zelfProof = extractedZelfProof;
-					console.log("Successfully extracted ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
-				} else {
-					console.log("Failed to extract valid ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
 				}
-			} catch (error) {
-				console.error("Error extracting ZelfProof from QR code:", error);
-			}
+			} catch (error) {}
 		}
 
 		return combinedResults;
@@ -214,8 +209,6 @@ const searchHoldDomain = async (params, authUser) => {
 const searchByDomain = async (params, authUser) => {
 	const { domain, storage } = params;
 
-	console.log("searchByDomain", params);
-
 	// Validate domain
 	if (!isDomainActive(domain)) {
 		return {
@@ -287,13 +280,8 @@ const searchByStorageKey = async (params, authUser) => {
 				const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
 				if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
 					combinedResults.tagObject.zelfProof = extractedZelfProof;
-					console.log("Successfully extracted ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
-				} else {
-					console.log("Failed to extract valid ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
 				}
-			} catch (error) {
-				console.error("Error extracting ZelfProof from QR code:", error);
-			}
+			} catch (error) {}
 		}
 
 		return combinedResults;

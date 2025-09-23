@@ -61,7 +61,9 @@ const _validatePassword = async (zelfProof, password) => {
 const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password) => {
 	const tagObject = tagRecord.tagObject;
 
-	const ipfsHash = tagRecord.ipfs?.length ? tagRecord.ipfs[0].ipfs_pin_hash || tagRecord.ipfs[0].ipfsHash : null;
+	const ipfsRecord = tagRecord.ipfs?.length ? tagRecord.ipfs[0] : null;
+
+	const ipfsHash = ipfsRecord.ipfs_pin_hash || ipfsRecord.ipfsHash || ipfsRecord.cid;
 
 	const arweaveHash = tagRecord.arweave?.length ? tagRecord.arweave[0].arweave_pin_hash || tagRecord.arweave[0].arweaveHash : null;
 
@@ -86,7 +88,6 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
 	};
 
 	const metadata = {
-		zelfProof: tagObject.zelfProof,
 		[tagKey]: tagObject.publicData[tagKey],
 		hasPassword: tagObject.publicData.hasPassword || "false",
 		ethAddress: tagObject.publicData.ethAddress || undefined,
@@ -94,13 +95,14 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
 		solanaAddress: tagObject.publicData.solanaAddress || undefined,
 		extraParams,
 		type: tagObject.publicData.type || "hold",
+		domain: tagObject.publicData.domain || undefined,
 	};
 
 	// keys to updte goes here
 	// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 	if (syncPublicData.suiAddress) {
-		extraParams.suiAddress = syncPublicData.suiAddress;
+		metadata.extraParams.suiAddress = syncPublicData.suiAddress;
 	}
 
 	// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -108,7 +110,9 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
 	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
 	if (ipfsHash) {
-		await TagsIPFSModule.unPinFiles([ipfsHash]);
+		await TagsIPFSModule.deleteFiles([ipfsRecord.id]);
+		// delay 1 seconds
+		await new Promise((resolve) => setTimeout(resolve, 1000));
 	}
 
 	const ipfs = await TagsIPFSModule.insert(
