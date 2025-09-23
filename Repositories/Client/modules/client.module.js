@@ -292,8 +292,6 @@ const auth = async (data, authUser) => {
 
 	const accountJSON = await axios.get(zelfAccount.url);
 
-	console.log({ accountJSON });
-
 	if (!accountJSON.data?.zelfProof) throw new Error("409:account_doesnt_contain_zelf_proof");
 
 	const decryptedZelfAccount = await zelfProofModule.decrypt({

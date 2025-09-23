@@ -2,7 +2,7 @@ const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const { getDomainConfiguration, isDomainActive } = require("./domain-registry.module");
 const TagsPartsModule = require("./tags-parts.module");
-const { QRZelfProofExtractor } = require("./qr-zelfproof-extractor.module");
+const { QRZelfProofExtractor, extractZelfProofFromQR } = require("./qr-zelfproof-extractor.module");
 
 /**
  * Tags Search Module
@@ -24,6 +24,8 @@ const { QRZelfProofExtractor } = require("./qr-zelfproof-extractor.module");
 const searchTag = async (params, authUser) => {
 	const { tagName, domain, key, value, domainConfig, environment, type, duration } = params;
 
+	const _tagName = TagsPartsModule.getFullTagName(tagName, domain);
+
 	try {
 		// Search in both IPFS and Arweave
 		const [ipfsResults, arweaveResults] = await Promise.all([
@@ -36,7 +38,7 @@ const searchTag = async (params, authUser) => {
 			ipfs: ipfsResults,
 			arweave: arweaveResults,
 			available: ipfsResults.length === 0 && arweaveResults.length === 0,
-			tagName: tagName,
+			tagName: _tagName,
 		};
 
 		// If results found, return the first one
@@ -56,18 +58,19 @@ const searchTag = async (params, authUser) => {
 		// Extract ZelfProof from QR code if it's not already present in metadata
 		if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
 			try {
-				const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
-				console.log("extractedZelfProof", extractedZelfProof);
-				if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
-					combinedResults.tagObject.zelfProof = extractedZelfProof;
-					console.log("Successfully extracted ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
-				} else {
-					console.log("Failed to extract valid ZelfProof from QR code for tag:", combinedResults.tagObject.tagName);
-				}
+				const extractedZelfProof = await extractZelfProofFromQR(combinedResults.tagObject.zelfProofQRCode);
+
+				console.log({ extractedZelfProof });
+
+				combinedResults.tagObject.zelfProof = extractedZelfProof;
 			} catch (error) {
 				console.error("Error extracting ZelfProof from QR code:", error);
 			}
 		}
+
+		console.log({ combinedResults, zelfProof: combinedResults.tagObject.zelfProof });
+
+		throw new Error("test");
 
 		return combinedResults;
 	} catch (error) {
@@ -90,12 +93,14 @@ const searchTag = async (params, authUser) => {
 const searchIPFS = async (params, authUser) => {
 	const { tagName, key, value, domainConfig, type } = params;
 
+	const _type = type || "both";
+
 	if (!domainConfig?.storage?.ipfsEnabled) return [];
 
 	const ipfsRecords = [];
 
 	try {
-		switch (type) {
+		switch (_type) {
 			case "hold":
 				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName, key, value, domainConfig })));
 			case "mainnet":
@@ -103,8 +108,12 @@ const searchIPFS = async (params, authUser) => {
 			default:
 				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName, key, value, domainConfig })));
 
+				const _holdTagName = `${tagName}.hold`;
+
+				console.log({ _holdTagName });
+
 				// now also query adding .hold to the tagName
-				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: `${tagName}.hold`, key, value, domainConfig })));
+				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _holdTagName, key, value, domainConfig })));
 		}
 
 		return ipfsRecords;

@@ -126,6 +126,7 @@ class QRZelfProofExtractor {
 
 			return null;
 		} catch (error) {
+			console.log({ error });
 			console.error("Error extracting ZelfProof from QR code:", error);
 			return null;
 		}

@@ -98,7 +98,16 @@ const decrypt = async (data) => {
 
 		return encryptedResponse?.data;
 	} catch (exception) {
-		console.error({ exception: exception.response?.data });
+		console.error({
+			exception: exception.response?.data,
+			data: {
+				face_base_64: data.faceBase64,
+				os: data.os || "DESKTOP",
+				password: data.password || undefined,
+				senseprint_base_64: data.zelfProof,
+				verifiers_auth_key: data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
+			},
+		});
 
 		const error = _formattingError(exception.response?.data);
 

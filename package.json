@@ -1,6 +1,9 @@
 {
 	"scripts": {
 		"start": "node server.js",
+		"test": "node test-runner.js",
+		"test:watch": "node test-runner.js --watch",
+		"test:coverage": "node test-runner.js --coverage",
 		"preinstall": "npx npm-force-resolutions"
 	},
 	"name": "zelf-wallet",
@@ -9,6 +12,10 @@
 	"main": "server.js",
 	"directories": {
 		"test": "tests"
+	},
+	"devDependencies": {
+		"jest": "^29.7.0",
+		"supertest": "^7.1.4"
 	},
 	"dependencies": {
 		"@ar.io/sdk": "^3.9.1",

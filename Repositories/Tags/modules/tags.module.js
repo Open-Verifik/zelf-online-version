@@ -16,8 +16,6 @@ const WalrusModule = require("../../Walrus/modules/walrus.module");
 const { generateHoldDomain } = require("./domain-registry.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const TagsRegistrationModule = require("./tags-registration.module");
-const axios = require("axios");
-const { extractZelfProofFromQR } = require("./qr-zelfproof-extractor.module");
 
 /**
  * Generate domain-specific hold domain
@@ -41,6 +39,8 @@ const generateDomainHoldDomain = (domain, name) => {
 const leaseTag = async (params, authUser) => {
 	const { tagName, domain, referralTagName } = params;
 
+	const _tagName = TagsPartsModule.getFullTagName(tagName, domain);
+
 	const domainConfig = getDomainConfig(domain);
 
 	if (!domainConfig) throw new Error(`Unsupported domain: ${domain}`);
@@ -48,7 +48,7 @@ const leaseTag = async (params, authUser) => {
 	// Get tag key using the method
 	const tagKey = domainConfig.getTagKey();
 
-	await _findDuplicatedTag(tagName, domain, domainConfig);
+	await _findDuplicatedTag(_tagName, domain, domainConfig);
 
 	const referralTagObject = await _validateReferral(referralTagName, authUser, domainConfig);
 
@@ -56,17 +56,14 @@ const leaseTag = async (params, authUser) => {
 
 	const { face, password } = decryptedParams;
 
-	const { eth, btc, solana, sui, zkProof, mnemonic } = await _createWalletsFromPhrase({
-		...params,
-		mnemonic: decryptedParams.mnemonic,
-	});
+	const { eth, btc, solana, sui, zkProof, mnemonic } = await _createWalletsFromPhrase(params.type, params.mnemonic, params.wordsCount);
 
 	const dataToEncrypt = {
 		publicData: {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
-			[tagKey]: tagName,
+			[tagKey]: _tagName,
 			domain,
 		},
 		metadata: {
@@ -75,7 +72,7 @@ const leaseTag = async (params, authUser) => {
 		},
 		faceBase64: face,
 		password,
-		_id: tagName,
+		_id: _tagName,
 		tolerance: params.tolerance,
 		addServerPassword: Boolean(params.addServerPassword),
 	};
@@ -105,11 +102,15 @@ const leaseTag = async (params, authUser) => {
 const searchTag = async (params, authUser) => {
 	const { tagName, domain, key, value, environment, type, domainConfig, duration } = params;
 
+	const _tagName = TagsPartsModule.getFullTagName(tagName, domain);
+
 	const _domainConfig = domainConfig || getDomainConfig(domain);
+
+	console.log({ _tagName });
 
 	const result = await TagsSearchModule.searchTag(
 		{
-			tagName,
+			tagName: _tagName,
 			domain,
 			key,
 			value,
@@ -141,6 +142,10 @@ const decryptTag = async (params, authUser) => {
 	const tagObject = searchResult.tagObject;
 
 	const { face, password } = await _decryptParams(params, authUser);
+
+	console.log({ tagObject: tagObject.zelfProof });
+
+	if (!tagObject.zelfProof) throw new Error("409:zelf_proof_not_found");
 
 	const decryptedZelfProof = await decrypt({
 		addServerPassword: Boolean(params.addServerPassword),
@@ -199,9 +204,7 @@ const previewTag = async (params, authUser) => {
 
 	const searchResult = await searchTag({ ...params, domainConfig, environment: "all" }, authUser);
 
-	if (searchResult.available) {
-		return searchResult;
-	}
+	if (searchResult.available) return searchResult;
 
 	const previewResult = await preview({
 		zelfProof: searchResult.tagObject.publicData.zelfProof,
@@ -237,10 +240,13 @@ const previewZelfProof = async (params, authUser) => {
  */
 const leaseConfirmation = async (params, authUser) => {
 	const { tagName, domain, coin, network } = params;
+
 	const domainConfig = getDomainConfig(domain);
 
+	const _tagName = TagsPartsModule.getFullTagName(tagName, domain);
+
 	const confirmation = await confirmPayUniqueAddress({
-		tagName: `${tagName}.${domain}`,
+		tagName: _tagName,
 		domain,
 		domainConfig,
 		coin,
@@ -248,7 +254,7 @@ const leaseConfirmation = async (params, authUser) => {
 	});
 
 	return {
-		tagName: `${tagName}.${domain}`,
+		tagName: _tagName,
 		domain,
 		domainConfig,
 		confirmation,
@@ -336,10 +342,9 @@ const _validateReferral = async (referralTagName, authUser, domainConfig) => {
 	const domain = domainConfig.name;
 
 	const searchParams = {
-		tagName: referralTagName.includes(".") ? referralTagName : `${referralTagName}.${domain}`,
+		tagName: TagsPartsModule.getFullTagName(referralTagName, domain),
 		domain,
 		domainConfig,
-
 		environment: "all",
 	};
 
@@ -352,10 +357,12 @@ const _validateReferral = async (referralTagName, authUser, domainConfig) => {
 
 /**
  * Create wallets from phrase
- * @param {Object} params
+ * @param {string} type
+ * @param {string} mnemonic
+ * @param {number} wordsCount default 12
  */
-const _createWalletsFromPhrase = async (params) => {
-	const _mnemonic = params.type === "import" ? params.mnemonic : generateMnemonic(params.wordsCount);
+const _createWalletsFromPhrase = async (type, mnemonic, wordsCount = 12) => {
+	const _mnemonic = type === "import" ? mnemonic : generateMnemonic(wordsCount);
 
 	const wordsArray = _mnemonic.split(" ");
 

@@ -71,7 +71,7 @@ const searchTag = async (ctx) => {
 		// Add domain context to request
 		const requestData = {
 			...ctx.request.query,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.query.tagName,
+			tagName: extractedName || ctx.request.query.tagName,
 			domain: extractedDomain,
 			environment: ctx.request.query.environment,
 			type: ctx.request.query.type || "both",
@@ -129,8 +129,9 @@ const leaseTag = async (ctx) => {
 
 		const requestData = {
 			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+			tagName: extractedName || ctx.request.body.tagName,
 			domain: extractedDomain,
+			wordsCount: Number(ctx.request.body.wordsCount),
 		};
 
 		const data = await Module.leaseTag(requestData, ctx.state.user);
@@ -182,7 +183,7 @@ const leaseOfflineTag = async (ctx) => {
 
 		const requestData = {
 			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+			tagName: extractedName || ctx.request.body.tagName,
 			domain: extractedDomain,
 		};
 
@@ -231,7 +232,7 @@ const previewTag = async (ctx) => {
 
 		const requestData = {
 			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+			tagName: extractedName || ctx.request.body.tagName,
 			domain: extractedDomain,
 		};
 
@@ -275,7 +276,7 @@ const decryptTag = async (ctx) => {
 
 		const requestData = {
 			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+			tagName: extractedName || ctx.request.body.tagName,
 			domain: extractedDomain,
 		};
 
@@ -352,7 +353,7 @@ const update = async (ctx) => {
 
 		const requestData = {
 			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.params.tagName,
+			tagName: extractedName || ctx.params.tagName,
 			domain: extractedDomain,
 		};
 
