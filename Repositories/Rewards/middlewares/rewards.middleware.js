@@ -1,5 +1,5 @@
 const { string, validate, number } = require("../../../Core/JoiUtils");
-const { extractDomainAndName, validateDomainAndName } = require("../../Tags/middlewares/tags.middleware");
+const { validateDomainAndName } = require("../../Tags/middlewares/tags.middleware");
 
 // Utility function to normalize zelfName with .zelf suffix
 const normalizeZelfName = (zelfName) => {
@@ -25,16 +25,16 @@ const extractTagInfo = (tagName, domain) => {
 const schemas = {
 	reward: {
 		tagName: string().required(),
-		domain: string(),
+		domain: string().required(),
 	},
 	rewardHistory: {
 		tagName: string().required(),
-		domain: string(),
+		domain: string().required(),
 		limit: number().optional().min(1).max(100).default(10),
 	},
 	rewardStats: {
 		tagName: string().required(),
-		domain: string(),
+		domain: string().required(),
 	},
 };
 
@@ -76,8 +76,9 @@ const dailyRewardsValidation = async (ctx, next) => {
 
 const rewardHistoryValidation = async (ctx, next) => {
 	try {
-		const { tagName, domain } = ctx.request.params;
-		const { limit } = ctx.request.query;
+		const { tagName } = ctx.request.params;
+
+		const { limit, domain } = ctx.request.query;
 
 		const valid = validate(schemas.rewardHistory, {
 			tagName,

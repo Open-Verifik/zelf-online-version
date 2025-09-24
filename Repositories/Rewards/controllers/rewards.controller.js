@@ -15,10 +15,10 @@ const dailyRewards = async (ctx) => {
 
 const rewardHistory = async (ctx) => {
 	try {
-		const { zelfName } = ctx.request.params;
-		const { limit } = ctx.request.query;
+		const { tagName } = ctx.request.params;
+		const { limit, domain } = ctx.request.query;
 
-		const data = await Module.getUserRewardHistory(zelfName, limit);
+		const data = await Module.getUserRewardHistory(tagName, domain, limit);
 
 		ctx.body = data;
 	} catch (error) {
@@ -31,9 +31,10 @@ const rewardHistory = async (ctx) => {
 
 const rewardStats = async (ctx) => {
 	try {
-		const { zelfName } = ctx.request.params;
+		const { tagName } = ctx.request.params;
+		const { domain } = ctx.request.query;
 
-		const data = await Module.getUserRewardStats(zelfName);
+		const data = await Module.getUserRewardStats(tagName, domain);
 
 		ctx.body = data;
 	} catch (error) {

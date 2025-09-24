@@ -370,9 +370,9 @@ const _generateZelfProof = async (dataToEncrypt, tagObject) => {
 };
 
 const getFullTagName = (tagName, domain) => {
-	if (tagName.includes(domain)) {
-		return tagName;
-	}
+	if (!tagName || !domain) throw new Error(`Invalid parameters: tagName=${tagName}, domain=${domain}`);
+
+	if (tagName.includes(domain)) return tagName;
 
 	return `${tagName}.${domain}`;
 };

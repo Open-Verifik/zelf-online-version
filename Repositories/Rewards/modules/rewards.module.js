@@ -10,6 +10,15 @@ const TagsSearchModule = require("../../Tags/modules/tags-search.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
 const TagsPartsModule = require("../../Tags/modules/tags-parts.module");
 
+/**
+ * Get rewards from IPFS
+ * @param {Object} params - Search parameters
+ * @param {string} params.zelfName - ZelfName
+ * @param {string} params.rewardDate - Reward date
+ * @param {string} params.type - Reward type
+ * @param {string} params.zelfNameType - ZelfName type
+ * @returns {Object} - IPFS data
+ */
 const get = async (params = {}) => {
 	try {
 		// Check for composite key optimization first
@@ -189,27 +198,7 @@ const dailyRewards = async (data, authUser) => {
 	try {
 		const { tagName, domain } = data;
 
-		const domainConfig = getDomainConfig(domain);
-
-		const tagResult = await TagsSearchModule.searchTag(
-			{
-				tagName,
-				domain,
-				domainConfig,
-				environment: "all",
-				type: "both",
-			},
-			authUser
-		);
-
-		if (!tagResult.tagObject) throw new Error("404:tag_not_found");
-
-		const tagObject = tagResult.tagObject;
-
-		// Validate that user has a Solana address for token transfer
-		if (!tagObject.publicData.solanaAddress) throw new Error("409:no_solana_address_found");
-
-		const _tagName = TagsPartsModule.getTagNameFromPublicData(tagObject, "full", domainConfig);
+		const { tagObject, _tagName, domainConfig } = await _getTagObject(tagName, domain, authUser);
 
 		// Check if user already claimed today
 		const todayReward = await _getTodayReward(_tagName);
@@ -230,7 +219,7 @@ const dailyRewards = async (data, authUser) => {
 		const rewardPrimaryKey = `${_tagName}${todayKey}`;
 		// Create reward data
 		const rewardData = {
-			name: _tagName,
+			rewardsTagName: _tagName,
 			rewardPrimaryKey,
 			amount: rewardAmount,
 			type: "daily",
@@ -245,7 +234,7 @@ const dailyRewards = async (data, authUser) => {
 
 		// Metadata for IPFS querying (key-value pairs)
 		const metadata = {
-			name: _tagName,
+			rewardsTagName: _tagName,
 			rewardPrimaryKey, // Composite key for direct lookup
 			rewardType: "daily",
 			rewardDate: moment().format("YYYY-MM-DD"), // Date without time for easy querying
@@ -374,71 +363,58 @@ const checkAndSendReminders = async () => {
 };
 
 // Get user's reward history
-const getUserRewardHistory = async (tagName, limit = 10) => {
-	try {
-		// Normalize zelfName
-		const normalizedZelfName = normalizeZelfName(zelfName);
+const getUserRewardHistory = async (tagName, domain, limit = 10) => {
+	// Normalize zelfName
+	const _tagName = TagsPartsModule.getFullTagName(tagName, domain);
 
-		// Get all reward files for this user from IPFS
-		const ipfsFiles = await IPFS.filter("name", normalizedZelfName);
+	// Get all reward files for this user from IPFS
+	const ipfsFiles = await IPFS.filter("rewardsTagName", _tagName);
 
-		// Parse and sort rewards by date
-		const rewards = [];
-		let totalEarned = 0;
+	// Parse and sort rewards by date
+	const rewards = [];
+	let totalEarned = 0;
 
-		for (const file of ipfsFiles) {
-			// Extract metadata from keyvalues object
-			const metadata = {
-				name: file.metadata?.name,
-			};
+	for (const file of ipfsFiles) {
+		if (!file.publicData.rewardType) continue;
 
-			if (!file.metadata?.keyvalues?.rewardType) continue;
+		// Use the metadata directly - no need to fetch URLs
+		rewards.push({
+			ipfsCid: file.ipfs_pin_hash,
+			publicData: file.publicData,
+			amount: parseFloat(file.publicData.amount) || 0,
+			rewardType: file.publicData.rewardType,
+			rewardDate: file.publicData.rewardDate,
+			claimedAt: file.publicData.redeemedAt || file.publicData.rewardDate,
+			status: "claimed", // All stored rewards are claimed
+		});
 
-			if (file.metadata && file.metadata.keyvalues) {
-				Object.assign(metadata, file.metadata.keyvalues);
-			}
-
-			// Use the metadata directly - no need to fetch URLs
-			rewards.push({
-				ipfsCid: file.ipfs_pin_hash,
-				metadata: metadata,
-				amount: parseFloat(metadata.amount) || 0,
-				rewardType: metadata.rewardType,
-				rewardDate: metadata.rewardDate,
-				claimedAt: metadata.redeemedAt || metadata.rewardDate,
-				status: "claimed", // All stored rewards are claimed
-			});
-
-			if (metadata.amount) {
-				totalEarned += parseFloat(metadata.amount) || 0;
-			}
+		if (file.publicData.amount) {
+			totalEarned += parseFloat(file.publicData.amount) || 0;
 		}
-
-		// Sort by claimedAt date (newest first) and limit
-		const sortedRewards = rewards.sort((a, b) => new Date(b.claimedAt) - new Date(a.claimedAt)).slice(0, limit);
-
-		return {
-			rewards: sortedRewards,
-			totalEarned,
-			rewardsCount: rewards.length,
-		};
-	} catch (error) {
-		throw new Error(`Failed to get reward history: ${error.message}`);
 	}
+
+	// Sort by claimedAt date (newest first) and limit
+	const sortedRewards = rewards.sort((a, b) => new Date(b.claimedAt) - new Date(a.claimedAt)).slice(0, limit);
+
+	return {
+		rewards: sortedRewards,
+		totalEarned,
+		rewardsCount: rewards.length,
+	};
 };
 
 // Get user's reward statistics
-const getUserRewardStats = async (zelfName) => {
+const getUserRewardStats = async (tagName, domain) => {
 	try {
 		const now = moment();
 		const startOfWeek = moment().startOf("week").toDate();
 		const startOfMonth = moment().startOf("month").toDate();
 
 		const [dailyStreak, weeklyTotal, monthlyTotal, canClaimToday] = await Promise.all([
-			_calculateDailyStreak(zelfName),
-			_getTotalRewardsInPeriod(zelfName, startOfWeek),
-			_getTotalRewardsInPeriod(zelfName, startOfMonth),
-			_hasClaimedToday(zelfName),
+			_calculateDailyStreak(tagName, domain),
+			_getTotalRewardsInPeriod(tagName, domain, startOfWeek),
+			_getTotalRewardsInPeriod(tagName, domain, startOfMonth),
+			_hasClaimedToday(tagName, domain),
 		]);
 
 		return {
@@ -454,28 +430,22 @@ const getUserRewardStats = async (zelfName) => {
 };
 
 // Helper function to calculate daily streak
-const _calculateDailyStreak = async (zelfName) => {
+const _calculateDailyStreak = async (tagName, domain) => {
 	try {
 		// Normalize zelfName
-		const normalizedZelfName = normalizeZelfName(zelfName);
+		const _tagName = TagsPartsModule.getFullTagName(tagName, domain);
 
 		// Get all daily rewards for this user
-		const ipfsFiles = await IPFS.filter("name", normalizedZelfName);
+		const ipfsFiles = await IPFS.filter("rewardsTagName", _tagName);
+
 		const dailyRewards = [];
 
 		// Filter for daily rewards and parse dates
 		for (const file of ipfsFiles) {
-			// Extract metadata from keyvalues object
-			const metadata = {};
-			if (file.metadata && file.metadata.keyvalues) {
-				// keyvalues is an object, not an array
-				Object.assign(metadata, file.metadata.keyvalues);
-			}
-
-			if (metadata.rewardType === "daily") {
+			if (file.publicData.rewardType === "daily") {
 				dailyRewards.push({
-					date: moment(metadata.rewardDate, "YYYY-MM-DD"),
-					metadata: metadata,
+					date: moment(file.publicData.rewardDate, "YYYY-MM-DD"),
+					metadata: file.publicData,
 				});
 			}
 		}
@@ -508,12 +478,9 @@ const _calculateDailyStreak = async (zelfName) => {
 };
 
 // Helper function to check if user has claimed today
-const _hasClaimedToday = async (zelfName) => {
+const _hasClaimedToday = async (tagName, domain) => {
 	try {
-		// Normalize zelfName
-		const normalizedZelfName = normalizeZelfName(zelfName);
-
-		const todayReward = await _getTodayReward(normalizedZelfName);
+		const todayReward = await _getTodayReward(tagName);
 
 		return todayReward !== null;
 	} catch (error) {
@@ -529,25 +496,18 @@ const _getTotalRewardsInPeriod = async (zelfName, startDate) => {
 		const normalizedZelfName = normalizeZelfName(zelfName);
 
 		// Get all rewards for this user
-		const ipfsFiles = await IPFS.filter("name", normalizedZelfName);
+		const ipfsFiles = await IPFS.filter("rewardsTagName", normalizedZelfName);
 		let total = 0;
 
 		const startMoment = moment(startDate);
 
 		for (const file of ipfsFiles) {
-			// Extract metadata from keyvalues object
-			const metadata = {};
-			if (file.metadata && file.metadata.keyvalues) {
-				// keyvalues is an object, not an array
-				Object.assign(metadata, file.metadata.keyvalues);
-			}
-
-			if (metadata.rewardDate) {
-				const rewardDate = moment(metadata.rewardDate, "YYYY-MM-DD");
+			if (file.publicData.rewardDate) {
+				const rewardDate = moment(file.publicData.rewardDate, "YYYY-MM-DD");
 
 				// Check if reward is within the period
 				if (rewardDate.isSameOrAfter(startMoment)) {
-					const amount = parseFloat(metadata.amount) || 0;
+					const amount = parseFloat(file.publicData.amount) || 0;
 					total += amount;
 				}
 			}
@@ -560,22 +520,40 @@ const _getTotalRewardsInPeriod = async (zelfName, startDate) => {
 	}
 };
 
+const _getTagObject = async (tagName, domain, authUser) => {
+	const domainConfig = getDomainConfig(domain);
+
+	const tagResult = await TagsSearchModule.searchTag(
+		{
+			tagName,
+			domain,
+			domainConfig,
+			environment: "all",
+			type: "both",
+		},
+		authUser
+	);
+
+	if (!tagResult.tagObject) throw new Error("404:tag_not_found");
+
+	const tagObject = tagResult.tagObject;
+
+	// Validate that user has a Solana address for token transfer
+	if (!tagObject.publicData.solanaAddress) throw new Error("409:no_solana_address_found");
+
+	const _tagName = TagsPartsModule.getTagNameFromPublicData(tagObject, "full", domainConfig);
+
+	return { tagObject, _tagName, domainConfig };
+};
+
 const rewardFirstTransaction = async (data, authUser) => {
 	try {
-		const { zelfName } = data;
+		const { tagName, domain } = data;
 
-		if (!zelfName) {
-			throw new Error("ZelfName is required");
-		}
-
-		// Get ZelfName public data to find Solana address
-		const zelfNamePublicData = await _getZelfNamePublicData(zelfName);
-		if (!zelfNamePublicData) throw new Error(`ZelfName ${zelfName} not found`);
-
-		if (!zelfNamePublicData.solanaAddress) throw new Error(`No Solana address found for ${zelfName}`);
+		const { tagObject, _tagName, domainConfig } = await _getTagObject(tagName, domain, authUser);
 
 		// Check if user has already received first transaction reward
-		const existingReward = await IPFS.filter("first_zns_transaction", zelfName);
+		const existingReward = await IPFS.filter("first_zns_transaction", _tagName);
 		const hasFirstTransactionReward = existingReward.length > 0;
 
 		if (hasFirstTransactionReward) {
@@ -589,7 +567,7 @@ const rewardFirstTransaction = async (data, authUser) => {
 
 		// Check if user has sent ZNS tokens (indicating they've used the token)
 		const sentTokenCheck = await ZNSTransactionDetector.hasSentZNSTokens(
-			zelfNamePublicData.solanaAddress,
+			tagObject.publicData.solanaAddress,
 			{ hours: 24 * 365, minAmount: 0.001 } // Check last year, any amount
 		);
 
@@ -613,7 +591,7 @@ const rewardFirstTransaction = async (data, authUser) => {
 
 		// Create reward data
 		const rewardData = {
-			zelfName,
+			tagName: _tagName,
 			amount: rewardAmount,
 			rewardType,
 			rewardDate,
@@ -630,16 +608,16 @@ const rewardFirstTransaction = async (data, authUser) => {
 		// Save to IPFS with specific filter key for first ZNS transaction
 		const rewardJson = JSON.stringify(rewardData);
 		const base64Json = Buffer.from(rewardJson).toString("base64");
-		const filename = `first-zns-transaction-${zelfName}.json`;
+		const filename = `first-zns-transaction-${_tagName}.json`;
 
 		// Metadata for IPFS querying with specific filter key
 		const metadata = {
-			first_zns_transaction: zelfName, // Specific filter key for easy searching
-			name: zelfName,
+			first_zns_transaction: _tagName, // Specific filter key for easy searching
+			rewardsTagName: _tagName,
 			rewardType: "first_transaction",
 			amount: rewardAmount.toString(),
 			description: "First ZNS Transaction Reward",
-			solanaAddress: zelfNamePublicData.solanaAddress,
+			solanaAddress: tagObject.publicData.solanaAddress,
 			rewardDate: moment().format("YYYY-MM-DD"),
 			redeemedAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 		};
@@ -650,15 +628,15 @@ const rewardFirstTransaction = async (data, authUser) => {
 		// Save to MongoDB
 
 		const mongoReward = new Model({
-			name: zelfName,
-			rewardPrimaryKey: `first_transaction_${zelfName}`,
+			name: _tagName,
+			rewardPrimaryKey: `first_transaction_${_tagName}`,
 			amount: rewardAmount,
 			type: "achievement", // Using achievement type for first transaction
 			status: "claimed",
 			description: "First ZNS Transaction Reward",
 			rewardDate: moment().format("YYYY-MM-DD"),
 			redeemedAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-			zelfNameType: zelfNamePublicData.type || "hold", // Get from public data
+			zelfNameType: tagObject.publicData.type || "hold", // Get from public data
 			ipfsCid: ipfsResult.IpfsHash,
 			metadata: rewardData,
 		});
@@ -670,13 +648,13 @@ const rewardFirstTransaction = async (data, authUser) => {
 		let tokenTransferError = null;
 
 		try {
-			const transferSignature = await ZNSTokenModule.giveTokensAfterPurchase(rewardAmount, zelfNamePublicData.solanaAddress);
+			const transferSignature = await ZNSTokenModule.giveTokensAfterPurchase(rewardAmount, tagObject.publicData.solanaAddress);
 
 			tokenTransferResult = {
 				success: true,
 				signature: transferSignature,
 				amount: rewardAmount,
-				recipientAddress: zelfNamePublicData.solanaAddress,
+				recipientAddress: tagObject.publicData.solanaAddress,
 			};
 
 			rewardData.tokenTransfer = tokenTransferResult;
@@ -689,7 +667,7 @@ const rewardFirstTransaction = async (data, authUser) => {
 				success: false,
 				error: tokenError.message,
 				amount: rewardAmount,
-				recipientAddress: zelfNamePublicData.solanaAddress,
+				recipientAddress: tagObject.publicData.solanaAddress,
 			};
 
 			rewardData.tokenTransfer = tokenTransferError;
@@ -700,7 +678,7 @@ const rewardFirstTransaction = async (data, authUser) => {
 		}
 
 		// Send notification
-		await _sendRewardNotification(zelfName, rewardAmount, tokenTransferResult ? "success" : "failed");
+		await _sendRewardNotification(_tagName, rewardAmount, tokenTransferResult ? "success" : "failed");
 
 		return {
 			success: true,
@@ -708,7 +686,7 @@ const rewardFirstTransaction = async (data, authUser) => {
 			reward: {
 				amount: rewardAmount,
 				rewardType,
-				zelfName,
+				tagName: _tagName,
 				description: "First ZNS Transaction Reward",
 				requirements: rewardData.requirements,
 			},
