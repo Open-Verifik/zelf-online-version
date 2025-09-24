@@ -1,7 +1,8 @@
 const { decrypt, encrypt, preview, encryptQRCode } = require("../../ZelfProof/modules/zelf-proof.module");
 const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
-const { getDomainConfiguration, generateStorageKey, generateHoldDomain } = require("./domain-registry.module");
+const { generateStorageKey, generateHoldDomain } = require("./domain-registry.module");
 const config = require("../../../Core/config");
+const { getDomainConfig } = require("../config/supported-domains");
 
 /**
  * Tags Parts Module
@@ -44,7 +45,8 @@ const encryptParams = async (params, authUser) => {
 	const { faceBase64, password, metadata, tagName, domain } = params;
 
 	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
+	const domainConfig = getDomainConfig(domain);
+
 	if (!domainConfig) {
 		throw new Error(`Domain '${domain}' is not supported`);
 	}
@@ -82,7 +84,8 @@ const previewTag = async (params, authUser) => {
 	const { zelfProof, tagName, domain } = params;
 
 	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
+	const domainConfig = getDomainConfig(domain);
+
 	if (!domainConfig) {
 		throw new Error(`Domain '${domain}' is not supported`);
 	}
@@ -111,7 +114,8 @@ const generateQRCode = async (params, authUser) => {
 	const { zelfProof, tagName, domain } = params;
 
 	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
+	const domainConfig = getDomainConfig(domain);
+
 	if (!domainConfig) {
 		throw new Error(`Domain '${domain}' is not supported`);
 	}
@@ -165,7 +169,8 @@ const generateDomainHoldDomain = (domain, name) => {
  */
 const validateDomainData = (data, domain) => {
 	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
+	const domainConfig = getDomainConfig(domain);
+
 	if (!domainConfig) {
 		return { valid: false, error: `Domain '${domain}' is not supported` };
 	}
@@ -200,7 +205,8 @@ const validateDomainData = (data, domain) => {
  */
 const processDomainMetadata = (metadata, domain) => {
 	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
+	const domainConfig = getDomainConfig(domain);
+
 	if (!domainConfig) {
 		throw new Error(`Domain '${domain}' is not supported`);
 	}
@@ -250,7 +256,8 @@ const createTagObject = async (params, authUser) => {
 	const { tagName, domain, publicData, privateData } = params;
 
 	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
+	const domainConfig = getDomainConfig(domain);
+
 	if (!domainConfig) {
 		throw new Error(`Domain '${domain}' is not supported`);
 	}
@@ -298,7 +305,7 @@ const createHoldObject = async (params, authUser) => {
 	const { tagName, domain, publicData, privateData } = params;
 
 	// Get domain configuration
-	const domainConfig = getDomainConfiguration(domain);
+	const domainConfig = getDomainConfig(domain);
 	if (!domainConfig) {
 		throw new Error(`Domain '${domain}' is not supported`);
 	}
@@ -370,6 +377,21 @@ const getFullTagName = (tagName, domain) => {
 	return `${tagName}.${domain}`;
 };
 
+const getTagNameFromPublicData = (tagObject, type = "full", domainConfig) => {
+	if (!domainConfig) domainConfig = getDomainConfig(tagObject.publicData.domain);
+
+	const keyPrefix = domainConfig.getTagKey();
+
+	switch (type) {
+		case "full":
+			return tagObject.publicData[keyPrefix];
+		case "name":
+			return tagObject.publicData[keyPrefix].split(".")[0];
+		default:
+			return tagObject.publicData[keyPrefix];
+	}
+};
+
 module.exports = {
 	decryptParams,
 	encryptParams,
@@ -384,4 +406,5 @@ module.exports = {
 	assignProperties,
 	generateZelfProof: _generateZelfProof,
 	getFullTagName,
+	getTagNameFromPublicData,
 };

@@ -8,6 +8,7 @@ const ZNSTransactionDetector = require("../../ZelfNameService/modules/zns-transa
 const { normalizeZelfName } = require("../middlewares/rewards.middleware");
 const TagsSearchModule = require("../../Tags/modules/tags-search.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
+const TagsPartsModule = require("../../Tags/modules/tags-parts.module");
 
 const get = async (params = {}) => {
 	try {
@@ -152,9 +153,6 @@ const _filterByMultipleKeys = async (filters) => {
 // Helper function to check if user already claimed today
 const _getTodayReward = async (zelfName) => {
 	try {
-		// Normalize zelfName
-		zelfName = normalizeZelfName(zelfName);
-
 		// Create composite key for direct lookup
 		const todayKey = moment().format("YYYY-MM-DD");
 
@@ -193,31 +191,28 @@ const dailyRewards = async (data, authUser) => {
 
 		const domainConfig = getDomainConfig(domain);
 
-		try {
-			const tagResult = await TagsSearchModule.searchTag(
-				{
-					tagName,
-					domain,
-					domainConfig,
-					environment: "all",
-					type: "both",
-				},
-				authUser
-			);
+		const tagResult = await TagsSearchModule.searchTag(
+			{
+				tagName,
+				domain,
+				domainConfig,
+				environment: "all",
+				type: "both",
+			},
+			authUser
+		);
 
-			return tagResult;
-		} catch (error) {
-			console.error("Error searching tag:", error);
-			throw new Error(error.message || "Failed to search tag");
-		}
+		if (!tagResult.tagObject) throw new Error("404:tag_not_found");
+
+		const tagObject = tagResult.tagObject;
 
 		// Validate that user has a Solana address for token transfer
-		if (!zelfNamePublicData.solanaAddress) {
-			throw new Error("No Solana address found for this ZelfName. Please update your ZelfName with a Solana address to receive rewards.");
-		}
+		if (!tagObject.publicData.solanaAddress) throw new Error("409:no_solana_address_found");
+
+		const _tagName = TagsPartsModule.getTagNameFromPublicData(tagObject, "full", domainConfig);
 
 		// Check if user already claimed today
-		const todayReward = await _getTodayReward(zelfName);
+		const todayReward = await _getTodayReward(_tagName);
 
 		if (todayReward) {
 			return {
@@ -229,33 +224,33 @@ const dailyRewards = async (data, authUser) => {
 		}
 
 		// Generate wheel reward based on type
-		const rewardAmount = _generateWheelReward(zelfNamePublicData.type);
+		const rewardAmount = _generateWheelReward(tagObject.publicData.type);
 
 		const todayKey = moment().format("YYYY-MM-DD");
-		const rewardPrimaryKey = `${zelfName}${todayKey}`;
+		const rewardPrimaryKey = `${_tagName}${todayKey}`;
 		// Create reward data
 		const rewardData = {
-			name: zelfName,
+			name: _tagName,
 			rewardPrimaryKey,
 			amount: rewardAmount,
 			type: "daily",
 			status: "claimed",
-			description: `Daily wheel reward for ${zelfNamePublicData.type} ZelfName`,
+			description: `Daily wheel reward for ${tagObject.publicData.type} ZelfName`,
 			rewardDate: moment().format("YYYY-MM-DD"),
 			redeemedAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-			zelfNameType: zelfNamePublicData.type,
+			zelfNameType: tagObject.publicData.type,
 			wheelSpin: true,
-			rewardRange: zelfNamePublicData.type === "hold" ? "0.1-1.0" : "0.2-2.0",
+			rewardRange: tagObject.publicData.type === "hold" ? "0.1-1.0" : "0.2-2.0",
 		};
 
 		// Metadata for IPFS querying (key-value pairs)
 		const metadata = {
-			name: zelfName,
+			name: _tagName,
 			rewardPrimaryKey, // Composite key for direct lookup
 			rewardType: "daily",
 			rewardDate: moment().format("YYYY-MM-DD"), // Date without time for easy querying
 			redeemedAt: moment().format("YYYY-MM-DD HH:mm:ss"), // Exact timestamp when redeemed
-			zelfNameType: zelfNamePublicData.type,
+			zelfNameType: tagObject.publicData.type,
 			amount: rewardAmount.toString(),
 		};
 
@@ -266,17 +261,17 @@ const dailyRewards = async (data, authUser) => {
 
 		// Step 1: Save to MongoDB with TTL (5 minutes) for immediate availability
 		const mongoReward = new Model({
-			name: zelfName,
+			name: _tagName,
 			rewardPrimaryKey,
 			amount: rewardAmount,
 			type: "daily",
 			status: "claimed",
-			description: `Daily wheel reward for ${zelfNamePublicData.type} ZelfName`,
+			description: `Daily wheel reward for ${tagObject.publicData.type} ZelfName`,
 			claimedAt: new Date(),
-			zelfNameType: zelfNamePublicData.type,
+			zelfNameType: tagObject.publicData.type,
 			metadata: {
 				wheelSpin: true,
-				rewardRange: zelfNamePublicData.type === "hold" ? "0.1-1.0" : "0.2-2.0",
+				rewardRange: tagObject.publicData.type === "hold" ? "0.1-1.0" : "0.2-2.0",
 			},
 		});
 
@@ -292,20 +287,20 @@ const dailyRewards = async (data, authUser) => {
 		}
 
 		// Trigger notification
-		await _sendRewardNotification(zelfName, rewardAmount, "claimed");
+		await _sendRewardNotification(_tagName, rewardAmount, "claimed");
 
 		// Step 3: Send ZNS tokens to user's Solana address
 		let tokenTransferResult = null;
 		let tokenTransferError = null;
 
 		try {
-			const transferSignature = await ZNSTokenModule.giveTokensAfterPurchase(rewardAmount, zelfNamePublicData.solanaAddress);
+			const transferSignature = await ZNSTokenModule.giveTokensAfterPurchase(rewardAmount, tagObject.publicData.solanaAddress);
 
 			tokenTransferResult = {
 				success: true,
 				signature: transferSignature,
 				amount: rewardAmount,
-				recipientAddress: zelfNamePublicData.solanaAddress,
+				recipientAddress: tagObject.publicData.solanaAddress,
 			};
 
 			// Update reward status to include token transfer success
@@ -319,7 +314,7 @@ const dailyRewards = async (data, authUser) => {
 				success: false,
 				error: tokenError.message,
 				amount: rewardAmount,
-				recipientAddress: zelfNamePublicData.solanaAddress,
+				recipientAddress: tagObject.publicData.solanaAddress,
 			};
 
 			// Update reward status to include token transfer failure
@@ -327,9 +322,6 @@ const dailyRewards = async (data, authUser) => {
 			mongoReward.tokenTransfer = tokenTransferError;
 			mongoReward.tokenTransferStatus = "failed";
 			await mongoReward.save();
-
-			// Don't throw error here, user still gets the reward record
-			// The token transfer can be retried later if needed
 		}
 
 		return {
@@ -340,7 +332,7 @@ const dailyRewards = async (data, authUser) => {
 				amount: rewardAmount,
 				currency: "ZNS",
 				type: "daily",
-				zelfNameType: zelfNamePublicData.type,
+				zelfNameType: tagObject.publicData.type,
 				claimedAt: rewardData.claimedAt,
 				nextClaimAvailable: moment().add(1, "day").startOf("day").toISOString(),
 				ipfsCid: ipfsResult?.IpfsHash || null,
@@ -382,7 +374,7 @@ const checkAndSendReminders = async () => {
 };
 
 // Get user's reward history
-const getUserRewardHistory = async (zelfName, limit = 10) => {
+const getUserRewardHistory = async (tagName, limit = 10) => {
 	try {
 		// Normalize zelfName
 		const normalizedZelfName = normalizeZelfName(zelfName);
