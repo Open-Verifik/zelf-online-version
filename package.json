@@ -12,7 +12,8 @@
 		"test:lease": "jest tests/integration/leaseTags-api.test.js --verbose --no-coverage",
 		"test:preview": "jest tests/integration/previewTags-api.test.js --verbose --no-coverage",
 		"test:search-tag": "jest tests/integration/searchTags-api.test.js --verbose --no-coverage",
-		"test:preview-tag": "jest tests/integration/previewTags-api.test.js --verbose --no-coverage"
+		"test:preview-tag": "jest tests/integration/previewTags-api.test.js --verbose --no-coverage",
+		"test:search-by-domain": "jest tests/integration/searchByDomain-api.test.js --verbose --no-coverage"
 	},
 	"name": "zelf-wallet",
 	"description": "zelf wallet backend",

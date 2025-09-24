@@ -141,6 +141,12 @@ const searchByStorageKey = async (params) => {
 	return key ? await searchInArweave(key, value) : await searchInArweave(_domainConfig.getTagKey(), tagName);
 };
 
+const searchByDomain = async (params) => {
+	const { domain } = params;
+
+	return await searchInArweave("domain", domain);
+};
+
 /**
  * Search Arweave for data
  * @param {string} key - Search key
@@ -268,5 +274,6 @@ const formatCreatedRecord = (record) => {
 module.exports = {
 	tagRegistration,
 	searchByStorageKey,
+	searchByDomain,
 	arweaveIDToBase64,
 };
