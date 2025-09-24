@@ -88,17 +88,19 @@ const searchIPFS = async (params, authUser) => {
 
 	const ipfsRecords = [];
 
+	const _tagName = TagsPartsModule.getFullTagName(tagName, domainConfig.name);
+
 	try {
 		switch (type) {
 			case "hold":
-				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName, key, value, domainConfig })));
+				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
 			case "mainnet":
-				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName, key, value, domainConfig })));
+				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
 			default:
-				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName, key, value, domainConfig })));
+				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
 
 				// now also query adding .hold to the tagName
-				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: `${tagName}.hold`, key, value, domainConfig })));
+				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: `${_tagName}.hold`, key, value, domainConfig })));
 		}
 
 		return ipfsRecords;
@@ -123,17 +125,19 @@ const searchArweave = async (params, authUser) => {
 
 		if (!_domainConfig?.storage?.arweaveEnabled) return [];
 
+		const _tagName = TagsPartsModule.getFullTagName(tagName, _domainConfig.name);
+
 		// Search by different criteria
 		if (tagName) {
-			return await TagsArweaveModule.searchByStorageKey({ tagName, domainConfig: _domainConfig, domain });
+			return TagsArweaveModule.searchByStorageKey({ tagName: _tagName, domainConfig: _domainConfig, domain });
 		}
 
 		if (key && value) {
-			return await TagsArweaveModule.searchByStorageKey({ key, value, domainConfig: _domainConfig, domain });
+			return TagsArweaveModule.searchByStorageKey({ key, value, domainConfig: _domainConfig, domain });
 		}
 
 		// Search by domain
-		return await TagsArweaveModule.searchByStorageKey({ key: "domain", value: domain, domainConfig: _domainConfig }, authUser);
+		return TagsArweaveModule.searchByStorageKey({ key: "domain", value: domain, domainConfig: _domainConfig }, authUser);
 	} catch (error) {
 		console.error("Error searching Arweave:", error);
 		return [];

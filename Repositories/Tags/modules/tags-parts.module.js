@@ -362,6 +362,14 @@ const _generateZelfProof = async (dataToEncrypt, tagObject) => {
 	tagObject.zelfProofQRCode = zelfProofQRCode;
 };
 
+const getFullTagName = (tagName, domain) => {
+	if (tagName.includes(domain)) {
+		return tagName;
+	}
+
+	return `${tagName}.${domain}`;
+};
+
 module.exports = {
 	decryptParams,
 	encryptParams,
@@ -375,4 +383,5 @@ module.exports = {
 	createHoldObject,
 	assignProperties,
 	generateZelfProof: _generateZelfProof,
+	getFullTagName,
 };

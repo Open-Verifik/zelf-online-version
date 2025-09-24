@@ -5,6 +5,15 @@ const Middleware = require("../middlewares/rewards.middleware");
 
 const base = "/rewards";
 
+module.exports = (server) => {
+	const PATH = config.basePath(base);
+
+	server.post(`${PATH}/daily`, Middleware.dailyRewardsValidation, Controller.dailyRewards);
+	server.post(`${PATH}/first-transaction`, Middleware.firstTransactionRewardValidation, Controller.firstTransactionReward);
+	server.get(`${PATH}/history/:tagName`, Middleware.rewardHistoryValidation, Controller.rewardHistory);
+	server.get(`${PATH}/stats/:tagName`, Middleware.rewardStatsValidation, Controller.rewardStats);
+};
+
 /**
  * @swagger
  * components:
@@ -82,24 +91,28 @@ const base = "/rewards";
  *           description: Last update timestamp
  *     DailyRewardRequest:
  *       type: object
- *       required: [zelfName]
+ *       required: [tagName]
  *       properties:
- *         zelfName:
+ *         tagName:
  *           type: string
- *           description: Zelf name (will be normalized to include .zelf suffix)
- *           example: "username"
- *           minLength: 3
- *           maxLength: 27
+ *           description: Tag name (supports multiple domains)
+ *           example: "username.avax"
+ *         domain:
+ *           type: string
+ *           description: Specific domain for the tag (optional if included in tagName)
+ *           example: "avax"
  *     FirstTransactionRewardRequest:
  *       type: object
- *       required: [zelfName]
+ *       required: [tagName]
  *       properties:
- *         zelfName:
+ *         tagName:
  *           type: string
- *           description: Zelf name (will be normalized to include .zelf suffix)
- *           example: "username"
- *           minLength: 3
- *           maxLength: 27
+ *           description: Tag name (supports multiple domains)
+ *           example: "username.avax"
+ *         domain:
+ *           type: string
+ *           description: Specific domain for the tag (optional if included in tagName)
+ *           example: "avax"
  *     RewardHistoryResponse:
  *       type: object
  *       properties:
@@ -173,284 +186,284 @@ const base = "/rewards";
  *           example: "Daily reward claimed successfully"
  */
 
-module.exports = (server) => {
-	const PATH = config.basePath(base);
+/**
+ * @swagger
+ * /api/rewards/daily:
+ *   post:
+ *     summary: Claim daily reward
+ *     description: Claim a daily reward for the specified zelf name. Users can claim one daily reward per day.
+ *     tags: [Rewards]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/DailyRewardRequest'
+ *     responses:
+ *       200:
+ *         description: Daily reward claimed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RewardResponse'
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "tagName is required"
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       409:
+ *         description: Daily reward already claimed today
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Daily reward already claimed for today"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 
-	/**
-	 * @swagger
-	 * /api/rewards/daily:
-	 *   post:
-	 *     summary: Claim daily reward
-	 *     description: Claim a daily reward for the specified zelf name. Users can claim one daily reward per day.
-	 *     tags: [Rewards]
-	 *     security:
-	 *       - bearerAuth: []
-	 *     requestBody:
-	 *       required: true
-	 *       content:
-	 *         application/json:
-	 *           schema:
-	 *             $ref: '#/components/schemas/DailyRewardRequest'
-	 *     responses:
-	 *       200:
-	 *         description: Daily reward claimed successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/RewardResponse'
-	 *       400:
-	 *         description: Invalid request data
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 error:
-	 *                   type: string
-	 *                   example: "zelfName is required"
-	 *       401:
-	 *         description: Unauthorized
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/Error'
-	 *       409:
-	 *         description: Daily reward already claimed today
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 error:
-	 *                   type: string
-	 *                   example: "Daily reward already claimed for today"
-	 *       500:
-	 *         description: Internal server error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/Error'
-	 */
-	server.post(`${PATH}/daily`, Middleware.dailyRewardsValidation, Controller.dailyRewards);
+/**
+ * @swagger
+ * /api/rewards/first-transaction:
+ *   post:
+ *     summary: Claim first transaction reward
+ *     description: Claim a reward for completing the first transaction. This reward can only be claimed once per user.
+ *     tags: [Rewards]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/FirstTransactionRewardRequest'
+ *     responses:
+ *       200:
+ *         description: First transaction reward claimed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RewardResponse'
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "tagName is required"
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       409:
+ *         description: First transaction reward already claimed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "First transaction reward already claimed"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 
-	/**
-	 * @swagger
-	 * /api/rewards/first-transaction:
-	 *   post:
-	 *     summary: Claim first transaction reward
-	 *     description: Claim a reward for completing the first transaction. This reward can only be claimed once per user.
-	 *     tags: [Rewards]
-	 *     security:
-	 *       - bearerAuth: []
-	 *     requestBody:
-	 *       required: true
-	 *       content:
-	 *         application/json:
-	 *           schema:
-	 *             $ref: '#/components/schemas/FirstTransactionRewardRequest'
-	 *     responses:
-	 *       200:
-	 *         description: First transaction reward claimed successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/RewardResponse'
-	 *       400:
-	 *         description: Invalid request data
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 error:
-	 *                   type: string
-	 *                   example: "zelfName is required"
-	 *       401:
-	 *         description: Unauthorized
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/Error'
-	 *       409:
-	 *         description: First transaction reward already claimed
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 error:
-	 *                   type: string
-	 *                   example: "First transaction reward already claimed"
-	 *       500:
-	 *         description: Internal server error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/Error'
-	 */
-	server.post(`${PATH}/first-transaction`, Middleware.firstTransactionRewardValidation, Controller.firstTransactionReward);
+/**
+ * @swagger
+ * /api/rewards/history/{tagName}:
+ *   get:
+ *     summary: Get user reward history
+ *     description: Retrieve the reward history for a specific tag name. Returns a paginated list of rewards.
+ *     tags: [Rewards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tagName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tag name (supports multiple domains)
+ *         example: "username.avax"
+ *       - in: query
+ *         name: domain
+ *         schema:
+ *           type: string
+ *         description: Specific domain for the tag (optional if included in tagName)
+ *         example: "avax"
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of rewards to return (max 100)
+ *         example: 20
+ *     responses:
+ *       200:
+ *         description: Reward history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RewardHistoryResponse'
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "tagName is required"
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: No rewards found for this user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 rewards:
+ *                   type: array
+ *                   items: []
+ *                 total:
+ *                   type: number
+ *                   example: 0
+ *                 limit:
+ *                   type: number
+ *                   example: 10
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 
-	/**
-	 * @swagger
-	 * /api/rewards/history/{zelfName}:
-	 *   get:
-	 *     summary: Get user reward history
-	 *     description: Retrieve the reward history for a specific zelf name. Returns a paginated list of rewards.
-	 *     tags: [Rewards]
-	 *     security:
-	 *       - bearerAuth: []
-	 *     parameters:
-	 *       - in: path
-	 *         name: zelfName
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *           minLength: 3
-	 *           maxLength: 27
-	 *         description: Zelf name (will be normalized to include .zelf suffix)
-	 *         example: "username"
-	 *       - in: query
-	 *         name: limit
-	 *         schema:
-	 *           type: integer
-	 *           minimum: 1
-	 *           maximum: 100
-	 *           default: 10
-	 *         description: Number of rewards to return (max 100)
-	 *         example: 20
-	 *     responses:
-	 *       200:
-	 *         description: Reward history retrieved successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/RewardHistoryResponse'
-	 *       400:
-	 *         description: Invalid request data
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 error:
-	 *                   type: string
-	 *                   example: "zelfName is required"
-	 *       401:
-	 *         description: Unauthorized
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/Error'
-	 *       404:
-	 *         description: No rewards found for this user
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 rewards:
-	 *                   type: array
-	 *                   items: []
-	 *                 total:
-	 *                   type: number
-	 *                   example: 0
-	 *                 limit:
-	 *                   type: number
-	 *                   example: 10
-	 *       500:
-	 *         description: Internal server error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/Error'
-	 */
-	server.get(`${PATH}/history/:zelfName`, Middleware.rewardHistoryValidation, Controller.rewardHistory);
-
-	/**
-	 * @swagger
-	 * /api/rewards/stats/{zelfName}:
-	 *   get:
-	 *     summary: Get user reward statistics
-	 *     description: Retrieve comprehensive reward statistics for a specific zelf name, including totals and breakdowns by type and status.
-	 *     tags: [Rewards]
-	 *     security:
-	 *       - bearerAuth: []
-	 *     parameters:
-	 *       - in: path
-	 *         name: zelfName
-	 *         required: true
-	 *         schema:
-	 *           type: string
-	 *           minLength: 3
-	 *           maxLength: 27
-	 *         description: Zelf name (will be normalized to include .zelf suffix)
-	 *         example: "username"
-	 *     responses:
-	 *       200:
-	 *         description: Reward statistics retrieved successfully
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/RewardStatsResponse'
-	 *       400:
-	 *         description: Invalid request data
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 error:
-	 *                   type: string
-	 *                   example: "zelfName is required"
-	 *       401:
-	 *         description: Unauthorized
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/Error'
-	 *       404:
-	 *         description: No reward statistics found for this user
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               type: object
-	 *               properties:
-	 *                 totalRewards:
-	 *                   type: number
-	 *                   example: 0
-	 *                 totalAmount:
-	 *                   type: number
-	 *                   example: 0
-	 *                 dailyRewards:
-	 *                   type: number
-	 *                   example: 0
-	 *                 referralRewards:
-	 *                   type: number
-	 *                   example: 0
-	 *                 bonusRewards:
-	 *                   type: number
-	 *                   example: 0
-	 *                 achievementRewards:
-	 *                   type: number
-	 *                   example: 0
-	 *                 pendingRewards:
-	 *                   type: number
-	 *                   example: 0
-	 *                 claimedRewards:
-	 *                   type: number
-	 *                   example: 0
-	 *                 expiredRewards:
-	 *                   type: number
-	 *                   example: 0
-	 *                 failedRewards:
-	 *                   type: number
-	 *                   example: 0
-	 *       500:
-	 *         description: Internal server error
-	 *         content:
-	 *           application/json:
-	 *             schema:
-	 *               $ref: '#/components/schemas/Error'
-	 */
-	server.get(`${PATH}/stats/:zelfName`, Middleware.rewardStatsValidation, Controller.rewardStats);
-};
+/**
+ * @swagger
+ * /api/rewards/stats/{tagName}:
+ *   get:
+ *     summary: Get user reward statistics
+ *     description: Retrieve comprehensive reward statistics for a specific tag name, including totals and breakdowns by type and status.
+ *     tags: [Rewards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tagName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tag name (supports multiple domains)
+ *         example: "username.avax"
+ *       - in: query
+ *         name: domain
+ *         schema:
+ *           type: string
+ *         description: Specific domain for the tag (optional if included in tagName)
+ *         example: "avax"
+ *     responses:
+ *       200:
+ *         description: Reward statistics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RewardStatsResponse'
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "tagName is required"
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: No reward statistics found for this user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalRewards:
+ *                   type: number
+ *                   example: 0
+ *                 totalAmount:
+ *                   type: number
+ *                   example: 0
+ *                 dailyRewards:
+ *                   type: number
+ *                   example: 0
+ *                 referralRewards:
+ *                   type: number
+ *                   example: 0
+ *                 bonusRewards:
+ *                   type: number
+ *                   example: 0
+ *                 achievementRewards:
+ *                   type: number
+ *                   example: 0
+ *                 pendingRewards:
+ *                   type: number
+ *                   example: 0
+ *                 claimedRewards:
+ *                   type: number
+ *                   example: 0
+ *                 expiredRewards:
+ *                   type: number
+ *                   example: 0
+ *                 failedRewards:
+ *                   type: number
+ *                   example: 0
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */

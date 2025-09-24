@@ -1,20 +1,71 @@
-const Joi = require("joi");
+const { string, validate, number } = require("../../../Core/JoiUtils");
+const { extractDomainAndName, validateDomainAndName } = require("../../Tags/middlewares/tags.middleware");
 
 // Utility function to normalize zelfName with .zelf suffix
 const normalizeZelfName = (zelfName) => {
 	return zelfName?.endsWith(".zelf") ? zelfName : `${zelfName}.zelf`;
 };
 
+// Utility function to extract domain and name from tagName
+const extractTagInfo = (tagName, domain) => {
+	if (!tagName) return { domain: "zelf", name: null };
+
+	// If tagName already contains a domain, extract it
+	if (tagName.includes(".")) {
+		const parts = tagName.split(".");
+		const extractedDomain = parts[parts.length - 1];
+		const name = parts.slice(0, -1).join(".");
+		return { domain: extractedDomain, name };
+	}
+
+	// Use provided domain or default to zelf
+	return { domain: domain || "zelf", name: tagName };
+};
+
+const schemas = {
+	reward: {
+		tagName: string().required(),
+		domain: string(),
+	},
+	rewardHistory: {
+		tagName: string().required(),
+		domain: string(),
+		limit: number().optional().min(1).max(100).default(10),
+	},
+	rewardStats: {
+		tagName: string().required(),
+		domain: string(),
+	},
+};
+
 const dailyRewardsValidation = async (ctx, next) => {
 	try {
-		const schema = Joi.object({
-			zelfName: Joi.string().required().min(3).max(27),
+		const { tagName, domain } = ctx.request.body;
+
+		const valid = validate(schemas.reward, {
+			tagName,
+			domain,
 		});
 
-		await schema.validateAsync(ctx.request.body);
+		if (valid.error) {
+			ctx.status = 400;
+			ctx.body = { error: valid.error.message };
+			return;
+		}
 
-		// Normalize zelfName to include .zelf suffix if missing
-		ctx.request.body.zelfName = normalizeZelfName(ctx.request.body.zelfName);
+		// Extract domain and name from tagName
+		const { domain: extractedDomain, name } = extractTagInfo(tagName, domain);
+		const domainValidation = await validateDomainAndName(extractedDomain, name);
+
+		if (!domainValidation.valid) {
+			ctx.status = 400;
+			ctx.body = { error: domainValidation.error };
+			return;
+		}
+
+		// Add extracted domain and name to context for use in controllers
+		ctx.state.extractedDomain = extractedDomain;
+		ctx.state.extractedName = name;
 
 		await next();
 	} catch (error) {
@@ -25,19 +76,34 @@ const dailyRewardsValidation = async (ctx, next) => {
 
 const rewardHistoryValidation = async (ctx, next) => {
 	try {
-		const paramsSchema = Joi.object({
-			zelfName: Joi.string().required().min(3).max(27),
+		const { tagName, domain } = ctx.request.params;
+		const { limit } = ctx.request.query;
+
+		const valid = validate(schemas.rewardHistory, {
+			tagName,
+			domain,
+			limit,
 		});
 
-		const querySchema = Joi.object({
-			limit: Joi.number().optional().min(1).max(100).default(10),
-		});
+		if (valid.error) {
+			ctx.status = 400;
+			ctx.body = { error: valid.error.message };
+			return;
+		}
 
-		await paramsSchema.validateAsync(ctx.request.params);
-		await querySchema.validateAsync(ctx.request.query);
+		// Extract domain and name from tagName
+		const { domain: extractedDomain, name } = extractTagInfo(tagName, domain);
+		const domainValidation = await validateDomainAndName(extractedDomain, name);
 
-		// Normalize zelfName to include .zelf suffix if missing
-		ctx.request.params.zelfName = normalizeZelfName(ctx.request.params.zelfName);
+		if (!domainValidation.valid) {
+			ctx.status = 400;
+			ctx.body = { error: domainValidation.error };
+			return;
+		}
+
+		// Add extracted domain and name to context for use in controllers
+		ctx.state.extractedDomain = extractedDomain;
+		ctx.state.extractedName = name;
 
 		await next();
 	} catch (error) {
@@ -48,14 +114,32 @@ const rewardHistoryValidation = async (ctx, next) => {
 
 const rewardStatsValidation = async (ctx, next) => {
 	try {
-		const schema = Joi.object({
-			zelfName: Joi.string().required().min(3).max(27),
+		const { tagName, domain } = ctx.request.params;
+
+		const valid = validate(schemas.rewardStats, {
+			tagName,
+			domain,
 		});
 
-		await schema.validateAsync(ctx.request.params);
+		if (valid.error) {
+			ctx.status = 400;
+			ctx.body = { error: valid.error.message };
+			return;
+		}
 
-		// Normalize zelfName to include .zelf suffix if missing
-		ctx.request.params.zelfName = normalizeZelfName(ctx.request.params.zelfName);
+		// Extract domain and name from tagName
+		const { domain: extractedDomain, name } = extractTagInfo(tagName, domain);
+		const domainValidation = await validateDomainAndName(extractedDomain, name);
+
+		if (!domainValidation.valid) {
+			ctx.status = 400;
+			ctx.body = { error: domainValidation.error };
+			return;
+		}
+
+		// Add extracted domain and name to context for use in controllers
+		ctx.state.extractedDomain = extractedDomain;
+		ctx.state.extractedName = name;
 
 		await next();
 	} catch (error) {
@@ -66,14 +150,32 @@ const rewardStatsValidation = async (ctx, next) => {
 
 const firstTransactionRewardValidation = async (ctx, next) => {
 	try {
-		const schema = Joi.object({
-			zelfName: Joi.string().required().min(3).max(27),
+		const { tagName, domain } = ctx.request.body;
+
+		const valid = validate(schemas.reward, {
+			tagName,
+			domain,
 		});
 
-		await schema.validateAsync(ctx.request.body);
+		if (valid.error) {
+			ctx.status = 400;
+			ctx.body = { error: valid.error.message };
+			return;
+		}
 
-		// Normalize zelfName to include .zelf suffix if missing
-		ctx.request.body.zelfName = normalizeZelfName(ctx.request.body.zelfName);
+		// Extract domain and name from tagName
+		const { domain: extractedDomain, name } = extractTagInfo(tagName, domain);
+		const domainValidation = await validateDomainAndName(extractedDomain, name);
+
+		if (!domainValidation.valid) {
+			ctx.status = 400;
+			ctx.body = { error: domainValidation.error };
+			return;
+		}
+
+		// Add extracted domain and name to context for use in controllers
+		ctx.state.extractedDomain = extractedDomain;
+		ctx.state.extractedName = name;
 
 		await next();
 	} catch (error) {
@@ -88,4 +190,5 @@ module.exports = {
 	rewardStatsValidation,
 	firstTransactionRewardValidation,
 	normalizeZelfName, // Export the utility function for use in other modules
+	extractTagInfo, // Export the new utility function for tag extraction
 };

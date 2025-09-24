@@ -6,6 +6,8 @@ const Model = require("../models/rewards.model"); // MongoDB model for TTL cache
 const moment = require("moment");
 const ZNSTransactionDetector = require("../../ZelfNameService/modules/zns-transaction-detector.module");
 const { normalizeZelfName } = require("../middlewares/rewards.middleware");
+const TagsSearchModule = require("../../Tags/modules/tags-search.module");
+const { getDomainConfig } = require("../../Tags/config/supported-domains");
 
 const get = async (params = {}) => {
 	try {
@@ -187,12 +189,27 @@ const _getTodayReward = async (zelfName) => {
 
 const dailyRewards = async (data, authUser) => {
 	try {
-		const { zelfName } = data;
+		const { tagName, domain } = data;
 
-		if (!zelfName) throw new Error("ZelfName is required");
+		const domainConfig = getDomainConfig(domain);
 
-		// Get ZelfName type to determine reward range
-		const zelfNamePublicData = await _getZelfNamePublicData(zelfName);
+		try {
+			const tagResult = await TagsSearchModule.searchTag(
+				{
+					tagName,
+					domain,
+					domainConfig,
+					environment: "all",
+					type: "both",
+				},
+				authUser
+			);
+
+			return tagResult;
+		} catch (error) {
+			console.error("Error searching tag:", error);
+			throw new Error(error.message || "Failed to search tag");
+		}
 
 		// Validate that user has a Solana address for token transfer
 		if (!zelfNamePublicData.solanaAddress) {
