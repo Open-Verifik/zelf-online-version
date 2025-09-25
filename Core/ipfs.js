@@ -142,7 +142,6 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 		// Upload the file to Pinata using the new API
 		const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 
-		console.log("uploadResponse", uploadResponse);
 		return {
 			url: `https://${pinataGateway}/ipfs/${uploadResponse.cid}`,
 			cid: uploadResponse.cid,
@@ -254,6 +253,10 @@ const unPinFiles = async (CIDs = []) => {
 };
 
 const deleteFiles = async (ids = []) => {
+	if (!Array.isArray(ids)) {
+		ids = [ids];
+	}
+
 	const unpin = await web3Instance.files.public.delete(ids);
 
 	return unpin;

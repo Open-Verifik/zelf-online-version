@@ -356,7 +356,7 @@ const update = async (ctx) => {
 			domain: extractedDomain,
 		};
 
-		const data = await Module.updateTag(requestData, ctx.state.user);
+		const data = await Module.update(requestData, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -364,6 +364,23 @@ const update = async (ctx) => {
 
 		ctx.status = _exception.status;
 		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
+/**
+ * Delete tag from IPFS
+ * @param {Object} ctx - Koa context
+ * @returns {Object} - Delete result
+ */
+const deleteTag = async (ctx) => {
+	try {
+		const { cid, faceBase64, password, tagName, domain } = ctx.request.body;
+
+		const result = await Module.deleteTag({ cid, faceBase64, password, tagName, domain }, ctx.state.user);
+
+		ctx.body = { data: result };
+	} catch (error) {
+		handleError(ctx, error);
 	}
 };
 
@@ -381,6 +398,7 @@ module.exports = {
 	purchaseRewards,
 	referralRewards,
 	update,
+	deleteTag,
 	// Utility functions
 	handleZelfPayLogic,
 	handleOldTagUpdate,

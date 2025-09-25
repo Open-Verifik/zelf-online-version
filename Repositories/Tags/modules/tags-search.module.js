@@ -41,9 +41,9 @@ const searchTag = async (params, authUser) => {
 
 		// If results found, return the first one
 		if (arweaveResults.length > 0) {
-			combinedResults.tagObject = arweaveResults[0];
+			combinedResults.tagObject = { ...arweaveResults[0] };
 		} else if (ipfsResults.length > 0) {
-			combinedResults.tagObject = ipfsResults[0];
+			combinedResults.tagObject = { ...ipfsResults[0] };
 		}
 
 		if (combinedResults.available) {

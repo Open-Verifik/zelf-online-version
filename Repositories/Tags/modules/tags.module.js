@@ -19,6 +19,7 @@ const TagsRegistrationModule = require("./tags-registration.module");
 const { extractZelfProofFromQR } = require("./qr-zelfproof-extractor.module");
 const SessionModule = require("../../Session/modules/session.module");
 const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
+const { unPinFiles } = require("./tags-ipfs.module");
 
 /**
  * Generate domain-specific hold domain
@@ -125,6 +126,14 @@ const searchTag = async (params, authUser) => {
 		},
 		authUser
 	);
+
+	if (result.ipfs?.length) {
+		for (let index = 0; index < result.ipfs.length; index++) {
+			const element = result.ipfs[index];
+			delete element.zelfProof;
+			delete element.zelfProofQRCode;
+		}
+	}
 
 	return result;
 };
@@ -421,6 +430,36 @@ const _decryptParams = async (params, authUser) => {
 	};
 };
 
+const deleteTag = async (params, authUser) => {
+	const { tagName, domain, faceBase64, password } = params;
+
+	const searchResult = await searchTag({ tagName, domain }, authUser);
+
+	const zelfProof = searchResult.tagObject.zelfProof;
+
+	const ipfsID = searchResult.tagObject.id;
+
+	const decryptedZelfProof = await decrypt({
+		faceBase64,
+		password,
+		zelfProof,
+	});
+
+	if (decryptedZelfProof.error) {
+		const error = new Error(decryptedZelfProof.error.code);
+		error.status = 409;
+		throw error;
+	}
+
+	const deletedFiles = [];
+
+	if (ipfsID) {
+		deletedFiles.push(await unPinFiles([ipfsID]));
+	}
+
+	return { tagObject: searchResult.tagObject, deletedFiles };
+};
+
 module.exports = {
 	leaseTag,
 	searchTag,
@@ -429,6 +468,7 @@ module.exports = {
 	previewZelfProof,
 	leaseConfirmation,
 	createZelfPay,
+	deleteTag,
 	// Utility functions
 	getDomainConfig,
 	generateDomainHoldDomain,

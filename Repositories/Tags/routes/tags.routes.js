@@ -18,6 +18,8 @@ module.exports = (server) => {
 	server.post(`${PATH}/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery); // [x]
 	server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOfflineTag); // [x]
 
+	server.delete(`${PATH}/delete`, Middleware.deleteTagValidation, Controller.deleteTag); // [x]
+
 	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof); // [x]
 	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptTag); // [x]
 	server.post(`${PATH}/revenue-cat`, Middleware.revenueCatWebhookValidation, Controller.revenueCatWebhook);

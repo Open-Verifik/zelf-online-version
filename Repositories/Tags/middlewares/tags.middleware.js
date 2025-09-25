@@ -24,6 +24,12 @@ const schemas = {
 		zelfProof: string(),
 		zelfProofQRCode: string().required(),
 	},
+	deleteTag: {
+		domain: string().required(),
+		tagName: string().required(),
+		faceBase64: string().required(),
+		password: string(),
+	},
 	leaseConfirmation: {
 		tagName: string().required(),
 		domain: string().required(),
@@ -365,6 +371,31 @@ const leaseOfflineValidation = async (ctx, next) => {
 };
 
 /**
+ * Delete Tag Validation
+ * @param {*} ctx - Koa context
+ * @param {*} next - Next middleware
+ */
+const deleteTagValidation = async (ctx, next) => {
+	const { cid, tagName, domain, faceBase64, password } = ctx.request.body;
+
+	const valid = validate(schemas.deleteTag, {
+		cid,
+		tagName,
+		domain,
+		faceBase64,
+		password,
+	});
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
+/**
  * Lease Confirmation Validation - Multi-domain support
  * @param {*} ctx - Koa context
  * @param {*} next - Next middleware
@@ -679,6 +710,7 @@ module.exports = {
 	leaseValidation,
 	leaseRecoveryValidation,
 	leaseOfflineValidation,
+	deleteTagValidation,
 	leaseConfirmationValidation,
 	previewValidation,
 	previewZelfProofValidation,

@@ -151,12 +151,13 @@ const tagRegistration = async (data, authUser) => {
  */
 const unPinFiles = async (CIDs = []) => {
 	try {
-		const unpinnedFiles = await IPFS.unPinFiles(CIDs);
+		const unpinnedFiles = await IPFS.deleteFiles(CIDs);
 
 		return unpinnedFiles;
-	} catch (exception) {}
-
-	return null;
+	} catch (exception) {
+		console.error("Error unpinning files:", exception);
+		return null;
+	}
 };
 
 /**
@@ -298,27 +299,6 @@ const update = async (data, authUser) => {
 };
 
 /**
- * Delete tag data from IPFS
- * @param {Object} params - Delete parameters
- * @param {string} params.cid - IPFS CID to delete
- * @param {Object} authUser - Authenticated user
- * @returns {Object} - Delete result
- */
-const deleteTag = async (params, authUser) => {
-	const { cid } = params;
-
-	try {
-		// Unpin the file first
-		await unPinFiles([cid]);
-
-		return { success: true, cid };
-	} catch (exception) {
-		console.error("Error deleting tag:", exception);
-		return { success: false, error: exception.message };
-	}
-};
-
-/**
  * Get domain statistics from IPFS
  * @param {string} domain - Domain name
  * @param {Object} authUser - Authenticated user
@@ -373,7 +353,6 @@ module.exports = {
 	getHoldDomain,
 	insertHoldDomain,
 	update,
-	deleteTag,
 	getDomainStats,
 	formatResults: _formatSearchResults,
 	formatRecord: _formatRecord,
