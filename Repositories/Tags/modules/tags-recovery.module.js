@@ -1,7 +1,7 @@
 const TagsModule = require("./tags.module");
 const TagsPartsModule = require("./tags-parts.module");
 const SessionModule = require("../../Session/modules/session.module");
-const { decrypt } = require("../../Wallet/modules/encryption");
+const { decrypt } = require("../../ZelfProof/modules/zelf-proof.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const TagsRegistrationModule = require("./tags-registration.module");
 
@@ -34,6 +34,7 @@ const leaseRecovery = async (payload, authUser) => {
 		faceBase64: face,
 		password,
 		zelfProof,
+		os: os || "DESKTOP",
 	});
 
 	const referralTagObject = await TagsModule._validateReferral(referralTagName, authUser, domainConfig);
