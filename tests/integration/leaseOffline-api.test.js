@@ -50,12 +50,15 @@ describe("Lease Offline API Integration Tests - Real Server", () => {
 			expect(response.body.data.zelfName).toBe(`${sampleTagName}.${sampleDomain}`);
 
 			// wait for 7 seconds
-			await new Promise((resolve) => setTimeout(resolve, 7000));
+			await new Promise((resolve) => setTimeout(resolve, 3500));
 
 			if (response.status === 200 && response.body.data && response.body.data.ipfs && response.body.data.ipfs.cid) {
 				// Test the delete endpoint with the actual CID from the lease response
 				const deleteData = {
-					cid: response.body.data.ipfs.cid,
+					tagName: sampleTagName,
+					domain: sampleDomain,
+					faceBase64: sampleFaceFromJSON.faceBase64,
+					password: "testpassword123",
 				};
 
 				const deleteResponse = await request(API_BASE_URL)
@@ -66,9 +69,8 @@ describe("Lease Offline API Integration Tests - Real Server", () => {
 
 				expect(deleteResponse.status).toBe(200);
 				expect(deleteResponse.body).toHaveProperty("data");
-				expect(deleteResponse.body.data).toHaveProperty("success");
-				expect(deleteResponse.body.data.success).toBe(true);
-				expect(deleteResponse.body.data).toHaveProperty("cid");
+				expect(deleteResponse.body.data).toHaveProperty("deletedFiles");
+				expect(deleteResponse.body.data).toHaveProperty("tagObject");
 			}
 		});
 
