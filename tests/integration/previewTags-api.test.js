@@ -209,8 +209,6 @@ describe("Preview Tags API Integration Tests - Real Server", () => {
 					.set("Authorization", `Bearer ${authToken}`)
 					.query(previewData);
 
-				console.log({ response: response.body, status: response.status });
-
 				expect(response.status).toBe(200);
 				expect(response.body.data).toHaveProperty("tagName");
 				expect(response.body.data).toHaveProperty("available");

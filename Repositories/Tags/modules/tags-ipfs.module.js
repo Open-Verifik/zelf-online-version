@@ -34,8 +34,6 @@ const get = async (data) => {
 
 		const storageKey = domainConfig ? domainConfig.storage.keyPrefix : generateStorageKey(domain);
 
-		console.log({ storageKey, tagName });
-
 		result = await IPFS.filter(storageKey, tagName);
 	} else if (key && value) {
 		result = await IPFS.filter(key, value);

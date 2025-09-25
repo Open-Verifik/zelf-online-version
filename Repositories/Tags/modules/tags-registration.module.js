@@ -31,9 +31,9 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 			expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
 			type: "mainnet",
-			suiAddress: tagObject.suiAddress,
 			hasPassword: tagObject.hasPassword,
 		},
+		suiAddress: tagObject.suiAddress,
 	};
 
 	if (referralTagObject) {
