@@ -1,5 +1,6 @@
 const { Buffer } = require("buffer");
 const axios = require("axios");
+
 // Try to require canvas and jsQR, fallback to alternative if not available
 let createCanvas, loadImage, jsQR;
 try {
@@ -41,9 +42,13 @@ class QRZelfProofExtractor {
 	 */
 	static async extractZelfProof(base64Image) {
 		if (base64Image.includes("https")) {
-			// get it from axios
-			const response = await axios.get(base64Image);
-			base64Image = response.data;
+			const response = await fetch(base64Image);
+
+			const buffer = await response.arrayBuffer();
+
+			const base64 = Buffer.from(buffer).toString("base64");
+
+			base64Image = `data:image/png;base64,${base64}`;
 		}
 
 		try {
@@ -98,6 +103,7 @@ class QRZelfProofExtractor {
 			}
 
 			if (!qrResult) {
+				console.warn("1. No QR code result");
 				return null;
 			}
 
@@ -130,6 +136,7 @@ class QRZelfProofExtractor {
 				return buffer.toString("base64");
 			}
 
+			console.warn("No QR code result");
 			return null;
 		} catch (error) {
 			console.error("Error extracting ZelfProof from QR code:", error);

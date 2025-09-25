@@ -46,8 +46,8 @@ const SUPPORTED_DOMAINS = {
 			},
 		],
 		validation: {
-			minLength: 3,
-			maxLength: 50,
+			minLength: 1,
+			maxLength: 27,
 			allowedChars: /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
 			reserved: ["www", "api", "admin", "support", "help", "zelf"],
 			customRules: [],
@@ -62,8 +62,8 @@ const SUPPORTED_DOMAINS = {
 			methods: ["coinbase", "crypto", "stripe"],
 			currencies: ["USD", "BTC", "ETH", "SOL"],
 			whitelist: {
-				"zelfmedellin2025.zelf": 24,
-				"zelfbogota2025.zelf": 25,
+				"migueltrevino.zelf": "24$",
+				"migueltrevinom.zelf": "50%",
 			},
 			pricingTable: {
 				1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
@@ -119,10 +119,10 @@ const SUPPORTED_DOMAINS = {
 			},
 		],
 		validation: {
-			minLength: 3,
-			maxLength: 30,
+			minLength: 1,
+			maxLength: 20,
 			allowedChars: /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
-			reserved: ["www", "api", "admin", "avalanche", "avax"],
+			reserved: ["www", "api", "admin", "avalanche", "avax", "carlos"],
 			customRules: [],
 		},
 		storage: {
@@ -201,7 +201,7 @@ const SUPPORTED_DOMAINS = {
 			customRules: [],
 		},
 		storage: {
-			keyPrefix: "bDAGName",
+			keyPrefix: "tagName",
 			ipfsEnabled: true,
 			arweaveEnabled: false, // Enterprise might prefer private storage
 			walrusEnabled: true,

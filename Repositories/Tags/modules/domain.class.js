@@ -135,6 +135,7 @@ class Domain {
 			if (amount.includes("%")) {
 				discountType = "percentage";
 				discount = parseInt(amount);
+
 				price = price - price * (discount / 100);
 			} else {
 				discount = parseInt(amount);

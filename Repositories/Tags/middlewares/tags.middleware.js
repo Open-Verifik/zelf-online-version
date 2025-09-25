@@ -21,7 +21,7 @@ const schemas = {
 	leaseOffline: {
 		tagName: string().required(),
 		domain: string().required(),
-		zelfProof: string().required(),
+		zelfProof: string(),
 		zelfProofQRCode: string().required(),
 	},
 	leaseConfirmation: {

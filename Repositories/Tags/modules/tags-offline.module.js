@@ -6,13 +6,12 @@ const moment = require("moment");
 const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const TagsRegistrationModule = require("./tags-registration.module");
+const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
 
 const _getExtraPublicData = async (password, zelfProof, syncPublicData) => {
 	if (!password || !zelfProof || !syncPublicData) {
 		return {};
 	}
-
-	await _validatePassword(zelfProof, password);
 
 	const extraKeys = {};
 
@@ -153,7 +152,9 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
  * @param {Object} authUser
  */
 const leaseOfflineTag = async (params, authUser) => {
-	const { tagName, domain, zelfProof, zelfProofQRCode, referralTagName, sync, syncPassword, syncPublicData, duration } = params;
+	const { tagName, domain, zelfProofQRCode, referralTagName, sync, syncPassword, syncPublicData, duration } = params;
+
+	let zelfProof = params.zelfProof;
 
 	const domainConfig = getDomainConfig(domain);
 
@@ -167,6 +168,10 @@ const leaseOfflineTag = async (params, authUser) => {
 
 	const { password } = decryptedParams;
 
+	if (!zelfProof) {
+		zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(zelfProofQRCode);
+	}
+
 	const { preview } = await previewZelfProof({ zelfProof }, authUser);
 
 	if (preview.publicData[tagKey] !== tagName) throw new Error("tag_does_not_match_in_zelfProof");
@@ -176,6 +181,8 @@ const leaseOfflineTag = async (params, authUser) => {
 	const extraPublicData = await _getExtraPublicData(password, zelfProof, syncPublicData);
 
 	if (sync && findExistingTag?.tagObject) {
+		await _validatePassword(zelfProof, password);
+
 		return await _syncOfflineTag(findExistingTag, tagKey, syncPublicData, sync, password);
 	}
 

@@ -51,7 +51,7 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 		domainConfig
 	);
 
-	metadata.extraParams.walrus = tagObject.walrus.blobId;
+	metadata.walrus = tagObject.walrus.blobId;
 
 	metadata.extraParams = JSON.stringify(metadata.extraParams);
 

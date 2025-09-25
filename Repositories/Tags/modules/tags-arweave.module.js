@@ -66,11 +66,14 @@ const tagRegistration = async (tagProofQRCode, tagObject, fileName) => {
 			name: "Content-Type",
 			value: "image/png",
 		},
-		{
+	];
+
+	if (zelfProof) {
+		tags.push({
 			name: "zelfProof",
 			value: zelfProof,
-		},
-	];
+		});
+	}
 
 	if (hasPassword) {
 		tags.push({
@@ -84,9 +87,7 @@ const tagRegistration = async (tagProofQRCode, tagObject, fileName) => {
 	for (let index = 0; index < publicKeys.length; index++) {
 		const publicKey = publicKeys[index];
 
-		if (publicKey === "zelfProof" || publicKey === "hasPassword") {
-			continue;
-		}
+		if (publicKey === "zelfProof" || publicKey === "hasPassword") continue;
 
 		tags.push({
 			name: publicKey,

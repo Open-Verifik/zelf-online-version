@@ -3,6 +3,7 @@ const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
 const { generateStorageKey, generateHoldDomain } = require("./domain-registry.module");
 const config = require("../../../Core/config");
 const { getDomainConfig } = require("../config/supported-domains");
+const SessionModule = require("../../Session/modules/session.module");
 
 /**
  * Tags Parts Module
@@ -26,11 +27,11 @@ const decryptParams = async (params, authUser) => {
 		};
 	}
 
-	const password = await SessionModule.sessionDecrypt(data.password || null, authUser);
+	const password = await SessionModule.sessionDecrypt(params.password || null, authUser);
 
-	const mnemonic = await SessionModule.sessionDecrypt(data.mnemonic || null, authUser);
+	const mnemonic = await SessionModule.sessionDecrypt(params.mnemonic || null, authUser);
 
-	const face = await SessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
+	const face = await SessionModule.sessionDecrypt(params.faceBase64 || null, authUser);
 
 	return { password, mnemonic, face };
 };
