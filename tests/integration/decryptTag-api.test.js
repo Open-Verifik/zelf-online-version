@@ -93,8 +93,6 @@ describe("Decrypt Tag API Integration Tests - Complete Flow", () => {
 				.set("Authorization", `Bearer ${authToken}`)
 				.send(decryptData);
 
-			console.log({ decryptResponse: decryptResponse.body, fullResponse: decryptResponse });
-
 			// Verify decrypt response structure
 			expect(decryptResponse.body).toHaveProperty("data");
 			expect(decryptResponse.body.data).toHaveProperty("id");
@@ -169,6 +167,7 @@ describe("Decrypt Tag API Integration Tests - Complete Flow", () => {
 				tagName: testTagName,
 				domain: sampleDomain,
 				faceBase64: sampleFaceFromJSON.faceBase64,
+				password: "testpassword123",
 				type: "create",
 				os: "DESKTOP",
 				removePGP: true,
@@ -205,16 +204,22 @@ describe("Decrypt Tag API Integration Tests - Complete Flow", () => {
 			console.log(`✅ Invalid password test passed for tag ${testTagName}.${sampleDomain}`);
 
 			// Clean up: delete the test tag
-			await request(API_BASE_URL)
+			const deleteResponse = await request(API_BASE_URL)
 				.delete("/api/tags/delete")
 				.set("Origin", "https://test.example.com")
 				.set("Authorization", `Bearer ${authToken}`)
 				.send({
 					tagName: testTagName,
 					domain: sampleDomain,
-					faceBase64: sampleFaceFromJSON.faceBase64,
-					password: "testpassword123", // Use correct password for cleanup
+					faceBase64: sampleFaceFromJSON.faceBase64, // Use correct face for cleanup
+					password: "testpassword123",
+					removePGP: true,
 				});
+
+			expect(deleteResponse.status).toBe(200);
+			expect(deleteResponse.body).toHaveProperty("data");
+			expect(deleteResponse.body.data).toHaveProperty("deletedFiles");
+			expect(deleteResponse.body.data).toHaveProperty("tagObject");
 		});
 
 		it("should handle decryption with invalid face", async () => {
@@ -227,6 +232,7 @@ describe("Decrypt Tag API Integration Tests - Complete Flow", () => {
 				tagName: testTagName,
 				domain: sampleDomain,
 				faceBase64: sampleFaceFromJSON.faceBase64,
+				password: "testpassword123",
 				type: "create",
 				os: "DESKTOP",
 				removePGP: true,
@@ -263,7 +269,7 @@ describe("Decrypt Tag API Integration Tests - Complete Flow", () => {
 			console.log(`✅ Invalid face test passed for tag ${testTagName}.${sampleDomain}`);
 
 			// Clean up: delete the test tag
-			await request(API_BASE_URL)
+			const deleteResponse = await request(API_BASE_URL)
 				.delete("/api/tags/delete")
 				.set("Origin", "https://test.example.com")
 				.set("Authorization", `Bearer ${authToken}`)
@@ -273,6 +279,11 @@ describe("Decrypt Tag API Integration Tests - Complete Flow", () => {
 					faceBase64: sampleFaceFromJSON.faceBase64, // Use correct face for cleanup
 					password: "testpassword123",
 				});
+
+			expect(deleteResponse.status).toBe(200);
+			expect(deleteResponse.body).toHaveProperty("data");
+			expect(deleteResponse.body.data).toHaveProperty("deletedFiles");
+			expect(deleteResponse.body.data).toHaveProperty("tagObject");
 		});
 
 		it("should handle decryption of non-existent tag", async () => {
