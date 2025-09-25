@@ -75,11 +75,15 @@ const saveCache = (licenses) => {
 const searchLicense = async (query, user) => {
 	const { domain } = query;
 
-	const existingLicense = await IPFS.get({ key: "licenseDomain", value: domain });
+	if (domain) {
+		const existingLicense = await IPFS.get({ key: "licenseDomain", value: domain });
 
-	if (!existingLicense.length) throw new Error("404:license_not_found");
+		if (!existingLicense.length) throw new Error("404:license_not_found");
 
-	return existingLicense[0];
+		return existingLicense[0];
+	}
+
+	return IPFS.get({ key: "type", value: "license" });
 };
 
 /**

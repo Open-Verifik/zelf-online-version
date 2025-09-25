@@ -3,9 +3,7 @@ const config = require("../../../Core/config");
 
 const schemas = {
 	search: {
-		domain: string()
-			.pattern(/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/)
-			.required(),
+		domain: string().pattern(/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/),
 	},
 	getMyLicense: {
 		// No specific validation needed for getting user's own licenses
