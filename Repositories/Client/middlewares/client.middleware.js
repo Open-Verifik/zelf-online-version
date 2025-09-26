@@ -1,4 +1,4 @@
-const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
+const { string, validate, boolean, number, stringEnum, email } = require("../../../Core/JoiUtils");
 const configuration = require("../../../Core/config");
 
 const schemas = {
@@ -8,23 +8,24 @@ const schemas = {
 		name: string().required(),
 		countryCode: string().required(),
 		phone: string().required(),
-		email: string().required(),
+		email: email().required(),
 		language: stringEnum(["en", "es"]),
 		company: string().required(),
 		faceBase64: string().required(),
+		masterPassword: string().required(),
 	},
 	update: {
 		faceBase64: string().required(),
 		masterPassword: string().required(),
 		name: string(),
-		email: string(),
+		email: email(),
 		countryCode: string(),
 		phone: string(),
 		company: string(),
 	},
 	destroy: {},
 	auth: {
-		email: string(),
+		email: email(),
 		countryCode: string(),
 		phone: string(),
 		faceBase64: string().required(),

@@ -148,7 +148,7 @@ const createOrUpdateLicense = async (body, jwt) => {
 
 		const accountJSON = await axios.get(zelfAccount.url);
 
-		const accountZelfProof = accountJSON.data.zelfProof;
+		const accountEmail = accountJSON.data.accountEmail;
 
 		// now we should validate if the zelfAccount is the owner of the license with the decrypted zelfProof
 		const decryptedZelfProof = await decrypt({
@@ -314,7 +314,7 @@ const loadOfficialLicenses = async () => {
 	}
 
 	// Fetch from IPFS
-	const officialLicenses = await IPFS.get({ key: "licenseType", value: "official" });
+	const officialLicenses = await IPFS.get({ key: "type", value: "license" });
 
 	const licenses = [];
 

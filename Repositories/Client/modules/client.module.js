@@ -142,6 +142,7 @@ const create = async (data) => {
 		version: "1.0.0",
 		name: data.name,
 		hasPassword: data.masterPassword ? "true" : "false",
+		zelfProof,
 	};
 
 	// Convert to JSON string and then to base64
@@ -290,9 +291,9 @@ const auth = async (data, authUser) => {
 
 	const zelfAccount = await get({ email, countryCode, phone });
 
-	const accountJSON = await axios.get(zelfAccount.url);
+	if (!zelfAccount) throw new Error("404:client_not_found");
 
-	console.log({ accountJSON });
+	const accountJSON = await axios.get(zelfAccount.url);
 
 	if (!accountJSON.data?.zelfProof) throw new Error("409:account_doesnt_contain_zelf_proof");
 

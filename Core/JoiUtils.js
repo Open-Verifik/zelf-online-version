@@ -85,6 +85,7 @@ const objectId = () => Joi.string().hex().length(24).error(_customErrors);
 const string = () => Joi.string().error(_customErrors);
 const stringOrNumber = () => Joi.alternatives().try(Joi.string(), Joi.number());
 const symbol = () => Joi.string().min(1).error(_customErrors);
+const email = () => Joi.string().email().error(_customErrors);
 
 const zelfNameDuration_ = () =>
 	Joi.string()
@@ -160,6 +161,7 @@ module.exports = {
 	crypto_,
 	dateOfBirth,
 	dateWithFormat,
+	email,
 	fileObject,
 	firstName,
 	forbidden,
