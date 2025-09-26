@@ -148,10 +148,10 @@ const createOrUpdateLicense = async (body, jwt) => {
 
 		const accountJSON = await axios.get(zelfAccount.url);
 
-		const accountEmail = accountJSON.data.accountEmail;
+		const accountZelfProof = accountJSON.data.zelfProof;
 
 		// now we should validate if the zelfAccount is the owner of the license with the decrypted zelfProof
-		const decryptedZelfProof = await decrypt({
+		await decrypt({
 			zelfProof: accountZelfProof,
 			faceBase64,
 			password: masterPassword || undefined,
@@ -159,7 +159,7 @@ const createOrUpdateLicense = async (body, jwt) => {
 		});
 
 		// validate if the domain being passed is registered or not because we need to compare the domain with the previous domain
-		await _checkIfDomainIsRegistered(body.domain, accountZelfProof);
+		await _checkIfDomainIsRegistered(body.domain, zelfAccount.publicData.accountEmail);
 
 		if (myLicense) {
 			// we will delete the previous license
@@ -291,7 +291,7 @@ const getUserByEmail = async (email) => {
 /**
  * Check if the domain is registered
  */
-const _checkIfDomainIsRegistered = async (domain, zelfProof) => {
+const _checkIfDomainIsRegistered = async (domain, accountEmail) => {
 	// Search for all licenses with the same zelfProof
 	const domains = await IPFS.get({ key: "licenseDomain", value: domain });
 
@@ -299,7 +299,7 @@ const _checkIfDomainIsRegistered = async (domain, zelfProof) => {
 
 	const foundDomain = domains[0];
 
-	if (foundDomain.publicData.licenseZelfProof !== zelfProof) throw new Error("409:domain_already_registered");
+	if (foundDomain.publicData.licenseOwner !== accountEmail) throw new Error("409:domain_already_registered");
 };
 
 /**
