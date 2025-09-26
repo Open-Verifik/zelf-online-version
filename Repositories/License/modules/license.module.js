@@ -6,6 +6,7 @@ const { decrypt } = require("../../ZelfProof/modules/zelf-proof.module");
 const moment = require("moment");
 const fs = require("fs");
 const path = require("path");
+const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
 
 // Cache file path for development mode
 const CACHE_FILE_PATH = path.join(__dirname, "../../../cache/official-licenses-cache.json");
@@ -101,7 +102,7 @@ const getMyLicense = async (jwt) => {
 	const metadata = client.publicData;
 
 	// Search for all licenses with the same zelfProof
-	const myRecords = await IPFS.get({ key: "licenseEmail", value: metadata.accountEmail });
+	const myRecords = await IPFS.get({ key: "licenseOwner", value: metadata.accountEmail });
 
 	const myLicenses = [];
 
@@ -162,8 +163,7 @@ const createOrUpdateLicense = async (body, jwt) => {
 		await _checkIfDomainIsRegistered(body.domain, zelfAccount.publicData.accountEmail);
 
 		if (myLicense) {
-			// we will delete the previous license
-			await IPFS.unPinFiles([myLicense.ipfs_pin_hash]);
+			await TagsIPFSModule.unPinFiles([myLicense.id]);
 		}
 
 		const licenseMetadata = {

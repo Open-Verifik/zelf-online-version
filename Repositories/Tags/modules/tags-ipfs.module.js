@@ -144,12 +144,12 @@ const tagRegistration = async (data, authUser) => {
 
 /**
  * Unpin tag files from IPFS
- * @param {Array} CIDs - Array of IPFS CIDs to unpin
+ * @param {Array} ids - Array of IPFS CIDs to unpin
  * @returns {Object} - Unpin result
  */
-const unPinFiles = async (CIDs = []) => {
+const unPinFiles = async (ids = []) => {
 	try {
-		const unpinnedFiles = await IPFS.deleteFiles(CIDs);
+		const unpinnedFiles = await IPFS.deleteFiles(ids);
 
 		return unpinnedFiles;
 	} catch (exception) {
