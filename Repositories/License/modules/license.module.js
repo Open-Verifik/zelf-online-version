@@ -191,7 +191,6 @@ const createOrUpdateLicense = async (body, jwt) => {
 					licenseSubscriptionId: "free",
 					licenseDomain: body.domain,
 					licenseOwner: jwt.email,
-					licenseZelfProof: accountZelfProof,
 				},
 				name: `${body.domain}.license`,
 				pinIt: true,
