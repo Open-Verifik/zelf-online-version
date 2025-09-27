@@ -172,133 +172,54 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 		});
 	});
 
-	// 	it("should authenticate client with phone credentials", async () => {
-	// 		const authData = {
-	// 			countryCode: testCountryCode,
-	// 			phone: testPhone,
-	// 			faceBase64: sampleFaceFromJSON.faceBase64,
-	// 			masterPassword: sampleFaceFromJSON.password,
-	// 			identificationMethod: "phone",
-	// 		};
+	it("should authenticate client with phone credentials", async () => {
+		const authData = {
+			countryCode: testCountryCode,
+			phone: testPhone,
+			faceBase64: sampleFaceFromJSON.faceBase64,
+			masterPassword: sampleFaceFromJSON.password,
+			identificationMethod: "phone",
+		};
 
-	// 		const response = await request(API_BASE_URL)
-	// 			.post("/api/clients/auth")
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key")
-	// 			.send(authData);
+		const response = await request(API_BASE_URL).post("/api/clients/auth").set("Origin", "https://test.example.com").send(authData);
 
-	// 		expect(response.status).toBe(200);
-	// 		expect(response.body).toHaveProperty("data");
-	// 		expect(response.body.data).toHaveProperty("token");
-	// 		expect(response.body.data).toHaveProperty("zelfProof");
-	// 		expect(response.body.data).toHaveProperty("zelfAccount");
-	// 	});
+		expect(response.status).toBe(200);
+		expect(response.body).toHaveProperty("data");
+		expect(response.body.data).toHaveProperty("token");
+		expect(response.body.data).toHaveProperty("zelfProof");
+		expect(response.body.data).toHaveProperty("zelfAccount");
+	});
 
-	// 	it("should fail authentication with invalid credentials", async () => {
-	// 		const authData = {
-	// 			email: testEmail,
-	// 			faceBase64: sampleFaceFromJSON.faceBase64,
-	// 			masterPassword: "wrong-password",
-	// 			identificationMethod: "email",
-	// 		};
+	describe("4. PUT /api/clients/sync - Update Account", () => {
+		it("should update client account with valid data", async () => {
+			const updateData = {
+				name: "Updated Test Client",
+				language: "es",
+				faceBase64: sampleFaceFromJSON.faceBase64,
+				masterPassword: sampleFaceFromJSON.password,
+			};
 
-	// 		const response = await request(API_BASE_URL)
-	// 			.post("/api/clients/auth")
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key")
-	// 			.send(authData);
+			const response = await request(API_BASE_URL)
+				.put("/api/clients/sync")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`)
+				.send(updateData);
 
-	// 		console.log("Authenticate Client (Invalid Credentials) Response:", JSON.stringify(response.body, null, 2));
+			expect(response.status).toBe(200);
+			expect(response.body.data).toHaveProperty("message", "Account updated successfully");
+			expect(response.body.data).toHaveProperty("zelfAccount");
+			expect(response.body.data).toHaveProperty("zelfProof");
 
-	// 		expect(response.status).toBe(403);
-	// 		expect(response.body).toHaveProperty("validationError");
-	// 	});
-
-	// 	it("should fail authentication with missing API key", async () => {
-	// 		const authData = {
-	// 			email: testEmail,
-	// 			faceBase64: sampleFaceFromJSON.faceBase64,
-	// 			masterPassword: sampleFaceFromJSON.password,
-	// 			identificationMethod: "email",
-	// 		};
-
-	// 		const response = await request(API_BASE_URL)
-	// 			.post("/api/clients/auth")
-	// 			.set("Origin", "https://test.example.com")
-	// 			// Missing x-api-key header
-	// 			.send(authData);
-
-	// 		console.log("Authenticate Client (Missing API Key) Response:", JSON.stringify(response.body, null, 2));
-
-	// 		expect(response.status).toBe(403);
-	// 		expect(response.body).toHaveProperty("validationError", "Missing key");
-	// 	});
-
-	// 	it("should fail authentication with non-existent client", async () => {
-	// 		const authData = {
-	// 			email: "nonexistent@example.com",
-	// 			faceBase64: sampleFaceFromJSON.faceBase64,
-	// 			masterPassword: sampleFaceFromJSON.password,
-	// 			identificationMethod: "email",
-	// 		};
-
-	// 		const response = await request(API_BASE_URL)
-	// 			.post("/api/clients/auth")
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key")
-	// 			.send(authData);
-
-	// 		console.log("Authenticate Client (Non-existent Client) Response:", JSON.stringify(response.body, null, 2));
-
-	// 		expect(response.status).toBe(404);
-	// 		expect(response.body).toHaveProperty("validationError", "Client not found");
-	// 	});
-
-	// 	it("should fail authentication with missing required fields", async () => {
-	// 		const authData = {
-	// 			email: testEmail,
-	// 			// Missing faceBase64, masterPassword, identificationMethod
-	// 		};
-
-	// 		const response = await request(API_BASE_URL)
-	// 			.post("/api/clients/auth")
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key")
-	// 			.send(authData);
-
-	// 		console.log("Authenticate Client (Missing Fields) Response:", JSON.stringify(response.body, null, 2));
-
-	// 		expect(response.status).toBe(409);
-	// 		expect(response.body).toHaveProperty("validationError");
-	// 	});
-	// });
-
-	// describe("4. PUT /api/clients/sync - Update Account", () => {
-	// 	it("should update client account with valid data", async () => {
-	// 		const updateData = {
-	// 			name: "Updated Test Client",
-	// 			email: `updated_${testEmail}`,
-	// 			language: "es",
-	// 			faceBase64: sampleFaceFromJSON.faceBase64,
-	// 			masterPassword: sampleFaceFromJSON.password,
-	// 		};
-
-	// 		const response = await request(API_BASE_URL)
-	// 			.put("/api/clients/sync")
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key")
-	// 			.send(updateData);
-
-	// 		console.log("Update Account Response:", JSON.stringify(response.body, null, 2));
-
-	// 		expect(response.status).toBe(200);
-	// 		expect(response.body).toHaveProperty("data");
-	// 		expect(response.body.data).toHaveProperty("message");
-	// 		expect(response.body.data).toHaveProperty("client");
-	// 		expect(response.body.data.client).toHaveProperty("name", "Updated Test Client");
-	// 		expect(response.body.data.client).toHaveProperty("email", `updated_${testEmail}`);
-	// 		expect(response.body.data.client).toHaveProperty("language", "es");
-	// 	});
+			// Validate zelfAccount structure
+			expect(response.body.data.zelfAccount).toHaveProperty("publicData");
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountName", "Updated Test Client");
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountEmail", testEmail);
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountPhone", testPhone);
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountCountryCode", testCountryCode);
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountCompany", "Test Company");
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountType", "client_account");
+		});
+	});
 
 	// 	it("should fail update with missing API key", async () => {
 	// 		const updateData = {
@@ -447,6 +368,9 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 			expect(response.body.data.zelfAccount).toHaveProperty("cid");
 			expect(response.body.data.zelfAccount).toHaveProperty("url");
 			expect(response.body.data.zelfAccount).toHaveProperty("publicData");
+
+			//make wait 1 second
+			await new Promise((resolve) => setTimeout(resolve, 1000));
 		});
 	});
 
@@ -454,7 +378,11 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 		const response = await request(API_BASE_URL)
 			.delete("/api/clients")
 			.set("Origin", "https://test.example.com")
-			.set("Authorization", `Bearer ${authToken}`);
+			.set("Authorization", `Bearer ${authToken}`)
+			.send({
+				masterPassword: sampleFaceFromJSON.password,
+				faceBase64: sampleFaceFromJSON.faceBase64,
+			});
 
 		expect(response.status).toBe(404);
 		expect(response.body).toHaveProperty("code", "NotFound");
@@ -471,7 +399,7 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 	describe("7. Verify Account After Deletion", () => {
 		it("should confirm client no longer exists after deletion", async () => {
 			const response = await request(API_BASE_URL).get("/api/clients").query({ email: testEmail });
-
+			console.log("Verify Account After Deletion Response:", { response: response.body });
 			expect(response.status).toBe(404);
 			expect(response.body).toHaveProperty("code", "NotFound");
 			expect(response.body).toHaveProperty("message", "client_not_found");

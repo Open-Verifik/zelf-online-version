@@ -222,8 +222,8 @@ const update = async (data, authUser) => {
 	if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
 
 	// Unpin the previous IPFS record
-	if (zelfAccount.ipfsHash || zelfAccount.ipfs_pin_hash) {
-		await IPFSModule.unPinFiles([zelfAccount.ipfsHash || zelfAccount.ipfs_pin_hash]);
+	if (zelfAccount.id) {
+		await IPFSModule.unPinFiles([zelfAccount.id]);
 	}
 
 	// Create updated client data (same structure as create method)
