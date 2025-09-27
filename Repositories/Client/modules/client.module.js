@@ -278,7 +278,34 @@ const update = async (data, authUser) => {
 	};
 };
 
-const destroy = async (data, authUser) => {};
+const destroy = async (data, authUser) => {
+	const { faceBase64, masterPassword } = data;
+	const zelfAccount = await get({ email: authUser.email });
+
+	console.log("zelfAccount", zelfAccount, masterPassword);
+
+	if (!zelfAccount) throw new Error("404:client_not_found");
+
+	const accountJSON = await axios.get(zelfAccount.url);
+
+	const decryptedZelfAccount = await zelfProofModule.decrypt({
+		zelfProof: accountJSON.data.zelfProof,
+		faceBase64,
+		verifierKey: config.zelfEncrypt.serverKey,
+		password: masterPassword || undefined,
+	});
+
+	if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
+
+	// now we can delete the zelfAccount
+	const deletedFiles = await IPFSModule.unPinFiles([zelfAccount.id]);
+
+	return {
+		message: "Client deleted successfully",
+		deletedFiles,
+		zelfAccount,
+	};
+};
 
 /**
  * authenticate a client

@@ -9,7 +9,7 @@ const sampleFaceFromJSON = require("../../config/0012589021.json");
 
 describe("Client Authentication API Integration Tests - Real Server", () => {
 	let authToken;
-	let createdClientId;
+	let accountEmail;
 	let testEmail;
 	let testPhone;
 	let testCountryCode;
@@ -38,9 +38,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 
 			const response = await request(API_BASE_URL).post("/api/clients").set("Origin", "https://test.example.com").send(createData);
 
-			// Record the response for analysis
-			console.log("Create Account Response:", JSON.stringify(response.body, null, 2));
-
 			expect(response.status).toBe(200);
 			expect(response.body.data).toHaveProperty("ipfsHash");
 			expect(response.body.data).toHaveProperty("token");
@@ -57,8 +54,9 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountType", "client_account");
 
 			// Store the created client ID for later tests (using email as identifier)
-			createdClientId = response.body.data.zelfAccount.publicData.accountEmail;
-			expect(createdClientId).toBeDefined();
+			accountEmail = response.body.data.zelfAccount.publicData.accountEmail;
+
+			expect(accountEmail).toBeDefined();
 		});
 
 		it("should fail to create account with missing required fields", async () => {
@@ -68,8 +66,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 			};
 
 			const response = await request(API_BASE_URL).post("/api/clients").set("Origin", "https://test.example.com").send(invalidData);
-
-			console.log("Create Account Validation Error Response:", JSON.stringify(response.body, null, 2));
 
 			expect(response.status).toBe(409);
 			expect(response.body).toHaveProperty("validationError");
@@ -89,8 +85,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 
 			const response = await request(API_BASE_URL).post("/api/clients").set("Origin", "https://test.example.com").send(invalidData);
 
-			console.log("Create Account Invalid Email Response:", JSON.stringify(response.body, null, 2));
-
 			expect(response.status).toBe(409);
 			expect(response.body).toHaveProperty("validationError");
 		});
@@ -99,8 +93,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 	describe("2. GET /api/clients - Verify Client (Account Available)", () => {
 		it("should verify that the created client exists by email", async () => {
 			const response = await request(API_BASE_URL).get("/api/clients").query({ email: testEmail });
-
-			console.log("Verify Client (Available) Response:", JSON.stringify(response.body, null, 2));
 
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
@@ -121,8 +113,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 				phone: testPhone,
 			});
 
-			console.log("Verify Client (Available by Phone) Response:", JSON.stringify(response.body, null, 2));
-
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
 			expect(response.body.data).toHaveProperty("id");
@@ -139,8 +129,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 		it("should return client not found for non-existent email", async () => {
 			const response = await request(API_BASE_URL).get("/api/clients").query({ email: "nonexistent@example.com" });
 
-			console.log("Verify Client (Not Found) Response:", JSON.stringify(response.body, null, 2));
-
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
 			expect(response.body.data).toBeNull();
@@ -148,8 +136,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 
 		it("should return all clients when no parameters provided", async () => {
 			const response = await request(API_BASE_URL).get("/api/clients");
-
-			console.log("Verify Client (Missing Parameters) Response:", JSON.stringify(response.body, null, 2));
 
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
@@ -162,33 +148,29 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 		});
 	});
 
-	// describe("3. POST /api/clients/auth - Authenticate Client", () => {
-	// 	it("should authenticate client with valid credentials and get JWT", async () => {
-	// 		const authData = {
-	// 			email: testEmail,
-	// 			faceBase64: sampleFaceFromJSON.faceBase64,
-	// 			masterPassword: sampleFaceFromJSON.password,
-	// 			identificationMethod: "email",
-	// 		};
+	describe("3. POST /api/clients/auth - Authenticate Client", () => {
+		it("should authenticate client with valid credentials and get JWT", async () => {
+			const authData = {
+				email: testEmail,
+				faceBase64: sampleFaceFromJSON.faceBase64,
+				masterPassword: sampleFaceFromJSON.password,
+				identificationMethod: "email",
+			};
 
-	// 		const response = await request(API_BASE_URL)
-	// 			.post("/api/clients/auth")
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key")
-	// 			.send(authData);
+			const response = await request(API_BASE_URL).post("/api/clients/auth").set("Origin", "https://test.example.com").send(authData);
 
-	// 		console.log("Authenticate Client Response:", JSON.stringify(response.body, null, 2));
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(response.body.data).toHaveProperty("token");
+			expect(response.body.data).toHaveProperty("zelfProof");
+			expect(response.body.data).toHaveProperty("zelfAccount");
 
-	// 		expect(response.status).toBe(200);
-	// 		expect(response.body).toHaveProperty("data");
-	// 		expect(response.body.data).toHaveProperty("token");
-	// 		expect(response.body.data).toHaveProperty("zelfProof");
-	// 		expect(response.body.data).toHaveProperty("zelfAccount");
+			// Store the JWT token for later tests
+			authToken = response.body.data.token;
 
-	// 		// Store the JWT token for later tests
-	// 		authToken = response.body.data.token;
-	// 		expect(authToken).toBeDefined();
-	// 	});
+			expect(authToken).toBeDefined();
+		});
+	});
 
 	// 	it("should authenticate client with phone credentials", async () => {
 	// 		const authData = {
@@ -204,8 +186,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 	// 			.set("Origin", "https://test.example.com")
 	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key")
 	// 			.send(authData);
-
-	// 		console.log("Authenticate Client (Phone) Response:", JSON.stringify(response.body, null, 2));
 
 	// 		expect(response.status).toBe(200);
 	// 		expect(response.body).toHaveProperty("data");
@@ -424,25 +404,61 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 	// 	});
 	// });
 
-	// describe("6. DELETE /api/clients/{id} - Delete Account", () => {
-	// 	it("should delete client account with valid ID", async () => {
-	// 		const response = await request(API_BASE_URL)
-	// 			.delete(`/api/clients/${createdClientId}`)
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key");
+	describe("6. DELETE /api/clients - Delete Account", () => {
+		it("should fail to delete client with invalid credentials (not owner)", async () => {
+			const response = await request(API_BASE_URL)
+				.delete(`/api/clients`)
+				.send({
+					accountEmail: "different@example.com",
+					masterPassword: "wrongpassword",
+					faceBase64: sampleFaceFromJSON.faceBase64,
+				})
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
 
-	// 		console.log("Delete Account Response:", JSON.stringify(response.body, null, 2));
+			console.log("Delete Account (Invalid Credentials) Response:", { response: response.body });
 
-	// 		expect(response.status).toBe(200);
-	// 		expect(response.body).toHaveProperty("data");
-	// 		expect(response.body.data).toHaveProperty("message", "Client deleted successfully");
-	// 	});
+			expect(response.status).toBe(500);
+			expect(response.body).toHaveProperty("code", "InternalServerError");
+			expect(response.body).toHaveProperty("message", "THE PROVIDED PASSWORD IS INVALID.");
+		});
+
+		it("should delete client account with valid credentials", async () => {
+			const response = await request(API_BASE_URL)
+				.delete(`/api/clients`)
+				.send({
+					accountEmail,
+					masterPassword: sampleFaceFromJSON.password,
+					faceBase64: sampleFaceFromJSON.faceBase64,
+				})
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
+
+			console.log("Delete Account Response:", { response: response.body, deletedFiles: response.body.data.deletedFiles });
+
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(response.body.data).toHaveProperty("message", "Client deleted successfully");
+			expect(response.body.data).toHaveProperty("deletedFiles");
+			expect(response.body.data).toHaveProperty("zelfAccount");
+
+			// Validate deletedFiles structure
+			expect(response.body.data.deletedFiles).toBeDefined();
+			expect(Array.isArray(response.body.data.deletedFiles)).toBe(true);
+
+			// Validate zelfAccount structure
+			expect(response.body.data.zelfAccount).toBeDefined();
+			expect(response.body.data.zelfAccount).toHaveProperty("cid");
+			expect(response.body.data.zelfAccount).toHaveProperty("url");
+			expect(response.body.data.zelfAccount).toHaveProperty("publicData");
+		});
+	});
 
 	// 	it("should fail to delete non-existent client", async () => {
 	// 		const response = await request(API_BASE_URL)
 	// 			.delete("/api/clients/non-existent-id")
 	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key");
+	// 			.set("Authorization", `Bearer ${authToken}`);
 
 	// 		console.log("Delete Account (Non-existent) Response:", JSON.stringify(response.body, null, 2));
 
@@ -451,7 +467,7 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 	// 	});
 
 	// 	it("should fail to delete with missing API key", async () => {
-	// 		const response = await request(API_BASE_URL).delete(`/api/clients/${createdClientId}`).set("Origin", "https://test.example.com");
+	// 		const response = await request(API_BASE_URL).delete(`/api/clients/${accountEmail}`).set("Origin", "https://test.example.com");
 	// 		// Missing x-api-key header
 
 	// 		console.log("Delete Account (Missing API Key) Response:", JSON.stringify(response.body, null, 2));

@@ -11,7 +11,7 @@ module.exports = (server) => {
 	// Routes
 	server.put(`${PATH}/sync`, Middleware.updateValidation, Controller.update);
 	server.put(`${PATH}/sync/password`, Middleware.updatePasswordValidation, Controller.updatePassword);
-	server.del(`${PATH}/:${primaryKey}`, Middleware.destroyValidation, Controller.destroy);
+	server.del(`${PATH}`, Middleware.destroyValidation, Controller.destroy);
 };
 
 /*

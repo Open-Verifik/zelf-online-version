@@ -94,7 +94,7 @@ const update = async (ctx) => {
 
 const destroy = async (ctx) => {
 	try {
-		const data = await Module.destroy(ctx.request.params, ctx.state.user);
+		const data = await Module.destroy(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
