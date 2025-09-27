@@ -282,8 +282,6 @@ const destroy = async (data, authUser) => {
 	const { faceBase64, masterPassword } = data;
 	const zelfAccount = await get({ email: authUser.email });
 
-	console.log("zelfAccount", zelfAccount, masterPassword);
-
 	if (!zelfAccount) throw new Error("404:client_not_found");
 
 	const accountJSON = await axios.get(zelfAccount.url);

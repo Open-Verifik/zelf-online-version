@@ -129,9 +129,9 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 		it("should return client not found for non-existent email", async () => {
 			const response = await request(API_BASE_URL).get("/api/clients").query({ email: "nonexistent@example.com" });
 
-			expect(response.status).toBe(200);
-			expect(response.body).toHaveProperty("data");
-			expect(response.body.data).toBeNull();
+			expect(response.status).toBe(404);
+			expect(response.body).toHaveProperty("code", "NotFound");
+			expect(response.body).toHaveProperty("message", "client_not_found");
 		});
 
 		it("should return all clients when no parameters provided", async () => {
@@ -416,8 +416,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 				.set("Origin", "https://test.example.com")
 				.set("Authorization", `Bearer ${authToken}`);
 
-			console.log("Delete Account (Invalid Credentials) Response:", { response: response.body });
-
 			expect(response.status).toBe(500);
 			expect(response.body).toHaveProperty("code", "InternalServerError");
 			expect(response.body).toHaveProperty("message", "THE PROVIDED PASSWORD IS INVALID.");
@@ -433,8 +431,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 				})
 				.set("Origin", "https://test.example.com")
 				.set("Authorization", `Bearer ${authToken}`);
-
-			console.log("Delete Account Response:", { response: response.body, deletedFiles: response.body.data.deletedFiles });
 
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
@@ -454,37 +450,31 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 		});
 	});
 
-	// 	it("should fail to delete non-existent client", async () => {
-	// 		const response = await request(API_BASE_URL)
-	// 			.delete("/api/clients/non-existent-id")
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("Authorization", `Bearer ${authToken}`);
+	it("should fail to delete non-existent client", async () => {
+		const response = await request(API_BASE_URL)
+			.delete("/api/clients")
+			.set("Origin", "https://test.example.com")
+			.set("Authorization", `Bearer ${authToken}`);
 
-	// 		console.log("Delete Account (Non-existent) Response:", JSON.stringify(response.body, null, 2));
+		expect(response.status).toBe(404);
+		expect(response.body).toHaveProperty("code", "NotFound");
+		expect(response.body).toHaveProperty("message", "client_not_found");
+	});
 
-	// 		expect(response.status).toBe(404);
-	// 		expect(response.body).toHaveProperty("validationError", "Client not found");
-	// 	});
+	it("should fail to delete with missing API key", async () => {
+		const response = await request(API_BASE_URL).delete(`/api/clients`).set("Origin", "https://test.example.com");
 
-	// 	it("should fail to delete with missing API key", async () => {
-	// 		const response = await request(API_BASE_URL).delete(`/api/clients/${accountEmail}`).set("Origin", "https://test.example.com");
-	// 		// Missing x-api-key header
+		expect(response.status).toBe(401);
+		expect(response.body).toHaveProperty("error", "Protected resource, use Authorization header to get access");
+	});
 
-	// 		console.log("Delete Account (Missing API Key) Response:", JSON.stringify(response.body, null, 2));
+	describe("7. Verify Account After Deletion", () => {
+		it("should confirm client no longer exists after deletion", async () => {
+			const response = await request(API_BASE_URL).get("/api/clients").query({ email: testEmail });
 
-	// 		expect(response.status).toBe(403);
-	// 		expect(response.body).toHaveProperty("validationError", "ApiKey not valid");
-	// 	});
-	// });
-
-	// describe("7. Verify Account After Deletion", () => {
-	// 	it("should confirm client no longer exists after deletion", async () => {
-	// 		const response = await request(API_BASE_URL).get("/api/clients").query({ email: testEmail });
-
-	// 		console.log("Verify Account (After Deletion) Response:", JSON.stringify(response.body, null, 2));
-
-	// 		expect(response.status).toBe(404);
-	// 		expect(response.body).toHaveProperty("validationError", "Client not found");
-	// 	});
-	// });
+			expect(response.status).toBe(404);
+			expect(response.body).toHaveProperty("code", "NotFound");
+			expect(response.body).toHaveProperty("message", "client_not_found");
+		});
+	});
 });

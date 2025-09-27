@@ -39,6 +39,8 @@ const verifyClient = async (ctx) => {
 	try {
 		const data = await Module.get(ctx.request.query);
 
+		if (!data) throw new Error("404:client_not_found");
+
 		ctx.body = { data };
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);
