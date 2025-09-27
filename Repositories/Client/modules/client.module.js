@@ -188,7 +188,6 @@ const create = async (data) => {
 const update = async (data, authUser) => {
 	const { name, email, countryCode, phone, company, faceBase64, masterPassword } = data;
 
-	// Clean country code to remove any flag emojis (e.g., "🇵🇦 +507" -> "+507")
 	const cleanCountryCode = countryCode ? countryCode.replace(/^[^\d+]*/, "").trim() : null;
 
 	// validate if the email is taken and it's different from the current email
@@ -423,7 +422,7 @@ const updatePassword = async (data, authUser) => {
 	};
 
 	// delete the previous ipfs record
-	await IPFSModule.unPinFiles([zelfAccount.ipfsHash]);
+	await IPFSModule.unPinFiles([zelfAccount.id]);
 
 	// Convert to JSON string and then to base64
 	const jsonData = JSON.stringify(newZelfAccountJSON, null, 2);

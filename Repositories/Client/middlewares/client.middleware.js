@@ -151,7 +151,12 @@ const updatePasswordValidation = async (ctx, next) => {
 	const { newPassword, confirmPassword } = ctx.request.body;
 	if (newPassword !== confirmPassword) {
 		ctx.status = 409;
-		ctx.body = { validationError: "Passwords do not match" };
+
+		ctx.body = {
+			message: "passwords_do_not_match",
+			code: "Conflict",
+		};
+
 		return;
 	}
 

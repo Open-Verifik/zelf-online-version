@@ -221,109 +221,85 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 		});
 	});
 
-	// 	it("should fail update with missing API key", async () => {
-	// 		const updateData = {
-	// 			name: "Updated Test Client",
-	// 			faceBase64: sampleFaceFromJSON.faceBase64,
-	// 			masterPassword: sampleFaceFromJSON.password,
-	// 		};
+	describe("5. PUT /api/clients/sync/password - Change Password", () => {
+		it("should change password with valid data", async () => {
+			const passwordData = {
+				newPassword: "NewSecurePassword123",
+				confirmPassword: "NewSecurePassword123",
+				faceBase64: sampleFaceFromJSON.faceBase64,
+				masterPassword: sampleFaceFromJSON.password,
+			};
 
-	// 		const response = await request(API_BASE_URL)
-	// 			.put("/api/clients/sync")
-	// 			.set("Origin", "https://test.example.com")
-	// 			// Missing x-api-key header
-	// 			.send(updateData);
+			const response = await request(API_BASE_URL)
+				.put("/api/clients/sync/password")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`)
+				.send(passwordData);
 
-	// 		console.log("Update Account (Missing API Key) Response:", JSON.stringify(response.body, null, 2));
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(response.body.data).toHaveProperty("message", "Password updated successfully");
+			expect(response.body.data).toHaveProperty("zelfProof");
+			expect(response.body.data).toHaveProperty("zelfAccount");
 
-	// 		expect(response.status).toBe(403);
-	// 		expect(response.body).toHaveProperty("validationError", "ApiKey not valid");
-	// 	});
+			// Validate zelfAccount structure
+			expect(response.body.data.zelfAccount).toHaveProperty("publicData");
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountEmail", testEmail);
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountPhone", testPhone);
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountCountryCode", testCountryCode);
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountCompany", "Test Company");
+			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountType", "client_account");
 
-	// 	it("should fail update with missing required fields", async () => {
-	// 		const updateData = {
-	// 			name: "Updated Test Client",
-	// 			// Missing faceBase64 and masterPassword
-	// 		};
+			// delay 1 second
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+		});
 
-	// 		const response = await request(API_BASE_URL)
-	// 			.put("/api/clients/sync")
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key")
-	// 			.send(updateData);
+		it("should change password back to original for subsequent tests", async () => {
+			const passwordData = {
+				masterPassword: "NewSecurePassword123",
+				newPassword: sampleFaceFromJSON.password,
+				confirmPassword: sampleFaceFromJSON.password,
+				faceBase64: sampleFaceFromJSON.faceBase64,
+			};
 
-	// 		console.log("Update Account (Missing Fields) Response:", JSON.stringify(response.body, null, 2));
+			const response = await request(API_BASE_URL)
+				.put("/api/clients/sync/password")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`)
+				.send(passwordData);
 
-	// 		expect(response.status).toBe(409);
-	// 		expect(response.body).toHaveProperty("validationError");
-	// 	});
-	// });
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(response.body.data).toHaveProperty("message", "Password updated successfully");
+			expect(response.body.data).toHaveProperty("zelfProof");
+			expect(response.body.data).toHaveProperty("zelfAccount");
 
-	// describe("5. PUT /api/clients/sync/password - Change Password", () => {
-	// 	it("should change password with valid data", async () => {
-	// 		const passwordData = {
-	// 			currentPassword: sampleFaceFromJSON.password,
-	// 			newPassword: "NewSecurePassword123",
-	// 			confirmPassword: "NewSecurePassword123",
-	// 			faceBase64: sampleFaceFromJSON.faceBase64,
-	// 			masterPassword: sampleFaceFromJSON.password,
-	// 		};
+			// delay 1 second
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+		});
 
-	// 		const response = await request(API_BASE_URL)
-	// 			.put("/api/clients/sync/password")
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key")
-	// 			.send(passwordData);
+		it("should fail password change with mismatched passwords", async () => {
+			const passwordData = {
+				currentPassword: sampleFaceFromJSON.password,
+				newPassword: "NewSecurePassword123",
+				confirmPassword: "DifferentPassword123",
+				faceBase64: sampleFaceFromJSON.faceBase64,
+				masterPassword: sampleFaceFromJSON.password,
+			};
 
-	// 		console.log("Change Password Response:", JSON.stringify(response.body, null, 2));
+			const response = await request(API_BASE_URL)
+				.put("/api/clients/sync/password")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`)
+				.send(passwordData);
 
-	// 		expect(response.status).toBe(200);
-	// 		expect(response.body).toHaveProperty("data");
-	// 		expect(response.body.data).toHaveProperty("message", "Password updated successfully");
-	// 	});
+			console.log("Change Password (Mismatched) Response:", { response: response.body });
 
-	// 	it("should fail password change with mismatched passwords", async () => {
-	// 		const passwordData = {
-	// 			currentPassword: sampleFaceFromJSON.password,
-	// 			newPassword: "NewSecurePassword123",
-	// 			confirmPassword: "DifferentPassword123",
-	// 			faceBase64: sampleFaceFromJSON.faceBase64,
-	// 			masterPassword: sampleFaceFromJSON.password,
-	// 		};
-
-	// 		const response = await request(API_BASE_URL)
-	// 			.put("/api/clients/sync/password")
-	// 			.set("Origin", "https://test.example.com")
-	// 			.set("x-api-key", process.env.SUPERADMIN_JWT_SECRET || "test-api-key")
-	// 			.send(passwordData);
-
-	// 		console.log("Change Password (Mismatched) Response:", JSON.stringify(response.body, null, 2));
-
-	// 		expect(response.status).toBe(400);
-	// 		expect(response.body).toHaveProperty("validationError", "Passwords do not match");
-	// 	});
-
-	// 	it("should fail password change with missing API key", async () => {
-	// 		const passwordData = {
-	// 			currentPassword: sampleFaceFromJSON.password,
-	// 			newPassword: "NewSecurePassword123",
-	// 			confirmPassword: "NewSecurePassword123",
-	// 			faceBase64: sampleFaceFromJSON.faceBase64,
-	// 			masterPassword: sampleFaceFromJSON.password,
-	// 		};
-
-	// 		const response = await request(API_BASE_URL)
-	// 			.put("/api/clients/sync/password")
-	// 			.set("Origin", "https://test.example.com")
-	// 			// Missing x-api-key header
-	// 			.send(passwordData);
-
-	// 		console.log("Change Password (Missing API Key) Response:", JSON.stringify(response.body, null, 2));
-
-	// 		expect(response.status).toBe(403);
-	// 		expect(response.body).toHaveProperty("validationError", "ApiKey not valid");
-	// 	});
-	// });
+			expect(response.status).toBe(409);
+			expect(response.body).toHaveProperty("message", "passwords_do_not_match");
+			expect(response.body).toHaveProperty("code", "Conflict");
+		});
+	});
 
 	describe("6. DELETE /api/clients - Delete Account", () => {
 		it("should fail to delete client with invalid credentials (not owner)", async () => {
@@ -368,9 +344,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 			expect(response.body.data.zelfAccount).toHaveProperty("cid");
 			expect(response.body.data.zelfAccount).toHaveProperty("url");
 			expect(response.body.data.zelfAccount).toHaveProperty("publicData");
-
-			//make wait 1 second
-			await new Promise((resolve) => setTimeout(resolve, 1000));
 		});
 	});
 
