@@ -293,8 +293,6 @@ describe("Client Authentication API Integration Tests - Real Server", () => {
 				.set("Authorization", `Bearer ${authToken}`)
 				.send(passwordData);
 
-			console.log("Change Password (Mismatched) Response:", { response: response.body });
-
 			expect(response.status).toBe(409);
 			expect(response.body).toHaveProperty("message", "passwords_do_not_match");
 			expect(response.body).toHaveProperty("code", "Conflict");
