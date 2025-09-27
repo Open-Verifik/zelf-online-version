@@ -9,7 +9,7 @@ module.exports = (server) => {
 	server.get(`${PATH}`, Middleware.searchValidation, Controller.searchLicense);
 	server.get(`${PATH}/my-license`, Middleware.getMyLicenseValidation, Controller.getMyLicense);
 	server.post(`${PATH}`, Middleware.createValidation, Controller.createOrUpdateLicense);
-	server.delete(`${PATH}/:ipfsHash`, Middleware.deleteValidation, Controller.deleteLicense);
+	server.delete(`${PATH}`, Middleware.deleteValidation, Controller.deleteLicense);
 };
 
 /**

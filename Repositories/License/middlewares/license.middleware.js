@@ -1,4 +1,4 @@
-const { string, validate, stringEnum } = require("../../../Core/JoiUtils");
+const { string, validate, stringEnum, object, array, number, boolean } = require("../../../Core/JoiUtils");
 const config = require("../../../Core/config");
 
 const schemas = {
@@ -15,11 +15,71 @@ const schemas = {
 		faceBase64: string().base64().required(),
 		masterPassword: string().optional().allow(""),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).optional(),
+		domainConfig: object({
+			name: string().required(),
+			holdSuffix: string().default(".hold"),
+			status: stringEnum(["active", "inactive", "suspended"]).default("active"),
+			description: string().optional(),
+			limits: object({
+				tags: number().integer().min(0).required(),
+				zelfkeys: number().integer().min(0).required(),
+			}).required(),
+			features: array()
+				.items(
+					object({
+						name: string().required(),
+						code: string().required(),
+						description: string().required(),
+						enabled: boolean().required(),
+					})
+				)
+				.required(),
+			validation: object({
+				minLength: number().integer().min(1).required(),
+				maxLength: number().integer().min(1).required(),
+				allowedChars: object().default({}),
+				reserved: array().items(string()).default([]),
+				customRules: array().items(string()).default([]),
+			}).required(),
+			storage: object({
+				keyPrefix: string().required(),
+				ipfsEnabled: boolean().default(true),
+				arweaveEnabled: boolean().default(false),
+				walrusEnabled: boolean().default(false),
+			}).required(),
+			tagPaymentSettings: object({
+				methods: array()
+					.items(stringEnum(["coinbase", "crypto", "stripe", "paypal"]))
+					.required(),
+				currencies: array()
+					.items(stringEnum(["BTC", "ETH", "SOL", "USD", "EUR", "GBP"]))
+					.required(),
+				whitelist: object().default({}),
+				pricingTable: object()
+					.pattern(
+						/^(\d+|\d+-\d+)$/, // Pattern for keys like "1", "2", "6-15", etc.
+						object({
+							1: number().min(0),
+							2: number().min(0),
+							3: number().min(0),
+							4: number().min(0),
+							5: number().min(0),
+							lifetime: number().min(0),
+						})
+					)
+					.required(),
+			}).required(),
+			metadata: object({
+				launchDate: string().isoDate().optional(),
+				version: string().optional(),
+				documentation: string().uri().optional(),
+				support: stringEnum(["standard", "premium", "enterprise"]).default("standard"),
+			}).optional(),
+		}).required(),
 	},
 	delete: {
-		ipfsHash: string()
-			.pattern(/^[a-zA-Z0-9]+$/)
-			.required(),
+		faceBase64: string().base64().required(),
+		masterPassword: string().optional().allow(""),
 	},
 };
 
@@ -79,13 +139,14 @@ const getMyLicenseValidation = async (ctx, next) => {
 const createValidation = async (ctx, next) => {
 	const payload = Object.assign(ctx.request.query, ctx.request.body);
 
-	const { domain, faceBase64, masterPassword, os } = payload;
+	const { domain, faceBase64, masterPassword, os, domainConfig } = payload;
 
 	const valid = validate(schemas.create, {
 		domain,
 		faceBase64,
 		masterPassword,
 		os,
+		domainConfig,
 	});
 
 	if (valid.error) {
@@ -103,12 +164,11 @@ const createValidation = async (ctx, next) => {
  * @param {*} next
  */
 const deleteValidation = async (ctx, next) => {
-	const payload = Object.assign(ctx.request.query, ctx.request.body, ctx.request.params);
-
-	const { ipfsHash } = payload;
+	const { faceBase64, masterPassword } = ctx.request.body;
 
 	const valid = validate(schemas.delete, {
-		ipfsHash,
+		faceBase64,
+		masterPassword,
 	});
 
 	if (valid.error) {
@@ -125,8 +185,4 @@ module.exports = {
 	getMyLicenseValidation,
 	createValidation,
 	deleteValidation,
-	// Legacy names for backward compatibility
-	validateSearchLicense: searchValidation,
-	validateCreateLicense: createValidation,
-	validateDeleteLicense: deleteValidation,
 };

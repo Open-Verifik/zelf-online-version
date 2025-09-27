@@ -34,6 +34,7 @@ const loadCache = () => {
 		if (!fs.existsSync(CACHE_FILE_PATH)) return null;
 
 		const cacheContent = fs.readFileSync(CACHE_FILE_PATH, "utf8");
+
 		const cacheData = JSON.parse(cacheContent);
 
 		return isCacheValid(cacheData) ? cacheData : null;
@@ -49,7 +50,6 @@ const loadCache = () => {
  */
 const saveCache = (licenses) => {
 	try {
-		// Ensure cache directory exists
 		const cacheDir = path.dirname(CACHE_FILE_PATH);
 		if (!fs.existsSync(cacheDir)) {
 			fs.mkdirSync(cacheDir, { recursive: true });
@@ -215,56 +215,37 @@ const createOrUpdateLicense = async (body, jwt) => {
  * @param {Object} user - User object
  * @returns {Object} - Deletion confirmation
  */
-const deleteLicense = async (params, user) => {
+const deleteLicense = async (params, authUser) => {
+	const { faceBase64, masterPassword, os } = params;
+
 	try {
-		const { ipfsHash } = params;
-		const userEmail = user?.email;
+		const { myLicense, zelfAccount } = await getMyLicense(authUser);
 
-		if (!userEmail) {
-			throw new Error("401:User not authenticated");
-		}
+		if (!myLicense) throw new Error("404:license_not_found");
 
-		// Verify ownership before deletion
-		const license = await searchLicenseByHash(ipfsHash);
-		if (!license || license.owner !== userEmail) {
-			throw new Error("403:Access denied - License not found or belongs to another user");
-		}
+		const accountJSON = await axios.get(zelfAccount.url);
+
+		const accountZelfProof = accountJSON.data.zelfProof;
+
+		// now we should validate if the zelfAccount is the owner of the license with the decrypted zelfProof
+		await decrypt({
+			zelfProof: accountZelfProof,
+			faceBase64,
+			os: os || "DESKTOP",
+			password: masterPassword || undefined,
+			verifierKey: config.zelfEncrypt.serverKey,
+		});
 
 		// Unpin from IPFS
-		await IPFS.unpin(ipfsHash);
+		const deletedFiles = await IPFS.unPinFiles([myLicense.id]);
 
 		return {
 			success: true,
 			message: "License deleted successfully",
+			deletedFiles,
 		};
 	} catch (error) {
 		console.error("Delete license error:", error);
-		throw error;
-	}
-};
-
-/**
- * Search license by IPFS hash
- */
-const searchLicenseByHash = async (ipfsHash) => {
-	try {
-		const response = await IPFS.getPin(ipfsHash);
-
-		if (response.data) {
-			const licenseData = response.data;
-			return {
-				domain: licenseData.publicData.domain,
-				ipfsHash: licenseData.ipfs_pin_hash,
-				owner: licenseData.publicData.owner,
-				zelfProof: licenseData.publicData.licenseZelfProof,
-				createdAt: licenseData.date_pinned,
-				updatedAt: licenseData.date_pinned,
-			};
-		}
-
-		return null;
-	} catch (error) {
-		console.error("Search license by hash error:", error);
 		throw error;
 	}
 };
@@ -341,6 +322,5 @@ module.exports = {
 	createOrUpdateLicense,
 	getUserZelfProof,
 	deleteLicense,
-	searchLicenseByHash,
 	loadOfficialLicenses,
 };

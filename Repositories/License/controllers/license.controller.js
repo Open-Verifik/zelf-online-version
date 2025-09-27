@@ -65,7 +65,7 @@ const createOrUpdateLicense = async (ctx) => {
  */
 const deleteLicense = async (ctx) => {
 	try {
-		const data = await Module.deleteLicense(ctx.request.params, ctx.state.user);
+		const data = await Module.deleteLicense(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
