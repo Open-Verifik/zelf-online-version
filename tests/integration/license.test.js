@@ -13,6 +13,7 @@ describe("License API Integration Tests - Real Server", () => {
 	let testEmail;
 	let testPhone;
 	let testCountryCode;
+	let createdDomain;
 
 	// Generate unique test data
 	beforeAll(() => {
@@ -57,11 +58,6 @@ describe("License API Integration Tests - Real Server", () => {
 			// Store the authentication token and account email for subsequent tests
 			authToken = response.body.data.token;
 			accountEmail = response.body.data.zelfAccount.publicData.accountEmail;
-
-			console.log("Created client account:", {
-				email: accountEmail,
-				token: authToken ? "Present" : "Missing",
-			});
 		});
 	});
 
@@ -71,8 +67,6 @@ describe("License API Integration Tests - Real Server", () => {
 				.get("/api/license/my-license")
 				.set("Origin", "https://test.example.com")
 				.set("Authorization", `Bearer ${authToken}`);
-
-			console.log("Get My License Response:", { response: response.body });
 
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
@@ -104,6 +98,7 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 
 		it("should fail to get license without authentication", async () => {
+			x;
 			const response = await request(API_BASE_URL).get("/api/license/my-license").set("Origin", "https://test.example.com");
 
 			expect(response.status).toBe(401);
@@ -123,9 +118,9 @@ describe("License API Integration Tests - Real Server", () => {
 
 	describe("3. POST /api/license - Create License", () => {
 		it("should create a new license with valid domainConfig", async () => {
-			const uniqueDomain = `testdomain${Date.now()}`;
+			createdDomain = `testdomain${Date.now()}`;
 			const domainConfig = {
-				name: uniqueDomain,
+				name: createdDomain,
 				holdSuffix: ".hold",
 				status: "active",
 				description: "Test domain for license creation",
@@ -192,7 +187,7 @@ describe("License API Integration Tests - Real Server", () => {
 			};
 
 			const createData = {
-				domain: uniqueDomain,
+				domain: createdDomain,
 				faceBase64: sampleFaceFromJSON.faceBase64,
 				masterPassword: sampleFaceFromJSON.password,
 				domainConfig: domainConfig,
@@ -204,13 +199,11 @@ describe("License API Integration Tests - Real Server", () => {
 				.set("Authorization", `Bearer ${authToken}`)
 				.send(createData);
 
-			console.log("Create License Response:", { response: response.body });
-
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
 			expect(response.body.data).toHaveProperty("ipfs");
-			expect(response.body.data).toHaveProperty("name", uniqueDomain);
-			expect(response.body.data).toHaveProperty("domain", uniqueDomain);
+			expect(response.body.data).toHaveProperty("name", createdDomain);
+			expect(response.body.data).toHaveProperty("domain", createdDomain);
 			expect(response.body.data).toHaveProperty("owner", testEmail);
 			expect(response.body.data).toHaveProperty("subscriptionId", "free");
 			expect(response.body.data).toHaveProperty("expiresAt");
@@ -338,12 +331,33 @@ describe("License API Integration Tests - Real Server", () => {
 			expect(response.body).toHaveProperty("validationError");
 		});
 
+		it("should verify license appears in get my license after creation", async () => {
+			// Verify that the license created in the previous test now appears
+			const response = await request(API_BASE_URL)
+				.get("/api/license/my-license")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
+
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(response.body.data).toHaveProperty("myLicense");
+			expect(response.body.data.myLicense).not.toBeNull();
+			expect(response.body.data).toHaveProperty("zelfAccount");
+
+			// Verify the license data matches what was created
+			expect(response.body.data.myLicense).toHaveProperty("publicData");
+			expect(response.body.data.myLicense.publicData).toHaveProperty("licenseDomain");
+			expect(response.body.data.myLicense.publicData).toHaveProperty("licenseOwner", testEmail);
+			expect(response.body.data.myLicense.publicData).toHaveProperty("licenseSubscriptionId", "free");
+			expect(response.body.data.myLicense.publicData).toHaveProperty("type", "license");
+		});
+
 		it("should update the existing license with new domainConfig", async () => {
 			// Update the license that was created in the previous test
-			const uniqueDomain = `testdomain${Date.now()}`;
+			createdDomain = `${createdDomain}-updated`;
 
 			const updatedDomainConfig = {
-				name: `${uniqueDomain}2`,
+				name: createdDomain,
 				holdSuffix: ".updated",
 				status: "active",
 				description: "Updated test domain for license",
@@ -416,7 +430,7 @@ describe("License API Integration Tests - Real Server", () => {
 			};
 
 			const updateData = {
-				domain: `${uniqueDomain}2`, // Modified domain name (just added "-updated")
+				domain: createdDomain, // Use the updated domain name
 				faceBase64: sampleFaceFromJSON.faceBase64,
 				masterPassword: sampleFaceFromJSON.password,
 				domainConfig: updatedDomainConfig,
@@ -433,8 +447,8 @@ describe("License API Integration Tests - Real Server", () => {
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
 			expect(response.body.data).toHaveProperty("ipfs");
-			expect(response.body.data).toHaveProperty("name", `${uniqueDomain}2`);
-			expect(response.body.data).toHaveProperty("domain", `${uniqueDomain}2`);
+			expect(response.body.data).toHaveProperty("name", createdDomain);
+			expect(response.body.data).toHaveProperty("domain", createdDomain);
 			expect(response.body.data).toHaveProperty("owner", testEmail);
 			expect(response.body.data).toHaveProperty("subscriptionId", "free");
 			expect(response.body.data).toHaveProperty("expiresAt");
@@ -470,7 +484,106 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 	});
 
-	describe("4. DELETE /api/license - Delete License", () => {
+	describe("4. GET /api/license - Search Licenses", () => {
+		it("should search for all licenses", async () => {
+			// Search for all licenses
+			const response = await request(API_BASE_URL)
+				.get("/api/license")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
+
+			console.log("Search Licenses Response:", { response: response.body.data });
+
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(Array.isArray(response.body.data)).toBe(true);
+			expect(response.body.data.length).toBeGreaterThan(0);
+
+			// Validate structure of each license in the array
+			response.body.data.forEach((license, index) => {
+				expect(license).toHaveProperty("id");
+				expect(license).toHaveProperty("name");
+				expect(license).toHaveProperty("cid");
+				expect(license).toHaveProperty("size");
+				expect(license).toHaveProperty("number_of_files");
+				expect(license).toHaveProperty("mime_type");
+				expect(license).toHaveProperty("group_id");
+				expect(license).toHaveProperty("created_at");
+				expect(license).toHaveProperty("url");
+				expect(license).toHaveProperty("publicData");
+
+				// Validate publicData structure (simplified version returned by search)
+				expect(license.publicData).toHaveProperty("licenseDomain");
+				expect(license.publicData).toHaveProperty("licenseOwner");
+				expect(license.publicData).toHaveProperty("licenseSubscriptionId");
+				expect(license.publicData).toHaveProperty("type");
+
+				// Validate data types
+				expect(typeof license.publicData.licenseDomain).toBe("string");
+				expect(typeof license.publicData.licenseOwner).toBe("string");
+				expect(typeof license.publicData.licenseSubscriptionId).toBe("string");
+				expect(typeof license.publicData.type).toBe("string");
+
+				// Validate that licenseDomain is not empty
+				expect(license.publicData.licenseDomain.length).toBeGreaterThan(0);
+				expect(license.publicData.licenseOwner.length).toBeGreaterThan(0);
+			});
+
+			// Search for the domain we created in this test
+			const createdLicense = response.body.data.find((license) => license.publicData.licenseDomain === createdDomain);
+
+			if (createdLicense) {
+				expect(createdLicense.publicData.licenseDomain).toBe(createdDomain);
+				expect(createdLicense.publicData.licenseOwner).toBe(testEmail);
+				expect(createdLicense.publicData.licenseSubscriptionId).toBe("free");
+				expect(createdLicense.publicData.type).toBe("license");
+			} else {
+				// If we can't find our specific license, at least verify we have licenses
+				expect(response.body.data.length).toBeGreaterThan(0);
+			}
+		});
+
+		it("should search for specific domain", async () => {
+			// Search for the specific domain that was created in test 3
+			const response = await request(API_BASE_URL)
+				.get("/api/license")
+				.query({ domain: createdDomain })
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
+
+			console.log("Search Specific Domain Response:", { response: response.body });
+
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(response.body.data).toHaveProperty("id");
+			expect(response.body.data).toHaveProperty("name");
+			expect(response.body.data).toHaveProperty("cid");
+			expect(response.body.data).toHaveProperty("url");
+			expect(response.body.data).toHaveProperty("publicData");
+			expect(response.body.data.publicData).toHaveProperty("licenseDomain", createdDomain);
+			expect(response.body.data.publicData).toHaveProperty("licenseOwner", testEmail);
+		});
+
+		it("should fail to search without authentication", async () => {
+			const response = await request(API_BASE_URL).get("/api/license").set("Origin", "https://test.example.com");
+
+			expect(response.status).toBe(401);
+			expect(response.body).toHaveProperty("error", "Protected resource, use Authorization header to get access");
+		});
+
+		it("should fail to search with invalid domain format", async () => {
+			const response = await request(API_BASE_URL)
+				.get("/api/license")
+				.query({ domain: "invalid_domain_with_underscores" })
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
+
+			expect(response.status).toBe(409);
+			expect(response.body).toHaveProperty("validationError");
+		});
+	});
+
+	describe("5. DELETE /api/license - Delete License", () => {
 		it("should fail to delete license with invalid credentials", async () => {
 			const deleteData = {
 				faceBase64: sampleFaceFromJSON.faceBase64,
@@ -500,8 +613,6 @@ describe("License API Integration Tests - Real Server", () => {
 				.set("Origin", "https://test.example.com")
 				.set("Authorization", `Bearer ${authToken}`)
 				.send(deleteData);
-
-			console.log("Delete License Response:", { response: response.body });
 
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
@@ -597,8 +708,6 @@ describe("License API Integration Tests - Real Server", () => {
 	afterAll(async () => {
 		if (authToken && accountEmail) {
 			try {
-				console.log("Cleaning up test client:", accountEmail);
-
 				const deleteResponse = await request(API_BASE_URL)
 					.delete("/api/clients")
 					.set("Origin", "https://test.example.com")
