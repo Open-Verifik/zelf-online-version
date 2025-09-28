@@ -246,8 +246,9 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 
 		it("should fail to create license without authentication", async () => {
+			const uniqueDomain = `testdomain${Date.now()}`; // Added unique domain name
 			const domainConfig = {
-				name: "testdomain",
+				name: uniqueDomain,
 				limits: { tags: 1000, zelfkeys: 5000 },
 				features: [
 					{
@@ -268,7 +269,7 @@ describe("License API Integration Tests - Real Server", () => {
 			};
 
 			const createData = {
-				domain: "testdomain",
+				domain: uniqueDomain,
 				faceBase64: sampleFaceFromJSON.faceBase64,
 				masterPassword: sampleFaceFromJSON.password,
 				domainConfig: domainConfig,
@@ -281,8 +282,9 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 
 		it("should fail to create license with invalid domainConfig", async () => {
+			const uniqueDomain = `testdomain${Date.now()}`;
 			const invalidDomainConfig = {
-				name: "testdomain",
+				name: uniqueDomain,
 				limits: { tags: -1, zelfkeys: 5000 }, // Invalid negative tags
 				features: [
 					{
@@ -301,7 +303,7 @@ describe("License API Integration Tests - Real Server", () => {
 			};
 
 			const createData = {
-				domain: "testdomain",
+				domain: uniqueDomain,
 				faceBase64: sampleFaceFromJSON.faceBase64,
 				masterPassword: sampleFaceFromJSON.password,
 				domainConfig: invalidDomainConfig,
@@ -318,8 +320,9 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 
 		it("should fail to create license with missing required fields", async () => {
+			const uniqueDomain = `testdomain${Date.now()}`;
 			const createData = {
-				domain: "testdomain",
+				domain: uniqueDomain,
 				faceBase64: sampleFaceFromJSON.faceBase64,
 				masterPassword: sampleFaceFromJSON.password,
 				// Missing domainConfig
@@ -333,6 +336,137 @@ describe("License API Integration Tests - Real Server", () => {
 
 			expect(response.status).toBe(409);
 			expect(response.body).toHaveProperty("validationError");
+		});
+
+		it("should update the existing license with new domainConfig", async () => {
+			// Update the license that was created in the previous test
+			const uniqueDomain = `testdomain${Date.now()}`;
+
+			const updatedDomainConfig = {
+				name: `${uniqueDomain}2`,
+				holdSuffix: ".updated",
+				status: "active",
+				description: "Updated test domain for license",
+				limits: {
+					tags: 2000, // Increased from 1000
+					zelfkeys: 10000, // Increased from 5000
+				},
+				features: [
+					{
+						name: "Zelf Name System",
+						code: "zns",
+						description: "Encryptions, Decryptions, previews of ZelfProofs",
+						enabled: true,
+					},
+					{
+						name: "Zelf Keys",
+						code: "zelfkeys",
+						description: "Zelf Keys: Passwords, Notes, Credit Cards, etc.",
+						enabled: true,
+					},
+					{
+						name: "Advanced Analytics",
+						code: "analytics",
+						description: "Advanced analytics and reporting features",
+						enabled: true,
+					},
+				],
+				validation: {
+					minLength: 2, // Changed from 3
+					maxLength: 100, // Changed from 50
+					allowedChars: {},
+					reserved: ["www", "api", "admin", "support", "help", "docs"], // Added "docs"
+					customRules: ["no-numbers-at-start"],
+				},
+				storage: {
+					keyPrefix: "updatedTestName", // Changed from "testName"
+					ipfsEnabled: true,
+					arweaveEnabled: true, // Changed from false
+					walrusEnabled: false,
+				},
+				tagPaymentSettings: {
+					methods: ["coinbase", "crypto", "stripe", "paypal"], // Added "paypal"
+					currencies: ["BTC", "ETH", "SOL", "USD", "EUR"], // Added "EUR"
+					whitelist: {},
+					pricingTable: {
+						1: {
+							1: 200, // Changed from 240
+							2: 360, // Changed from 432
+							3: 510, // Changed from 612
+							4: 640, // Changed from 768
+							5: 750, // Changed from 900
+							lifetime: 3000, // Changed from 3600
+						},
+						2: {
+							1: 100, // Changed from 120
+							2: 180, // Changed from 216
+							3: 255, // Changed from 306
+							4: 320, // Changed from 384
+							5: 375, // Changed from 450
+							lifetime: 1500, // Changed from 1800
+						},
+					},
+				},
+				metadata: {
+					launchDate: "2025-02-01", // Changed from "2025-01-01"
+					version: "2.0.0", // Changed from "1.0.0"
+					documentation: "https://docs.updatedtestdomain.com", // Changed URL
+					support: "premium", // Changed from "standard"
+				},
+			};
+
+			const updateData = {
+				domain: `${uniqueDomain}2`, // Modified domain name (just added "-updated")
+				faceBase64: sampleFaceFromJSON.faceBase64,
+				masterPassword: sampleFaceFromJSON.password,
+				domainConfig: updatedDomainConfig,
+			};
+
+			const response = await request(API_BASE_URL)
+				.post("/api/license")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`)
+				.send(updateData);
+
+			console.log("Update License Response:", { response: response.body });
+
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(response.body.data).toHaveProperty("ipfs");
+			expect(response.body.data).toHaveProperty("name", `${uniqueDomain}2`);
+			expect(response.body.data).toHaveProperty("domain", `${uniqueDomain}2`);
+			expect(response.body.data).toHaveProperty("owner", testEmail);
+			expect(response.body.data).toHaveProperty("subscriptionId", "free");
+			expect(response.body.data).toHaveProperty("expiresAt");
+
+			// Check that the updated domainConfig properties are preserved
+			expect(response.body.data).toHaveProperty("limits");
+			expect(response.body.data.limits).toHaveProperty("tags", 2000);
+			expect(response.body.data.limits).toHaveProperty("zelfkeys", 10000);
+
+			expect(response.body.data).toHaveProperty("features");
+			expect(response.body.data.features).toHaveLength(3); // Now has 3 features
+			expect(response.body.data.features[0]).toHaveProperty("name", "Zelf Name System");
+			expect(response.body.data.features[2]).toHaveProperty("name", "Advanced Analytics");
+			expect(response.body.data.features[2]).toHaveProperty("code", "analytics");
+
+			expect(response.body.data).toHaveProperty("validation");
+			expect(response.body.data.validation).toHaveProperty("minLength", 2);
+			expect(response.body.data.validation).toHaveProperty("maxLength", 100);
+			expect(response.body.data.validation.reserved).toContain("docs");
+
+			expect(response.body.data).toHaveProperty("storage");
+			expect(response.body.data.storage).toHaveProperty("keyPrefix", "updatedTestName");
+			expect(response.body.data.storage).toHaveProperty("arweaveEnabled", true);
+
+			expect(response.body.data).toHaveProperty("tagPaymentSettings");
+			expect(response.body.data.tagPaymentSettings.methods).toContain("paypal");
+			expect(response.body.data.tagPaymentSettings.currencies).toContain("EUR");
+			expect(response.body.data.tagPaymentSettings.pricingTable[1][1]).toBe(200);
+
+			expect(response.body.data).toHaveProperty("metadata");
+			expect(response.body.data.metadata).toHaveProperty("version", "2.0.0");
+			expect(response.body.data.metadata).toHaveProperty("support", "premium");
 		});
 	});
 
