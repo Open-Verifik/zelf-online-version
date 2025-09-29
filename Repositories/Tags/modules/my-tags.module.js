@@ -5,6 +5,7 @@ const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
 const { addPurchaseReward } = require("./tags-token.module");
 const { getDomainConfig } = require("../config/supported-domains");
+const jwt = require("jsonwebtoken");
 
 /**
  * Confirm payment with Coinbase
@@ -51,8 +52,17 @@ const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
  * @param {Object} params
  * @param {Object} authUser
  */
-const renewMyTag = async (params, authUser) => {
-	const { tagName, domain, network, token } = params;
+const verifyPaymentConfirmation = async (tagName, domain, network, token, authUser) => {
+	const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+
+	return {
+		tokenDecoded,
+		authUser,
+		tagName,
+		domain,
+		network,
+	};
+
 	const domainConfig = getDomainConfig(domain);
 
 	if (!authUser || !authUser.tagName) {
@@ -154,7 +164,7 @@ const addDurationToTag = async (params, preview) => {
 };
 
 module.exports = {
-	renewMyTag,
+	verifyPaymentConfirmation,
 	transferMyTag,
 	updateOldTagObject,
 	addDurationToTag,

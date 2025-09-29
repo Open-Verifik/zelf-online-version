@@ -15,7 +15,7 @@ const schemas = {
 	paymentConfirmation: {
 		tagName: string().required(),
 		domain: string(),
-		network: string().required(),
+		network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC"]).required(),
 		token: string().required(),
 	},
 	paymentOptions: {
@@ -102,7 +102,7 @@ const paymentConfirmationValidation = async (ctx, next) => {
 		return;
 	}
 
-	const { tagName, domain, token } = ctx.request.body;
+	const { tagName, domain, token, network } = ctx.request.body;
 
 	const domainValidation = await validateDomainAndName(domain, tagName);
 
@@ -129,6 +129,13 @@ const paymentConfirmationValidation = async (ctx, next) => {
 	if (tokenDecoded.ttl < now) {
 		ctx.status = 409;
 		ctx.body = { validationError: "token_expired" };
+		return;
+	}
+
+	// now validate the network and coin
+	if (!tokenDecoded.prices[network]) {
+		ctx.status = 409;
+		ctx.body = { validationError: "invalid_network" };
 		return;
 	}
 

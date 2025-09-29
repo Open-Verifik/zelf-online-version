@@ -38,9 +38,9 @@ const transferTag = async (ctx) => {
  */
 const paymentConfirmation = async (ctx) => {
 	try {
-		const { tagName, domain, duration } = ctx.request.body;
+		const { tagName, domain, network, token } = ctx.request.body;
 
-		const data = await Module.renewMyTag(tagName, domain, duration, ctx.state.user);
+		const data = await Module.verifyPaymentConfirmation(tagName, domain, network, token, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
