@@ -17,8 +17,10 @@ const schemas = {
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).optional(),
 		domainConfig: object({
 			name: string().required(),
+			type: string().optional(),
 			holdSuffix: string().default(".hold"),
 			status: stringEnum(["active", "inactive", "suspended"]).default("active"),
+			owner: string().optional(),
 			description: string().optional(),
 			limits: object({
 				tags: number().integer().min(0).required(),

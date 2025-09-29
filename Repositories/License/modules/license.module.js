@@ -93,7 +93,7 @@ const searchLicense = async (query, user) => {
  * @param {Object} jwt - JWT object
  * @returns {Array} - Array of user's licenses
  */
-const getMyLicense = async (jwt) => {
+const getMyLicense = async (jwt, withJSON = false) => {
 	// Get client data to get the zelfProof
 	const client = await ClientModule.get({ email: jwt.email });
 
@@ -109,6 +109,20 @@ const getMyLicense = async (jwt) => {
 	for (const record of myRecords) {
 		if (record.publicData.type === "license") {
 			myLicenses.push(record);
+		}
+	}
+
+	let jsonResponse = null;
+
+	// get the json from the url
+	if (withJSON) {
+		try {
+			jsonResponse = await axios.get(myLicenses[0].url);
+
+			myLicenses[0].domainConfig = jsonResponse.data;
+		} catch (error) {
+			console.error("Error getting json from url:", error);
+			throw error;
 		}
 	}
 

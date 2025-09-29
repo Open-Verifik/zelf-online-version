@@ -27,7 +27,7 @@ const searchLicense = async (ctx) => {
  */
 const getMyLicense = async (ctx) => {
 	try {
-		const data = await Module.getMyLicense(ctx.state.user);
+		const data = await Module.getMyLicense(ctx.state.user, ctx.request.query.withJSON);
 
 		ctx.body = { data };
 	} catch (error) {

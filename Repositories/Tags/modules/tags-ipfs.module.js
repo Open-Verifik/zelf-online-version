@@ -64,6 +64,12 @@ const _formatRecord = (item) => {
 		delete formattedResult.publicData.extraParams;
 	}
 
+	if (formattedResult.publicData?.ethAddress) {
+		formattedResult.publicData.blockDAGAddress = formattedResult.publicData.ethAddress;
+
+		formattedResult.publicData.avalancheAddress = formattedResult.publicData.ethAddress;
+	}
+
 	if (formattedResult?.publicData?.coinBase) {
 		const coinBase = JSON.parse(formattedResult.publicData.coinBase);
 
