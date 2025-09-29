@@ -155,14 +155,27 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 		solanaAddress: renewTagPayObject?.publicData?.solanaAddress,
 	};
 
-	const ethPrices = await calculateCryptoValue("ETH", priceDetails.price);
+	const prices = {
+		ETH: null,
+		SOL: null,
+		BTC: null,
+	};
 
-	const solPrices = await calculateCryptoValue("SOL", priceDetails.price);
+	if (domainConfig?.payment?.currencies?.includes("ETH")) {
+		prices.ETH = await calculateCryptoValue("ETH", priceDetails.price);
+	}
+
+	if (domainConfig?.payment?.currencies?.includes("SOL")) {
+		prices.SOL = await calculateCryptoValue("SOL", priceDetails.price);
+	}
+
+	if (domainConfig?.payment?.currencies?.includes("BTC")) {
+		prices.BTC = await calculateCryptoValue("BTC", priceDetails.price);
+	}
 
 	const returnData = {
 		paymentAddress,
-		ethPrices,
-		solPrices,
+		prices,
 		tagName: `${tagData.tagName}.${domain}`,
 		tagPayName: `${tagData.tagName}.${domain}pay`,
 		expiresAt: tagObject.publicData.expiresAt,
@@ -181,7 +194,11 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 
 	const signedDataPrice = jwt.sign(returnData, config.JWT_SECRET);
 
-	return { ...returnData, signedDataPrice };
+	return {
+		...returnData,
+		signedDataPrice,
+		domainConfig,
+	};
 };
 
 const calculateCryptoValue = async (token = "ETH", price_) => {

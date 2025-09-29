@@ -287,7 +287,7 @@ class Domain {
 			features: this.features,
 			validation: this.validation,
 			storage: this.storage,
-			tagPaymentSettings: this.payment,
+			payment: this.payment,
 			metadata: this.metadata,
 		};
 	}

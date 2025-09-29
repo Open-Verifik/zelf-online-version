@@ -3,7 +3,6 @@ const { searchTag } = require("./tags.module");
 const moment = require("moment");
 const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
-
 const { addPurchaseReward } = require("./tags-token.module");
 const { getDomainConfig } = require("../config/supported-domains");
 
