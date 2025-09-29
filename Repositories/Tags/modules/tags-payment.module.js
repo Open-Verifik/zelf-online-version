@@ -218,6 +218,42 @@ const calculateCryptoValue = async (token = "ETH", price_) => {
 	}
 };
 
+/**
+ * check if the tag pay object requires an update
+ * @param {Object} tagPayObject
+ * @param {Object} priceDetails
+ * @returns {boolean} - true if the tag pay object requires an update, false otherwise
+ */
+const _requiresUpdate = async (tagPayObject, priceDetails) => {
+	const sameDuration = !tagPayObject || tagPayObject?.publicData?.duration == priceDetails.duration;
+
+	if (!sameDuration && tagPayObject?.zelfProofQRCode) {
+		console.log("deleting tag pay object...");
+
+		await tagsIpfsModule.unPinFiles([tagPayObject.id]);
+
+		return true;
+	}
+
+	// now check if the coinbase_expires_at is before the current date
+	if (tagPayObject?.publicData?.coinbase_expires_at && moment(tagPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
+		console.log("deleting tag pay object...");
+		await tagsIpfsModule.unPinFiles([tagPayObject.id]);
+
+		return true;
+	}
+
+	return false;
+};
+
+/**
+ * fetch the tag pay record
+ * @param {Object} tagObject
+ * @param {number} currentCount
+ * @param {Object} priceDetails
+ * @param {Object} domainConfig
+ * @returns {Object} - tag pay object
+ */
 const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainConfig) => {
 	const { tagName } = tagObject;
 
@@ -227,15 +263,9 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
 
 	const tagPayObject = tagPayRecords.tagObject || {};
 
-	const sameDuration = !tagPayObject || tagPayObject?.publicData?.duration == priceDetails.duration;
+	const requiresUpdate = await _requiresUpdate(tagPayObject, priceDetails);
 
-	if (!sameDuration && tagPayObject?.zelfProofQRCode) {
-		console.log("deleting tag pay object...");
-
-		await tagsIpfsModule.unPinFiles([tagPayObject.id]);
-	}
-
-	if (!tagPayObject?.id || !sameDuration) {
+	if (!tagPayObject?.id || requiresUpdate) {
 		const newTagPayObject = await createTagPay(
 			{
 				...tagPayObject,
@@ -251,39 +281,6 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
 	}
 
 	return tagPayObject;
-
-	let renewTagPayObject = null;
-
-	for (let index = 0; index < tagPayRecords.length; index++) {
-		const record = tagPayRecords[index];
-
-		if (record.publicData.type !== "mainnet") continue;
-
-		const count = parseInt(record.publicData.count);
-
-		const recordDuration = parseInt(record.publicData.duration);
-
-		if ((!renewTagPayObject || count > parseInt(renewTagPayObject.publicData.count)) && recordDuration === duration) {
-			renewTagPayObject = record;
-		}
-	}
-
-	if (renewTagPayObject && moment(renewTagPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
-		const newTagPayRecord = await updateTagPay(renewTagPayObject, {
-			newCoinbaseUrl: true,
-			referralTagName: tagName,
-		});
-
-		return newTagPayRecord.ipfs || newTagPayRecord.arweave;
-	} else if (!renewTagPayObject) {
-		tagObject.publicData.duration = duration || 1;
-
-		const newTagPayRecord = await createTagPay(tagName, tagObject, priceDetails, currentCount + 1);
-
-		return newTagPayRecord.ipfs || newTagPayRecord.arweave;
-	}
-
-	return renewTagPayObject;
 };
 
 /**
