@@ -159,6 +159,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 		ETH: null,
 		SOL: null,
 		BTC: null,
+		AVAX: null,
 	};
 
 	if (domainConfig?.payment?.currencies?.includes("ETH")) {
@@ -171,6 +172,10 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 
 	if (domainConfig?.payment?.currencies?.includes("BTC")) {
 		prices.BTC = await calculateCryptoValue("BTC", priceDetails.price);
+	}
+
+	if (domainConfig?.payment?.currencies?.includes("AVAX")) {
+		prices.AVAX = await calculateCryptoValue("AVAX", priceDetails.price);
 	}
 
 	const returnData = {

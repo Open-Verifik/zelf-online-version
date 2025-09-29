@@ -16,7 +16,7 @@ module.exports = (server) => {
 	server.get(`${PATH}/payment-options`, Middleware.paymentOptionsValidation, Controller.paymentOptions);
 
 	// payment confirmation
-	server.post(`${PATH}/payment-confirmation`, Middleware.paymentConfirmationValidation, Controller.renewTag);
+	server.post(`${PATH}/payment-confirmation`, Middleware.paymentConfirmationValidation, Controller.paymentConfirmation);
 };
 
 /**

@@ -36,19 +36,11 @@ const transferTag = async (ctx) => {
  * @param {Object} ctx - Koa context
  * @returns {Object} - Renewal results
  */
-const renewTag = async (ctx) => {
+const paymentConfirmation = async (ctx) => {
 	try {
-		const { extractedDomain, extractedName } = ctx.state;
-		const domainConfig = getDomainConfig(extractedDomain);
+		const { tagName, domain, duration } = ctx.request.body;
 
-		const requestData = {
-			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
-			domain: extractedDomain,
-			domainConfig,
-		};
-
-		const data = await Module.renewMyTag(requestData, ctx.state.user);
+		const data = await Module.renewMyTag(tagName, domain, duration, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -83,6 +75,6 @@ const paymentOptions = async (ctx) => {
 
 module.exports = {
 	transferTag,
-	renewTag,
+	paymentConfirmation,
 	paymentOptions,
 };

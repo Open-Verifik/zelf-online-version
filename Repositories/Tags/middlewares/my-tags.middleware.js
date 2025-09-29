@@ -2,6 +2,8 @@ const { string, validate, boolean, number, stringEnum } = require("../../../Core
 const Session = require("../../Session/models/session.model");
 const moment = require("moment");
 const { extractDomainAndName, validateDomainAndName } = require("./tags.middleware");
+const jwt = require("jsonwebtoken");
+const config = require("../../../Core/config");
 
 const schemas = {
 	transfer: {
@@ -79,9 +81,7 @@ const paymentOptionsValidation = async (ctx, next) => {
 
 	if (!domainValidation.valid) {
 		ctx.status = 409;
-
 		ctx.body = { validationError: domainValidation.error };
-
 		return;
 	}
 
@@ -102,11 +102,9 @@ const paymentConfirmationValidation = async (ctx, next) => {
 		return;
 	}
 
-	const { tagName, domain } = ctx.request.body;
+	const { tagName, domain, token } = ctx.request.body;
 
-	// Validate domain and tag name
-	const { domain: extractedDomain, name } = extractDomainAndName(tagName, domain);
-	const domainValidation = await validateDomainAndName(extractedDomain, name);
+	const domainValidation = await validateDomainAndName(domain, tagName);
 
 	if (!domainValidation.valid) {
 		ctx.status = 409;
@@ -114,9 +112,25 @@ const paymentConfirmationValidation = async (ctx, next) => {
 		return;
 	}
 
-	// Add extracted domain and name to context
-	ctx.state.extractedDomain = extractedDomain;
-	ctx.state.extractedName = name;
+	// now also validate the token is valid that we encrypted with jwt
+	const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+
+	if (!tokenDecoded) {
+		ctx.status = 409;
+		ctx.body = { validationError: "invalid_token" };
+		return;
+	}
+
+	// now validate tokenDecoded.ttl is still valid
+	// TEMPORARY: Simulate 2 hours in the future for testing
+	//.add(2, "hours")
+	const now = moment().unix();
+
+	if (tokenDecoded.ttl < now) {
+		ctx.status = 409;
+		ctx.body = { validationError: "token_expired" };
+		return;
+	}
 
 	await next();
 };
