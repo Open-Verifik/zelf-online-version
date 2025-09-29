@@ -229,7 +229,7 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
 	const tagPayObject = tagPayRecords.tagObject;
 
 	if (!tagPayObject) {
-		const newTagPayObject = await createTagPay(tagPayName, tagObject, priceDetails, currentCount + 1);
+		const newTagPayObject = await createTagPay(tagPayName, tagObject, priceDetails, currentCount + 1, domainConfig);
 
 		return newTagPayObject.tagObject;
 	}
@@ -270,7 +270,49 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
 	return renewTagPayObject;
 };
 
-const createTagPay = async (tagPayName, tagObject, priceDetails, currentCount) => {
+/**
+ * create coinbase charge
+ * @param {string} tagPayName
+ * @param {Object} priceDetails
+ * @param {number} currentCount
+ * @param {Object} domainConfig
+ * @returns {Object} - Coinbase charge object
+ */
+const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, domainConfig) => {
+	const coinbasePayload = {
+		name: tagPayName,
+		description: `Purchase of the Zelf Name > ${tagPayName} for $${priceDetails.price}`,
+		pricing_type: "fixed_price",
+		local_price: {
+			amount: `${priceDetails.price}`,
+			currency: "USD",
+		},
+		metadata: {
+			zelfName: tagPayName,
+			ethAddress: eth.address,
+			btcAddress: btc.address,
+			solanaAddress: solana.address,
+			count: `${currentCount}`,
+		},
+		redirect_url: "https://payment.zelf.world/checkout",
+		cancel_url: "https://payment.zelf.world/checkout",
+	};
+
+	const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
+
+	return coinbaseCharge;
+};
+
+/**
+ * create tag pay
+ * @param {string} tagPayName
+ * @param {Object} tagObject
+ * @param {Object} priceDetails
+ * @param {number} currentCount
+ * @param {Object} domainConfig
+ * @returns {Object} - Tag pay object
+ */
+const createTagPay = async (tagPayName, tagObject, priceDetails, currentCount, domainConfig) => {
 	// we will get the price calculated,
 	const mnemonic = generateMnemonic(12);
 	const jsonfile = require("../../../config/0012589021.json");
@@ -298,28 +340,13 @@ const createTagPay = async (tagPayName, tagObject, priceDetails, currentCount) =
 		addServerPassword: true,
 	};
 
-	const coinbasePayload = {
-		name: tagPayName,
-		description: `Purchase of the Zelf Name > ${tagPayName} for $${priceDetails.price}`,
-		pricing_type: "fixed_price",
-		local_price: {
-			amount: `${priceDetails.price}`,
-			currency: "USD",
-		},
-		metadata: {
-			zelfName: tagPayName,
-			ethAddress: eth.address,
-			btcAddress: btc.address,
-			solanaAddress: solana.address,
-			count: `${currentCount}`,
-		},
-		redirect_url: "https://payment.zelf.world/checkout",
-		cancel_url: "https://payment.zelf.world/checkout",
-	};
+	let coinbaseCharge = null;
+
+	if (domainConfig?.payment?.methods?.includes("coinbase")) {
+		coinbaseCharge = await _createCoinbaseCharge(tagPayName, priceDetails, currentCount, domainConfig);
+	}
 
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
-
-	const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
 
 	const payload = {
 		base64: tagObject.zelfProofQRCode,
@@ -331,10 +358,6 @@ const createTagPay = async (tagPayName, tagObject, priceDetails, currentCount) =
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
 			zelfName: tagPayName,
-			coinBase: JSON.stringify({
-				hosted_url: coinbaseCharge.hosted_url,
-				expires_at: coinbaseCharge.expires_at,
-			}),
 			extraParams: JSON.stringify({
 				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
 				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -345,6 +368,13 @@ const createTagPay = async (tagPayName, tagObject, priceDetails, currentCount) =
 		},
 		pinIt: true,
 	};
+
+	if (coinbaseCharge) {
+		payload.metadata.coinBase = JSON.stringify({
+			hosted_url: coinbaseCharge.hosted_url,
+			expires_at: coinbaseCharge.expires_at,
+		});
+	}
 
 	let ipfs = await tagsIpfsModule.insert(payload, { pro: true });
 
