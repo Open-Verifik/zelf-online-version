@@ -197,7 +197,6 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 	return {
 		...returnData,
 		signedDataPrice,
-		domainConfig,
 	};
 };
 
@@ -226,10 +225,27 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
 
 	let tagPayRecords = await searchTag({ tagName: tagPayName, domainConfig });
 
-	const tagPayObject = tagPayRecords.tagObject;
+	const tagPayObject = tagPayRecords.tagObject || {};
 
-	if (!tagPayObject) {
-		const newTagPayObject = await createTagPay(tagPayName, tagObject, priceDetails, currentCount + 1, domainConfig);
+	const sameDuration = !tagPayObject || tagPayObject?.publicData?.duration == priceDetails.duration;
+
+	if (!sameDuration && tagPayObject?.zelfProofQRCode) {
+		console.log("deleting tag pay object...");
+
+		await tagsIpfsModule.unPinFiles([tagPayObject.id]);
+	}
+
+	if (!tagPayObject?.id || !sameDuration) {
+		const newTagPayObject = await createTagPay(
+			{
+				...tagPayObject,
+				tagPayName,
+			},
+			tagObject,
+			priceDetails,
+			currentCount + 1,
+			domainConfig
+		);
 
 		return newTagPayObject.tagObject;
 	}
@@ -278,7 +294,7 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
  * @param {Object} domainConfig
  * @returns {Object} - Coinbase charge object
  */
-const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, domainConfig) => {
+const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, { ethAddress, btcAddress, solanaAddress }) => {
 	const coinbasePayload = {
 		name: tagPayName,
 		description: `Purchase of the Zelf Name > ${tagPayName} for $${priceDetails.price}`,
@@ -289,9 +305,9 @@ const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, dom
 		},
 		metadata: {
 			zelfName: tagPayName,
-			ethAddress: eth.address,
-			btcAddress: btc.address,
-			solanaAddress: solana.address,
+			ethAddress: ethAddress,
+			btcAddress: btcAddress,
+			solanaAddress: solanaAddress,
 			count: `${currentCount}`,
 		},
 		redirect_url: "https://payment.zelf.world/checkout",
@@ -312,52 +328,66 @@ const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, dom
  * @param {Object} domainConfig
  * @returns {Object} - Tag pay object
  */
-const createTagPay = async (tagPayName, tagObject, priceDetails, currentCount, domainConfig) => {
+const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount, domainConfig) => {
 	// we will get the price calculated,
-	const mnemonic = generateMnemonic(12);
-	const jsonfile = require("../../../config/0012589021.json");
-	const eth = createEthWallet(mnemonic);
-	const btc = createBTCWallet(mnemonic);
-	const solana = await createSolanaWallet(mnemonic);
-	// const zkProof = await OfflineProofModule.createProof(mnemonic);
 
-	const dataToEncrypt = {
-		publicData: {
-			ethAddress: eth.address,
-			solanaAddress: solana.address,
-			btcAddress: btc.address,
-			customerZelfName: tagObject.tagName,
-			zelfName: tagPayName,
-			currentCount: `${currentCount}`,
-		},
-		metadata: {
-			mnemonic,
-		},
-		faceBase64: jsonfile.faceBase64,
-		password: jsonfile.password,
-		_id: tagPayName,
-		tolerance: "REGULAR",
-		addServerPassword: true,
-	};
+	// const zkProof = await OfflineProofModule.createProof(mnemonic);
 
 	let coinbaseCharge = null;
 
-	if (domainConfig?.payment?.methods?.includes("coinbase")) {
-		coinbaseCharge = await _createCoinbaseCharge(tagPayName, priceDetails, currentCount, domainConfig);
+	if (!tagPayObject.zelfProofQRCode) {
+		const mnemonic = generateMnemonic(12);
+		const jsonfile = require("../../../config/0012589021.json");
+		const eth = createEthWallet(mnemonic);
+		const btc = createBTCWallet(mnemonic);
+		const solana = await createSolanaWallet(mnemonic);
+
+		const dataToEncrypt = {
+			publicData: {
+				ethAddress: eth.address,
+				solanaAddress: solana.address,
+				btcAddress: btc.address,
+				customerZelfName: tagObject.tagName,
+				[domainConfig.getTagKey()]: tagPayObject.tagPayName,
+				currentCount: `${currentCount}`,
+			},
+			metadata: {
+				mnemonic,
+			},
+			faceBase64: jsonfile.faceBase64,
+			password: jsonfile.password,
+			_id: tagPayObject.tagPayName,
+			tolerance: "REGULAR",
+			addServerPassword: true,
+		};
+
+		await TagsPartsModule.generateZelfProof(dataToEncrypt, tagPayObject);
+
+		if (!tagPayObject.publicData) tagPayObject.publicData = {};
+
+		tagPayObject.publicData.ethAddress = eth.address;
+		tagPayObject.publicData.btcAddress = btc.address;
+		tagPayObject.publicData.solanaAddress = solana.address;
 	}
 
-	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
+	if (domainConfig?.payment?.methods?.includes("coinbase")) {
+		coinbaseCharge = await _createCoinbaseCharge(tagPayObject.tagPayName, priceDetails, currentCount, {
+			ethAddress: tagPayObject.publicData.ethAddress,
+			btcAddress: tagPayObject.publicData.btcAddress,
+			solanaAddress: tagPayObject.publicData.solanaAddress,
+		});
+	}
 
 	const payload = {
-		base64: tagObject.zelfProofQRCode,
-		name: tagPayName,
+		base64: tagPayObject.zelfProofQRCode,
+		name: tagPayObject.tagPayName,
 		metadata: {
 			hasPassword: tagObject.publicData.hasPassword,
 			type: "mainnet",
-			ethAddress: eth.address,
-			solanaAddress: solana.address,
-			btcAddress: btc.address,
-			zelfName: tagPayName,
+			ethAddress: tagPayObject.publicData.ethAddress,
+			solanaAddress: tagPayObject.publicData.solanaAddress,
+			btcAddress: tagPayObject.publicData.btcAddress,
+			[domainConfig.getTagKey()]: tagPayObject.tagPayName,
 			extraParams: JSON.stringify({
 				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
 				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
