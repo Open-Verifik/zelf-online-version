@@ -64,6 +64,16 @@ const _formatRecord = (item) => {
 		delete formattedResult.publicData.extraParams;
 	}
 
+	if (formattedResult?.publicData?.coinBase) {
+		const coinBase = JSON.parse(formattedResult.publicData.coinBase);
+
+		formattedResult.publicData.coinbase_hosted_url = coinBase.hosted_url;
+
+		formattedResult.publicData.coinbase_expires_at = coinBase.expires_at;
+
+		delete formattedResult.publicData.coinBase;
+	}
+
 	return formattedResult;
 };
 

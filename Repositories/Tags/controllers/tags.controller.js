@@ -342,32 +342,6 @@ const referralRewards = async (ctx) => {
 };
 
 /**
- * Update tag
- * @param {Object} ctx - Koa context
- * @returns {Object} - Update results
- */
-const update = async (ctx) => {
-	try {
-		const { extractedDomain, extractedName } = ctx.state;
-
-		const requestData = {
-			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.params.tagName,
-			domain: extractedDomain,
-		};
-
-		const data = await Module.update(requestData, ctx.state.user);
-
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
-
-		ctx.status = _exception.status;
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
-};
-
-/**
  * Delete tag from IPFS
  * @param {Object} ctx - Koa context
  * @returns {Object} - Delete result
@@ -397,7 +371,6 @@ module.exports = {
 	revenueCatWebhook,
 	purchaseRewards,
 	referralRewards,
-	update,
 	deleteTag,
 	// Utility functions
 	handleZelfPayLogic,

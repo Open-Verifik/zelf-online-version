@@ -1,4 +1,16 @@
 const { getDomainConfig, getDomainPrice, getDomainPaymentMethods, getDomainCurrencies, getDomainLimits } = require("../config/supported-domains");
+const tagsIpfsModule = require("./tags-ipfs.module");
+const TagsPartsModule = require("./tags-parts.module");
+const { createEthWallet } = require("../../Wallet/modules/eth");
+const { createBTCWallet } = require("../../Wallet/modules/btc");
+const { createSolanaWallet } = require("../../Wallet/modules/solana");
+const { generateMnemonic } = require("../../Wallet/modules/helpers");
+const { createCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
+const moment = require("moment");
+const { searchTag } = require("./tags.module");
+const { getTickerPrice } = require("../../binance/modules/binance.module");
+const jwt = require("jsonwebtoken");
+const config = require("../../../Core/config");
 
 /**
  * Tags Payment Module
@@ -97,35 +109,239 @@ const validateCurrency = (domain, currency) => {
 };
 
 /**
- * Get payment options for domain
- * @param {string} domain - Domain name
- * @returns {Object} - Payment options
+ * Get payment options
+ * @param {string} tagName
+ * @param {string} domain
+ * @param {string} duration
+ * @param {Object} authUser
  */
-const getPaymentOptions = (domain) => {
+const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 	const domainConfig = getDomainConfig(domain);
-	if (!domainConfig) {
-		return { success: false, error: "Domain not supported" };
+
+	// Get current tag data
+	const tagData = await searchTag({ tagName, domain, domainConfig }, authUser);
+
+	if (tagData.available) {
+		const error = new Error("tag_not_found");
+		error.status = 404;
+		throw error;
 	}
 
-	const paymentConfig = domainConfig.payment || {};
-	const limits = getDomainLimits(domain);
+	const tagObject = tagData.tagObject;
+
+	const priceDetails = domainConfig.getPrice(tagName, duration);
+
+	const recordsWithSameName = tagData.ipfs?.length || tagData.arweave?.length;
+
+	const renewTagPayObject = await _fetchTagPayRecord(
+		{
+			tagName: `${tagData.tagName}.${domain}`,
+			publicData: tagObject.publicData,
+		},
+		recordsWithSameName,
+		priceDetails,
+		domainConfig
+	);
+
+	if (!renewTagPayObject) {
+		const error = new Error("tagPayRecord_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const paymentAddress = {
+		ethAddress: renewTagPayObject?.publicData?.ethAddress,
+		btcAddress: renewTagPayObject?.publicData?.btcAddress,
+		solanaAddress: renewTagPayObject?.publicData?.solanaAddress,
+	};
+
+	const ethPrices = await calculateCryptoValue("ETH", priceDetails.price);
+
+	const solPrices = await calculateCryptoValue("SOL", priceDetails.price);
+
+	const returnData = {
+		paymentAddress,
+		ethPrices,
+		solPrices,
+		tagName: `${tagData.tagName}.${domain}`,
+		tagPayName: `${tagData.tagName}.${domain}pay`,
+		expiresAt: tagObject.publicData.expiresAt,
+		ttl: moment().add("2", "hours").unix(),
+		duration: parseInt(duration || 1),
+		coinbase_hosted_url: renewTagPayObject.publicData.coinbase_hosted_url,
+		coinbase_expires_at: renewTagPayObject.publicData.coinbase_expires_at,
+		count: parseInt(renewTagPayObject.publicData.count),
+		payment: {
+			registeredAt: renewTagPayObject.publicData.registeredAt,
+			expiresAt: renewTagPayObject.publicData.expiresAt,
+			referralTagName: tagObject.publicData.referralTagName,
+			referralSolanaAddress: tagObject.publicData.referralSolanaAddress,
+		},
+	};
+
+	const signedDataPrice = jwt.sign(returnData, config.JWT_SECRET);
+
+	return { ...returnData, signedDataPrice };
+};
+
+const calculateCryptoValue = async (token = "ETH", price_) => {
+	try {
+		const { price } = await getTickerPrice({ symbol: `${token}` });
+
+		if (!price) throw new Error(`Unable to fetch ${token} price`);
+
+		const cryptoValue = price_ / price;
+
+		return {
+			amountToSend: parseFloat(cryptoValue.toFixed(7)),
+			ratePriceInUSD: parseFloat(parseFloat(price).toFixed(5)),
+			price: price_,
+		};
+	} catch (error) {
+		throw error;
+	}
+};
+
+const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainConfig) => {
+	const { tagName } = tagObject;
+
+	const tagPayName = `${tagName}pay`;
+
+	let tagPayRecords = await searchTag({ tagName: tagPayName, domainConfig });
+
+	const tagPayObject = tagPayRecords.tagObject;
+
+	if (!tagPayObject) {
+		const newTagPayObject = await createTagPay(tagPayName, tagObject, priceDetails, currentCount + 1);
+
+		return newTagPayObject.tagObject;
+	}
+
+	return tagPayObject;
+
+	let renewTagPayObject = null;
+
+	for (let index = 0; index < tagPayRecords.length; index++) {
+		const record = tagPayRecords[index];
+
+		if (record.publicData.type !== "mainnet") continue;
+
+		const count = parseInt(record.publicData.count);
+
+		const recordDuration = parseInt(record.publicData.duration);
+
+		if ((!renewTagPayObject || count > parseInt(renewTagPayObject.publicData.count)) && recordDuration === duration) {
+			renewTagPayObject = record;
+		}
+	}
+
+	if (renewTagPayObject && moment(renewTagPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
+		const newTagPayRecord = await updateTagPay(renewTagPayObject, {
+			newCoinbaseUrl: true,
+			referralTagName: tagName,
+		});
+
+		return newTagPayRecord.ipfs || newTagPayRecord.arweave;
+	} else if (!renewTagPayObject) {
+		tagObject.publicData.duration = duration || 1;
+
+		const newTagPayRecord = await createTagPay(tagName, tagObject, priceDetails, currentCount + 1);
+
+		return newTagPayRecord.ipfs || newTagPayRecord.arweave;
+	}
+
+	return renewTagPayObject;
+};
+
+const createTagPay = async (tagPayName, tagObject, priceDetails, currentCount) => {
+	// we will get the price calculated,
+	const mnemonic = generateMnemonic(12);
+	const jsonfile = require("../../../config/0012589021.json");
+	const eth = createEthWallet(mnemonic);
+	const btc = createBTCWallet(mnemonic);
+	const solana = await createSolanaWallet(mnemonic);
+	// const zkProof = await OfflineProofModule.createProof(mnemonic);
+
+	const dataToEncrypt = {
+		publicData: {
+			ethAddress: eth.address,
+			solanaAddress: solana.address,
+			btcAddress: btc.address,
+			customerZelfName: tagObject.tagName,
+			zelfName: tagPayName,
+			currentCount: `${currentCount}`,
+		},
+		metadata: {
+			mnemonic,
+		},
+		faceBase64: jsonfile.faceBase64,
+		password: jsonfile.password,
+		_id: tagPayName,
+		tolerance: "REGULAR",
+		addServerPassword: true,
+	};
+
+	const coinbasePayload = {
+		name: tagPayName,
+		description: `Purchase of the Zelf Name > ${tagPayName} for $${priceDetails.price}`,
+		pricing_type: "fixed_price",
+		local_price: {
+			amount: `${priceDetails.price}`,
+			currency: "USD",
+		},
+		metadata: {
+			zelfName: tagPayName,
+			ethAddress: eth.address,
+			btcAddress: btc.address,
+			solanaAddress: solana.address,
+			count: `${currentCount}`,
+		},
+		redirect_url: "https://payment.zelf.world/checkout",
+		cancel_url: "https://payment.zelf.world/checkout",
+	};
+
+	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
+
+	const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
+
+	const payload = {
+		base64: tagObject.zelfProofQRCode,
+		name: tagPayName,
+		metadata: {
+			hasPassword: tagObject.publicData.hasPassword,
+			type: "mainnet",
+			ethAddress: eth.address,
+			solanaAddress: solana.address,
+			btcAddress: btc.address,
+			zelfName: tagPayName,
+			coinBase: JSON.stringify({
+				hosted_url: coinbaseCharge.hosted_url,
+				expires_at: coinbaseCharge.expires_at,
+			}),
+			extraParams: JSON.stringify({
+				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+				price: priceDetails.price,
+				duration: priceDetails.duration,
+				count: `${currentCount}`,
+			}),
+		},
+		pinIt: true,
+	};
+
+	let ipfs = await tagsIpfsModule.insert(payload, { pro: true });
+
+	ipfs = tagsIpfsModule.formatRecord(ipfs);
 
 	return {
-		success: true,
-		domain,
-		methods: getDomainPaymentMethods(domain),
-		currencies: getDomainCurrencies(domain),
-		discounts: paymentConfig.discounts || {},
-		limits: {
-			maxTagsPerUser: limits.maxTagsPerUser,
-			maxTransferPerDay: limits.maxTransferPerDay,
-			maxRenewalPerDay: limits.maxRenewalPerDay,
+		ipfs: [ipfs],
+		tagObject: {
+			...ipfs,
+			zelfProofQRCode: tagObject.zelfProofQRCode,
+			zelfProof: tagObject.zelfProof,
 		},
-		pricing: {
-			base: domainConfig.price,
-			yearly: getDomainPrice(domain, "yearly"),
-			lifetime: getDomainPrice(domain, "lifetime"),
-		},
+		available: false,
+		arweave: [],
 	};
 };
 

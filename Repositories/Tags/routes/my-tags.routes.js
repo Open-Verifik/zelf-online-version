@@ -13,10 +13,10 @@ module.exports = (server) => {
 	server.post(`${PATH}/transfer`, Middleware.transferValidation, Controller.transferTag);
 
 	// payment options
-	server.get(`${PATH}/payment-options`, Middleware.howToRenewValidation, Controller.howToRenewTag);
+	server.get(`${PATH}/payment-options`, Middleware.paymentOptionsValidation, Controller.paymentOptions);
 
 	// payment confirmation
-	server.post(`${PATH}/payment-confirmation`, Middleware.renewValidation, Controller.renewTag);
+	server.post(`${PATH}/payment-confirmation`, Middleware.paymentConfirmationValidation, Controller.renewTag);
 };
 
 /**

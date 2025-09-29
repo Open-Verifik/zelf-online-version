@@ -185,6 +185,10 @@ const firstTransactionRewardValidation = async (ctx, next) => {
 	}
 };
 
+const releaseRewardsValidation = async (ctx, next) => {
+	await next();
+};
+
 module.exports = {
 	dailyRewardsValidation,
 	rewardHistoryValidation,
@@ -192,4 +196,5 @@ module.exports = {
 	firstTransactionRewardValidation,
 	normalizeZelfName, // Export the utility function for use in other modules
 	extractTagInfo, // Export the new utility function for tag extraction
+	releaseRewardsValidation,
 };

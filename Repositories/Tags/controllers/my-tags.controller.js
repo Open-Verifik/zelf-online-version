@@ -1,19 +1,6 @@
 const Module = require("../modules/my-tags.module");
-const { getDomainConfiguration } = require("../modules/domain-registry.module");
-
-/**
- * Get domain-specific configuration
- * @param {string} domain - Domain name
- * @returns {Object} - Domain configuration
- */
-const getDomainConfig = (domain) => {
-	try {
-		return getDomainConfiguration(domain);
-	} catch (error) {
-		console.error(`Error getting domain config for ${domain}:`, error);
-		return getDomainConfiguration("zelf"); // Fallback to zelf
-	}
-};
+const { getDomainConfig } = require("../config/supported-domains");
+const TagsPaymentModule = require("../modules/tags-payment.module");
 
 /**
  * Transfer tag
@@ -74,23 +61,15 @@ const renewTag = async (ctx) => {
 };
 
 /**
- * How to renew tag
+ * Payment options
  * @param {Object} ctx - Koa context
  * @returns {Object} - Renewal instructions
  */
-const howToRenewTag = async (ctx) => {
+const paymentOptions = async (ctx) => {
 	try {
-		const { extractedDomain, extractedName } = ctx.state;
-		const domainConfig = getDomainConfig(extractedDomain);
+		const { tagName, domain, duration } = ctx.request.query;
 
-		const requestData = {
-			...ctx.request.query,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.query.tagName,
-			domain: extractedDomain,
-			domainConfig,
-		};
-
-		const data = await Module.howToRenewMyTag(requestData, ctx.state.user);
+		const data = await TagsPaymentModule.getPaymentOptions(tagName, domain, duration, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
@@ -105,6 +84,5 @@ const howToRenewTag = async (ctx) => {
 module.exports = {
 	transferTag,
 	renewTag,
-	howToRenewTag,
-	getDomainConfig,
+	paymentOptions,
 };

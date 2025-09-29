@@ -45,6 +45,7 @@ module.exports = (server) => {
 	//T
 	require("../Repositories/tron/routes/tron-scrapping.route")(server);
 	require("../Repositories/Tags/routes/tags.routes")(server);
+	require("../Repositories/Tags/routes/my-tags.routes")(server);
 	//U
 	//V
 	//W

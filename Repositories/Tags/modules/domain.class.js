@@ -88,6 +88,7 @@ class Domain {
 	getPrice(tagName, duration = "1", referralTagName = "") {
 		if (!tagName) {
 			return {
+				duration,
 				price: 0,
 				currency: "USD",
 				reward: 0,
@@ -149,6 +150,7 @@ class Domain {
 
 		// Round up to 2 decimal places
 		return {
+			duration,
 			price: Math.max(Math.ceil(price * 100) / 100, 0),
 			currency: "USD",
 			reward: Math.max(Math.ceil((price / this.payment.rewardPrice) * 100) / 100, 0),

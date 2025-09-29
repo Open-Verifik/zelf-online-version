@@ -1,8 +1,7 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
 const captchaService = require("../../../Core/captcha");
-const config = require("../../../Core/config");
 const Session = require("../../Session/models/session.model");
-const { getDomainConfiguration, validateDomainName, isDomainActive } = require("../modules/domain-registry.module");
+const { validateDomainName, isDomainActive } = require("../modules/domain-registry.module");
 
 const schemas = {
 	search: {
@@ -136,6 +135,7 @@ const validateDomainAndName = async (domain, name) => {
 	// Validate name against domain rules
 	if (name) {
 		const nameValidation = await validateDomainName(domain, name);
+
 		if (!nameValidation.valid) {
 			return nameValidation;
 		}

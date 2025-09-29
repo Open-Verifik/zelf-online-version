@@ -1,29 +1,11 @@
 const config = require("../../../Core/config");
-const jwt = require("jsonwebtoken");
-const { searchTag, createZelfPay, updateZelfPay } = require("./tags.module");
+const { searchTag } = require("./tags.module");
 const moment = require("moment");
-const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
-const ArweaveModule = require("../../Arweave/modules/arweave.module");
-const IPFSModule = require("../../IPFS/modules/ipfs.module");
-const TagsPartsModule = require("./tags-parts.module");
-const { addReferralReward, addPurchaseReward, getPurchaseReward } = require("./tags-token.module");
-const { getDomainConfiguration } = require("./domain-registry.module");
 
-/**
- * Get domain-specific configuration
- * @param {string} domain - Domain name
- * @returns {Object} - Domain configuration
- */
-const getDomainConfig = (domain) => {
-	try {
-		return getDomainConfiguration(domain);
-	} catch (error) {
-		console.error(`Error getting domain config for ${domain}:`, error);
-		return getDomainConfiguration("zelf"); // Fallback to zelf
-	}
-};
+const { addPurchaseReward } = require("./tags-token.module");
+const { getDomainConfig } = require("../config/supported-domains");
 
 /**
  * Confirm payment with Coinbase
@@ -150,163 +132,7 @@ const renewMyTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const transferMyTag = async (params, authUser) => {
-	const { tagName, domain, faceBase64, password } = params;
-	const domainConfig = getDomainConfig(domain);
-
-	if (!authUser || !authUser.tagName) {
-		const error = new Error("tag_not_authenticated");
-		error.status = 401;
-		throw error;
-	}
-
-	// Verify the tag belongs to the user
-	if (authUser.tagName !== `${tagName}.${domain}`) {
-		const error = new Error("tag_not_owned");
-		error.status = 403;
-		throw error;
-	}
-
-	// Get current tag data
-	const tagData = await searchTag({ tagName, domain }, authUser);
-
-	if (tagData.available) {
-		const error = new Error("tag_not_found");
-		error.status = 404;
-		throw error;
-	}
-
-	const tagObject = tagData.tagObject;
-
-	// Decrypt the tag
-	const decryptedTag = await decryptTag({ tagName, domain, faceBase64, password }, authUser);
-
-	if (!decryptedTag) {
-		const error = new Error("tag_decryption_failed");
-		error.status = 409;
-		throw error;
-	}
-
-	// Create new tag with same data but different owner
-	const newTagData = {
-		...tagObject,
-		publicData: {
-			...tagObject.publicData,
-			transferredAt: moment().toISOString(),
-			transferredFrom: authUser.email,
-		},
-	};
-
-	// Store new version in IPFS
-	const ipfsResult = await IPFSModule.insert(
-		{
-			base64: Buffer.from(JSON.stringify(newTagData, null, 2)).toString("base64"),
-			metadata: {
-				...newTagData.publicData,
-				type: "tag",
-				domain,
-			},
-			name: `${tagName}.${domain}`,
-			pinIt: true,
-		},
-		{ pro: true }
-	);
-
-	// Store new version in Arweave
-	const arweaveResult = await ArweaveModule.insert(
-		{
-			base64: Buffer.from(JSON.stringify(newTagData, null, 2)).toString("base64"),
-			metadata: {
-				...newTagData.publicData,
-				type: "tag",
-				domain,
-			},
-			name: `${tagName}.${domain}`,
-		},
-		{ pro: true }
-	);
-
-	return {
-		tagName: `${tagName}.${domain}`,
-		domain,
-		domainConfig,
-		ipfs: ipfsResult,
-		arweave: arweaveResult,
-		transferredAt: newTagData.publicData.transferredAt,
-		transferredFrom: newTagData.publicData.transferredFrom,
-	};
-};
-
-/**
- * How to renew my tag
- * @param {Object} params
- * @param {Object} authUser
- */
-const howToRenewMyTag = async (params, authUser) => {
-	const { tagName, domain } = params;
-	const domainConfig = getDomainConfig(domain);
-
-	if (!authUser || !authUser.tagName) {
-		const error = new Error("tag_not_authenticated");
-		error.status = 401;
-		throw error;
-	}
-
-	// Verify the tag belongs to the user
-	if (authUser.tagName !== `${tagName}.${domain}`) {
-		const error = new Error("tag_not_owned");
-		error.status = 403;
-		throw error;
-	}
-
-	// Get current tag data
-	const tagData = await searchTag({ tagName, domain }, authUser);
-
-	if (tagData.available) {
-		const error = new Error("tag_not_found");
-		error.status = 404;
-		throw error;
-	}
-
-	const tagObject = tagData.tagObject;
-
-	// Get renewal price
-	const renewalPrice = domainConfig.price || 0;
-
-	// Get payment methods
-	const paymentMethods = [];
-
-	if (renewalPrice > 0) {
-		// Add Coinbase payment
-		paymentMethods.push({
-			method: "coinbase",
-			price: renewalPrice,
-			currency: "USD",
-			description: `Renewal for ${tagName}.${domain}`,
-		});
-
-		// Add crypto payment options
-		const cryptoOptions = await getTickerPrice("BTC,ETH,SOL");
-
-		for (const [symbol, price] of Object.entries(cryptoOptions)) {
-			paymentMethods.push({
-				method: "crypto",
-				symbol,
-				price: renewalPrice / price,
-				currency: symbol,
-				description: `Renewal for ${tagName}.${domain}`,
-			});
-		}
-	}
-
-	return {
-		tagName: `${tagName}.${domain}`,
-		domain,
-		domainConfig,
-		renewalPrice,
-		paymentMethods,
-		expiresAt: tagObject.publicData.expiresAt,
-		daysUntilExpiry: moment(tagObject.publicData.expiresAt).diff(moment(), "days"),
-	};
+	return "not-implemented";
 };
 
 /**
@@ -315,58 +141,7 @@ const howToRenewMyTag = async (params, authUser) => {
  * @param {string} domain
  */
 const updateOldTagObject = async (tagObject, domain = "zelf") => {
-	const domainConfig = getDomainConfig(domain);
-
-	// Add missing fields
-	if (!tagObject.publicData.registeredAt) {
-		tagObject.publicData.registeredAt = moment().toISOString();
-	}
-
-	if (!tagObject.publicData.domain) {
-		tagObject.publicData.domain = domain;
-	}
-
-	if (!tagObject.publicData.domainConfig) {
-		tagObject.publicData.domainConfig = domainConfig;
-	}
-
-	// Update the tag object
-	tagObject.publicData.updatedAt = moment().toISOString();
-
-	// Store updated version in IPFS
-	const ipfsResult = await IPFSModule.insert(
-		{
-			base64: Buffer.from(JSON.stringify(tagObject, null, 2)).toString("base64"),
-			metadata: {
-				...tagObject.publicData,
-				type: "tag",
-				domain,
-			},
-			name: tagObject.publicData.tagName,
-			pinIt: true,
-		},
-		{ pro: true }
-	);
-
-	// Store updated version in Arweave
-	const arweaveResult = await ArweaveModule.insert(
-		{
-			base64: Buffer.from(JSON.stringify(tagObject, null, 2)).toString("base64"),
-			metadata: {
-				...tagObject.publicData,
-				type: "tag",
-				domain,
-			},
-			name: tagObject.publicData.tagName,
-		},
-		{ pro: true }
-	);
-
-	return {
-		...tagObject,
-		updatedIpfs: ipfsResult,
-		updatedArweave: arweaveResult,
-	};
+	return "not-implemented";
 };
 
 /**
@@ -376,76 +151,14 @@ const updateOldTagObject = async (tagObject, domain = "zelf") => {
  * @returns {Object} - Updated tag records
  */
 const addDurationToTag = async (params, preview) => {
-	const { tagName, domain, duration, eventID, eventPrice } = params;
-	const domainConfig = getDomainConfig(domain);
-
-	// Find the tag
-	const searchParams = {
-		tagName: `${tagName}.${domain}`,
-		domain,
-		key: "tagName",
-		value: `${tagName}.${domain}`,
-	};
-
-	const searchResult = await searchTag(searchParams, {});
-
-	if (!searchResult.tagObject) {
-		const error = new Error("Tag not found");
-		error.status = 404;
-		throw error;
-	}
-
-	const tagObject = searchResult.tagObject;
-
-	// Update the tag object with new duration and event info
-	tagObject.publicData.duration = duration;
-	tagObject.publicData.eventID = eventID;
-	tagObject.publicData.eventPrice = eventPrice;
-	tagObject.publicData.renewedAt = moment().toISOString();
-	tagObject.publicData.expiresAt = moment(tagObject.publicData.expiresAt).add(duration, "year").toISOString();
-
-	// Store updated version in IPFS
-	const masterIPFSRecord = await IPFSModule.insert(
-		{
-			base64: Buffer.from(JSON.stringify(tagObject, null, 2)).toString("base64"),
-			metadata: {
-				...tagObject.publicData,
-				type: "tag",
-				domain,
-			},
-			name: `${tagName}.${domain}`,
-			pinIt: true,
-		},
-		{ pro: true }
-	);
-
-	// Store updated version in Arweave
-	const masterArweaveRecord = await ArweaveModule.insert(
-		{
-			base64: Buffer.from(JSON.stringify(tagObject, null, 2)).toString("base64"),
-			metadata: {
-				...tagObject.publicData,
-				type: "tag",
-				domain,
-			},
-			name: `${tagName}.${domain}`,
-		},
-		{ pro: true }
-	);
-
-	return {
-		masterArweaveRecord,
-		masterIPFSRecord,
-	};
+	return "not-implemented";
 };
 
 module.exports = {
 	renewMyTag,
 	transferMyTag,
-	howToRenewMyTag,
 	updateOldTagObject,
 	addDurationToTag,
 	// Utility functions
-	getDomainConfig,
 	_confirmPaymentWithCoinbase,
 };

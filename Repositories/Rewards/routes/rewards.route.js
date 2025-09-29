@@ -12,6 +12,9 @@ module.exports = (server) => {
 	server.post(`${PATH}/first-transaction`, Middleware.firstTransactionRewardValidation, Controller.firstTransactionReward);
 	server.get(`${PATH}/history/:tagName`, Middleware.rewardHistoryValidation, Controller.rewardHistory);
 	server.get(`${PATH}/stats/:tagName`, Middleware.rewardStatsValidation, Controller.rewardStats);
+
+	// release rewards
+	// server.post(`${PATH}/release`, Middleware.releaseRewardsValidation, Controller.releaseRewards);
 };
 
 /**
