@@ -137,7 +137,7 @@ describe("Search Tags API Integration Tests - Real Server", () => {
 
 		it("should search for tag in different domains (avax)", async () => {
 			const searchParams = {
-				tagName: `avaxuser${Date.now()}.avax`,
+				tagName: `test${Math.random().toString(36).substring(2, 8)}.avax`,
 				domain: "avax",
 				os: "DESKTOP",
 			};
