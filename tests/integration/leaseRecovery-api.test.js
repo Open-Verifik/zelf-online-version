@@ -58,8 +58,6 @@ describe("Lease Recovery API Integration Tests", () => {
 		expect(sampleZelfProof).toBeDefined();
 
 		console.log(`✅ Setup complete: Created test tag ${testTagName}.${sampleDomain} for recovery testing`);
-		console.log(`ZelfProof length: ${sampleZelfProof.length}`);
-		console.log(`ZelfProof preview: ${sampleZelfProof.substring(0, 100)}...`);
 	});
 
 	describe("Lease Recovery Flow", () => {
@@ -84,9 +82,6 @@ describe("Lease Recovery API Integration Tests", () => {
 				.set("Origin", "https://test.example.com")
 				.set("Authorization", `Bearer ${authToken}`)
 				.send(recoveryData);
-
-			console.log("Recovery response status:", recoveryResponse.status);
-			console.log("Recovery response body:", JSON.stringify(recoveryResponse.body, null, 2));
 
 			// Handle cases where ZelfProof service is not available
 			if (

@@ -61,7 +61,7 @@ const getTransactionsList = async (params, query = { show: "25" }) => {
 
 	const response = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`);
 	const userAddress = params.id;
-	return { transactions: await extractTransactionData(response, userAddress) };
+	return { transactions: await extractTransactionDataWithPrice(response, userAddress) };
 };
 
 // Obtener detalles de una transacción específica
@@ -250,7 +250,7 @@ function analizarTransaccion(tx, direccionPropia) {
 	return resultado;
 }
 
-async function extractTransactionData(transactions, userAddress) {
+async function extractTransactionDataWithPrice(transactions, userAddress) {
 	const { price: btcPrice } = await getTickerPrice({ symbol: "BTC" });
 
 	if (!btcPrice) throw new Error("Could not retrieve BTC price");

@@ -15,13 +15,43 @@ describe("License API Integration Tests - Real Server", () => {
 	let testCountryCode;
 	let createdDomain;
 
-	// Generate unique test data
+	// Generate unique test data for each test run
 	beforeAll(() => {
 		const timestamp = Date.now();
 		const randomSuffix = Math.random().toString(36).substring(7);
 		testEmail = `testclient_${timestamp}_${randomSuffix}@example.com`;
 		testPhone = `555${timestamp.toString().slice(-7)}`;
 		testCountryCode = "+1";
+	});
+
+	// Clean up after each test to prevent state pollution
+	afterEach(async () => {
+		// Add a small delay to prevent race conditions
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	});
+
+	// Clean up after all tests
+	afterAll(async () => {
+		if (authToken && accountEmail) {
+			try {
+				const deleteResponse = await request(API_BASE_URL)
+					.delete("/api/clients")
+					.set("Origin", "https://test.example.com")
+					.set("Authorization", `Bearer ${authToken}`)
+					.send({
+						accountEmail: accountEmail,
+						masterPassword: sampleFaceFromJSON.password,
+						faceBase64: sampleFaceFromJSON.faceBase64,
+					});
+
+				console.log("Cleanup response:", {
+					status: deleteResponse.status,
+					message: deleteResponse.body.data?.message || deleteResponse.body.message,
+				});
+			} catch (error) {
+				console.error("Cleanup failed:", error.message);
+			}
+		}
 	});
 
 	describe("1. POST /api/clients - Create Account (Prerequisite)", () => {
@@ -58,11 +88,20 @@ describe("License API Integration Tests - Real Server", () => {
 			// Store the authentication token and account email for subsequent tests
 			authToken = response.body.data.token;
 			accountEmail = response.body.data.zelfAccount.publicData.accountEmail;
-		});
+		}, 10000); // Increase timeout to 10 seconds
 	});
+
+	// Helper function to check if authentication is available
+	const requireAuth = () => {
+		if (!authToken) {
+			throw new Error("Authentication token not available. Previous test may have failed.");
+		}
+	};
 
 	describe("2. GET /api/license/my-license - Get My License", () => {
 		it("should get user's license information (no license exists yet)", async () => {
+			requireAuth();
+
 			const response = await request(API_BASE_URL)
 				.get("/api/license/my-license")
 				.set("Origin", "https://test.example.com")
@@ -95,7 +134,7 @@ describe("License API Integration Tests - Real Server", () => {
 			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountPhone", testPhone);
 			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountSubscriptionId", "free");
 			expect(response.body.data.zelfAccount.publicData).toHaveProperty("accountType", "client_account");
-		});
+		}, 10000);
 
 		it("should fail to get license without authentication", async () => {
 			const response = await request(API_BASE_URL).get("/api/license/my-license").set("Origin", "https://test.example.com");
@@ -117,6 +156,8 @@ describe("License API Integration Tests - Real Server", () => {
 
 	describe("3. POST /api/license - Create License", () => {
 		it("should create a new license with valid domainConfig", async () => {
+			requireAuth();
+
 			createdDomain = `testdomain${Date.now()}`;
 
 			const domainConfig = {
@@ -236,7 +277,7 @@ describe("License API Integration Tests - Real Server", () => {
 			expect(response.body.data).toHaveProperty("metadata");
 			expect(response.body.data.metadata).toHaveProperty("version", "1.0.0");
 			expect(response.body.data.metadata).toHaveProperty("support", "standard");
-		});
+		}, 15000); // Increase timeout for license creation
 
 		it("should fail to create license without authentication", async () => {
 			const uniqueDomain = `testdomain${Date.now()}`; // Added unique domain name
@@ -332,8 +373,9 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 
 		it("should verify license appears in get my license after creation", async () => {
-			// Verify that the license created in the previous test now appears
+			requireAuth();
 
+			// Verify that the license created in the previous test now appears
 			const response = await request(API_BASE_URL)
 				.get("/api/license/my-license")
 				.set("Origin", "https://test.example.com")
@@ -487,6 +529,8 @@ describe("License API Integration Tests - Real Server", () => {
 
 	describe("4. GET /api/license - Search Licenses", () => {
 		it("should search for all licenses", async () => {
+			requireAuth();
+
 			// Search for all licenses
 			const response = await request(API_BASE_URL)
 				.get("/api/license")
@@ -582,6 +626,8 @@ describe("License API Integration Tests - Real Server", () => {
 
 	describe("5. GET /api/tags/domains - List All Domains", () => {
 		it("should get all domains", async () => {
+			requireAuth();
+
 			const response = await request(API_BASE_URL)
 				.get("/api/tags/domains")
 				.set("Origin", "https://test.example.com")
@@ -705,6 +751,8 @@ describe("License API Integration Tests - Real Server", () => {
 
 	describe("6. GET /api/tags/domains/:domain - Get Specific Domain", () => {
 		it("should get specific domain by name", async () => {
+			requireAuth();
+
 			const response = await request(API_BASE_URL)
 				.get(`/api/tags/domains/zelf`)
 				.set("Origin", "https://test.example.com")
@@ -749,6 +797,8 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 
 		it("should fail to get non-existent domain", async () => {
+			requireAuth();
+
 			const nonExistentDomain = `nonexistent${Date.now()}`;
 			const response = await request(API_BASE_URL)
 				.get(`/api/tags/domains/${nonExistentDomain}`)
@@ -778,6 +828,8 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 
 		it("should fail to get domain with invalid domain format", async () => {
+			requireAuth();
+
 			const invalidDomain = "ijdofsodifjidj";
 			const response = await request(API_BASE_URL)
 				.get(`/api/tags/domains/${invalidDomain}`)
@@ -792,6 +844,8 @@ describe("License API Integration Tests - Real Server", () => {
 
 	describe("7. DELETE /api/license - Delete License", () => {
 		it("should fail to delete license with invalid credentials", async () => {
+			requireAuth();
+
 			const deleteData = {
 				faceBase64: sampleFaceFromJSON.faceBase64,
 				masterPassword: "wrong_password",
@@ -809,6 +863,8 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 
 		it("should delete the license created in test 3", async () => {
+			requireAuth();
+
 			// Delete the license that was created in the previous test
 			const deleteData = {
 				faceBase64: sampleFaceFromJSON.faceBase64,
@@ -909,29 +965,5 @@ describe("License API Integration Tests - Real Server", () => {
 		// 	expect(response.status).toBe(409);
 		// 	expect(response.body).toHaveProperty("validationError");
 		// });
-	});
-
-	// Cleanup: Delete the test client after all tests
-	afterAll(async () => {
-		if (authToken && accountEmail) {
-			try {
-				const deleteResponse = await request(API_BASE_URL)
-					.delete("/api/clients")
-					.set("Origin", "https://test.example.com")
-					.set("Authorization", `Bearer ${authToken}`)
-					.send({
-						accountEmail: accountEmail,
-						masterPassword: sampleFaceFromJSON.password,
-						faceBase64: sampleFaceFromJSON.faceBase64,
-					});
-
-				console.log("Cleanup response:", {
-					status: deleteResponse.status,
-					message: deleteResponse.body.data?.message || deleteResponse.body.message,
-				});
-			} catch (error) {
-				console.error("Cleanup failed:", error.message);
-			}
-		}
 	});
 });

@@ -148,6 +148,8 @@ describe("Search Tags API Integration Tests - Real Server", () => {
 				.set("Authorization", `Bearer ${authToken}`)
 				.query(searchParams);
 
+			console.log("should search for tag in different domains (avax)", { response: response.body });
+
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
 		});
