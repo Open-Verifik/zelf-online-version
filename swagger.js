@@ -5,12 +5,12 @@ const options = {
 	definition: {
 		openapi: "3.0.0",
 		info: {
-			title: "Zelf Wallet API",
+			title: "Zelf Name Service",
 			version: "1.0.0",
-			description: "Comprehensive API documentation for Zelf Wallet - A secure cryptocurrency wallet with biometric authentication",
+			description: "Comprehensive API documentation for Zelf Name Service - Your Face is your key.",
 			contact: {
-				name: "Zelf Wallet Support",
-				email: "support@zelf.world",
+				name: "Zelf World",
+				email: "miguel@zelf.world",
 				url: "https://zelf.world",
 			},
 			license: {
