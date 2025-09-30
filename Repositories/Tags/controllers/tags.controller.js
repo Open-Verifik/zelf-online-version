@@ -5,6 +5,7 @@ const TagsRecoveryModule = require("../modules/tags-recovery.module");
 const HttpHandler = require("../../../Core/http-handler");
 const TagsOfflineModule = require("../modules/tags-offline.module");
 const TagsSearchModule = require("../modules/tags-search.module");
+const { getAllSupportedDomains } = require("../modules/domain-registry.module");
 
 /**
  * Standard error handler for controllers
@@ -358,6 +359,33 @@ const deleteTag = async (ctx) => {
 	}
 };
 
+const getDomains = async (ctx, next) => {
+	const domains = await getAllSupportedDomains();
+
+	ctx.body = { data: domains };
+
+	await next();
+};
+
+const getDomain = async (ctx, next) => {
+	const { domain } = ctx.request.params;
+
+	const domainConfig = await Module.getDomainConfig(domain);
+
+	if (!domainConfig) {
+		ctx.status = 404;
+		ctx.body = {
+			code: "NotFound",
+			message: "domain_not_found",
+		};
+		return;
+	}
+
+	ctx.body = { data: domainConfig };
+
+	await next();
+};
+
 module.exports = {
 	searchTag,
 	searchTagsByDomain,
@@ -375,4 +403,8 @@ module.exports = {
 	// Utility functions
 	handleZelfPayLogic,
 	handleOldTagUpdate,
+
+	// domains
+	getDomains,
+	getDomain,
 };

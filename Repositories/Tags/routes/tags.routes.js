@@ -9,6 +9,12 @@ const base = "/tags";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
+	// domain helper routes
+	server.get(`${PATH}/domains`, Controller.getDomains);
+	server.get(`${PATH}/domains/:domain`, Controller.getDomain);
+	// server.get(`${PATH}/domains/:domain/pricing`, Controller.getDomainPricing);
+	// server.get(`${PATH}/domains/:domain/payment-options`, Controller.getDomainPaymentOptions);
+
 	// Route definitions
 	server.get(`${PATH}/search`, Middleware.getValidation, Controller.searchTag); // [x]
 	server.get(`${PATH}/search-by-domain`, Middleware.searchByDomainValidation, Controller.searchTagsByDomain); // [x]
