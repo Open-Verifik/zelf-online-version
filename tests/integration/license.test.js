@@ -98,7 +98,6 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 
 		it("should fail to get license without authentication", async () => {
-			x;
 			const response = await request(API_BASE_URL).get("/api/license/my-license").set("Origin", "https://test.example.com");
 
 			expect(response.status).toBe(401);
@@ -119,6 +118,7 @@ describe("License API Integration Tests - Real Server", () => {
 	describe("3. POST /api/license - Create License", () => {
 		it("should create a new license with valid domainConfig", async () => {
 			createdDomain = `testdomain${Date.now()}`;
+
 			const domainConfig = {
 				name: createdDomain,
 				holdSuffix: ".hold",
@@ -157,7 +157,7 @@ describe("License API Integration Tests - Real Server", () => {
 				},
 				tagPaymentSettings: {
 					methods: ["coinbase", "crypto", "stripe"],
-					currencies: ["BTC", "ETH", "SOL", "USD"],
+					currencies: ["BTC", "ETH", "SOL", "USDT"],
 					whitelist: {},
 					pricingTable: {
 						1: {
@@ -333,6 +333,7 @@ describe("License API Integration Tests - Real Server", () => {
 
 		it("should verify license appears in get my license after creation", async () => {
 			// Verify that the license created in the previous test now appears
+
 			const response = await request(API_BASE_URL)
 				.get("/api/license/my-license")
 				.set("Origin", "https://test.example.com")
@@ -399,8 +400,8 @@ describe("License API Integration Tests - Real Server", () => {
 					walrusEnabled: false,
 				},
 				tagPaymentSettings: {
-					methods: ["coinbase", "crypto", "stripe", "paypal"], // Added "paypal"
-					currencies: ["BTC", "ETH", "SOL", "USD", "EUR"], // Added "EUR"
+					methods: ["coinbase", "crypto", "stripe"], // Added "paypal"
+					currencies: ["BTC", "ETH", "SOL", "USDT", "BDAG"],
 					whitelist: {},
 					pricingTable: {
 						1: {
@@ -442,8 +443,6 @@ describe("License API Integration Tests - Real Server", () => {
 				.set("Authorization", `Bearer ${authToken}`)
 				.send(updateData);
 
-			console.log("Update License Response:", { response: response.body });
-
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
 			expect(response.body.data).toHaveProperty("ipfs");
@@ -474,8 +473,10 @@ describe("License API Integration Tests - Real Server", () => {
 			expect(response.body.data.storage).toHaveProperty("arweaveEnabled", true);
 
 			expect(response.body.data).toHaveProperty("tagPaymentSettings");
-			expect(response.body.data.tagPaymentSettings.methods).toContain("paypal");
-			expect(response.body.data.tagPaymentSettings.currencies).toContain("EUR");
+			expect(response.body.data.tagPaymentSettings.methods).toContain("coinbase");
+			expect(response.body.data.tagPaymentSettings.methods).toContain("crypto");
+			expect(response.body.data.tagPaymentSettings.methods).toContain("stripe");
+			expect(response.body.data.tagPaymentSettings.currencies).toContain("BDAG");
 			expect(response.body.data.tagPaymentSettings.pricingTable[1][1]).toBe(200);
 
 			expect(response.body.data).toHaveProperty("metadata");
@@ -491,8 +492,6 @@ describe("License API Integration Tests - Real Server", () => {
 				.get("/api/license")
 				.set("Origin", "https://test.example.com")
 				.set("Authorization", `Bearer ${authToken}`);
-
-			console.log("Search Licenses Response:", { response: response.body.data });
 
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
@@ -551,8 +550,6 @@ describe("License API Integration Tests - Real Server", () => {
 				.set("Origin", "https://test.example.com")
 				.set("Authorization", `Bearer ${authToken}`);
 
-			console.log("Search Specific Domain Response:", { response: response.body });
-
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
 			expect(response.body.data).toHaveProperty("id");
@@ -583,7 +580,217 @@ describe("License API Integration Tests - Real Server", () => {
 		});
 	});
 
-	describe("5. DELETE /api/license - Delete License", () => {
+	describe("5. GET /api/tags/domains - List All Domains", () => {
+		it("should get all domains", async () => {
+			const response = await request(API_BASE_URL)
+				.get("/api/tags/domains")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
+
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(typeof response.body.data).toBe("object");
+			expect(Array.isArray(response.body.data)).toBe(false);
+
+			// Get domain names (keys) from the response
+			const domainNames = Object.keys(response.body.data);
+			expect(domainNames.length).toBeGreaterThan(0);
+
+			// Validate structure of each domain in the map
+			domainNames.forEach((domainName) => {
+				const domain = response.body.data[domainName];
+
+				// Validate basic domain properties
+				expect(domain).toHaveProperty("name", domainName);
+				expect(domain).toHaveProperty("owner");
+				expect(domain).toHaveProperty("status");
+				expect(domain).toHaveProperty("type");
+				expect(domain).toHaveProperty("description");
+
+				// Validate domain configuration sections
+				expect(domain).toHaveProperty("limits");
+				expect(domain).toHaveProperty("features");
+				expect(domain).toHaveProperty("validation");
+				expect(domain).toHaveProperty("storage");
+				expect(domain).toHaveProperty("payment");
+				expect(domain).toHaveProperty("metadata");
+
+				// Validate data types
+				expect(typeof domain.name).toBe("string");
+				expect(typeof domain.owner).toBe("string");
+				expect(typeof domain.status).toBe("string");
+				expect(typeof domain.type).toBe("string");
+				expect(typeof domain.description).toBe("string");
+
+				// Validate that domain name is not empty
+				expect(domain.name.length).toBeGreaterThan(0);
+				expect(domain.owner.length).toBeGreaterThan(0);
+
+				// Validate limits structure
+				expect(domain.limits).toHaveProperty("tags");
+				expect(domain.limits).toHaveProperty("zelfkeys");
+				expect(typeof domain.limits.tags).toBe("number");
+				expect(typeof domain.limits.zelfkeys).toBe("number");
+
+				// Validate features structure
+				expect(Array.isArray(domain.features)).toBe(true);
+				domain.features.forEach((feature) => {
+					expect(feature).toHaveProperty("name");
+					expect(feature).toHaveProperty("code");
+					expect(feature).toHaveProperty("description");
+					expect(feature).toHaveProperty("enabled");
+					expect(typeof feature.enabled).toBe("boolean");
+				});
+
+				// Validate validation structure
+				expect(domain.validation).toHaveProperty("minLength");
+				expect(domain.validation).toHaveProperty("maxLength");
+				expect(domain.validation).toHaveProperty("reserved");
+				expect(typeof domain.validation.minLength).toBe("number");
+				expect(typeof domain.validation.maxLength).toBe("number");
+				expect(Array.isArray(domain.validation.reserved)).toBe(true);
+
+				// Validate storage structure
+				expect(domain.storage).toHaveProperty("keyPrefix");
+				expect(domain.storage).toHaveProperty("ipfsEnabled");
+				expect(domain.storage).toHaveProperty("arweaveEnabled");
+				expect(typeof domain.storage.keyPrefix).toBe("string");
+				expect(typeof domain.storage.ipfsEnabled).toBe("boolean");
+				expect(typeof domain.storage.arweaveEnabled).toBe("boolean");
+
+				// Validate payment structure
+				expect(domain.payment).toHaveProperty("methods");
+				expect(domain.payment).toHaveProperty("currencies");
+				expect(Array.isArray(domain.payment.methods)).toBe(true);
+				expect(Array.isArray(domain.payment.currencies)).toBe(true);
+
+				// Validate metadata structure
+				expect(domain.metadata).toHaveProperty("version");
+				expect(domain.metadata).toHaveProperty("documentation");
+				expect(typeof domain.metadata.version).toBe("string");
+				expect(typeof domain.metadata.documentation).toBe("string");
+			});
+
+			// Check if specific domains exist in the map
+			expect(response.body.data).toHaveProperty("zelf");
+			expect(response.body.data).toHaveProperty("avax");
+			expect(response.body.data).toHaveProperty("bdag");
+
+			// Validate specific domain properties
+			expect(response.body.data.zelf.name).toBe("zelf");
+			expect(response.body.data.zelf.type).toBe("official");
+			expect(response.body.data.zelf.owner).toBe("zelf-team");
+
+			expect(response.body.data.avax.name).toBe("avax");
+			expect(response.body.data.bdag.name).toBe("bdag");
+		});
+
+		it("should fail to get domains without authentication", async () => {
+			const response = await request(API_BASE_URL).get("/api/tags/domains").set("Origin", "https://test.example.com");
+
+			expect(response.status).toBe(401);
+			expect(response.body).toHaveProperty("error", "Protected resource, use Authorization header to get access");
+		});
+
+		it("should fail to get domains with invalid token", async () => {
+			const response = await request(API_BASE_URL)
+				.get("/api/tags/domains")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", "Bearer invalid_token");
+
+			expect(response.status).toBe(401);
+			expect(response.body).toHaveProperty("error", "Protected resource, use Authorization header to get access");
+		});
+	});
+
+	describe("6. GET /api/tags/domains/:domain - Get Specific Domain", () => {
+		it("should get specific domain by name", async () => {
+			const response = await request(API_BASE_URL)
+				.get(`/api/tags/domains/zelf`)
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
+
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+
+			// Validate domain configuration structure (direct response, not IPFS wrapped)
+			expect(response.body.data).toHaveProperty("name", "zelf");
+			expect(response.body.data).toHaveProperty("owner", "zelf-team");
+			expect(response.body.data).toHaveProperty("status", "active");
+			expect(response.body.data).toHaveProperty("type", "official");
+			expect(response.body.data).toHaveProperty("description", "Official Zelf domain");
+
+			// Validate that the domain configuration is present
+			expect(response.body.data).toHaveProperty("limits");
+			expect(response.body.data).toHaveProperty("features");
+			expect(response.body.data).toHaveProperty("validation");
+			expect(response.body.data).toHaveProperty("storage");
+			expect(response.body.data).toHaveProperty("payment");
+			expect(response.body.data).toHaveProperty("metadata");
+
+			// Validate specific values from the official zelf domain config
+			expect(response.body.data.limits).toHaveProperty("tags", 10000);
+			expect(response.body.data.limits).toHaveProperty("zelfkeys", 10000);
+			expect(response.body.data.features).toHaveLength(2);
+			expect(response.body.data.validation).toHaveProperty("minLength", 1);
+			expect(response.body.data.validation).toHaveProperty("maxLength", 27);
+			expect(response.body.data.storage).toHaveProperty("keyPrefix", "zelfName");
+			expect(response.body.data.storage).toHaveProperty("ipfsEnabled", true);
+			expect(response.body.data.storage).toHaveProperty("arweaveEnabled", true);
+			expect(response.body.data.payment.methods).toContain("coinbase");
+			expect(response.body.data.payment.methods).toContain("crypto");
+			expect(response.body.data.payment.methods).toContain("stripe");
+			expect(response.body.data.payment.currencies).toContain("USD");
+			expect(response.body.data.payment.currencies).toContain("BTC");
+			expect(response.body.data.payment.currencies).toContain("ETH");
+			expect(response.body.data.payment.currencies).toContain("SOL");
+			expect(response.body.data.metadata).toHaveProperty("version", "1.0.0");
+			expect(response.body.data.metadata).toHaveProperty("documentation", "https://docs.zelf.world");
+		});
+
+		it("should fail to get non-existent domain", async () => {
+			const nonExistentDomain = `nonexistent${Date.now()}`;
+			const response = await request(API_BASE_URL)
+				.get(`/api/tags/domains/${nonExistentDomain}`)
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
+
+			expect(response.status).toBe(404);
+			expect(response.body).toHaveProperty("code", "NotFound");
+			expect(response.body).toHaveProperty("message", "domain_not_found");
+		});
+
+		it("should fail to get domain without authentication", async () => {
+			const response = await request(API_BASE_URL).get(`/api/tags/domains/${createdDomain}`).set("Origin", "https://test.example.com");
+
+			expect(response.status).toBe(401);
+			expect(response.body).toHaveProperty("error", "Protected resource, use Authorization header to get access");
+		});
+
+		it("should fail to get domain with invalid token", async () => {
+			const response = await request(API_BASE_URL)
+				.get(`/api/tags/domains/${createdDomain}`)
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", "Bearer invalid_token");
+
+			expect(response.status).toBe(401);
+			expect(response.body).toHaveProperty("error", "Protected resource, use Authorization header to get access");
+		});
+
+		it("should fail to get domain with invalid domain format", async () => {
+			const invalidDomain = "ijdofsodifjidj";
+			const response = await request(API_BASE_URL)
+				.get(`/api/tags/domains/${invalidDomain}`)
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
+
+			expect(response.status).toBe(404);
+			expect(response.body).toHaveProperty("code", "NotFound");
+			expect(response.body).toHaveProperty("message", "domain_not_found");
+		});
+	});
+
+	describe("7. DELETE /api/license - Delete License", () => {
 		it("should fail to delete license with invalid credentials", async () => {
 			const deleteData = {
 				faceBase64: sampleFaceFromJSON.faceBase64,
