@@ -175,6 +175,7 @@ module.exports = (server) => {
  *             required:
  *               - domain
  *               - faceBase64
+ *               - domainConfig
  *             properties:
  *               domain:
  *                 type: string
@@ -190,6 +191,187 @@ module.exports = (server) => {
  *                 type: string
  *                 description: Optional master password for additional security
  *                 example: "mySecurePassword123"
+ *               os:
+ *                 type: string
+ *                 enum: ["DESKTOP", "ANDROID", "IOS"]
+ *                 description: Operating system platform (optional)
+ *                 example: "DESKTOP"
+ *               domainConfig:
+ *                 type: object
+ *                 description: Complete domain configuration object
+ *                 required:
+ *                   - name
+ *                   - limits
+ *                   - features
+ *                   - validation
+ *                   - storage
+ *                   - tagPaymentSettings
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                     description: Domain display name
+ *                     example: "My Company"
+ *                   type:
+ *                     type: string
+ *                     description: Domain type
+ *                   holdSuffix:
+ *                     type: string
+ *                     default: ".hold"
+ *                     description: Suffix for hold domains
+ *                   status:
+ *                     type: string
+ *                     enum: ["active", "inactive", "suspended"]
+ *                     default: "active"
+ *                     description: Domain status
+ *                   owner:
+ *                     type: string
+ *                     description: Domain owner information
+ *                   description:
+ *                     type: string
+ *                     description: Domain description
+ *                   limits:
+ *                     type: object
+ *                     required:
+ *                       - tags
+ *                       - zelfkeys
+ *                     properties:
+ *                       tags:
+ *                         type: integer
+ *                         minimum: 0
+ *                         description: Maximum number of tags allowed
+ *                         example: 1000
+ *                       zelfkeys:
+ *                         type: integer
+ *                         minimum: 0
+ *                         description: Maximum number of zelfkeys allowed
+ *                         example: 100
+ *                   features:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       required:
+ *                         - name
+ *                         - code
+ *                         - description
+ *                         - enabled
+ *                       properties:
+ *                         name:
+ *                           type: string
+ *                           description: Feature name
+ *                         code:
+ *                           type: string
+ *                           description: Feature code
+ *                         description:
+ *                           type: string
+ *                           description: Feature description
+ *                         enabled:
+ *                           type: boolean
+ *                           description: Whether feature is enabled
+ *                   validation:
+ *                     type: object
+ *                     required:
+ *                       - minLength
+ *                       - maxLength
+ *                     properties:
+ *                       minLength:
+ *                         type: integer
+ *                         minimum: 1
+ *                         description: Minimum tag length
+ *                       maxLength:
+ *                         type: integer
+ *                         minimum: 1
+ *                         description: Maximum tag length
+ *                       allowedChars:
+ *                         type: object
+ *                         default: {}
+ *                         description: Allowed character patterns
+ *                       reserved:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         default: []
+ *                         description: Reserved tag names
+ *                       customRules:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         default: []
+ *                         description: Custom validation rules
+ *                   storage:
+ *                     type: object
+ *                     required:
+ *                       - keyPrefix
+ *                     properties:
+ *                       keyPrefix:
+ *                         type: string
+ *                         description: Storage key prefix
+ *                       ipfsEnabled:
+ *                         type: boolean
+ *                         default: true
+ *                         description: Enable IPFS storage
+ *                       arweaveEnabled:
+ *                         type: boolean
+ *                         default: false
+ *                         description: Enable Arweave storage
+ *                       walrusEnabled:
+ *                         type: boolean
+ *                         default: false
+ *                         description: Enable Walrus storage
+ *                   tagPaymentSettings:
+ *                     type: object
+ *                     required:
+ *                       - methods
+ *                       - currencies
+ *                       - pricingTable
+ *                     properties:
+ *                       methods:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                           enum: ["coinbase", "crypto", "stripe", "paypal"]
+ *                         description: Accepted payment methods
+ *                       currencies:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                           enum: ["BTC", "ETH", "SOL", "USDC", "USDT", "BDAG", "AVAX", "ZNS"]
+ *                         description: Accepted currencies
+ *                       whitelist:
+ *                         type: object
+ *                         default: {}
+ *                         description: Payment whitelist settings
+ *                       pricingTable:
+ *                         type: object
+ *                         description: Pricing configuration for different tag counts
+ *                         patternProperties:
+ *                           "^(\\d+|\\d+-\\d+)$":
+ *                             type: object
+ *                             properties:
+ *                               "1": { type: number, minimum: 0 }
+ *                               "2": { type: number, minimum: 0 }
+ *                               "3": { type: number, minimum: 0 }
+ *                               "4": { type: number, minimum: 0 }
+ *                               "5": { type: number, minimum: 0 }
+ *                               lifetime: { type: number, minimum: 0 }
+ *                   metadata:
+ *                     type: object
+ *                     properties:
+ *                       launchDate:
+ *                         type: string
+ *                         format: date
+ *                         description: Domain launch date
+ *                       version:
+ *                         type: string
+ *                         description: Domain version
+ *                       documentation:
+ *                         type: string
+ *                         format: uri
+ *                         description: Documentation URL
+ *                       support:
+ *                         type: string
+ *                         enum: ["standard", "premium", "enterprise"]
+ *                         default: "standard"
+ *                         description: Support level
  *     responses:
  *       201:
  *         description: License created/updated successfully
@@ -241,22 +423,31 @@ module.exports = (server) => {
 
 /**
  * @swagger
- * /api/license/{ipfsHash}:
+ * /api/license:
  *   delete:
- *     summary: Delete license by IPFS hash
- *     description: Delete a license record from IPFS by its hash
+ *     summary: Delete user's license
+ *     description: Delete the current user's license with biometric verification. The system automatically identifies the user's license via their zelfProof.
  *     tags: [License]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: ipfsHash
- *         required: true
- *         schema:
- *           type: string
- *           pattern: '^[a-zA-Z0-9]+$'
- *         description: IPFS hash of the license to delete
- *         example: "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - faceBase64
+ *             properties:
+ *               faceBase64:
+ *                 type: string
+ *                 format: base64
+ *                 description: Base64 encoded face image for biometric verification
+ *                 example: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+ *               masterPassword:
+ *                 type: string
+ *                 description: Optional master password for additional security
+ *                 example: "mySecurePassword123"
  *     responses:
  *       200:
  *         description: License deleted successfully
@@ -265,18 +456,37 @@ module.exports = (server) => {
  *             schema:
  *               type: object
  *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "License deleted successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                       example: true
+ *                     message:
+ *                       type: string
+ *                       example: "License deleted successfully"
+ *                     deletedFiles:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       description: Array of IPFS file hashes that were unpinned
  *       400:
- *         description: Bad request - Invalid IPFS hash format
+ *         description: Bad request - Invalid biometric verification or missing face image
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               invalid_face:
+ *                 summary: Invalid face image
+ *                 value:
+ *                   success: false
+ *                   message: "No face detected in the provided image"
+ *               multiple_faces:
+ *                 summary: Multiple faces detected
+ *                 value:
+ *                   success: false
+ *                   message: "Multiple face were detected in the provided image"
  *       401:
  *         description: Unauthorized - User not authenticated
  *         content:
@@ -284,7 +494,7 @@ module.exports = (server) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: License not found
+ *         description: License not found or user has no license
  *         content:
  *           application/json:
  *             schema:

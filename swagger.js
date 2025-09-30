@@ -134,80 +134,40 @@ const options = {
 		},
 		tags: [
 			{
-				name: "Authentication",
-				description: "Authentication and authorization endpoints",
-			},
-			{
 				name: "Zero-Knowledge Proofs",
 				description: "ZKP generation and verification endpoints",
-			},
-			{
-				name: "Public",
-				description: "Public endpoints that don't require authentication",
-			},
-			{
-				name: "Protected",
-				description: "Protected endpoints that require JWT authentication",
 			},
 			{
 				name: "Client",
 				description: "Client management endpoints",
 			},
 			{
-				name: "IPFS",
-				description: "IPFS storage and retrieval endpoints",
-			},
-			{
-				name: "Mail",
-				description: "Email service endpoints",
-			},
-			{
-				name: "SuperAdmin",
-				description: "Super admin management endpoints",
-			},
-			{
 				name: "Session",
 				description: "Session management endpoints",
-			},
-			{
-				name: "Subscribers",
-				description: "Subscriber management endpoints",
-			},
-			{
-				name: "Wallet",
-				description: "Wallet management endpoints",
-			},
-			{
-				name: "Blockchain",
-				description: "Blockchain integration endpoints (Avalanche, Bitcoin, Cardano, etc.)",
-			},
-			{
-				name: "Data Analytics",
-				description: "Data analytics and reporting endpoints",
 			},
 			{
 				name: "Rewards",
 				description: "Rewards and incentive endpoints",
 			},
 			{
-				name: "Zelf Name Service - Search",
-				description: "Zelf name search and availability checking endpoints",
+				name: "Tags - Search",
+				description: "Tag search and availability checking endpoints with multi-domain support",
 			},
 			{
-				name: "Zelf Name Service - Leasing",
-				description: "Zelf name leasing, recovery, and management endpoints",
+				name: "Tags - Leasing",
+				description: "Tag leasing, recovery, and management endpoints with multi-domain support",
 			},
 			{
-				name: "Zelf Name Service - Purchasing",
-				description: "Zelf name payment processing and reward management endpoints",
+				name: "Tags - Management",
+				description: "Tag management, deletion, and update endpoints with multi-domain support",
 			},
 			{
-				name: "Zelf Name Service - Preview",
-				description: "Zelf name and proof preview endpoints",
+				name: "Tags - Preview & Decryption",
+				description: "Tag preview, decryption, and zelf proof endpoints with multi-domain support",
 			},
 			{
-				name: "Zelf Name Service - Decryption",
-				description: "Zelf name decryption and wallet access endpoints",
+				name: "Tags - Rewards & Webhooks",
+				description: "Tag rewards, webhooks, and payment processing endpoints",
 			},
 			{
 				name: "ZelfProof - Encryption",
@@ -220,6 +180,14 @@ const options = {
 			{
 				name: "ZelfProof - Preview",
 				description: "ZelfProof preview and metadata endpoints",
+			},
+			{
+				name: "License",
+				description: "License management operations",
+			},
+			{
+				name: "My Tags",
+				description: "User-specific tag management operations",
 			},
 		],
 	},

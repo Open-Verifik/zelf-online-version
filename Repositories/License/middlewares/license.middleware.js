@@ -54,7 +54,7 @@ const schemas = {
 					.items(stringEnum(["coinbase", "crypto", "stripe", "paypal"]))
 					.required(),
 				currencies: array()
-					.items(stringEnum(["BTC", "ETH", "SOL", "USD", "EUR", "GBP"]))
+					.items(stringEnum(["BTC", "ETH", "SOL", "USDC", "USDT", "BDAG", "AVAX", "ZNS"]))
 					.required(),
 				whitelist: object().default({}),
 				pricingTable: object()

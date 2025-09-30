@@ -421,17 +421,25 @@ module.exports = (server) => {
  *           description: Domain-related error message
  *           example: "Domain not supported"
  * tags:
- *   - name: Tags
- *     description: Multi-domain tag management operations
+ *   - name: Tags - Search
+ *     description: Tag search and availability checking endpoints with multi-domain support
+ *   - name: Tags - Leasing
+ *     description: Tag leasing, recovery, and management endpoints with multi-domain support
+ *   - name: Tags - Management
+ *     description: Tag management, deletion, and update endpoints with multi-domain support
+ *   - name: Tags - Preview & Decryption
+ *     description: Tag preview, decryption, and zelf proof endpoints with multi-domain support
+ *   - name: Tags - Rewards & Webhooks
+ *     description: Tag rewards, webhooks, and payment processing endpoints
  */
 
 /**
  * @swagger
- * /api/tags/v2/search:
+ * /api/tags/search:
  *   get:
- *     summary: Search for a tag (v2) - Multi-domain support
+ *     summary: Search for a tag - Multi-domain support
  *     description: Enhanced search functionality with multi-domain support. Supports .zelf, .avax, .btc, .tech, .bdag domains and more.
- *     tags: [Tags]
+ *     tags: [Tags - Search]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -510,11 +518,11 @@ module.exports = (server) => {
 
 /**
  * @swagger
- * /api/tags/v2/search:
+ * /api/tags/search:
  *   post:
- *     summary: Search for a tag (v2) - POST - Multi-domain support
- *     description: Enhanced search functionality using POST method with multi-domain support. Same functionality as GET v2 but with request body.
- *     tags: [Tags]
+ *     summary: Search for a tag - POST - Multi-domain support
+ *     description: Enhanced search functionality using POST method with multi-domain support. Same functionality as GET but with request body.
+ *     tags: [Tags - Search]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -561,11 +569,61 @@ module.exports = (server) => {
 
 /**
  * @swagger
- * /api/tags/v2/lease:
+ * /api/tags/search-by-domain:
+ *   get:
+ *     summary: Search tags by domain
+ *     description: Search for tags within a specific domain and storage system
+ *     tags: [Tags - Search]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: domain
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Domain to search in
+ *         example: "avax"
+ *       - in: query
+ *         name: storage
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: ["IPFS", "Arweave", "Walrus"]
+ *         description: Storage system to search
+ *         example: "IPFS"
+ *     responses:
+ *       200:
+ *         description: Search completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TagSearchResponse'
+ *       409:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 validationError:
+ *                   type: string
+ *                   example: "Domain and storage are required"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+/**
+ * @swagger
+ * /api/tags/lease:
  *   post:
- *     summary: Lease a tag (v2) - Multi-domain support
+ *     summary: Lease a tag - Multi-domain support
  *     description: Enhanced lease functionality with multi-domain support. Supports creating and importing wallets for different domains.
- *     tags: [Tags]
+ *     tags: [Tags - Leasing]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -612,11 +670,11 @@ module.exports = (server) => {
 
 /**
  * @swagger
- * /api/tags/v2/lease-recovery:
+ * /api/tags/lease-recovery:
  *   post:
  *     summary: Recover and lease a new tag - Multi-domain support
  *     description: Recover access using an existing zelf proof and lease a new tag with multi-domain support.
- *     tags: [Tags]
+ *     tags: [Tags - Leasing]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -663,53 +721,11 @@ module.exports = (server) => {
 
 /**
  * @swagger
- * /api/tags/zelfpay:
- *   get:
- *     summary: Get ZelfPay information
- *     description: Retrieve ZelfPay information for a given zelf proof. Used for payment processing and wallet integration.
- *     tags: [Tags]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: zelfProof
- *         required: true
- *         schema:
- *           type: string
- *         description: Zelf proof for payment verification
- *         example: "zelf_proof_data"
- *     responses:
- *       200:
- *         description: ZelfPay information retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ZelfPayResponse'
- *       409:
- *         description: Missing ZelfProof
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 validationError:
- *                   type: string
- *                   example: "Missing ZelfProof"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/v2/lease-offline:
+ * /api/tags/lease-offline:
  *   post:
- *     summary: Lease a tag offline (v2) - Multi-domain support
+ *     summary: Lease a tag offline - Multi-domain support
  *     description: Enhanced offline lease functionality with multi-domain support.
- *     tags: [Tags]
+ *     tags: [Tags - Leasing]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -747,51 +763,11 @@ module.exports = (server) => {
 
 /**
  * @swagger
- * /api/tags/v2/lease-confirmation:
+ * /api/tags/preview:
  *   post:
- *     summary: Confirm lease payment (v2) - Multi-domain support
- *     description: Enhanced lease confirmation with multi-domain support.
- *     tags: [Tags]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/TagLeaseConfirmationRequest'
- *     responses:
- *       200:
- *         description: Lease confirmation completed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TagLeaseResponse'
- *       400:
- *         description: Invalid lease confirmation details
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 validationError:
- *                   type: string
- *                   example: "Invalid lease confirmation details"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/v2/preview:
- *   post:
- *     summary: Preview tag (v2) - Multi-domain support
+ *     summary: Preview tag - Multi-domain support
  *     description: Enhanced preview functionality with multi-domain support.
- *     tags: [Tags]
+ *     tags: [Tags - Preview & Decryption]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -833,11 +809,92 @@ module.exports = (server) => {
 
 /**
  * @swagger
+ * /api/tags/delete:
+ *   delete:
+ *     summary: Delete a tag
+ *     description: Delete a tag with biometric verification
+ *     tags: [Tags - Management]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - domain
+ *               - tagName
+ *               - faceBase64
+ *             properties:
+ *               domain:
+ *                 type: string
+ *                 description: Domain of the tag to delete
+ *                 example: "avax"
+ *               tagName:
+ *                 type: string
+ *                 description: Name of the tag to delete
+ *                 example: "username.avax"
+ *               faceBase64:
+ *                 type: string
+ *                 format: base64
+ *                 description: Base64 encoded face image for biometric verification
+ *                 example: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ..."
+ *               password:
+ *                 type: string
+ *                 description: Optional password for additional security
+ *                 example: "secure_password"
+ *     responses:
+ *       200:
+ *         description: Tag deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Tag deleted successfully"
+ *       400:
+ *         description: Bad request - Invalid biometric verification
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "No face detected in the provided image"
+ *       401:
+ *         description: Unauthorized - User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Tag not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+/**
+ * @swagger
  * /api/tags/preview-zelfproof:
  *   post:
  *     summary: Preview zelf proof
  *     description: Preview a zelf proof to validate and get preview data without processing.
- *     tags: [Tags]
+ *     tags: [Tags - Preview & Decryption]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -877,11 +934,11 @@ module.exports = (server) => {
 
 /**
  * @swagger
- * /api/tags/v2/decrypt:
+ * /api/tags/decrypt:
  *   post:
- *     summary: Decrypt tag (v2) - Multi-domain support
+ *     summary: Decrypt tag - Multi-domain support
  *     description: Enhanced decryption functionality with multi-domain support.
- *     tags: [Tags]
+ *     tags: [Tags - Preview & Decryption]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -927,7 +984,7 @@ module.exports = (server) => {
  *   post:
  *     summary: RevenueCat webhook handler
  *     description: Handle RevenueCat subscription events and webhooks for payment processing.
- *     tags: [Tags]
+ *     tags: [Tags - Rewards & Webhooks]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -984,7 +1041,7 @@ module.exports = (server) => {
  *   post:
  *     summary: Release purchase rewards
  *     description: Release purchase rewards for the authenticated user. Requires super admin privileges.
- *     tags: [Tags]
+ *     tags: [Tags - Rewards & Webhooks]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -1022,7 +1079,7 @@ module.exports = (server) => {
  *   post:
  *     summary: Release referral rewards
  *     description: Release referral rewards for the authenticated user. Requires super admin privileges.
- *     tags: [Tags]
+ *     tags: [Tags - Rewards & Webhooks]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -1046,70 +1103,6 @@ module.exports = (server) => {
  *                 error:
  *                   type: string
  *                   example: "Unauthorized"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/{tagName}:
- *   put:
- *     summary: Update tag lease duration - Multi-domain support
- *     description: Update the lease duration for a specific tag. Supports multiple domains.
- *     tags: [Tags]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: tagName
- *         required: true
- *         schema:
- *           type: string
- *         description: The tag name to update (supports multiple domains)
- *         example: "username.avax"
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/TagUpdateRequest'
- *     responses:
- *       200:
- *         description: Tag updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: object
- *                   description: Updated tag data
- *       403:
- *         description: Access forbidden - user doesn't own the tag
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 validationError:
- *                   type: string
- *                   example: "Access forbidden"
- *       409:
- *         description: Validation error or domain not supported
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/DomainError'
- *                 - type: object
- *                   properties:
- *                     validationError:
- *                       type: string
- *                       example: "Invalid duration"
  *       500:
  *         description: Internal server error
  *         content:
