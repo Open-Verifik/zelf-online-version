@@ -1,0 +1,14 @@
+const Controller = require("../controllers/subscription-plan.controller");
+const Middleware = require("../middlewares/subscription-plan.middleware");
+const config = require("../../../Core/config");
+const base = "/subscription-plans";
+
+module.exports = (server) => {
+	const PATH = config.basePath(base);
+
+	// GET /api/subscription-plans - list plans
+	server.get(`${PATH}`, Controller.list);
+
+	// GET /api/subscription-plans/:productId - get specific plan by product ID
+	server.get(`${PATH}/:productId`, Middleware.getByIdValidation, Controller.getById);
+};

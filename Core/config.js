@@ -151,6 +151,11 @@ const configuration = {
 	fantom: {
 		rpcUrl: process.env.FANTOM_RPC_URL || "https://fragrant-wild-smoke.fantom.quiknode.pro/9f6de2bac71c11f7c08e97e7be74a9d770c62a86",
 	},
+	stripe: {
+		redirectUrl: process.env.STRIPE_REDIRECTURL || "https://verifik.app",
+		secretKey: process.env.STRIPE_SECRET_KEY || "",
+		taxes: 0.19,
+	},
 };
 
 module.exports = configuration;
