@@ -1,8 +1,9 @@
 const request = require("supertest");
 const fs = require("fs");
 const path = require("path");
+require("dotenv").config();
 
-const API_BASE_URL = "http://localhost:3003";
+const API_BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
 
 describe("Lease Recovery API Integration Tests", () => {
 	let authToken;

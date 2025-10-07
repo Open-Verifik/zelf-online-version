@@ -1,4 +1,4 @@
-const { string, validate, boolean, number, jsonObjectWithMinKeys, stringEnum } = require("../../../Core/JoiUtils");
+const { string, validate, boolean, number, jsonObjectWithMinKeys, stringEnum, stringKeyValueObject } = require("../../../Core/JoiUtils");
 const { jwtValidation } = require("./jwt-validation.middleware");
 
 /**
@@ -13,10 +13,10 @@ const { jwtValidation } = require("./jwt-validation.middleware");
 const schemas = {
 	encrypt: {
 		livenessDetectionPriorCreation: boolean(),
-		publicData: jsonObjectWithMinKeys(),
+		publicData: stringKeyValueObject(),
 		faceBase64: string().required(),
 		livenessLevel: string().required(),
-		metadata: jsonObjectWithMinKeys().required(),
+		metadata: stringKeyValueObject().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		password: string(),
 		identifier: string().required(),

@@ -20,7 +20,7 @@ module.exports = {
 		JWT_SECRET: "test-jwt-secret-key-for-testing-only",
 		MONGODB_URI: "mongodb://localhost:27017/zelf_testing",
 		// Add any other test-specific environment variables here
-		PORT: 3001, // Use different port for testing
+		PORT: 3050, // Use same port as running server for integration tests
 		LOG_LEVEL: "info", // Keep logs for debugging real data operations
 		// NO MOCKING - Use real external service URLs
 		EXTERNAL_API_URL: process.env.EXTERNAL_API_URL || "https://api.example.com",

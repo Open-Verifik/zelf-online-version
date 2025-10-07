@@ -1,9 +1,10 @@
 // Search Tags API Integration Tests - Testing Real Running Server
-// This test works with the actual running server on port 3003
+// This test works with the actual running server
 const request = require("supertest");
+require("dotenv").config();
 
 // Test against the actual running server
-const API_BASE_URL = "http://localhost:3003";
+const API_BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
 
 describe("Search Tags API Integration Tests - Real Server", () => {
 	let authToken;

@@ -153,6 +153,12 @@ const jsonObjectWithMinKeys = () =>
 		.min(1) // Ensures the object has at least one key
 		.error(_customErrors);
 
+const stringKeyValueObject = () =>
+	Joi.object()
+		.min(1) // Ensures the object has at least one key
+		.pattern(Joi.string(), Joi.string()) // All keys and values must be strings
+		.error(_customErrors);
+
 module.exports = {
 	alternative,
 	alternativeMany,
@@ -179,6 +185,7 @@ module.exports = {
 	showRecords,
 	string,
 	stringEnum,
+	stringKeyValueObject,
 	stringOrNumber,
 	symbol,
 	urlSecure,
