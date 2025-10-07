@@ -130,6 +130,7 @@ const createCheckoutSession = async (productId, priceId, customerEmail = null) =
 		metadata: {
 			productId: productId,
 			priceId: priceId,
+			customerEmail: customerEmail,
 		},
 	};
 

@@ -1,5 +1,7 @@
 const Stripe = require("stripe");
 const config = require("../../../Core/config");
+const IPFSModule = require("../../IPFS/modules/ipfs.module");
+const { syncLicenseWithStripe } = require("../../License/modules/license.module");
 
 /**
  * Get Stripe client instance
@@ -24,21 +26,27 @@ const processWebhookEvent = async (event) => {
 				return await handleInvoicePaymentFailed(event.data.object, stripe);
 
 			case "customer.subscription.created":
+				return { not_implemented: true };
 				return await handleSubscriptionCreated(event.data.object, stripe);
 
 			case "customer.subscription.updated":
+				return { not_implemented: true };
 				return await handleSubscriptionUpdated(event.data.object, stripe);
 
 			case "customer.subscription.deleted":
+				return { not_implemented: true };
 				return await handleSubscriptionDeleted(event.data.object, stripe);
 
 			case "checkout.session.completed":
+				return { not_implemented: true };
 				return await handleCheckoutSessionCompleted(event.data.object, stripe);
 
 			case "payment_intent.succeeded":
+				return { not_implemented: true };
 				return await handlePaymentIntentSucceeded(event.data.object, stripe);
 
 			case "payment_intent.payment_failed":
+				return { not_implemented: true };
 				return await handlePaymentIntentFailed(event.data.object, stripe);
 
 			default:
@@ -55,7 +63,7 @@ const processWebhookEvent = async (event) => {
  * Handle successful invoice payment
  */
 const handleInvoicePaymentSucceeded = async (invoice, stripe) => {
-	console.log("Invoice payment succeeded:", invoice.id);
+	// console.log("Invoice payment succeeded:", invoice.id, { invoice });
 
 	try {
 		// Get subscription details
@@ -74,14 +82,20 @@ const handleInvoicePaymentSucceeded = async (invoice, stripe) => {
 			currency: invoice.currency,
 			status: "paid",
 			paidAt: new Date(invoice.status_transitions.paid_at * 1000),
+			subscription,
+			customer,
 		};
 
-		// TODO: Save payment data to database
-		// TODO: Update user subscription status
-		// TODO: Send confirmation email
-		// TODO: Update user's subscription in localStorage
+		// TODO: retrieve the account from IPFS
+		const accountsWithSameEmail = await IPFSModule.get({ key: "accountEmail", value: customer.email });
 
-		console.log("Payment processed successfully:", paymentData);
+		if (!accountsWithSameEmail.length) throw new Error("404:account_not_found");
+
+		// retrieve the license from IPFS with the same accountEmail
+		const licensesWithSameEmail = await IPFSModule.get({ key: "licenseOwner", value: customer.email });
+
+		await syncLicenseWithStripe(licensesWithSameEmail[0], paymentData);
+
 		return { status: "success", action: "invoice_payment_succeeded", data: paymentData };
 	} catch (error) {
 		console.error("Error handling invoice payment succeeded:", error);
@@ -93,7 +107,7 @@ const handleInvoicePaymentSucceeded = async (invoice, stripe) => {
  * Handle failed invoice payment
  */
 const handleInvoicePaymentFailed = async (invoice, stripe) => {
-	console.log("Invoice payment failed:", invoice.id);
+	// console.log("Invoice payment failed:", invoice.id);
 
 	try {
 		const paymentData = {
@@ -123,7 +137,7 @@ const handleInvoicePaymentFailed = async (invoice, stripe) => {
  * Handle subscription creation
  */
 const handleSubscriptionCreated = async (subscription, stripe) => {
-	console.log("Subscription created:", subscription.id);
+	// console.log("Subscription created:", subscription.id);
 
 	try {
 		const subscriptionData = {
@@ -185,10 +199,6 @@ const handleSubscriptionDeleted = async (subscription, stripe) => {
 			status: subscription.status,
 			canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
 		};
-
-		// TODO: Update subscription status in database
-		// TODO: Handle subscription cancellation
-		// TODO: Send cancellation confirmation
 
 		console.log("Subscription deleted:", subscriptionData);
 		return { status: "success", action: "subscription_deleted", data: subscriptionData };

@@ -15,15 +15,36 @@ class Domain {
 		this.status = domainData.status || "inactive";
 		this.owner = domainData.owner || "";
 		this.description = domainData.description || "";
+		this.startDate = domainData.startDate || "";
+		this.endDate = domainData.endDate || "";
 		// Features array
 		this.features = domainData.features || [];
 		// Validation rules
-		this.validation = {
-			minLength: domainData.validation?.minLength || 3,
-			maxLength: domainData.validation?.maxLength || 50,
-			allowedChars: domainData.validation?.allowedChars || /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
-			reserved: domainData.validation?.reserved || [],
-			customRules: domainData.validation?.customRules || [],
+		this.tags = {
+			minLength: domainData.tags?.minLength || 3,
+			maxLength: domainData.tags?.maxLength || 50,
+			allowedChars: domainData.tags?.allowedChars || /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
+			reserved: domainData.tags?.reserved || [],
+			customRules: domainData.tags?.customRules || [],
+			payment: {
+				methods: domainData.tags?.payment?.methods || ["coinbase", "crypto"],
+				currencies: domainData.tags?.payment?.currencies || ["USD"],
+				discounts: domainData.tags?.payment.discounts || {
+					yearly: 0.1,
+					lifetime: 0.2,
+				},
+				rewardPrice: domainData.tags?.payment?.rewardPrice || 10,
+				whitelist: domainData.tags?.payment.whitelist || {},
+				pricingTable: domainData.tags?.payment.pricingTable || {},
+			},
+		};
+
+		this.zelfkeys = {
+			plans: domainData.zelfkeys?.plans || [],
+			payment: {
+				whitelist: domainData.zelfkeys?.whitelist || {},
+				pricingTable: domainData.zelfkeys?.pricingTable || {},
+			},
 		};
 
 		// Storage configuration
@@ -35,27 +56,20 @@ class Domain {
 			backupEnabled: domainData.storage?.backupEnabled || false,
 		};
 
-		// Payment configuration - support both old and new structure
-		const paymentData = domainData.tagPaymentSettings || domainData.payment || {};
-		this.payment = {
-			methods: paymentData.methods || ["coinbase", "crypto"],
-			currencies: paymentData.currencies || ["USD"],
-			discounts: paymentData.discounts || {
-				yearly: 0.1,
-				lifetime: 0.2,
-			},
-			rewardPrice: paymentData.rewardPrice || 10,
-			whitelist: paymentData.whitelist || {},
-			pricingTable: paymentData.pricingTable || {},
+		this.stripe = {
+			productId: domainData.stripe?.productId || "",
+			priceId: domainData.stripe?.priceId || "",
+			latestInvoiceId: domainData.stripe?.latestInvoiceId || "",
+			invoices: domainData.stripe?.invoices || [],
+			amountPaid: domainData.stripe?.amountPaid || 0,
+			paidAt: domainData.stripe?.paidAt || "",
 		};
 
-		// Limits - support both old and new structure
+		// Limits - support both old and new structure > this will be modified from the subscription plan (stripe)
 		this.limits = {
-			tags: domainData.limits?.tags || domainData.limits?.maxTagsPerUser || 5,
-			zelfkeys: domainData.limits?.zelfkeys || domainData.limits?.maxTransferPerDay || 3,
-			maxTagsPerUser: domainData.limits?.maxTagsPerUser || domainData.limits?.tags || 5,
-			maxTransferPerDay: domainData.limits?.maxTransferPerDay || domainData.limits?.zelfkeys || 3,
-			maxRenewalPerDay: domainData.limits?.maxRenewalPerDay || 2,
+			tags: domainData.limits?.tags || 100,
+			zelfkeys: domainData.limits?.zelfkeys || 100,
+			zelfProofs: domainData.limits?.zelfProofs || 100,
 		};
 
 		// Metadata

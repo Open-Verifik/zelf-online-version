@@ -7,6 +7,7 @@ const moment = require("moment");
 const fs = require("fs");
 const path = require("path");
 const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
+const DefaultLicenseValues = require("./default-license.values");
 
 // Cache file path for development mode
 const CACHE_FILE_PATH = path.join(__dirname, "../../../cache/official-licenses-cache.json");
@@ -330,6 +331,49 @@ const _loadLicenseJSON = async (ipfsUrl) => {
 	return jsonData.data;
 };
 
+const syncLicenseWithStripe = async (license, paymentData) => {
+	// first we need to
+	const licenseData = await _loadLicenseJSON(license.url);
+
+	const plan = DefaultLicenseValues.findPlanByPrice(paymentData.amountPaid);
+
+	licenseData.limits = plan.limits;
+	licenseData.subscriptionId = paymentData.subscriptionId;
+	licenseData.startDate = moment(new Date(paymentData.subscription.current_period_start * 1000)).format("YYYY-MM-DD HH:mm:ss");
+	licenseData.endDate = moment(new Date(paymentData.subscription.current_period_end * 1000)).format("YYYY-MM-DD HH:mm:ss");
+	licenseData.expiresAt = moment(new Date(paymentData.subscription.current_period_end * 1000))
+		.add(15, "days")
+		.format("YYYY-MM-DD HH:mm:ss");
+
+	// now we will create it with the new details
+
+	await TagsIPFSModule.unPinFiles([license.id]);
+
+	const jsonData = JSON.stringify({ ...licenseData }, null, 2);
+
+	const base64Data = Buffer.from(jsonData).toString("base64");
+
+	const licenseUpdated = await IPFS.insert(
+		{
+			base64: base64Data,
+			metadata: {
+				type: "license",
+				licenseType: plan.code,
+				licenseSubscriptionId: paymentData.subscriptionId,
+				licenseDomain: licenseData.domain,
+				licenseOwner: licenseData.owner,
+			},
+			name: `${licenseData.domain}.license`,
+			pinIt: true,
+		},
+		{ pro: true }
+	);
+
+	console.log({ licenseUpdated });
+
+	return licenseUpdated;
+};
+
 module.exports = {
 	searchLicense,
 	getMyLicense,
@@ -337,4 +381,5 @@ module.exports = {
 	getUserZelfProof,
 	deleteLicense,
 	loadOfficialLicenses,
+	syncLicenseWithStripe,
 };

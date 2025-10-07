@@ -33,7 +33,7 @@ const subscribe = async (ctx) => {
 	try {
 		const { productId, priceId } = ctx.request.body;
 
-		const customerEmail = ctx.request.body.customerEmail || null;
+		const customerEmail = ctx.request.body.customerEmail || ctx.state.user.email;
 
 		const session = await Module.createCheckoutSession(productId, priceId, customerEmail);
 
