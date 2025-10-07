@@ -1,5 +1,6 @@
 const axios = require("../../../Core/axios").getEncryptionInstance();
 const config = require("../../../Core/config");
+const { QRZelfProofExtractor } = require("../../Tags/modules/qr-zelfproof-extractor.module");
 const QRCode = require("qrcode");
 
 const encrypt = async (data) => {
@@ -78,7 +79,13 @@ const encryptQRCode = async (data) => {
 
 		const zelfQR = `data:image/png;base64,${base64Image}`;
 
-		return { zelfQR };
+		let zelfProof = null;
+
+		if (data.generateZelfProof) {
+			zelfProof = await QRZelfProofExtractor.extractZelfProof(base64Image);
+		}
+
+		return { zelfQR, zelfProof: zelfProof || undefined };
 	} catch (exception) {
 		console.error({ exception });
 

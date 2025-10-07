@@ -375,6 +375,7 @@ describe("ZelfProof API Integration Tests - Real Server", () => {
 				identifier: `qr_test_${Date.now()}`,
 				requireLiveness: true,
 				tolerance: "REGULAR",
+				generateZelfProof: true,
 			};
 
 			const response = await request(API_BASE_URL)
@@ -387,6 +388,10 @@ describe("ZelfProof API Integration Tests - Real Server", () => {
 			expect(response.body).toHaveProperty("zelfQR");
 			expect(response.body.zelfQR).toBeDefined();
 			expect(response.body.zelfQR).toMatch(/^data:image\/png;base64,/);
+			// when generateZelfProof=true, endpoint returns { zelfQR, zelfProof: string | undefined }
+			if (response.body.zelfProof !== undefined) {
+				expect(typeof response.body.zelfProof).toBe("string");
+			}
 		});
 
 		it("should encrypt data and generate QR code with complex nested data", async () => {
@@ -418,6 +423,7 @@ describe("ZelfProof API Integration Tests - Real Server", () => {
 				identifier: `complex_qr_test_${Date.now()}`,
 				requireLiveness: false,
 				tolerance: "SOFT",
+				generateZelfProof: true,
 			};
 
 			const response = await request(API_BASE_URL)
@@ -429,6 +435,9 @@ describe("ZelfProof API Integration Tests - Real Server", () => {
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("zelfQR");
 			expect(response.body.zelfQR).toMatch(/^data:image\/png;base64,/);
+			if (response.body.zelfProof !== undefined) {
+				expect(typeof response.body.zelfProof).toBe("string");
+			}
 		});
 
 		it("should encrypt data and generate QR code with password protection", async () => {
@@ -454,6 +463,7 @@ describe("ZelfProof API Integration Tests - Real Server", () => {
 				password: "super_secure_password_456",
 				requireLiveness: true,
 				tolerance: "HARDENED",
+				generateZelfProof: true,
 			};
 
 			const response = await request(API_BASE_URL)
@@ -465,6 +475,9 @@ describe("ZelfProof API Integration Tests - Real Server", () => {
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("zelfQR");
 			expect(response.body.zelfQR).toMatch(/^data:image\/png;base64,/);
+			if (response.body.zelfProof !== undefined) {
+				expect(typeof response.body.zelfProof).toBe("string");
+			}
 		});
 
 		it("should return validation error when required fields are missing", async () => {

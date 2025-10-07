@@ -1,5 +1,4 @@
 const { Buffer } = require("buffer");
-const axios = require("axios");
 
 // Try to require canvas and jsQR, fallback to alternative if not available
 let createCanvas, loadImage, jsQR;
