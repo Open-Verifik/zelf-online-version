@@ -11,4 +11,7 @@ module.exports = (server) => {
 
 	// GET /api/subscription-plans/:productId - get specific plan by product ID
 	server.get(`${PATH}/:productId`, Middleware.getByIdValidation, Controller.getById);
+
+	// now we need to create a subscribe action > will open a stripe checkout session
+	server.post(`${PATH}/subscribe`, Middleware.subscribeValidation, Controller.subscribe);
 };

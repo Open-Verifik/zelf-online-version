@@ -26,6 +26,7 @@ module.exports = (server) => {
 	//S
 	require("../Repositories/SuperAdmin/routes/super-admin.route")(server);
 	require("../Repositories/Session/routes/session.route")(server);
+	require("../Repositories/Stripe/routes/stripe.routes")(server);
 	require("../Repositories/Subscribers/routes/subscriber.route")(server);
 	//T
 	//U

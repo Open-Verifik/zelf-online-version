@@ -155,6 +155,13 @@ const configuration = {
 		redirectUrl: process.env.STRIPE_REDIRECTURL || "https://verifik.app",
 		secretKey: process.env.STRIPE_SECRET_KEY || "",
 		taxes: 0.19,
+		frontendUrl: process.env.FRONTEND_URL || "http://localhost:4200",
+		checkoutUrls: {
+			success:
+				process.env.STRIPE_SUCCESS_URL ||
+				`${process.env.FRONTEND_URL || "http://localhost:4200"}/settings/plan-billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+			cancel: process.env.STRIPE_CANCEL_URL || `${process.env.FRONTEND_URL || "http://localhost:4200"}/settings/plan-billing?canceled=true`,
+		},
 	},
 };
 

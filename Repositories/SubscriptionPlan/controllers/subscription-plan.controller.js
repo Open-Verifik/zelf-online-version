@@ -20,7 +20,28 @@ const getById = async (ctx) => {
 		const { productId } = ctx.request.params;
 
 		const data = await Module.getSubscriptionPlan(productId);
+
 		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
+const subscribe = async (ctx) => {
+	try {
+		const { productId, priceId } = ctx.request.body;
+
+		const customerEmail = ctx.request.body.customerEmail || null;
+
+		const session = await Module.createCheckoutSession(productId, priceId, customerEmail);
+
+		ctx.body = {
+			sessionId: session.id,
+			url: session.url,
+			success: true,
+		};
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);
 		ctx.status = _exception.status;
@@ -31,4 +52,5 @@ const getById = async (ctx) => {
 module.exports = {
 	list,
 	getById,
+	subscribe,
 };

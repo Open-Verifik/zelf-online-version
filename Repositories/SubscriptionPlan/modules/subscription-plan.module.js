@@ -1,4 +1,5 @@
 const Stripe = require("stripe");
+const config = require("../../../Core/config");
 
 /**
  * Get Stripe client
@@ -43,6 +44,18 @@ const listSubscriptionPlans = async () => {
 		return (planType === "license" || codeIncludesEnroll) && zelfPlan && allowedZelfPlans.has(zelfPlan);
 	});
 
+	for (const product of filteredProducts) {
+		const pricesList = await stripe.prices.list({
+			product: product.id,
+			active: true,
+			limit: 100,
+		});
+
+		if (!pricesList || pricesList.data.length === 0) continue;
+
+		product.prices = pricesList.data;
+	}
+
 	return filteredProducts;
 };
 
@@ -61,10 +74,77 @@ const getSubscriptionPlan = async (productId) => {
 
 	if (!allowedZelfPlans.has(product.metadata.zelfPlan)) throw new Error("404:plan_not_found");
 
+	const pricesList = await stripe.prices.list({
+		product: product.id,
+		active: true,
+		limit: 100,
+	});
+
+	if (!pricesList || pricesList.data.length === 0) throw new Error("404:plan_not_found");
+
+	product.prices = pricesList.data;
+
 	return product;
+};
+
+/**
+ * Create a Stripe checkout session for subscription
+ * @param {string} productId - Stripe product ID
+ * @param {string} priceId - Stripe price ID
+ * @param {string} customerEmail - Customer email (optional)
+ * @returns {Promise<Object>} - Stripe checkout session
+ */
+const createCheckoutSession = async (productId, priceId, customerEmail = null) => {
+	const stripe = getStripeClient();
+
+	// Validate that the product and price exist and are active
+	const product = await stripe.products.retrieve(productId);
+
+	if (!product || !product.active) {
+		throw new Error("404:product_not_found");
+	}
+
+	const price = await stripe.prices.retrieve(priceId);
+
+	if (!price || !price.active) {
+		throw new Error("404:price_not_found");
+	}
+
+	// Verify the price belongs to the product
+	if (price.product !== productId) {
+		throw new Error("400:price_product_mismatch");
+	}
+
+	// Create checkout session
+	const sessionParams = {
+		payment_method_types: ["card"],
+		line_items: [
+			{
+				price: priceId,
+				quantity: 1,
+			},
+		],
+		mode: "subscription",
+		success_url: config.stripe.checkoutUrls.success,
+		cancel_url: config.stripe.checkoutUrls.cancel,
+		metadata: {
+			productId: productId,
+			priceId: priceId,
+		},
+	};
+
+	// Add customer email if provided
+	if (customerEmail) {
+		sessionParams.customer_email = customerEmail;
+	}
+
+	const session = await stripe.checkout.sessions.create(sessionParams);
+
+	return session;
 };
 
 module.exports = {
 	listSubscriptionPlans,
 	getSubscriptionPlan,
+	createCheckoutSession,
 };
