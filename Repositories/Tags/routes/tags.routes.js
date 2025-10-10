@@ -92,7 +92,7 @@ module.exports = (server) => {
 	 *                           properties:
 	 *                             name:
 	 *                               type: string
-	 *                               example: "Zelf Name System"
+	 *                               example: "Zelf Name Service"
 	 *                             code:
 	 *                               type: string
 	 *                               example: "zns"
@@ -233,7 +233,7 @@ module.exports = (server) => {
 	 *                         tags: 10000
 	 *                         zelfkeys: 10000
 	 *                       features:
-	 *                         - name: "Zelf Name System"
+	 *                         - name: "Zelf Name Service"
 	 *                           code: "zns"
 	 *                           description: "Encryptions, Decryptions, previews of ZelfProofs"
 	 *                           enabled: true
@@ -350,7 +350,7 @@ module.exports = (server) => {
 	 *                         properties:
 	 *                           name:
 	 *                             type: string
-	 *                             example: "Zelf Name System"
+	 *                             example: "Zelf Name Service"
 	 *                           code:
 	 *                             type: string
 	 *                             example: "zns"
@@ -463,7 +463,7 @@ module.exports = (server) => {
 	 *                       maxRenewalPerDay: 2
 	 *                       maxTransferPerDay: 10000
 	 *                     features:
-	 *                       - name: "Zelf Name System"
+	 *                       - name: "Zelf Name Service"
 	 *                         code: "zns"
 	 *                         description: "Encryptions, Decryptions, previews of ZelfProofs"
 	 *                         enabled: true

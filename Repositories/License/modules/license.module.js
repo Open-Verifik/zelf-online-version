@@ -410,7 +410,7 @@ const syncLicenseWithStripe = async (license, paymentData) => {
 				description: `License for ${paymentData.customerEmail}`,
 				features: [
 					{
-						name: "Zelf Name System",
+						name: "Zelf Name Service",
 						code: "zns",
 						description: "Encryptions, Decryptions, previews of ZelfProofs",
 						enabled: true,

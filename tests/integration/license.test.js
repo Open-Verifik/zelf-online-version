@@ -172,7 +172,7 @@ describe("License API Integration Tests - Real Server", () => {
 				},
 				features: [
 					{
-						name: "Zelf Name System",
+						name: "Zelf Name Service",
 						code: "zns",
 						description: "Encryptions, Decryptions, previews of ZelfProofs",
 						enabled: true,
@@ -257,7 +257,7 @@ describe("License API Integration Tests - Real Server", () => {
 
 			expect(response.body.data).toHaveProperty("features");
 			expect(response.body.data.features).toHaveLength(2);
-			expect(response.body.data.features[0]).toHaveProperty("name", "Zelf Name System");
+			expect(response.body.data.features[0]).toHaveProperty("name", "Zelf Name Service");
 			expect(response.body.data.features[0]).toHaveProperty("code", "zns");
 			expect(response.body.data.features[0]).toHaveProperty("enabled", true);
 
@@ -287,7 +287,7 @@ describe("License API Integration Tests - Real Server", () => {
 				limits: { tags: 1000, zelfkeys: 5000 },
 				features: [
 					{
-						name: "Zelf Name System",
+						name: "Zelf Name Service",
 						code: "zns",
 						description: "Test feature",
 						enabled: true,
@@ -323,7 +323,7 @@ describe("License API Integration Tests - Real Server", () => {
 				limits: { tags: -1, zelfkeys: 5000 }, // Invalid negative tags
 				features: [
 					{
-						name: "Zelf Name System",
+						name: "Zelf Name Service",
 						// Missing required fields: code, description, enabled
 					},
 				],
@@ -411,7 +411,7 @@ describe("License API Integration Tests - Real Server", () => {
 				},
 				features: [
 					{
-						name: "Zelf Name System",
+						name: "Zelf Name Service",
 						code: "zns",
 						description: "Encryptions, Decryptions, previews of ZelfProofs",
 						enabled: true,
@@ -502,7 +502,7 @@ describe("License API Integration Tests - Real Server", () => {
 
 			expect(response.body.data).toHaveProperty("features");
 			expect(response.body.data.features).toHaveLength(3); // Now has 3 features
-			expect(response.body.data.features[0]).toHaveProperty("name", "Zelf Name System");
+			expect(response.body.data.features[0]).toHaveProperty("name", "Zelf Name Service");
 			expect(response.body.data.features[2]).toHaveProperty("name", "Advanced Analytics");
 			expect(response.body.data.features[2]).toHaveProperty("code", "analytics");
 

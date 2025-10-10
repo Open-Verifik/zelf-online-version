@@ -33,7 +33,7 @@ const SUPPORTED_DOMAINS = {
 		},
 		features: [
 			{
-				name: "Zelf Name System",
+				name: "Zelf Name Service",
 				code: "zns",
 				description: "Encryptions, Decryptions, previews of ZelfProofs",
 				enabled: true,
@@ -106,7 +106,7 @@ const SUPPORTED_DOMAINS = {
 		},
 		features: [
 			{
-				name: "Zelf Name System",
+				name: "Zelf Name Service",
 				code: "zns",
 				description: "Encryptions, Decryptions, previews of ZelfProofs",
 				enabled: true,
@@ -181,7 +181,7 @@ const SUPPORTED_DOMAINS = {
 		},
 		features: [
 			{
-				name: "Zelf Name System",
+				name: "Zelf Name Service",
 				code: "zns",
 				description: "Encryptions, Decryptions, previews of ZelfProofs",
 				enabled: true,
