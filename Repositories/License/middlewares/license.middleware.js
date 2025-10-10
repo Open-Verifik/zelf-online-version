@@ -17,7 +17,6 @@ const schemas = {
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).optional(),
 		domainConfig: object({
 			name: string().required(),
-			type: string().optional(),
 			holdSuffix: string().default(".hold"),
 			status: stringEnum(["active", "inactive", "suspended"]).default("active"),
 			owner: string().optional(),
@@ -31,7 +30,7 @@ const schemas = {
 				customRules: array().items(string()).default([]),
 				payment: object({
 					methods: array()
-						.items(stringEnum(["coinbase", "crypto", "stripe", "paypal"]))
+						.items(stringEnum(["coinbase", "crypto", "stripe"]))
 						.required(),
 					currencies: array()
 						.items(stringEnum(["BTC", "ETH", "SOL", "USDC", "USDT", "BDAG", "AVAX", "ZNS"]))
@@ -61,6 +60,7 @@ const schemas = {
 					ipfsEnabled: boolean().default(true),
 					arweaveEnabled: boolean().default(false),
 					walrusEnabled: boolean().default(false),
+					backupEnabled: boolean().default(false),
 					// Note: backupEnabled is not allowed in frontend payload
 				}).required(),
 			}).required(),
@@ -75,16 +75,10 @@ const schemas = {
 					ipfsEnabled: boolean().default(true),
 					arweaveEnabled: boolean().default(false),
 					walrusEnabled: boolean().default(false),
+					backupEnabled: boolean().default(false),
 					// Note: backupEnabled is not allowed in frontend payload
 				}).required(),
 			}).required(),
-			stripe: object({
-				productId: string().default(""),
-				priceId: string().default(""),
-				latestInvoiceId: string().default(""),
-				amountPaid: number().min(0).default(0),
-				paidAt: string().default(""),
-			}).default({}),
 			metadata: object({
 				launchDate: string().isoDate().optional(),
 				version: string().optional(),
