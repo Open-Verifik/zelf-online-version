@@ -8,16 +8,19 @@ const config = require("../../../Core/config");
  */
 class Domain {
 	constructor(domainData) {
+		// Generate random name if none provided
+		this.name = domainData.name || this._generateRandomName();
+
+		// Set owner from authUser if provided
+		this.owner = domainData.owner || (domainData.authUser ? domainData.authUser.email : "");
+
 		// Core properties
-		this.name = domainData.name || "";
 		this.type = domainData.type || "custom";
 		this.holdSuffix = domainData.holdSuffix || ".hold";
 		this.status = domainData.status || "inactive";
-		this.owner = domainData.owner || "";
 		this.description = domainData.description || "";
 		this.startDate = domainData.startDate || "";
 		this.endDate = domainData.endDate || "";
-		// Features array
 		this.features = domainData.features || [];
 		// Validation rules
 		this.tags = {
@@ -37,6 +40,13 @@ class Domain {
 				whitelist: domainData.tags?.payment.whitelist || {},
 				pricingTable: domainData.tags?.payment.pricingTable || {},
 			},
+			storage: {
+				keyPrefix: domainData.tags?.storage?.keyPrefix || "tagName",
+				ipfsEnabled: domainData.tags?.storage?.ipfsEnabled || true,
+				arweaveEnabled: domainData.tags?.storage?.arweaveEnabled || true,
+				walrusEnabled: domainData.tags?.storage?.walrusEnabled || false,
+				backupEnabled: domainData.tags?.storage?.backupEnabled || false,
+			},
 		};
 
 		this.zelfkeys = {
@@ -45,22 +55,19 @@ class Domain {
 				whitelist: domainData.zelfkeys?.whitelist || {},
 				pricingTable: domainData.zelfkeys?.pricingTable || {},
 			},
-		};
-
-		// Storage configuration
-		this.storage = {
-			keyPrefix: domainData.storage?.keyPrefix || "tagName",
-			ipfsEnabled: domainData.storage?.ipfsEnabled || true,
-			arweaveEnabled: domainData.storage?.arweaveEnabled || true,
-			walrusEnabled: domainData.storage?.walrusEnabled || false,
-			backupEnabled: domainData.storage?.backupEnabled || false,
+			storage: {
+				keyPrefix: domainData.zelfkeys?.storage?.keyPrefix || "tagName",
+				ipfsEnabled: domainData.zelfkeys?.storage?.ipfsEnabled || true,
+				arweaveEnabled: domainData.zelfkeys?.storage?.arweaveEnabled || true,
+				walrusEnabled: domainData.zelfkeys?.storage?.walrusEnabled || false,
+				backupEnabled: domainData.zelfkeys?.storage?.backupEnabled || false,
+			},
 		};
 
 		this.stripe = {
 			productId: domainData.stripe?.productId || "",
 			priceId: domainData.stripe?.priceId || "",
 			latestInvoiceId: domainData.stripe?.latestInvoiceId || "",
-			invoices: domainData.stripe?.invoices || [],
 			amountPaid: domainData.stripe?.amountPaid || 0,
 			paidAt: domainData.stripe?.paidAt || "",
 		};
@@ -292,16 +299,17 @@ class Domain {
 		return {
 			name: this.name,
 			type: this.type,
-			price: this.price,
 			holdSuffix: this.holdSuffix,
 			status: this.status,
 			owner: this.owner,
 			description: this.description,
-			limits: this.limits,
-			features: this.features,
-			validation: this.validation,
+			startDate: this.startDate,
+			endDate: this.endDate,
+			features: this.features || [],
+			tags: this.tags,
+			zelfkeys: this.zelfkeys,
 			storage: this.storage,
-			payment: this.payment,
+			stripe: this.stripe,
 			metadata: this.metadata,
 		};
 	}
@@ -345,6 +353,14 @@ class Domain {
 	 */
 	getTagKey() {
 		return this.storage.keyPrefix;
+	}
+
+	/**
+	 * Generate a random domain name
+	 * @returns {string} - Random domain name
+	 */
+	_generateRandomName() {
+		return Math.random().toString(36).substring(2, 8);
 	}
 }
 

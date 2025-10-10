@@ -22,59 +22,75 @@ const schemas = {
 			status: stringEnum(["active", "inactive", "suspended"]).default("active"),
 			owner: string().optional(),
 			description: string().optional(),
-			limits: object({
-				tags: number().integer().min(0).required(),
-				zelfkeys: number().integer().min(0).required(),
-			}).required(),
-			features: array()
-				.items(
-					object({
-						name: string().required(),
-						code: string().required(),
-						description: string().required(),
-						enabled: boolean().required(),
-					})
-				)
-				.required(),
-			validation: object({
+			// Note: limits are managed by Stripe subscription, not sent from frontend
+			tags: object({
 				minLength: number().integer().min(1).required(),
 				maxLength: number().integer().min(1).required(),
 				allowedChars: object().default({}),
 				reserved: array().items(string()).default([]),
 				customRules: array().items(string()).default([]),
+				payment: object({
+					methods: array()
+						.items(stringEnum(["coinbase", "crypto", "stripe", "paypal"]))
+						.required(),
+					currencies: array()
+						.items(stringEnum(["BTC", "ETH", "SOL", "USDC", "USDT", "BDAG", "AVAX", "ZNS"]))
+						.required(),
+					discounts: object({
+						yearly: number().min(0).max(1).default(0.1),
+						lifetime: number().min(0).max(1).default(0.2),
+					}).default({}),
+					rewardPrice: number().min(0).default(10),
+					whitelist: object().default({}),
+					pricingTable: object()
+						.pattern(
+							/^(\d+|\d+-\d+)$/, // Pattern for keys like "1", "2", "6-15", etc.
+							object({
+								1: number().min(0),
+								2: number().min(0),
+								3: number().min(0),
+								4: number().min(0),
+								5: number().min(0),
+								lifetime: number().min(0),
+							})
+						)
+						.required(),
+				}).required(),
+				storage: object({
+					keyPrefix: string().required(),
+					ipfsEnabled: boolean().default(true),
+					arweaveEnabled: boolean().default(false),
+					walrusEnabled: boolean().default(false),
+					// Note: backupEnabled is not allowed in frontend payload
+				}).required(),
 			}).required(),
-			storage: object({
-				keyPrefix: string().required(),
-				ipfsEnabled: boolean().default(true),
-				arweaveEnabled: boolean().default(false),
-				walrusEnabled: boolean().default(false),
+			zelfkeys: object({
+				plans: array().items(object()).default([]),
+				payment: object({
+					whitelist: object().default({}),
+					pricingTable: object().default({}),
+				}).default({}),
+				storage: object({
+					keyPrefix: string().required(),
+					ipfsEnabled: boolean().default(true),
+					arweaveEnabled: boolean().default(false),
+					walrusEnabled: boolean().default(false),
+					// Note: backupEnabled is not allowed in frontend payload
+				}).required(),
 			}).required(),
-			tagPaymentSettings: object({
-				methods: array()
-					.items(stringEnum(["coinbase", "crypto", "stripe", "paypal"]))
-					.required(),
-				currencies: array()
-					.items(stringEnum(["BTC", "ETH", "SOL", "USDC", "USDT", "BDAG", "AVAX", "ZNS"]))
-					.required(),
-				whitelist: object().default({}),
-				pricingTable: object()
-					.pattern(
-						/^(\d+|\d+-\d+)$/, // Pattern for keys like "1", "2", "6-15", etc.
-						object({
-							1: number().min(0),
-							2: number().min(0),
-							3: number().min(0),
-							4: number().min(0),
-							5: number().min(0),
-							lifetime: number().min(0),
-						})
-					)
-					.required(),
-			}).required(),
+			stripe: object({
+				productId: string().default(""),
+				priceId: string().default(""),
+				latestInvoiceId: string().default(""),
+				amountPaid: number().min(0).default(0),
+				paidAt: string().default(""),
+			}).default({}),
 			metadata: object({
 				launchDate: string().isoDate().optional(),
 				version: string().optional(),
 				documentation: string().uri().optional(),
+				community: string().optional(),
+				enterprise: string().optional(),
 				support: stringEnum(["standard", "premium", "enterprise"]).default("standard"),
 			}).optional(),
 		}).required(),

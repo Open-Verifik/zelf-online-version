@@ -8,6 +8,7 @@ const fs = require("fs");
 const path = require("path");
 const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
 const DefaultLicenseValues = require("./default-license.values");
+const { Domain } = require("../../Tags/modules/domain.class");
 
 // Cache file path for development mode
 const CACHE_FILE_PATH = path.join(__dirname, "../../../cache/official-licenses-cache.json");
@@ -151,6 +152,72 @@ const getUserZelfProof = async (userEmail) => {
 };
 
 /**
+ * Filter domain config to only include user-modifiable fields
+ * @param {Object} domainConfig - Full domain configuration
+ * @param {Object} existingLicense - Existing license data (if updating)
+ * @returns {Object} - Filtered domain configuration
+ */
+const filterUserModifiableFields = (domainConfig, existingLicense = null) => {
+	// Fields that users are NOT allowed to modify (system-managed)
+	const protectedFields = [
+		"startDate",
+		"endDate",
+		"expiresAt",
+		"subscriptionId",
+		"previousDomain",
+		"owner",
+		"zelfProof",
+		"type",
+		"licenseType",
+		"stripe",
+	];
+
+	// If updating existing license, preserve system-managed fields
+	if (existingLicense) {
+		const existingData = existingLicense.domainConfig || existingLicense;
+
+		// Preserve system-managed fields from existing license
+		protectedFields.forEach((field) => {
+			if (existingData[field] !== undefined) {
+				domainConfig[field] = existingData[field];
+			}
+		});
+
+		// Preserve limits from existing license (only modified via Stripe subscription)
+		if (existingData.limits) {
+			domainConfig.limits = existingData.limits;
+		}
+
+		// Preserve Stripe data from existing license (only modified via Stripe webhooks)
+		if (existingData.stripe) {
+			domainConfig.stripe = existingData.stripe;
+		}
+	} else {
+		// For new licenses, set default system-managed fields
+		domainConfig.startDate = moment().format("YYYY-MM-DD HH:mm:ss");
+		domainConfig.endDate = moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss");
+		domainConfig.expiresAt = moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss");
+		domainConfig.subscriptionId = "free";
+		domainConfig.previousDomain = "";
+		domainConfig.type = domainConfig.type || "custom";
+		domainConfig.limits = {
+			tags: 100,
+			zelfkeys: 100,
+			zelfProofs: 100,
+		};
+		domainConfig.stripe = {
+			productId: "",
+			priceId: "",
+			latestInvoiceId: "",
+			amountPaid: 0,
+			paidAt: "",
+		};
+	}
+
+	return domainConfig;
+};
+
+/**
  * Create or update license
  * @param {Object} body - Request body
  * @param {Object} user - User object
@@ -181,16 +248,17 @@ const createOrUpdateLicense = async (body, jwt) => {
 			await TagsIPFSModule.unPinFiles([myLicense.id]);
 		}
 
+		// Filter domain config to only include user-modifiable fields
+		const filteredDomainConfig = filterUserModifiableFields(domainConfig, myLicense);
+
 		const licenseMetadata = {
-			...domainConfig,
-			licenseType: domainConfig.type,
+			...filteredDomainConfig,
+			licenseType: filteredDomainConfig.type,
 			type: "license",
-			subscriptionId: "free",
 			previousDomain: myLicense?.publicData.domain || "",
 			domain: body.domain,
 			owner: jwt.email,
 			zelfProof: accountZelfProof,
-			expiresAt: moment().add(1, "year").toISOString(),
 		};
 
 		const jsonData = JSON.stringify({ ...licenseMetadata }, null, 2);
@@ -202,8 +270,8 @@ const createOrUpdateLicense = async (body, jwt) => {
 				base64: base64Data,
 				metadata: {
 					type: "license",
-					licenseType: domainConfig.type,
-					licenseSubscriptionId: "free",
+					licenseType: filteredDomainConfig.type,
+					licenseSubscriptionId: filteredDomainConfig.subscriptionId || "free",
 					licenseDomain: body.domain,
 					licenseOwner: jwt.email,
 				},
@@ -333,23 +401,101 @@ const _loadLicenseJSON = async (ipfsUrl) => {
 
 const syncLicenseWithStripe = async (license, paymentData) => {
 	// first we need to
-	const licenseData = await _loadLicenseJSON(license.url);
+	const licenseData = license
+		? await _loadLicenseJSON(license.url)
+		: {
+				owner: paymentData.customerEmail,
+				type: "license",
+				status: "active",
+				description: `License for ${paymentData.customerEmail}`,
+				features: [
+					{
+						name: "Zelf Name System",
+						code: "zns",
+						description: "Encryptions, Decryptions, previews of ZelfProofs",
+						enabled: true,
+					},
+					{
+						name: "Zelf Keys",
+						code: "zelfkeys",
+						description: "Zelf Keys: Passwords, Notes, Credit Cards, etc.",
+						enabled: true,
+					},
+				],
+				tags: {
+					minLength: 3,
+					maxLength: 50,
+					allowedChars: /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
+					reserved: ["www", "api", "admin", "support", "help"],
+					customRules: [],
+					payment: {
+						methods: ["coinbase", "crypto", "stripe"],
+						currencies: ["BDAG", "BTC", "ETH", "SOL", "USDT"],
+						discounts: {
+							yearly: 0.1,
+							lifetime: 0.2,
+						},
+						rewardPrice: 10,
+						whitelist: {},
+						pricingTable: {},
+					},
+					storage: {
+						// Moved storage inside tags
+						keyPrefix: "tagName",
+						ipfsEnabled: true,
+						arweaveEnabled: true,
+						walrusEnabled: true,
+						backupEnabled: false,
+					},
+				},
+				zelfkeys: {
+					plans: [],
+					payment: {
+						whitelist: {},
+						pricingTable: {},
+					},
+					storage: {
+						// Moved storage inside zelfkeys
+						keyPrefix: "tagName",
+						ipfsEnabled: true,
+						arweaveEnabled: true,
+						walrusEnabled: true,
+						backupEnabled: false,
+					},
+				},
+				metadata: {
+					launchDate: moment().format("YYYY-MM-DD"),
+					version: "1.0.0",
+					documentation: "https://docs.zelf.world",
+					support: "standard",
+				},
+		  };
 
 	const plan = DefaultLicenseValues.findPlanByPrice(paymentData.amountPaid);
 
-	licenseData.limits = plan.limits;
-	licenseData.subscriptionId = paymentData.subscriptionId;
-	licenseData.startDate = moment(new Date(paymentData.subscription.current_period_start * 1000)).format("YYYY-MM-DD HH:mm:ss");
-	licenseData.endDate = moment(new Date(paymentData.subscription.current_period_end * 1000)).format("YYYY-MM-DD HH:mm:ss");
-	licenseData.expiresAt = moment(new Date(paymentData.subscription.current_period_end * 1000))
+	const licenseObject = new Domain(licenseData);
+
+	licenseObject.limits = plan.limits;
+	licenseObject.subscriptionId = paymentData.subscriptionId;
+	licenseObject.startDate = moment(new Date(paymentData.subscription.current_period_start * 1000)).format("YYYY-MM-DD HH:mm:ss");
+	licenseObject.endDate = moment(new Date(paymentData.subscription.current_period_end * 1000)).format("YYYY-MM-DD HH:mm:ss");
+	licenseObject.expiresAt = moment(new Date(paymentData.subscription.current_period_end * 1000))
 		.add(15, "days")
 		.format("YYYY-MM-DD HH:mm:ss");
+
+	licenseObject.stripe = {
+		productId: paymentData.productId,
+		priceId: paymentData.priceId,
+		latestInvoiceId: paymentData.invoiceId,
+		amountPaid: paymentData.amountPaid,
+		paidAt: paymentData.paidAt,
+	};
 
 	// now we will create it with the new details
 
 	await TagsIPFSModule.unPinFiles([license.id]);
 
-	const jsonData = JSON.stringify({ ...licenseData }, null, 2);
+	const jsonData = JSON.stringify(licenseObject.toJSON(), null, 2);
 
 	const base64Data = Buffer.from(jsonData).toString("base64");
 
@@ -360,10 +506,10 @@ const syncLicenseWithStripe = async (license, paymentData) => {
 				type: "license",
 				licenseType: plan.code,
 				licenseSubscriptionId: paymentData.subscriptionId,
-				licenseDomain: licenseData.domain,
+				licenseDomain: licenseObject.name,
 				licenseOwner: licenseData.owner,
 			},
-			name: `${licenseData.domain}.license`,
+			name: `${licenseObject.name}.license`,
 			pinIt: true,
 		},
 		{ pro: true }

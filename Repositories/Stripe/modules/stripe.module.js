@@ -79,14 +79,13 @@ const handleInvoicePaymentSucceeded = async (invoice, stripe) => {
 			customerId: invoice.customer,
 			customerEmail: customer.email,
 			amountPaid: invoice.amount_paid,
+			paidAt: new Date(invoice.status_transitions.paid_at * 1000),
 			currency: invoice.currency,
 			status: "paid",
-			paidAt: new Date(invoice.status_transitions.paid_at * 1000),
 			subscription,
 			customer,
 		};
 
-		// TODO: retrieve the account from IPFS
 		const accountsWithSameEmail = await IPFSModule.get({ key: "accountEmail", value: customer.email });
 
 		if (!accountsWithSameEmail.length) throw new Error("404:account_not_found");
