@@ -80,17 +80,23 @@ const searchTag = async (ctx) => {
 
 		let data = await Module.searchTag(requestData, ctx.state.user);
 
+		console.log({ data });
 		// Handle zelfPay logic
 		const zelfPayResult = await handleZelfPayLogic(data, ctx.state.user, extractedDomain);
+
+		console.log({ zelfPayResult });
 
 		// If zelfPay result is found, return it
 		if (zelfPayResult) {
 			ctx.body = { data: zelfPayResult };
+
 			return;
 		}
 
 		ctx.body = { data };
 	} catch (error) {
+		console.error({ error });
+
 		handleError(ctx, error);
 	}
 };

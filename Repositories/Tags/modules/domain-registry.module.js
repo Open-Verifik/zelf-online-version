@@ -108,7 +108,8 @@ const getHoldSuffix = (domain) => {
  */
 const getPricingTable = (domain) => {
 	const config = getDomainConfig(domain);
-	return config?.payment?.pricingTable || {};
+
+	return config?.tags?.payment?.pricingTable || {};
 };
 
 /**

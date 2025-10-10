@@ -341,10 +341,10 @@ const createHoldObject = async (params, authUser) => {
 const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainConfig) => {
 	const { referralTagObject } = payload;
 
-	const referralTagName = referralTagObject?.publicData?.[domainConfig.storage.keyPrefix].split(".")[0];
+	const referralTagName = referralTagObject?.publicData?.[domainConfig.tags.storage.keyPrefix]?.split(".")[0];
 
 	const { price, reward, discount, discountType } = domainConfig.getPrice(
-		tagObject[domainConfig.storage.keyPrefix],
+		tagObject[domainConfig.tags.storage.keyPrefix],
 		"1",
 		referralTagName ? `${referralTagName}.${domainConfig.name}` : ""
 	);

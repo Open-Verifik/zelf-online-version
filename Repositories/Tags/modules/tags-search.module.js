@@ -66,6 +66,8 @@ const searchTag = async (params, authUser) => {
 
 		return combinedResults;
 	} catch (error) {
+		console.error({ searchTag_error: error });
+
 		return {
 			available: false,
 			error: error.message,

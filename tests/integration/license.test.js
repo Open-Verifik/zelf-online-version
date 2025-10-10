@@ -520,7 +520,7 @@ describe("License API Integration Tests - Real Server", () => {
 			expect(response.body.data.tagPaymentSettings.methods).toContain("crypto");
 			expect(response.body.data.tagPaymentSettings.methods).toContain("stripe");
 			expect(response.body.data.tagPaymentSettings.currencies).toContain("BDAG");
-			expect(response.body.data.tagPaymentSettings.pricingTable[1][1]).toBe(200);
+			expect(response.body.data.tags.payment.pricingTable[1][1]).toBe(200);
 
 			expect(response.body.data).toHaveProperty("metadata");
 			expect(response.body.data.metadata).toHaveProperty("version", "2.0.0");

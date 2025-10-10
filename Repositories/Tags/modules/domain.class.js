@@ -116,6 +116,7 @@ class Domain {
 				discount: 0,
 				priceWithoutDiscount: 0,
 				discountType: "percentage",
+				length: 0,
 			};
 		}
 
@@ -125,17 +126,17 @@ class Domain {
 
 		const length = splitTagName[0].length;
 
-		if (!this.payment.pricingTable) return 0;
+		if (!this.tags?.payment?.pricingTable) return 0;
 
 		if (!["1", "2", "3", "4", "5", "lifetime"].includes(`${duration}`))
 			throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
 
 		let price = 24;
 
-		if (length >= 6 && length <= 15) {
-			price = this.payment.pricingTable["6-15"][duration];
-		} else if (this.payment.pricingTable[length]) {
-			price = this.payment.pricingTable[length][duration];
+		if (this.tags?.payment.pricingTable[length]) {
+			price = this.tags?.payment.pricingTable[length][duration];
+		} else if (length >= 6 && length <= 15) {
+			price = this.tags?.payment.pricingTable["6-15"]?.[duration];
 		} else {
 			throw new Error("Invalid name length. Length must be between 1 and 27.");
 		}
@@ -149,7 +150,7 @@ class Domain {
 
 		let discountType = "percentage";
 
-		const whitelist = this.payment.whitelist || {};
+		const whitelist = this.tags?.payment.whitelist || {};
 
 		if (Object.keys(whitelist).length && referralTagName && whitelist[referralTagName]) {
 			const amount = whitelist[referralTagName];
@@ -174,10 +175,11 @@ class Domain {
 			duration,
 			price: Math.max(Math.ceil(price * 100) / 100, 0),
 			currency: "USD",
-			reward: Math.max(Math.ceil((price / this.payment.rewardPrice) * 100) / 100, 0),
+			reward: Math.max(Math.ceil((price / this.tags?.payment.rewardPrice) * 100) / 100, 0),
 			discount,
 			priceWithoutDiscount,
 			discountType,
+			length,
 		};
 	}
 
@@ -188,7 +190,7 @@ class Domain {
 	 */
 	validateTagName(tagName) {
 		// Check minimum length
-		if (tagName.length < this.validation.minLength) {
+		if (tagName.length < this.tags?.minLength) {
 			return {
 				valid: false,
 				error: `Tag name must be at least ${this.validation.minLength} characters long`,
@@ -196,10 +198,10 @@ class Domain {
 		}
 
 		// Check maximum length
-		if (tagName.length > this.validation.maxLength) {
+		if (tagName.length > this.tags?.maxLength) {
 			return {
 				valid: false,
-				error: `Tag name must be no more than ${this.validation.maxLength} characters long`,
+				error: `Tag name must be no more than ${this.tags?.maxLength} characters long`,
 			};
 		}
 

@@ -2,7 +2,7 @@ const { SUPPORTED_DOMAINS } = require("../config/supported-domains");
 
 /**
  * Domain Registry Class
- * 
+ *
  * This class provides a centralized way to manage domain configurations
  * and provides easy access to domain properties and validation methods.
  */
@@ -120,7 +120,7 @@ class DomainRegistry {
 	generateStorageKey(domainName, tagName) {
 		const domain = this.getDomain(domainName);
 		if (!domain || !domain.storage) return null;
-		
+
 		const keyPrefix = domain.storage.keyPrefix || "tagName";
 		return `${keyPrefix}_${tagName}`;
 	}
@@ -134,7 +134,7 @@ class DomainRegistry {
 	generateHoldDomain(domainName, tagName) {
 		const domain = this.getDomain(domainName);
 		if (!domain) return null;
-		
+
 		const holdSuffix = domain.holdSuffix || ".hold";
 		return `${tagName}${holdSuffix}`;
 	}
@@ -198,33 +198,33 @@ class DomainRegistry {
 
 		// Check minimum length
 		if (rules.minLength && tagName.length < rules.minLength) {
-			return { 
-				valid: false, 
-				error: `Tag name must be at least ${rules.minLength} characters long` 
+			return {
+				valid: false,
+				error: `Tag name must be at least ${rules.minLength} characters long`,
 			};
 		}
 
 		// Check maximum length
 		if (rules.maxLength && tagName.length > rules.maxLength) {
-			return { 
-				valid: false, 
-				error: `Tag name must be no more than ${rules.maxLength} characters long` 
+			return {
+				valid: false,
+				error: `Tag name must be no more than ${rules.maxLength} characters long`,
 			};
 		}
 
 		// Check allowed characters
 		if (rules.allowedChars && !rules.allowedChars.test(tagName)) {
-			return { 
-				valid: false, 
-				error: `Tag name contains invalid characters. Allowed pattern: ${rules.allowedChars}` 
+			return {
+				valid: false,
+				error: `Tag name contains invalid characters. Allowed pattern: ${rules.allowedChars}`,
 			};
 		}
 
 		// Check reserved names
 		if (rules.reserved && rules.reserved.includes(tagName.toLowerCase())) {
-			return { 
-				valid: false, 
-				error: `Tag name '${tagName}' is reserved` 
+			return {
+				valid: false,
+				error: `Tag name '${tagName}' is reserved`,
 			};
 		}
 
@@ -320,7 +320,8 @@ class DomainRegistry {
 	 */
 	getPricingTable(domainName) {
 		const domain = this.getDomain(domainName);
-		return domain && domain.payment ? domain.payment.pricingTable : {};
+
+		return domain && domain.tags?.payment ? domain.tags.payment.pricingTable : {};
 	}
 
 	/**

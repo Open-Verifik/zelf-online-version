@@ -285,28 +285,24 @@ const getByType = (type) => {
  */
 const validateDomainName = (domain, name) => {
 	const config = getDomainConfig(domain);
-	if (!config) {
-		return { valid: false, error: "Domain not supported" };
-	}
-
-	const { validation } = config;
+	if (!config) return { valid: false, error: "Domain not supported" };
 
 	// Check length
-	if (name.length < validation.minLength) {
-		return { valid: false, error: `Name must be at least ${validation.minLength} characters` };
+	if (name.length < config.tags.minLength) {
+		return { valid: false, error: `Name must be at least ${config.tags.minLength} characters` };
 	}
 
-	if (name.length > validation.maxLength) {
-		return { valid: false, error: `Name must be no more than ${validation.maxLength} characters` };
+	if (name.length > config.tags.maxLength) {
+		return { valid: false, error: `Name must be no more than ${config.tags.maxLength} characters` };
 	}
 
 	// Check allowed characters
-	if (!validation.allowedChars.test(name)) {
+	if (!config.tags.allowedChars.test(name)) {
 		return { valid: false, error: "Name contains invalid characters" };
 	}
 
 	// Check reserved names
-	if (validation.reserved.includes(name.toLowerCase())) {
+	if (config.tags.reserved.includes(name.toLowerCase())) {
 		return { valid: false, error: "Name is reserved" };
 	}
 

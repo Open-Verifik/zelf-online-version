@@ -111,31 +111,40 @@ const leaseTag = async (params, authUser) => {
 const searchTag = async (params, authUser) => {
 	const { tagName, domain, key, value, environment, type, domainConfig, duration } = params;
 
-	const _domainConfig = domainConfig || getDomainConfig(domain);
+	try {
+		const _domainConfig = domainConfig || getDomainConfig(domain);
 
-	const result = await TagsSearchModule.searchTag(
-		{
-			tagName,
-			domain,
-			key,
-			value,
-			environment: environment || "all",
-			type: type || "both",
-			domainConfig: _domainConfig,
-			duration: duration || "1",
-		},
-		authUser
-	);
+		console.log({ _domainConfig });
 
-	if (result.ipfs?.length) {
-		for (let index = 0; index < result.ipfs.length; index++) {
-			const element = result.ipfs[index];
-			delete element.zelfProof;
-			delete element.zelfProofQRCode;
+		const result = await TagsSearchModule.searchTag(
+			{
+				tagName,
+				domain,
+				key,
+				value,
+				environment: environment || "all",
+				type: type || "both",
+				domainConfig: _domainConfig,
+				duration: duration || "1",
+			},
+			authUser
+		);
+
+		console.log({ result });
+
+		if (result.ipfs?.length) {
+			for (let index = 0; index < result.ipfs.length; index++) {
+				const element = result.ipfs[index];
+				delete element.zelfProof;
+				delete element.zelfProofQRCode;
+			}
 		}
-	}
 
-	return result;
+		return result;
+	} catch (error) {
+		console.error({ error });
+		throw error;
+	}
 };
 
 /**
