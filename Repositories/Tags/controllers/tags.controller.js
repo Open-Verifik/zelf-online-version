@@ -2,21 +2,10 @@ const Module = require("../modules/tags.module");
 const RevenueCatModule = require("../modules/revenue-cat.module");
 const { updateOldTagObject } = require("../modules/my-tags.module");
 const TagsRecoveryModule = require("../modules/tags-recovery.module");
-const HttpHandler = require("../../../Core/http-handler");
 const TagsOfflineModule = require("../modules/tags-offline.module");
 const TagsSearchModule = require("../modules/tags-search.module");
 const { getAllSupportedDomains } = require("../modules/domain-registry.module");
-
-/**
- * Standard error handler for controllers
- * @param {Object} ctx - Koa context
- * @param {Error} error - Error object
- */
-const handleError = (ctx, error) => {
-	console.error({ error });
-	ctx.status = error.status || 500;
-	ctx.body = { error: error.message };
-};
+const { errorHandler } = require("../../../Core/http-handler");
 
 /**
  * Handle zelfPay logic for searchTag functions
@@ -80,11 +69,8 @@ const searchTag = async (ctx) => {
 
 		let data = await Module.searchTag(requestData, ctx.state.user);
 
-		console.log({ data });
 		// Handle zelfPay logic
 		const zelfPayResult = await handleZelfPayLogic(data, ctx.state.user, extractedDomain);
-
-		console.log({ zelfPayResult });
 
 		// If zelfPay result is found, return it
 		if (zelfPayResult) {
@@ -95,9 +81,11 @@ const searchTag = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
+		const _exception = errorHandler(error, ctx);
 
-		handleError(ctx, error);
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -114,14 +102,11 @@ const searchTagsByDomain = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
+		const _exception = errorHandler(error, ctx);
 
 		ctx.status = _exception.status;
 
-		ctx.body = {
-			message: _exception.message,
-			code: _exception.code,
-		};
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -144,7 +129,7 @@ const leaseTag = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
+		const _exception = errorHandler(error, ctx);
 
 		ctx.status = _exception.status;
 
@@ -171,9 +156,10 @@ const leaseRecovery = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
+		const _exception = errorHandler(error, ctx);
 
 		ctx.status = _exception.status;
+
 		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
@@ -197,7 +183,11 @@ const leaseOfflineTag = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -220,9 +210,10 @@ const leaseConfirmation = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
+		const _exception = errorHandler(error, ctx);
 
 		ctx.status = _exception.status;
+
 		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
@@ -246,9 +237,10 @@ const previewTag = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
+		const _exception = errorHandler(error, ctx);
 
 		ctx.status = _exception.status;
+
 		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
@@ -264,9 +256,10 @@ const previewZelfProof = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
+		const _exception = errorHandler(error, ctx);
 
 		ctx.status = _exception.status;
+
 		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
@@ -290,9 +283,10 @@ const decryptTag = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
+		const _exception = errorHandler(error, ctx);
 
 		ctx.status = _exception.status;
+
 		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
@@ -308,7 +302,11 @@ const revenueCatWebhook = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -323,9 +321,10 @@ const purchaseRewards = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
+		const _exception = errorHandler(error, ctx);
 
 		ctx.status = _exception.status;
+
 		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
@@ -341,9 +340,10 @@ const referralRewards = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		const _exception = HttpHandler.errorHandler(error, ctx);
+		const _exception = errorHandler(error, ctx);
 
 		ctx.status = _exception.status;
+
 		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
@@ -361,7 +361,11 @@ const deleteTag = async (ctx) => {
 
 		ctx.body = { data: result };
 	} catch (error) {
-		handleError(ctx, error);
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 

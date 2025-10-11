@@ -1,0 +1,657 @@
+/**
+ * ZelfKey Module - Password Manager functionality similar to LastPass
+ * Standalone version without external dependencies
+ * @author Miguel Trevino <miguel@zelf.world>
+ */
+
+// Mock implementations for standalone use
+const mockZelfProofModule = {
+	encryptQRCode: async (data) => {
+		// Mock implementation - in real use, this would encrypt with ZelfProof
+		return {
+			zelfQR: `mock_qr_code_${Date.now()}`
+		};
+	},
+	encrypt: async (data) => {
+		// Mock implementation - in real use, this would encrypt with ZelfProof
+		return {
+			zelfProof: `mock_zelf_proof_${Date.now()}`
+		};
+	},
+	decrypt: async (data) => {
+		// Mock implementation - in real use, this would decrypt with ZelfProof
+		return {
+			publicData: { type: "mock", timestamp: new Date().toISOString() },
+			metadata: { mock: true }
+		};
+	},
+	preview: async (data) => {
+		// Mock implementation - in real use, this would preview with ZelfProof
+		return {
+			publicData: { type: "mock", timestamp: new Date().toISOString() }
+		};
+	}
+};
+
+const mockPinata = {
+	pinFile: async (file, name, type, metadata) => {
+		// Mock implementation - in real use, this would pin to IPFS
+		return {
+			IpfsHash: `mock_hash_${Date.now()}`,
+			url: `https://mock-gateway.com/${name}`,
+			PinSize: 1024,
+			name: name,
+			metadata: metadata
+		};
+	},
+	filter: async (key, value) => {
+		// Mock implementation - in real use, this would filter IPFS files
+		return [];
+	}
+};
+
+const mockCreateNFT = async (data, authToken) => {
+	// Mock implementation - in real use, this would create NFT on Avalanche
+	return {
+		transactionHash: `mock_tx_${Date.now()}`,
+		cost: "0.001",
+		owner: authToken.identifier,
+		contractAddress: "mock_contract",
+		metadataUrl: "mock_metadata_url",
+		tokenId: "1",
+		metadata: { mock: true },
+		explorerUrl: "https://mock-explorer.com"
+	};
+};
+
+const mockConfig = {
+	avalanche: {
+		createNFT: true
+	}
+};
+
+const createMetadataAndPublicData = async (type, data, authToken) => {
+    switch (type) {
+        case "password":
+            return {
+                metadata: {
+                    username: `${data.username}`,
+                    password: `${data.password}`,
+                },
+                publicData: {
+                    type: "website_password",
+                    website: `${data.website}`,
+                    username: data.username,
+                    folder: data.folder && data.insideFolder ? data.folder : undefined,
+                    timestamp: `${new Date().toISOString()}`,
+                    zelfName: `${authToken.identifier}`,
+                    category: `${authToken.identifier}_password`,
+                },
+            };
+        case "notes":
+            return {
+                metadata: data.keyValuePairs,
+                publicData: {
+                    type: "notes",
+                    title: `${data.title}`,
+                    timestamp: `${new Date().toISOString()}`,
+                    folder: data.folder && data.insideFolder ? data.folder : undefined,
+                    zelfName: `${authToken.identifier}`,
+                    category: `${authToken.identifier}_notes`,
+                },
+            };
+        case "credit_card":
+            return {
+                metadata: {
+                    cardNumber: `${data.cardNumber}`,
+                    expiryMonth: `${data.expiryMonth}`,
+                    expiryYear: `${data.expiryYear}`,
+                    cvv: `${data.cvv}`,
+                },
+                publicData: {
+                    type: "credit_card",
+                    card: JSON.stringify({
+                        name: `${data.cardName}`,
+                        number: `****-****-****-${data.cardNumber.slice(-4)}`,
+                        expires: `${data.expiryMonth}/${data.expiryYear.slice(-2)}`,
+                        bankName: `${data.bankName}`,
+                    }),
+                    folder: data.folder && data.insideFolder ? data.folder : undefined,
+                    timestamp: `${new Date().toISOString()}`,
+                    zelfName: `${authToken.identifier}`,
+                    category: `${authToken.identifier}_credit_card`,
+                },
+            };
+
+        default:
+            throw new Error(`Unsupported data type: ${type}`);
+    }
+};
+
+const validateOwnership = async (zelfProof, faceBase64, masterPassword) => {
+    const decryptedResponse = await mockZelfProofModule.decrypt({
+        zelfProof,
+        faceBase64,
+        password: masterPassword,
+        os: "DESKTOP",
+    });
+
+    return decryptedResponse.publicData;
+};
+
+const _store = async (publicData, metadata, faceBase64, identifier, authToken) => {
+    const { zelfQR } = await mockZelfProofModule.encryptQRCode({
+        publicData,
+        metadata,
+        faceBase64,
+        identifier,
+        requireLiveness: true,
+        tolerance: "REGULAR",
+        os: "DESKTOP",
+    });
+
+    const zelfKey = await mockZelfProofModule.encrypt({
+        publicData,
+        metadata,
+        faceBase64,
+        identifier,
+        requireLiveness: true,
+        tolerance: "REGULAR",
+        os: "DESKTOP",
+    });
+
+    let qrCodeIPFS = null;
+
+    try {
+        qrCodeIPFS = await mockPinata.pinFile(zelfQR, `${identifier}.png`, "image/png", {
+            ...publicData,
+            identifier,
+            zelfProof: zelfKey.zelfProof,
+        });
+    } catch (ipfsError) {
+        console.warn("⚠️ Failed to pin QR code to IPFS, continuing without IPFS:", ipfsError.message);
+    }
+
+    const NFT =
+        mockConfig.avalanche.createNFT && qrCodeIPFS
+            ? await mockCreateNFT(
+                  {
+                      zelfQR,
+                      url: qrCodeIPFS.url,
+                      name: identifier,
+                      publicData,
+                      zelfProof: zelfKey.zelfProof,
+                  },
+                  authToken
+              )
+            : null;
+
+    try {
+        const NFTJSON = JSON.stringify(NFT, null, 2);
+
+        const base64Data = Buffer.from(NFTJSON).toString("base64");
+
+        await mockPinata.pinFile(base64Data, `${identifier}_nft_transaction.json`, "application/json", {
+            transactionHash: NFT.transactionHash,
+            receipt: JSON.stringify({
+                cost: NFT.cost,
+                owner: NFT.owner,
+                contractAddress: NFT.contractAddress,
+                metadataUrl: NFT.metadataUrl,
+                tokenId: NFT.tokenId,
+            }),
+            identifier,
+            metadata: JSON.stringify(NFT.metadata),
+            explorerUrl: NFT.explorerUrl,
+            category: `${publicData.category}_nft_transaction`,
+        });
+    } catch (ipfsError) {
+        console.warn("⚠️ Failed to pin QR code to IPFS, continuing without IPFS:", ipfsError.message);
+    }
+
+    return {
+        success: true,
+        zelfProof: zelfKey.zelfProof,
+        zelfQR, // Encrypted string
+        NFT,
+        ipfs: qrCodeIPFS
+            ? {
+                  hash: qrCodeIPFS.IpfsHash,
+                  gatewayUrl: qrCodeIPFS.url,
+                  pinSize: qrCodeIPFS.PinSize,
+                  timestamp: `${new Date().toISOString()}`,
+                  name: qrCodeIPFS.name,
+                  metadata: qrCodeIPFS.metadata,
+              }
+            : null,
+        publicData,
+    };
+};
+
+/**
+ * Store website passwords
+ * @param {Object} data
+ * @param {string} data.website - Website URL or name
+ * @param {string} data.username - Username/email for the site
+ * @param {string} data.password - Password for the site
+ * @param {string} data.notes - Additional notes
+ * @param {string} data.faceBase64 - User's face for encryption
+ * @param {string} data.password - User's master password
+ * @returns {Promise<Object>}
+ */
+const storePassword = async (data, authToken) => {
+    const { website, faceBase64, masterPassword, name, folder, insideFolder, zelfProof } = data;
+
+    try {
+        const { metadata, publicData } = await createMetadataAndPublicData("password", data, authToken);
+
+        const identifier = name ? `${authToken.identifier}_${name}_${Date.now()}` : `${authToken.identifier}_${website}_${Date.now()}`;
+
+        const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
+
+        return {
+            ...result,
+            message: "Website password stored successfully as QR code and zelfProof string",
+        };
+    } catch (error) {
+        console.error({ error });
+        throw new Error("Failed to store website password");
+    }
+};
+
+/**
+ * Store notes as key-value pairs (metadata structure)
+ * @param {Object} data
+ * @param {string} data.title - Note title
+ * @param {Object} data.keyValuePairs - Object with up to 10 key-value pairs
+ * @param {string} data.faceBase64 - User's face for encryption
+ * @param {string} data.password - User's master password
+ * @returns {Promise<Object>}
+ */
+const storeNotes = async (data, authToken) => {
+    const { title, faceBase64 } = data;
+
+    try {
+        const identifier = `${authToken.identifier}_notes_${title}_${Date.now()}`;
+
+        const { metadata, publicData } = await createMetadataAndPublicData("notes", data, authToken);
+
+        const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
+
+        return {
+            ...result,
+            message: "Notes stored successfully",
+        };
+    } catch (error) {
+        console.error("Error storing notes:", { error });
+        throw new Error("Failed to store notes");
+    }
+};
+
+/**
+ * Validate credit card data
+ * @param {Object} data
+ * @param {string} data.cardNumber - Credit card number
+ * @param {string} data.expiryMonth - Expiry month (MM)
+ * @param {string} data.expiryYear - Expiry year (YYYY)
+ */
+const _validateCreditCardData = (cardNumber, expiryMonth, expiryYear) => {
+    if (!cardNumber || cardNumber.length < 13 || cardNumber.length > 19) {
+        throw new Error("Invalid credit card number");
+    }
+
+    const currentYear = new Date().getFullYear();
+
+    const currentMonth = new Date().getMonth() + 1;
+
+    if (parseInt(expiryYear) < currentYear || (parseInt(expiryYear) === currentYear && parseInt(expiryMonth) < currentMonth)) {
+        throw new Error("Credit card has expired");
+    }
+
+    if (parseInt(expiryMonth) < 1 || parseInt(expiryMonth) > 12) {
+        throw new Error("Invalid expiry month");
+    }
+};
+
+/**
+ * Store credit card information
+ * @param {Object} data
+ * @param {string} data.cardName - Name on the card
+ * @param {string} data.cardNumber - Credit card number
+ * @param {string} data.expiryMonth - Expiry month (MM)
+ * @param {string} data.expiryYear - Expiry year (YYYY)
+ * @param {string} data.cvv - CVV code
+ * @param {string} data.bankName - Bank name
+ * @param {string} data.faceBase64 - User's face for encryption
+ * @param {string} data.password - User's master password
+ * @returns {Promise<Object>}
+ */
+const storeCreditCard = async (data, authToken) => {
+    const { cardNumber, expiryMonth, expiryYear, bankName, faceBase64 } = data;
+
+    try {
+        _validateCreditCardData(cardNumber, expiryMonth, expiryYear);
+
+        const identifier = `${authToken.identifier}_${bankName}_${Date.now()}`;
+
+        const { metadata, publicData } = await createMetadataAndPublicData("credit_card", data, authToken);
+
+        const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
+
+        return {
+            ...result,
+            message: "Credit card stored successfully",
+        };
+    } catch (error) {
+        console.error("Error storing credit card:", error);
+        throw new Error("Failed to store credit card");
+    }
+};
+
+/**
+ * Main function to handle different types of data storage
+ * @param {Object} data
+ * @param {string} data.type - Type of data to store (password, notes, credit_card)
+ * @param {Object} data.payload - Data payload specific to the type
+ * @param {string} data.faceBase64 - User's face for encryption
+ * @param {string} data.password - User's master password
+ * @returns {Promise<Object>}
+ */
+const storeData = async (data, authToken) => {
+    try {
+        const { type, faceBase64, zelfProof, masterPassword } = data;
+
+        // Validate required fields
+        if (!type || !faceBase64) {
+            throw new Error("Missing required fields: type, payload, faceBase64, password");
+        }
+
+        await validateOwnership(zelfProof, faceBase64, masterPassword);
+
+        // Route to appropriate storage function
+        let result;
+        switch (type) {
+            case "password":
+                // validate if includes password
+                if (!data.password) throw new Error("Missing required fields: password");
+
+                result = await storePassword(data, authToken);
+                break;
+
+            case "notes":
+                result = await storeNotes(data, authToken);
+                break;
+
+            case "credit_card":
+                result = await storeCreditCard(data, authToken);
+                break;
+
+            default:
+                throw new Error(`Unsupported data type: ${type}`);
+        }
+
+        // Add IPFS information if available
+        if (result.ipfs) {
+            result.message += ` | IPFS: ${result.ipfs.hash}`;
+        }
+
+        return result;
+    } catch (error) {
+        console.error("Error in storeData:", error);
+        throw error;
+    }
+};
+
+/**
+ * Retrieve stored data using ZelfProof
+ * @param {Object} data
+ * @param {string} data.zelfProof - Encrypted ZelfProof
+ * @param {string} data.faceBase64 - User's face for decryption
+ * @param {string} data.password - User's master password
+ * @returns {Promise<Object>}
+ */
+const retrieveData = async (data, authToken) => {
+    try {
+        const { zelfProof, faceBase64, password } = data;
+
+        // Decrypt using ZelfProof module
+        const decryptedResponse = await mockZelfProofModule.decrypt({
+            zelfProof,
+            faceBase64,
+            password,
+            os: "DESKTOP",
+        });
+
+        return {
+            success: true,
+            data: decryptedResponse,
+            message: "Data retrieved successfully",
+        };
+    } catch (error) {
+        console.error("Error retrieving data:", error);
+        throw new Error("Failed to retrieve data");
+    }
+};
+
+/**
+ * Preview stored data without full decryption
+ * @param {Object} data
+ * @param {string} data.zelfProof - Encrypted ZelfProof
+ * @param {string} data.faceBase64 - User's face for preview
+ * @returns {Promise<Object>}
+ */
+const previewData = async (data, authToken) => {
+    try {
+        const { zelfProof, faceBase64 } = data;
+
+        // Preview using ZelfProof module
+        const previewResponse = await mockZelfProofModule.preview({
+            zelfProof,
+            faceBase64,
+            tolerance: "REGULAR",
+        });
+
+        return {
+            success: true,
+            publicData: previewResponse.publicData,
+            message: "Data preview successful",
+        };
+    } catch (error) {
+        console.error("Error previewing data:", error);
+        throw new Error("Failed to preview data");
+    }
+};
+
+/**
+ * Create NFT-ready data structure from ZelfKey storage
+ * This function prepares the data for NFT minting with proper metadata
+ * @param {Object} data
+ * @param {string} data.zelfProof - Encrypted ZelfProof string
+ * @param {string} data.faceBase64 - User's face for verification
+ * @param {string} data.password - User's master password
+ * @returns {Promise<Object>} NFT-ready data structure
+ */
+const createNFTReadyData = async (data, authToken) => {
+    try {
+        const { zelfProof, faceBase64, password } = data;
+
+        // First, retrieve the data to get the IPFS information
+        const retrievedData = await retrieveData(
+            {
+                zelfProof,
+                faceBase64,
+                password,
+            },
+            authToken
+        );
+
+        if (!retrievedData.success || !retrievedData.data.ipfs) {
+            throw new Error("No IPFS data available for NFT creation");
+        }
+
+        const { ipfs, publicData } = retrievedData.data;
+
+        // Create NFT-ready structure
+        const nftReadyData = {
+            success: true,
+            zelfKeyData: {
+                publicData,
+                ipfs: {
+                    hash: ipfs.hash,
+                    gatewayUrl: ipfs.gatewayUrl,
+                    pinSize: ipfs.pinSize,
+                    timestamp: ipfs.timestamp,
+                    name: ipfs.name,
+                    metadata: ipfs.metadata,
+                },
+                message: `NFT-ready data created from ${publicData.type}`,
+                timestamp: new Date().toISOString(),
+            },
+            nftMetadata: {
+                name: `ZelfKey ${publicData.type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}`,
+                description: `Secure ${publicData.type.replace(/_/g, " ")} stored with ZelfKey biometric encryption`,
+                image: ipfs.gatewayUrl,
+                external_url: "https://zelf.world",
+                attributes: [
+                    {
+                        trait_type: "Data Type",
+                        value: publicData.type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+                    },
+                    {
+                        trait_type: "Storage Method",
+                        value: "ZelfKey Biometric Encryption",
+                    },
+                    {
+                        trait_type: "Security Level",
+                        value: "Maximum",
+                    },
+                    {
+                        trait_type: "IPFS Hash",
+                        value: ipfs.hash,
+                    },
+                    {
+                        trait_type: "Timestamp",
+                        value: ipfs.timestamp,
+                    },
+                    {
+                        trait_type: "Project",
+                        value: "ZelfKey Avalanche Integration",
+                    },
+                ],
+                properties: {
+                    files: [
+                        {
+                            type: "image/png",
+                            uri: ipfs.gatewayUrl,
+                        },
+                    ],
+                    category: "image",
+                    zelfKey: {
+                        type: publicData.type,
+                        encrypted: true,
+                        biometric: true,
+                        ipfs: {
+                            hash: ipfs.hash,
+                            gateway: ipfs.gatewayUrl,
+                        },
+                    },
+                },
+            },
+            message: "NFT-ready data structure created successfully",
+        };
+
+        return nftReadyData;
+    } catch (error) {
+        console.error("Error creating NFT-ready data:", error);
+        throw new Error(`Failed to create NFT-ready data: ${error.message}`);
+    }
+};
+
+/**
+ * List data by category
+ * @param {Object} data - Query parameters
+ * @param {Object} authToken - Authentication token
+ * @returns {Promise<Object>} List of data items in the specified category
+ */
+const listData = async (data, authToken) => {
+    try {
+        const { category } = data;
+
+        // Validate category
+        const validCategories = ["password", "notes", "credit_card"];
+        if (!validCategories.includes(category)) {
+            throw new Error(`Invalid category: ${category}`);
+        }
+
+        // Query IPFS via Pinata for files with the specific category metadata
+        // The category is stored as `${authToken.identifier}_${category}` in the metadata
+        const categoryFilter = `${authToken.identifier}_${category}`;
+
+        // Filter files by the category metadata
+        const files = await mockPinata.filter("category", categoryFilter);
+
+        const nftTransactionFiles = await mockPinata.filter("category", `${categoryFilter}_nft_transaction`);
+
+        // Transform the files to include relevant information
+        const transformedData = files.map((file) => ({
+            id: file.ipfs_pin_hash,
+            name: file.name,
+            url: file.url,
+            size: file.size,
+            timestamp: file.date_pinned,
+            name: file.metadata?.name,
+
+            publicData: file.metadata?.keyvalues || {},
+        }));
+
+        const transformedNftTransactionData = nftTransactionFiles.map((file) => ({
+            id: file.ipfs_pin_hash,
+            name: file.name,
+            url: file.url,
+            size: file.size,
+            timestamp: file.date_pinned,
+            publicData: file.metadata?.keyvalues || {},
+        }));
+
+        // Map over transformedData as the main collection and optionally add NFT transaction data if it exists
+        const finalData = transformedData.map((data) => {
+            const matchingNftTransaction = transformedNftTransactionData.find(
+                (nftTransaction) => nftTransaction.publicData.identifier === data.publicData.identifier
+            );
+
+            const result = {
+                ...data,
+            };
+
+            // If we have matching NFT transaction data, add it to the result
+            if (matchingNftTransaction?.publicData) {
+                const receipt = JSON.parse(matchingNftTransaction.publicData.receipt || "{}");
+                const metadata = JSON.parse(matchingNftTransaction.publicData.metadata || "{}");
+
+                result.NFT = {
+                    ...matchingNftTransaction.publicData,
+                    ...receipt,
+                    // Preserve the important metadata fields, especially the image URL for Snowtrace
+                    ...metadata,
+                };
+            }
+
+            return result;
+        });
+
+        return {
+            success: true,
+            message: `Found ${finalData.length} items in category: ${category}`,
+            category: category,
+            data: finalData,
+            timestamp: new Date().toISOString(),
+            zelfName: authToken.identifier,
+            totalCount: finalData.length,
+        };
+    } catch (error) {
+        console.error("Error listing data:", error);
+        throw new Error(`Failed to list data: ${error.message}`);
+    }
+};
+
+export { storeData, retrieveData, previewData, createNFTReadyData, listData };

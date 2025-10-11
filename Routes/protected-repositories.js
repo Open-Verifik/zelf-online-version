@@ -28,6 +28,7 @@ module.exports = (server) => {
 	//L
 	require("../Repositories/License/routes/license.route")(server);
 	require("../Repositories/License/routes/theme.route")(server);
+
 	require("../Repositories/Lifi/routes/lifi.route")(server);
 	// Subscription Plans
 	require("../Repositories/SubscriptionPlan/routes/subscription-plan.route")(server);
@@ -58,6 +59,7 @@ module.exports = (server) => {
 	//Y
 	//Z
 	require("../Repositories/ZelfNameService/routes/zns.routes")(server);
+	require("../Repositories/ZelfKeys/routes/zelf-key.route")(server);
 	require("../Repositories/ZelfNameService/routes/my-zns.routes")(server);
 };
 // end

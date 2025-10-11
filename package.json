@@ -75,8 +75,8 @@
 		"qrcode-reader": "^1.0.4",
 		"readable-stream": "^4.5.2",
 		"request": "^2.88.2",
-		"swagger-jsdoc": "^6.2.8",
 		"stripe": "^16.6.0",
+		"swagger-jsdoc": "^6.2.8",
 		"tiny-secp256k1": "^2.2.3",
 		"web3-validator": "^2.0.6"
 	},
@@ -93,6 +93,7 @@
 	"author": "Miguel Trevino",
 	"license": "ISC",
 	"devDependencies": {
+		"jest": "^30.2.0",
 		"supertest": "^7.1.4"
 	}
 }
