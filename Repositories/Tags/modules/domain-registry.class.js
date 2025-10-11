@@ -1,4 +1,4 @@
-const { SUPPORTED_DOMAINS } = require("../config/supported-domains");
+const { getSupportedDomains } = require("../config/supported-domains");
 
 /**
  * Domain Registry Class
@@ -8,7 +8,7 @@ const { SUPPORTED_DOMAINS } = require("../config/supported-domains");
  */
 class DomainRegistry {
 	constructor() {
-		this.domains = SUPPORTED_DOMAINS;
+		this.domains = getSupportedDomains();
 	}
 
 	/**

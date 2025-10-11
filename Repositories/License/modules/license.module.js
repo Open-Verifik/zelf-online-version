@@ -9,7 +9,7 @@ const path = require("path");
 const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
 const DefaultLicenseValues = require("./default-license.values");
 const { Domain } = require("../../Tags/modules/domain.class");
-
+const CACHE_DOMAINS = {};
 // Cache file path for development mode
 const CACHE_FILE_PATH = path.join(__dirname, "../../../cache/official-licenses-cache.json");
 
@@ -35,9 +35,13 @@ const loadCache = () => {
 	try {
 		if (!fs.existsSync(CACHE_FILE_PATH)) return null;
 
-		const cacheContent = fs.readFileSync(CACHE_FILE_PATH, "utf8");
+		const cacheContent = CACHE_DOMAINS.timestamp ? CACHE_DOMAINS : fs.readFileSync(CACHE_FILE_PATH, "utf8");
 
-		const cacheData = JSON.parse(cacheContent);
+		const cacheData = CACHE_DOMAINS.timestamp ? CACHE_DOMAINS : JSON.parse(cacheContent);
+
+		CACHE_DOMAINS.timestamp = cacheData.timestamp;
+
+		CACHE_DOMAINS.licenses = cacheData.licenses;
 
 		return isCacheValid(cacheData) ? cacheData : null;
 	} catch (error) {
@@ -61,6 +65,10 @@ const saveCache = (licenses) => {
 			timestamp: moment().toISOString(),
 			licenses: licenses,
 		};
+
+		CACHE_DOMAINS.timestamp = cacheData.timestamp;
+
+		CACHE_DOMAINS.licenses = cacheData.licenses;
 
 		fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cacheData, null, 2));
 		console.log("Official licenses cache saved successfully");
@@ -515,12 +523,11 @@ const syncLicenseWithStripe = async (license, paymentData) => {
 		{ pro: true }
 	);
 
-	console.log({ licenseUpdated });
-
 	return licenseUpdated;
 };
 
 module.exports = {
+	CACHE_DOMAINS,
 	searchLicense,
 	getMyLicense,
 	createOrUpdateLicense,

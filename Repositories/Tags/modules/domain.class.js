@@ -133,10 +133,11 @@ class Domain {
 
 		let price = 24;
 
-		if (this.tags?.payment.pricingTable[length]) {
-			price = this.tags?.payment.pricingTable[length][duration];
-		} else if (length >= 6 && length <= 15) {
+		if (length >= 6 && length <= 15) {
 			price = this.tags?.payment.pricingTable["6-15"]?.[duration];
+			console.log("6-15", price, this);
+		} else if (this.tags?.payment.pricingTable[length]) {
+			price = this.tags?.payment.pricingTable[length][duration];
 		} else {
 			throw new Error("Invalid name length. Length must be between 1 and 27.");
 		}

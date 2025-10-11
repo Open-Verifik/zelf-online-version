@@ -1,5 +1,5 @@
 const {
-	SUPPORTED_DOMAINS,
+	getSupportedDomains,
 	getDomainConfig,
 	isSupported,
 	isDomainActive,
@@ -178,7 +178,7 @@ const getDomainStats = (domain) => {
  * @returns {Array} - Array of domain names
  */
 const listDomainNames = () => {
-	return Object.keys(SUPPORTED_DOMAINS);
+	return Object.keys(getSupportedDomains());
 };
 
 /**
@@ -186,7 +186,7 @@ const listDomainNames = () => {
  * @returns {number} - Total number of domains
  */
 const getDomainCount = () => {
-	return Object.keys(SUPPORTED_DOMAINS).length;
+	return Object.keys(getSupportedDomains()).length;
 };
 
 /**

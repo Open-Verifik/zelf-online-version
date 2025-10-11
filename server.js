@@ -119,6 +119,7 @@ const server = app.listen(config.port, () => {
 					}
 
 					const token = ctx.request.query?.token || ctx.request?.body?.token;
+
 					if (!token) return null;
 
 					const _indexOfToken = token.indexOf("ey");
