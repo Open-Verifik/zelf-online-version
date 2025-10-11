@@ -1,6 +1,7 @@
 const LicenseModule = require("./license.module");
 const IPFS = require("../../../Repositories/IPFS/modules/ipfs.module");
 const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
+const moment = require("moment");
 
 /**
  * Get user's theme settings
@@ -44,6 +45,7 @@ const updateThemeSettings = async (requestData, user) => {
 		const updatedDomainConfig = {
 			...myLicense.domainConfig,
 			themeSettings: themeSettings,
+			updatedAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 		};
 
 		// Create new license file with updated theme settings
