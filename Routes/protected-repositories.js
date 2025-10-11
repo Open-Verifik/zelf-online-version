@@ -27,6 +27,7 @@ module.exports = (server) => {
 	//K
 	//L
 	require("../Repositories/License/routes/license.route")(server);
+	require("../Repositories/License/routes/theme.route")(server);
 	require("../Repositories/Lifi/routes/lifi.route")(server);
 	// Subscription Plans
 	require("../Repositories/SubscriptionPlan/routes/subscription-plan.route")(server);

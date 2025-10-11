@@ -103,13 +103,33 @@ const searchLicense = async (query, user) => {
  * @param {Object} jwt - JWT object
  * @returns {Array} - Array of user's licenses
  */
-const getMyLicense = async (jwt, withJSON = false) => {
+const getMyLicense = async (jwt, withJSON = false, ownershipCredentials) => {
 	// Get client data to get the zelfProof
 	const client = await ClientModule.get({ email: jwt.email });
 
 	if (!client) throw new Error("404:client_not_found");
 
 	const metadata = client.publicData;
+
+	let accountZelfProof = null;
+
+	let accountJSON = null;
+
+	// if ownershipCredentials are provided, we need to verify the ownership of the license
+	if (ownershipCredentials) {
+		const { faceBase64, masterPassword } = ownershipCredentials;
+
+		accountJSON = await axios.get(client.url);
+
+		accountZelfProof = accountJSON.data.zelfProof;
+
+		await decrypt({
+			zelfProof: accountZelfProof,
+			faceBase64,
+			password: masterPassword || undefined,
+			verifierKey: config.zelfEncrypt.serverKey,
+		});
+	}
 
 	// Search for all licenses with the same zelfProof
 	const myRecords = await IPFS.get({ key: "licenseOwner", value: metadata.accountEmail });
@@ -125,7 +145,7 @@ const getMyLicense = async (jwt, withJSON = false) => {
 	let jsonResponse = null;
 
 	// get the json from the url
-	if (withJSON) {
+	if (withJSON && myLicenses.length) {
 		try {
 			jsonResponse = await axios.get(myLicenses[0].url);
 
@@ -136,7 +156,7 @@ const getMyLicense = async (jwt, withJSON = false) => {
 		}
 	}
 
-	return { myLicense: myLicenses.length ? myLicenses[0] : null, zelfAccount: client };
+	return { myLicense: myLicenses.length ? myLicenses[0] : null, zelfAccount: client, accountZelfProof, accountJSON };
 };
 
 /**
@@ -235,26 +255,12 @@ const createOrUpdateLicense = async (body, jwt) => {
 	const { faceBase64, masterPassword, domainConfig } = body;
 
 	try {
-		const { myLicense, zelfAccount } = await getMyLicense(jwt);
-
-		const accountJSON = await axios.get(zelfAccount.url);
-
-		const accountZelfProof = accountJSON.data.zelfProof;
-
-		// now we should validate if the zelfAccount is the owner of the license with the decrypted zelfProof
-		await decrypt({
-			zelfProof: accountZelfProof,
-			faceBase64,
-			password: masterPassword || undefined,
-			verifierKey: config.zelfEncrypt.serverKey,
-		});
+		const { myLicense, zelfAccount, accountZelfProof } = await getMyLicense(jwt, false, { faceBase64, masterPassword });
 
 		// validate if the domain being passed is registered or not because we need to compare the domain with the previous domain
 		await _checkIfDomainIsRegistered(body.domain, zelfAccount.publicData.accountEmail);
 
-		if (myLicense) {
-			await TagsIPFSModule.unPinFiles([myLicense.id]);
-		}
+		if (myLicense) await TagsIPFSModule.unPinFiles([myLicense.id]);
 
 		// Filter domain config to only include user-modifiable fields
 		const filteredDomainConfig = filterUserModifiableFields(domainConfig, myLicense);
@@ -269,7 +275,7 @@ const createOrUpdateLicense = async (body, jwt) => {
 			zelfProof: accountZelfProof,
 		};
 
-		const jsonData = JSON.stringify({ ...licenseMetadata }, null, 2);
+		const jsonData = JSON.stringify(licenseMetadata, null, 2);
 
 		const base64Data = Buffer.from(jsonData).toString("base64");
 
@@ -307,25 +313,12 @@ const createOrUpdateLicense = async (body, jwt) => {
  * @returns {Object} - Deletion confirmation
  */
 const deleteLicense = async (params, authUser) => {
-	const { faceBase64, masterPassword, os } = params;
+	const { faceBase64, masterPassword } = params;
 
 	try {
-		const { myLicense, zelfAccount } = await getMyLicense(authUser);
+		const { myLicense } = await getMyLicense(authUser, false, { faceBase64, masterPassword });
 
 		if (!myLicense) throw new Error("404:license_not_found");
-
-		const accountJSON = await axios.get(zelfAccount.url);
-
-		const accountZelfProof = accountJSON.data.zelfProof;
-
-		// now we should validate if the zelfAccount is the owner of the license with the decrypted zelfProof
-		await decrypt({
-			zelfProof: accountZelfProof,
-			faceBase64,
-			os: os || "DESKTOP",
-			password: masterPassword || undefined,
-			verifierKey: config.zelfEncrypt.serverKey,
-		});
 
 		// Unpin from IPFS
 		const deletedFiles = await IPFS.unPinFiles([myLicense.id]);
