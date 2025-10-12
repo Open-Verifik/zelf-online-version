@@ -1,9 +1,10 @@
-const Module = require("../modules/zelf-key.module.js");
-const { errorHandler } = require("../../../Core/http-handler");
 /**
  * ZelfKey Controller - Handles HTTP requests for password manager operations
  * @author Miguel Trevino <miguel@zelf.world>
  */
+
+const Module = require("../modules/zelf-key.module.js");
+const { errorHandler } = require("../../../Core/http-handler");
 
 /**
  * Store website password specifically
