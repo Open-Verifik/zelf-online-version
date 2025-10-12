@@ -44,11 +44,6 @@ describe("License API Integration Tests - Real Server", () => {
 						masterPassword: sampleFaceFromJSON.password,
 						faceBase64: sampleFaceFromJSON.faceBase64,
 					});
-
-				console.log("Cleanup response:", {
-					status: deleteResponse.status,
-					message: deleteResponse.body.data?.message || deleteResponse.body.message,
-				});
 			} catch (error) {
 				console.error("Cleanup failed:", error.message);
 			}
@@ -240,8 +235,6 @@ describe("License API Integration Tests - Real Server", () => {
 				.set("Origin", "https://test.example.com")
 				.set("Authorization", `Bearer ${authToken}`)
 				.send(createData);
-
-			console.log({ response: response.body });
 
 			expect(response.status).toBe(200);
 			expect(response.body).toHaveProperty("data");
