@@ -135,7 +135,6 @@ class Domain {
 
 		if (length >= 6 && length <= 15) {
 			price = this.tags?.payment.pricingTable["6-15"]?.[duration];
-			console.log("6-15", price, this);
 		} else if (this.tags?.payment.pricingTable[length]) {
 			price = this.tags?.payment.pricingTable[length][duration];
 		} else {
@@ -258,7 +257,7 @@ class Domain {
 	 * @returns {boolean} - True if IPFS is enabled
 	 */
 	isIPFSEnabled() {
-		return this.storage.ipfsEnabled;
+		return this.tags.storage.ipfsEnabled;
 	}
 
 	/**
@@ -266,7 +265,7 @@ class Domain {
 	 * @returns {boolean} - True if Arweave is enabled
 	 */
 	isArweaveEnabled() {
-		return this.storage.arweaveEnabled;
+		return this.tags.storage.arweaveEnabled;
 	}
 
 	/**
@@ -274,7 +273,7 @@ class Domain {
 	 * @returns {boolean} - True if backup is enabled
 	 */
 	isBackupEnabled() {
-		return this.storage.backupEnabled;
+		return this.tags.storage.backupEnabled;
 	}
 
 	/**
@@ -311,7 +310,7 @@ class Domain {
 			features: this.features || [],
 			tags: this.tags,
 			zelfkeys: this.zelfkeys,
-			storage: this.storage,
+			storage: this.tags.storage,
 			stripe: this.stripe,
 			metadata: this.metadata,
 		};
@@ -355,7 +354,7 @@ class Domain {
 	 * @returns {string} - The tag key (storage.keyPrefix)
 	 */
 	getTagKey() {
-		return this.storage.keyPrefix;
+		return this.tags.storage.keyPrefix;
 	}
 
 	/**

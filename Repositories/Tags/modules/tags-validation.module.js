@@ -1,15 +1,15 @@
-const { 
-	getDomainConfiguration, 
-	isDomainSupported, 
-	isDomainActive, 
+const {
+	getDomainConfiguration,
+	isDomainSupported,
+	isDomainActive,
 	validateDomainName,
 	getDomainLimits,
-	supportsFeature 
+	supportsFeature,
 } = require("./domain-registry.module");
 
 /**
  * Tags Validation Module
- * 
+ *
  * This module provides comprehensive validation for the Tags system.
  * It handles domain validation, name validation, feature validation, and limits checking.
  */
@@ -32,6 +32,7 @@ const validateTagNameFormat = (tagName) => {
 
 	// Extract domain and name
 	const domain = parts[parts.length - 1].toLowerCase();
+
 	const name = parts.slice(0, -1).join(".");
 
 	// Check if domain is supported
@@ -50,11 +51,11 @@ const validateTagNameFormat = (tagName) => {
 		return nameValidation;
 	}
 
-	return { 
-		valid: true, 
-		domain, 
-		name, 
-		tagName: `${name}.${domain}` 
+	return {
+		valid: true,
+		domain,
+		name,
+		tagName: `${name}.${domain}`,
 	};
 };
 
@@ -81,11 +82,11 @@ const validateDomainAndName = async (domain, name) => {
 		return nameValidation;
 	}
 
-	return { 
-		valid: true, 
-		domain, 
-		name, 
-		tagName: `${name}.${domain}` 
+	return {
+		valid: true,
+		domain,
+		name,
+		tagName: `${name}.${domain}`,
 	};
 };
 
@@ -134,12 +135,12 @@ const validateTagCreation = async (params, authUser) => {
 		return { valid: false, error: `Maximum ${limits.maxTagsPerUser} tags per user exceeded` };
 	}
 
-	return { 
-		valid: true, 
-		domain: domainValidation.domain, 
-		name: domainValidation.name, 
+	return {
+		valid: true,
+		domain: domainValidation.domain,
+		name: domainValidation.name,
 		tagName: domainValidation.tagName,
-		domainConfig 
+		domainConfig,
 	};
 };
 
@@ -182,11 +183,11 @@ const validateTagTransfer = async (params, authUser) => {
 		return { valid: false, error: `Maximum ${limits.maxTransferPerDay} transfers per day exceeded` };
 	}
 
-	return { 
-		valid: true, 
-		domain: domainValidation.domain, 
-		name: domainValidation.name, 
-		tagName: domainValidation.tagName 
+	return {
+		valid: true,
+		domain: domainValidation.domain,
+		name: domainValidation.name,
+		tagName: domainValidation.tagName,
 	};
 };
 
@@ -229,11 +230,11 @@ const validateTagRenewal = async (params, authUser) => {
 		return { valid: false, error: `Maximum ${limits.maxRenewalPerDay} renewals per day exceeded` };
 	}
 
-	return { 
-		valid: true, 
-		domain: domainValidation.domain, 
-		name: domainValidation.name, 
-		tagName: domainValidation.tagName 
+	return {
+		valid: true,
+		domain: domainValidation.domain,
+		name: domainValidation.name,
+		tagName: domainValidation.tagName,
 	};
 };
 
@@ -256,11 +257,11 @@ const validateTagSearch = async (params, authUser) => {
 		if (!tagValidation.valid) {
 			return tagValidation;
 		}
-		return { 
-			valid: true, 
-			domain: tagValidation.domain, 
-			name: tagValidation.name, 
-			tagName: tagValidation.tagName 
+		return {
+			valid: true,
+			domain: tagValidation.domain,
+			name: tagValidation.name,
+			tagName: tagValidation.tagName,
 		};
 	}
 
@@ -325,13 +326,13 @@ const validateHoldDomain = async (params, authUser) => {
 		return { valid: false, error: `Domain '${domain}' does not support hold functionality` };
 	}
 
-	return { 
-		valid: true, 
-		domain: domainValidation.domain, 
-		name: domainValidation.name, 
+	return {
+		valid: true,
+		domain: domainValidation.domain,
+		name: domainValidation.name,
 		tagName: domainValidation.tagName,
 		holdDomain: `${domainValidation.name}${domainConfig.holdSuffix}.${domain}`,
-		domainConfig 
+		domainConfig,
 	};
 };
 
@@ -394,13 +395,13 @@ const validatePayment = async (params, authUser) => {
 		return { valid: false, error: `Payment amount must be at least ${domainPrice} cents` };
 	}
 
-	return { 
-		valid: true, 
-		domain, 
-		amount, 
-		currency, 
-		method, 
-		domainConfig 
+	return {
+		valid: true,
+		domain,
+		amount,
+		currency,
+		method,
+		domainConfig,
 	};
 };
 
@@ -422,27 +423,27 @@ const validateUserLimits = async (domain, operation, authUser) => {
 	switch (operation) {
 		case "create":
 			if (limits.maxTagsPerUser && authUser.tagCount >= limits.maxTagsPerUser) {
-				return { 
-					valid: false, 
-					error: `Maximum ${limits.maxTagsPerUser} tags per user exceeded` 
+				return {
+					valid: false,
+					error: `Maximum ${limits.maxTagsPerUser} tags per user exceeded`,
 				};
 			}
 			break;
 
 		case "transfer":
 			if (limits.maxTransferPerDay && authUser.dailyTransfers >= limits.maxTransferPerDay) {
-				return { 
-					valid: false, 
-					error: `Maximum ${limits.maxTransferPerDay} transfers per day exceeded` 
+				return {
+					valid: false,
+					error: `Maximum ${limits.maxTransferPerDay} transfers per day exceeded`,
 				};
 			}
 			break;
 
 		case "renew":
 			if (limits.maxRenewalPerDay && authUser.dailyRenewals >= limits.maxRenewalPerDay) {
-				return { 
-					valid: false, 
-					error: `Maximum ${limits.maxRenewalPerDay} renewals per day exceeded` 
+				return {
+					valid: false,
+					error: `Maximum ${limits.maxRenewalPerDay} renewals per day exceeded`,
 				};
 			}
 			break;

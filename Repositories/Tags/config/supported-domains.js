@@ -256,6 +256,8 @@ const SUPPORTED_DOMAINS = {
  * @returns {Object|null} - Domain configuration or null if not found
  */
 const getDomainConfig = (domain) => {
+	if (!domain) return null;
+
 	const supportedDomains = getSupportedDomains();
 
 	return supportedDomains[domain.toLowerCase()] || null;

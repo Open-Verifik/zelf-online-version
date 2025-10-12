@@ -233,8 +233,6 @@ const _requiresUpdate = async (tagPayObject, priceDetails) => {
 	const sameDuration = !tagPayObject || tagPayObject?.publicData?.duration == priceDetails.duration;
 
 	if (!sameDuration && tagPayObject?.zelfProofQRCode) {
-		console.log("deleting tag pay object...");
-
 		await tagsIpfsModule.unPinFiles([tagPayObject.id]);
 
 		return true;

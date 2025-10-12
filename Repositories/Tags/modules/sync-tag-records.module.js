@@ -55,9 +55,9 @@ const updateTags = async (tagObject, tagsToAdd) => {
 
 	const tagName = tagObject.publicData[tagKey];
 
-	const zelfProof = tagObject.zelfProof || tagObject.publicData.zelfProof;
-
 	const zelfProofQRCode = tagObject.zelfProofQRCode || tagObject.publicData.zelfProofQRCode;
+
+	if (!tagObject.publicData.expiresAt) tagObject.publicData.expiresAt = moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss");
 
 	const extraParams = {
 		hasPassword: tagObject.publicData.hasPassword,
@@ -72,7 +72,6 @@ const updateTags = async (tagObject, tagsToAdd) => {
 	};
 
 	const metadata = {
-		zelfProof,
 		[tagKey]: tagName,
 		ethAddress: tagObject.publicData.ethAddress || undefined,
 		btcAddress: tagObject.publicData.btcAddress || undefined,
@@ -98,8 +97,16 @@ const updateTags = async (tagObject, tagsToAdd) => {
 	let arweave = {};
 
 	// unpin the current IPFS hash
-	if (tagObject.ipfsHash || tagObject.ipfs_pin_hash) {
-		await TagsIPFSModule.unPinFiles([tagObject.ipfsHash || tagObject.ipfs_pin_hash]);
+	if (tagObject.id) await TagsIPFSModule.unPinFiles([tagObject.ipfsId || tagObject.id]);
+
+	if (metadata.type === "mainnet") {
+		// save in Arweave as well
+		arweave = await TagsArweaveModule.tagRegistration(zelfProofQRCode, {
+			hasPassword: metadata.hasPassword,
+			zelfProof: tagObject.publicData?.zelfProof,
+			publicData: { ...metadata },
+			fileName: tagName,
+		});
 	}
 
 	const ipfs = await TagsIPFSModule.tagRegistration(
@@ -112,15 +119,7 @@ const updateTags = async (tagObject, tagsToAdd) => {
 		{ pro: true }
 	);
 
-	if (metadata.type === "mainnet") {
-		// save in Arweave as well
-		arweave = await TagsArweaveModule.tagRegistration(zelfProofQRCode, {
-			hasPassword: metadata.hasPassword,
-			zelfProof: metadata.zelfProof,
-			publicData: metadata,
-			fileName: tagName,
-		});
-	}
+	console.log({ ipfsSync: ipfs });
 
 	return {
 		ipfs,

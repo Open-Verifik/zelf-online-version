@@ -231,6 +231,10 @@ const formatSearchResults = (searchResults) => {
 			delete formattedResult.publicData.extraParams;
 		}
 
+		if (formattedResult.publicData.leaseExpiresAt) {
+			formattedResult.publicData.expiresAt = formattedResult.publicData.leaseExpiresAt;
+		}
+
 		formattedResults.push(formattedResult);
 	}
 
@@ -267,6 +271,10 @@ const formatCreatedRecord = (record) => {
 		Object.assign(formattedRecord.publicData, extraParams);
 
 		delete formattedRecord.publicData.extraParams;
+	}
+
+	if (formattedRecord.publicData.leaseExpiresAt) {
+		formattedRecord.publicData.expiresAt = formattedRecord.publicData.leaseExpiresAt;
 	}
 
 	return formattedRecord;

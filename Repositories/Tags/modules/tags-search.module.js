@@ -22,7 +22,9 @@ const { QRZelfProofExtractor } = require("./qr-zelfproof-extractor.module");
  * @returns {Object} - Search results
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value, domainConfig, environment, type, duration } = params;
+	const { tagName, domain, key, value, environment, type, duration } = params;
+
+	let domainConfig = params.domainConfig || getDomainConfiguration(domain);
 
 	try {
 		// Search in both IPFS and Arweave
@@ -42,8 +44,12 @@ const searchTag = async (params, authUser) => {
 		// If results found, return the first one
 		if (arweaveResults.length > 0) {
 			combinedResults.tagObject = { ...arweaveResults[0] };
-		} else if (ipfsResults.length > 0) {
-			combinedResults.tagObject = { ...ipfsResults[0] };
+		}
+
+		if (ipfsResults.length > 0) {
+			if (!combinedResults.tagObject) combinedResults.tagObject = { ...ipfsResults[0] };
+
+			combinedResults.tagObject.ipfsId = ipfsResults[0].id;
 		}
 
 		if (combinedResults.available) {
@@ -84,9 +90,13 @@ const searchTag = async (params, authUser) => {
  * @returns {Array} - IPFS search results
  */
 const searchIPFS = async (params, authUser) => {
-	const { tagName, key, value, domainConfig, type } = params;
+	const { tagName, key, value, type, domain } = params;
 
-	if (!domainConfig?.storage?.ipfsEnabled) return [];
+	const domainConfig = params.domainConfig || getDomainConfiguration(domain);
+
+	if (!domainConfig?.tags?.storage?.ipfsEnabled) {
+		return [];
+	}
 
 	const ipfsRecords = [];
 
@@ -125,7 +135,7 @@ const searchArweave = async (params, authUser) => {
 		// Get domain configuration
 		const _domainConfig = domainConfig || getDomainConfiguration(domain);
 
-		if (!_domainConfig?.storage?.arweaveEnabled) return [];
+		if (!_domainConfig?.tags?.storage?.arweaveEnabled) return [];
 
 		const _tagName = TagsPartsModule.getFullTagName(tagName, _domainConfig.name);
 

@@ -32,7 +32,7 @@ const get = async (data) => {
 	if (tagName) {
 		// Generate domain-specific storage key
 
-		const storageKey = domainConfig ? domainConfig.storage.keyPrefix : generateStorageKey(domain);
+		const storageKey = domainConfig ? domainConfig.tags.storage.keyPrefix : generateStorageKey(domain);
 
 		result = await IPFS.filter(storageKey, tagName);
 	} else if (key && value) {
@@ -54,6 +54,16 @@ const _formatRecord = (item) => {
 		date_pinned: item.date_pinned || item.Timestamp || item.created_at,
 		date_unpinned: item.date_unpinned,
 		publicData: item.publicData || item.metadata?.keyvalues || item.metadata || item.keyvalues,
+		network: item.network,
+		pinned: item.pinned,
+		duplicated: item.is_duplicate,
+		saved: !Boolean(item.is_duplicate),
+		web3: item.web3,
+		name: item.name,
+		metadata: item.metadata,
+		created_at: item.created_at,
+		updated_at: item.updated_at,
+		deleted_at: item.deleted_at,
 	};
 
 	if (formattedResult?.publicData?.extraParams) {
