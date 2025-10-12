@@ -114,8 +114,6 @@ const searchTag = async (params, authUser) => {
 	try {
 		const _domainConfig = domainConfig || getDomainConfig(domain);
 
-		console.log({ _domainConfig });
-
 		const result = await TagsSearchModule.searchTag(
 			{
 				tagName,
@@ -129,8 +127,6 @@ const searchTag = async (params, authUser) => {
 			},
 			authUser
 		);
-
-		console.log({ result });
 
 		if (result.ipfs?.length) {
 			for (let index = 0; index < result.ipfs.length; index++) {
@@ -163,13 +159,15 @@ const decryptTag = async (params, authUser) => {
 
 	const tagObject = searchResult.tagObject;
 
+	if (!tagObject?.zelfProof) throw new Error("404:tag_not_found");
+
 	const { face, password } = await _decryptParams(params, authUser);
 
 	const decryptedZelfProof = await decrypt({
 		addServerPassword: Boolean(params.addServerPassword),
 		faceBase64: face,
 		password,
-		zelfProof: tagObject.zelfProof,
+		zelfProof: tagObject?.zelfProof,
 	});
 
 	if (decryptedZelfProof.error) {
@@ -419,23 +417,15 @@ const _decryptParams = async (params, authUser) => {
 		};
 	}
 
-	const { faceBase64, password } = params;
-
-	const decryptedFace = await decrypt({
-		faceBase64,
-		password,
-		verifierKey: config.zelfEncrypt.serverKey,
-	});
-
-	if (decryptedFace.error) {
-		const error = new Error(decryptedFace.error.code);
-		error.status = 409;
-		throw error;
-	}
+	// Use session decryption for all parameters consistently
+	const password = params.password ? await SessionModule.sessionDecrypt(params.password, authUser) : null;
+	const mnemonic = params.mnemonic ? await SessionModule.sessionDecrypt(params.mnemonic, authUser) : null;
+	const face = params.faceBase64 ? await SessionModule.sessionDecrypt(params.faceBase64, authUser) : null;
 
 	return {
-		face: decryptedFace.face,
 		password,
+		mnemonic,
+		face,
 	};
 };
 

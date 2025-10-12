@@ -27,11 +27,10 @@ const decryptParams = async (params, authUser) => {
 		};
 	}
 
-	const password = await SessionModule.sessionDecrypt(params.password || null, authUser);
-
-	const mnemonic = await SessionModule.sessionDecrypt(params.mnemonic || null, authUser);
-
-	const face = await SessionModule.sessionDecrypt(params.faceBase64 || null, authUser);
+	// Only decrypt if the values exist and are not null/undefined
+	const password = params.password ? await SessionModule.sessionDecrypt(params.password, authUser) : null;
+	const mnemonic = params.mnemonic ? await SessionModule.sessionDecrypt(params.mnemonic, authUser) : null;
+	const face = params.faceBase64 ? await SessionModule.sessionDecrypt(params.faceBase64, authUser) : null;
 
 	return { password, mnemonic, face };
 };

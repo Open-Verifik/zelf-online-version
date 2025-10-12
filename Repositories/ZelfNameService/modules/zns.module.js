@@ -714,11 +714,10 @@ const _decryptParams = async (data, authUser) => {
 		};
 	}
 
-	const password = await SessionModule.sessionDecrypt(data.password || null, authUser);
-
-	const mnemonic = await SessionModule.sessionDecrypt(data.mnemonic || null, authUser);
-
-	const face = await SessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
+	// Only decrypt if the values exist and are not null/undefined
+	const password = data.password ? await SessionModule.sessionDecrypt(data.password, authUser) : null;
+	const mnemonic = data.mnemonic ? await SessionModule.sessionDecrypt(data.mnemonic, authUser) : null;
+	const face = data.faceBase64 ? await SessionModule.sessionDecrypt(data.faceBase64, authUser) : null;
 
 	return { password, mnemonic, face };
 };
