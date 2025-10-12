@@ -9,6 +9,7 @@ const schema = {
 	},
 	insert: {
 		identifier: string().required(),
+		domain: string().required(),
 	},
 	decrypt: {
 		message: string().required(),

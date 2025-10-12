@@ -53,6 +53,7 @@ const insert = async (params) => {
 				{
 					session: existingSession._id,
 					identifier: existingSession.identifier,
+					domain: existingSession.domain,
 					ip: existingSession.clientIP,
 				},
 				config.JWT_SECRET
@@ -64,6 +65,7 @@ const insert = async (params) => {
 
 	const session = new Model({
 		identifier: params.identifier || params.clientIP,
+		domain: params.domain,
 		clientIP: params.clientIP,
 		type: params.type || "general",
 		status: "active",
@@ -90,6 +92,7 @@ const insert = async (params) => {
 			{
 				session: session._id,
 				identifier: session.identifier,
+				domain: session.domain,
 				ip: session.clientIP,
 			},
 			config.JWT_SECRET

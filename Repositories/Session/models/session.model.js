@@ -14,6 +14,7 @@ const SessionSchema = new Schema({
 		required: true,
 		unique: true,
 	},
+	domain: requiredField(String),
 	clientIP: requiredField(String),
 	isWebExtension: requiredField(Boolean, false),
 	status: requiredEnumField(String, ["active", "used"], "active"),
