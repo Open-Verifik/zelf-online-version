@@ -35,11 +35,7 @@ const createUnderName = async (payload) => {
 
 	const owner = await ant.getOwner();
 
-	console.log({ owner });
-
 	const records = await ant.getRecords();
-
-	console.log({ records });
 
 	return {
 		records,

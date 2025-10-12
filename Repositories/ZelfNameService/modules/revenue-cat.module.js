@@ -54,8 +54,6 @@ const _handleWebhook = async (event) => {
 
 	const zelfNameRecords = previewResult.arweave ? previewResult.arweave : previewResult.ipfs ? previewResult.ipfs : previewResult;
 
-	console.log({ event, zelfNameRecords, previewQuery, previewResult });
-
 	if (!zelfNameRecords.length) {
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
