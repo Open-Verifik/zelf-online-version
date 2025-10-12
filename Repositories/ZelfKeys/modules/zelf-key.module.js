@@ -4,9 +4,9 @@
  * @author Miguel Trevino <miguel@zelf.world>
  */
 
-const TagsSearchModule = require("../../Tags/modules/tags-search.module");
-const TagsValidationModule = require("../../Tags/modules/tags-validation.module");
 const TagsModule = require("../../Tags/modules/tags.module");
+const TagsPartsModule = require("../../Tags/modules/tags-parts.module");
+const ZelfKeyIPFSModule = require("./zelf-key-ipfs.module");
 
 const createMetadataAndPublicData = async (type, data, authToken) => {
 	switch (type) {
@@ -22,7 +22,7 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
 					username: data.username,
 					folder: data.folder && data.insideFolder ? data.folder : undefined,
 					timestamp: `${new Date().toISOString()}`,
-					zelfName: `${authToken.identifier}`,
+					keyOwner: `${authToken.identifier}${authToken.domain ? "." + authToken.domain : ""}`,
 					category: `${authToken.identifier}_password`,
 				},
 			};
@@ -34,7 +34,7 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
 					title: `${data.title}`,
 					timestamp: `${new Date().toISOString()}`,
 					folder: data.folder && data.insideFolder ? data.folder : undefined,
-					zelfName: `${authToken.identifier}`,
+					keyOwner: `${authToken.identifier}${authToken.domain ? "." + authToken.domain : ""}`,
 					category: `${authToken.identifier}_notes`,
 				},
 			};
@@ -56,7 +56,7 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
 					}),
 					folder: data.folder && data.insideFolder ? data.folder : undefined,
 					timestamp: `${new Date().toISOString()}`,
-					zelfName: `${authToken.identifier}`,
+					keyOwner: `${authToken.identifier}${authToken.domain ? "." + authToken.domain : ""}`,
 					category: `${authToken.identifier}_credit_card`,
 				},
 			};
@@ -78,34 +78,50 @@ const validateOwnership = async (identifier, domain, faceBase64, masterPassword,
 		if (extraParams.removePGP) {
 			sessionParams.removePGP = true;
 		}
-
-		const decryptedTag = await TagsModule.decryptTag(sessionParams, authToken);
-
-		return decryptedTag;
+		// this will throw an error if the tag is not found or the password is incorrect or the face is incorrect
+		await TagsModule.decryptTag(sessionParams, authToken);
 	}
 };
 
 const _store = async (publicData, metadata, faceBase64, masterPassword, identifier, authToken) => {
 	const zelfKey = {
 		zelfProof: null,
+		zelfProofQRCode: null,
 	};
 
+	const dataToEncrypt = {
+		publicData,
+		metadata,
+		faceBase64,
+		password: masterPassword,
+		_id: identifier,
+		tolerance: "REGULAR",
+		addServerPassword: false,
+	};
+
+	await TagsPartsModule.generateZelfProof(dataToEncrypt, zelfKey);
+
+	// now save it in IPFS
+	zelfKey.ipfs = await ZelfKeyIPFSModule.saveZelfKey(
+		{
+			zelfProofQRCode: zelfKey.zelfProofQRCode,
+			identifier,
+			publicData,
+		},
+		authToken
+	);
+
 	return {
+		zelfKey,
 		authToken,
 		success: true,
-		zelfProof: zelfKey.zelfProof,
 		zelfQR: null, // Encrypted string
 		NFT: null,
-		// ipfs: qrCodeIPFS
-		// 	? {
-		// 			hash: qrCodeIPFS.IpfsHash,
-		// 			gatewayUrl: qrCodeIPFS.url,
-		// 			pinSize: qrCodeIPFS.PinSize,
-		// 			timestamp: `${new Date().toISOString()}`,
-		// 			name: qrCodeIPFS.name,
-		// 			metadata: qrCodeIPFS.metadata,
-		// 	  }
-		// 	: null,
+		ipfs: {
+			...zelfKey.ipfs,
+			publicData: zelfKey.ipfs.keyvalues,
+			keyvalues: undefined,
+		},
 		publicData,
 	};
 };
@@ -121,12 +137,21 @@ const _store = async (publicData, metadata, faceBase64, masterPassword, identifi
  * @param {string} data.password - User's master password
  * @returns {Promise<Object>}
  */
+// Helper function to generate short timestamp (e.g., H2M0)
+const getShortTimestamp = () => {
+	const now = new Date();
+	const hours = now.getHours();
+	const minutes = now.getMinutes();
+	return `H${hours}M${minutes}`;
+};
+
 const storePassword = async (data, authToken) => {
-	const { website, faceBase64, name, masterPassword } = data;
+	const { username, faceBase64, name, masterPassword } = data;
 
 	const { metadata, publicData } = await createMetadataAndPublicData("password", data, authToken);
 
-	const identifier = name ? `${authToken.identifier}_${name}_${Date.now()}` : `${authToken.identifier}_${website}_${Date.now()}`;
+	const shortTimestamp = getShortTimestamp();
+	const identifier = name ? `${authToken.identifier}_${name}_${shortTimestamp}` : `${authToken.identifier}_${username}_${shortTimestamp}`;
 
 	const result = await _store(publicData, metadata, faceBase64, masterPassword, identifier, authToken);
 
@@ -149,7 +174,9 @@ const storeNotes = async (data, authToken) => {
 	const { title, faceBase64 } = data;
 
 	try {
-		const identifier = `${authToken.identifier}_notes_${title}_${Date.now()}`;
+		const shortTimestamp = getShortTimestamp();
+
+		const identifier = `${authToken.identifier}_notes_${title}_${shortTimestamp}`;
 
 		const { metadata, publicData } = await createMetadataAndPublicData("notes", data, authToken);
 
@@ -209,7 +236,8 @@ const storeCreditCard = async (data, authToken) => {
 	try {
 		_validateCreditCardData(cardNumber, expiryMonth, expiryYear);
 
-		const identifier = `${authToken.identifier}_${bankName}_${Date.now()}`;
+		const shortTimestamp = getShortTimestamp();
+		const identifier = `${authToken.identifier}_${bankName}_${shortTimestamp}`;
 
 		const { metadata, publicData } = await createMetadataAndPublicData("credit_card", data, authToken);
 
