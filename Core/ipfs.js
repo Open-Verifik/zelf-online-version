@@ -150,7 +150,7 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 			pinned: true,
 			web3: true,
 			name: filename,
-			publicData: uploadResponse.keyvalues,
+			...uploadResponse,
 		};
 	} catch (error) {
 		console.error(error);
@@ -194,11 +194,11 @@ const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "i
 
 		return {
 			url: `https://${pinataGateway}/ipfs/${uploadResponse.IpfsHash}`,
-			...uploadResponse,
 			pinned: true,
 			web3: true,
 			name: filename,
 			metadata,
+			...uploadResponse,
 		};
 	} catch (error) {
 		console.error(error);
