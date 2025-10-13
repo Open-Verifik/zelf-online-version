@@ -39,11 +39,11 @@ const insert = async (params) => {
 		findOne: true,
 	};
 
-	if (config.env === "development") {
-		queryParams.where_identifier = params.identifier || params.clientIP;
-	} else {
-		queryParams.where_clientIP = params.clientIP;
-	}
+	// if (config.env === "development") {
+	// 	queryParams.where_identifier = params.identifier || params.clientIP;
+	// } else {
+	queryParams.where_clientIP = params.clientIP;
+	// }
 
 	const existingSession = await get(queryParams);
 
@@ -65,7 +65,7 @@ const insert = async (params) => {
 
 	const session = new Model({
 		identifier: params.identifier || params.clientIP,
-		domain: params.domain,
+		domain: params.domain || "zelf",
 		clientIP: params.clientIP,
 		type: params.type || "general",
 		status: "active",
@@ -92,7 +92,7 @@ const insert = async (params) => {
 			{
 				session: session._id,
 				identifier: session.identifier,
-				domain: session.domain,
+				domain: session.domain || "zelf",
 				ip: session.clientIP,
 			},
 			config.JWT_SECRET
