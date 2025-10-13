@@ -171,7 +171,7 @@ const storePassword = async (data, authToken) => {
  * @returns {Promise<Object>}
  */
 const storeNotes = async (data, authToken) => {
-	const { title, faceBase64 } = data;
+	const { title, faceBase64, masterPassword } = data;
 
 	try {
 		const shortTimestamp = getShortTimestamp();
@@ -180,7 +180,7 @@ const storeNotes = async (data, authToken) => {
 
 		const { metadata, publicData } = await createMetadataAndPublicData("notes", data, authToken);
 
-		const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
+		const result = await _store(publicData, metadata, faceBase64, masterPassword, identifier, authToken);
 
 		return {
 			...result,
@@ -231,7 +231,7 @@ const _validateCreditCardData = (cardNumber, expiryMonth, expiryYear) => {
  * @returns {Promise<Object>}
  */
 const storeCreditCard = async (data, authToken) => {
-	const { cardNumber, expiryMonth, expiryYear, bankName, faceBase64 } = data;
+	const { cardNumber, expiryMonth, expiryYear, bankName, faceBase64, masterPassword } = data;
 
 	try {
 		_validateCreditCardData(cardNumber, expiryMonth, expiryYear);
@@ -241,7 +241,7 @@ const storeCreditCard = async (data, authToken) => {
 
 		const { metadata, publicData } = await createMetadataAndPublicData("credit_card", data, authToken);
 
-		const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
+		const result = await _store(publicData, metadata, faceBase64, masterPassword, identifier, authToken);
 
 		return {
 			...result,
