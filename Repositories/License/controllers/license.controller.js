@@ -49,7 +49,7 @@ const createOrUpdateLicense = async (ctx) => {
 		const data = await Module.createOrUpdateLicense(ctx.request.body, ctx.state.user);
 
 		// reload the official licenses in the cache file
-		await Module.loadOfficialLicenses(true);
+		Module.loadOfficialLicenses(true);
 
 		ctx.body = { data };
 	} catch (error) {

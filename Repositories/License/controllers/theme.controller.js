@@ -41,7 +41,7 @@ const updateThemeSettings = async (ctx) => {
 		);
 
 		// reload the official licenses in the cache file
-		await LicenseModule.loadOfficialLicenses(true);
+		LicenseModule.loadOfficialLicenses(true);
 
 		ctx.body = { data };
 	} catch (error) {
