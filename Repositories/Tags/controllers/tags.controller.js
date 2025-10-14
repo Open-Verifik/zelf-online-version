@@ -370,9 +370,21 @@ const deleteTag = async (ctx) => {
 };
 
 const getDomains = async (ctx, next) => {
-	const domains = await getAllSupportedDomains();
+	try {
+		// Load licenses first to ensure we have the latest data
+		const { loadOfficialLicenses } = require("../../License/modules/license.module");
+		const licenses = await loadOfficialLicenses();
 
-	ctx.body = { data: domains };
+		// Get domains with the loaded licenses
+		const domains = getAllSupportedDomains(licenses);
+
+		ctx.body = { data: domains };
+	} catch (error) {
+		console.error("Error loading domains:", error);
+		// Fallback to domains without licenses
+		const domains = getAllSupportedDomains();
+		ctx.body = { data: domains };
+	}
 
 	await next();
 };

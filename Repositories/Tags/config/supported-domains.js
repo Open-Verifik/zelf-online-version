@@ -1,15 +1,12 @@
 const { Domain } = require("../modules/domain.class");
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
+const NodeCache = require("node-cache");
 
-// Cache file path for license data - updated to use new location outside project directory
-const CACHE_FILE_PATH = path.join(os.homedir(), ".zelf-cache", "official-licenses-cache.json");
-
-// In-memory cache for dynamic domains
-let cachedDynamicDomains = null;
-
-let lastCacheTimestamp = null;
+// Initialize cache for dynamic domains with 1 hour TTL
+const domainsCache = new NodeCache({
+	stdTTL: 3600, // 1 hour TTL
+	checkperiod: 600, // Check every 10 minutes
+	useClones: false,
+});
 
 /**
  * Supported Domains Configuration
@@ -29,227 +26,7 @@ let lastCacheTimestamp = null;
  * - metadata: Additional domain-specific data
  */
 
-const SUPPORTED_DOMAINS = {
-	// Official Zelf domain (existing functionality)
-	// zelf: new Domain({
-	// 	name: "zelf",
-	// 	type: "official",
-	// 	holdSuffix: ".hold",
-	// 	status: "active",
-	// 	owner: "zelf-team",
-	// 	description: "Official Zelf domain",
-	// 	limits: {
-	// 		tags: 10000,
-	// 		zelfkeys: 10000,
-	// 	},
-	// 	features: [
-	// 		{
-	// 			name: "Zelf Name Service",
-	// 			code: "zns",
-	// 			description: "Encryptions, Decryptions, previews of ZelfProofs",
-	// 			enabled: true,
-	// 		},
-	// 		{
-	// 			name: "Zelf Keys",
-	// 			code: "zelfkeys",
-	// 			description: "Zelf Keys: Passwords, Notes, Credit Cards, etc.",
-	// 			enabled: true,
-	// 		},
-	// 	],
-	// 	validation: {
-	// 		minLength: 1,
-	// 		maxLength: 27,
-	// 		allowedChars: /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
-	// 		reserved: ["www", "api", "admin", "support", "help", "zelf"],
-	// 		customRules: [],
-	// 	},
-	// 	storage: {
-	// 		keyPrefix: "zelfName",
-	// 		ipfsEnabled: true,
-	// 		arweaveEnabled: true,
-	// 		walrusEnabled: true,
-	// 	},
-	// 	tagPaymentSettings: {
-	// 		methods: ["coinbase", "crypto", "stripe"],
-	// 		currencies: ["USD", "BTC", "ETH", "SOL"],
-	// 		whitelist: {
-	// 			"migueltrevino.zelf": "24$",
-	// 			"migueltrevinom.zelf": "50%",
-	// 		},
-	// 		pricingTable: {
-	// 			1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
-	// 			2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
-	// 			3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
-	// 			4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
-	// 			5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
-	// 			"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
-	// 			16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
-	// 			17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
-	// 			18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
-	// 			19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
-	// 			20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
-	// 			21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
-	// 			22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
-	// 			23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
-	// 			24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
-	// 			25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
-	// 			26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
-	// 			27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
-	// 		},
-	// 	},
-	// 	metadata: {
-	// 		launchDate: "2023-01-01",
-	// 		version: "1.0.0",
-	// 		documentation: "https://docs.zelf.world",
-	// 	},
-	// }),
-	// // Avalanche community domain
-	// avax: new Domain({
-	// 	name: "avax",
-	// 	type: "custom",
-	// 	holdSuffix: ".hold",
-	// 	status: "active",
-	// 	owner: "avalanche-community",
-	// 	description: "Avalanche community domain",
-	// 	limits: {
-	// 		tags: 10000,
-	// 		zelfkeys: 10000,
-	// 	},
-	// 	features: [
-	// 		{
-	// 			name: "Zelf Name Service",
-	// 			code: "zns",
-	// 			description: "Encryptions, Decryptions, previews of ZelfProofs",
-	// 			enabled: true,
-	// 		},
-	// 		{
-	// 			name: "Zelf Keys",
-	// 			code: "zelfkeys",
-	// 			description: "Zelf Keys: Passwords, Notes, Credit Cards, etc.",
-	// 			enabled: true,
-	// 		},
-	// 	],
-	// 	validation: {
-	// 		minLength: 1,
-	// 		maxLength: 20,
-	// 		allowedChars: /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
-	// 		reserved: ["www", "api", "admin", "avalanche", "avax", "carlos"],
-	// 		customRules: [],
-	// 	},
-	// 	storage: {
-	// 		keyPrefix: "avaxName",
-	// 		ipfsEnabled: true,
-	// 		arweaveEnabled: true,
-	// 		walrusEnabled: true,
-	// 		backupEnabled: false,
-	// 	},
-	// 	tagPaymentSettings: {
-	// 		methods: ["coinbase", "crypto", "stripe"],
-	// 		currencies: ["USD", "AVAX", "BTC", "ETH"],
-	// 		whitelist: {
-	// 			"privacy.avax": "24$",
-	// 			"security.avax": "25%",
-	// 		},
-	// 		pricingTable: {
-	// 			1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
-	// 			2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
-	// 			3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
-	// 			4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
-	// 			5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
-	// 			"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
-	// 			16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
-	// 			17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
-	// 			18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
-	// 			19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
-	// 			20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
-	// 			21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
-	// 			22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
-	// 			23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
-	// 			24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
-	// 			25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
-	// 			26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
-	// 			27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
-	// 		},
-	// 	},
-	// 	metadata: {
-	// 		launchDate: "2024-01-15",
-	// 		version: "1.0.0",
-	// 		documentation: "https://docs.avax.zelf.world",
-	// 		community: "avalanche",
-	// 	},
-	// }),
-	// // Enterprise domain example
-	// bdag: new Domain({
-	// 	name: "bdag",
-	// 	type: "enterprise",
-	// 	holdSuffix: ".hold",
-	// 	status: "active",
-	// 	owner: "blockDAG",
-	// 	description: "blockDAG enterprise domain",
-	// 	limits: {
-	// 		tags: 10000,
-	// 		zelfkeys: 10000,
-	// 	},
-	// 	features: [
-	// 		{
-	// 			name: "Zelf Name Service",
-	// 			code: "zns",
-	// 			description: "Encryptions, Decryptions, previews of ZelfProofs",
-	// 			enabled: true,
-	// 		},
-	// 		{
-	// 			name: "Zelf Keys",
-	// 			code: "zelfkeys",
-	// 			description: "Zelf Keys: Passwords, Notes, Credit Cards, etc.",
-	// 			enabled: true,
-	// 		},
-	// 	],
-	// 	validation: {
-	// 		minLength: 3,
-	// 		maxLength: 20,
-	// 		allowedChars: /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
-	// 		reserved: ["www", "api", "admin", "blockDAG", "bdag"],
-	// 		customRules: [],
-	// 	},
-	// 	storage: {
-	// 		keyPrefix: "tagName",
-	// 		ipfsEnabled: true,
-	// 		arweaveEnabled: false, // Enterprise might prefer private storage
-	// 		walrusEnabled: true,
-	// 	},
-	// 	tagPaymentSettings: {
-	// 		methods: ["coinbase", "crypto", "stripe"],
-	// 		currencies: ["USD", "BTC", "ETH", "SOL"],
-	// 		pricingTable: {
-	// 			1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
-	// 			2: { 1: 120, 2: 216, 3: 306, 4: 384, 5: 450, lifetime: 1800 },
-	// 			3: { 1: 72, 2: 130, 3: 184, 4: 230, 5: 270, lifetime: 1080 },
-	// 			4: { 1: 36, 2: 65, 3: 92, 4: 115, 5: 135, lifetime: 540 },
-	// 			5: { 1: 30, 2: 54, 3: 76, 4: 96, 5: 112, lifetime: 450 },
-	// 			"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
-	// 			16: { 1: 23, 2: 41, 3: 59, 4: 74, 5: 86, lifetime: 345 },
-	// 			17: { 1: 22, 2: 40, 3: 56, 4: 70, 5: 82, lifetime: 330 },
-	// 			18: { 1: 21, 2: 38, 3: 54, 4: 67, 5: 79, lifetime: 315 },
-	// 			19: { 1: 20, 2: 36, 3: 51, 4: 64, 5: 75, lifetime: 300 },
-	// 			20: { 1: 19, 2: 34, 3: 48, 4: 61, 5: 72, lifetime: 285 },
-	// 			21: { 1: 18, 2: 32, 3: 46, 4: 58, 5: 68, lifetime: 270 },
-	// 			22: { 1: 17, 2: 31, 3: 43, 4: 54, 5: 64, lifetime: 255 },
-	// 			23: { 1: 16, 2: 29, 3: 41, 4: 51, 5: 60, lifetime: 240 },
-	// 			24: { 1: 15, 2: 27, 3: 38, 4: 48, 5: 56, lifetime: 225 },
-	// 			25: { 1: 14, 2: 25, 3: 36, 4: 45, 5: 53, lifetime: 210 },
-	// 			26: { 1: 13, 2: 23, 3: 33, 4: 42, 5: 49, lifetime: 195 },
-	// 			27: { 1: 12, 2: 22, 3: 31, 4: 38, 5: 45, lifetime: 180 },
-	// 		},
-	// 	},
-	// 	metadata: {
-	// 		launchDate: "2024-04-01",
-	// 		version: "1.0.0",
-	// 		documentation: "https://docs.bdag.zelf.world",
-	// 		enterprise: "blockDAG",
-	// 		support: "enterprise",
-	// 	},
-	// }),
-};
+const SUPPORTED_DOMAINS = {};
 
 /**
  * Get domain configuration by domain name
@@ -276,10 +53,11 @@ const isSupported = (domain) => {
 
 /**
  * Get all supported domains
+ * @param {Array} licenses - Optional array of license objects
  * @returns {Object} - All supported domains
  */
-const getAllSupportedDomains = () => {
-	return getSupportedDomains();
+const getAllSupportedDomains = (licenses = null) => {
+	return getSupportedDomains(licenses);
 };
 
 /**
@@ -430,60 +208,55 @@ const getDomainLimits = (domain) => {
 };
 
 /**
- * Load dynamic domains from cache file (with in-memory caching)
+ * Load dynamic domains from provided licenses data
+ * @param {Array} licenses - Array of license objects
  * @returns {Object|null} - Dynamic domains object or null if not available
  */
-const loadDynamicDomains = () => {
+const loadDynamicDomains = (licenses = null) => {
 	try {
-		if (!fs.existsSync(CACHE_FILE_PATH)) {
-			return null;
+		// Check if we have cached domains
+		let cachedDomains = domainsCache.get("dynamic-domains");
+		if (cachedDomains) {
+			return cachedDomains;
 		}
 
-		const stats = fs.statSync(CACHE_FILE_PATH);
-		const currentTimestamp = stats.mtime.getTime();
-
-		// Return cached version if file hasn't changed
-		if (cachedDynamicDomains && lastCacheTimestamp === currentTimestamp) {
-			return cachedDynamicDomains;
-		}
-
-		const cacheContent = fs.readFileSync(CACHE_FILE_PATH, "utf8");
-		const cacheData = JSON.parse(cacheContent);
-
-		if (cacheData.licenses && Array.isArray(cacheData.licenses)) {
+		// If licenses are provided, use them to create domains
+		if (licenses && Array.isArray(licenses)) {
 			// Convert license data to Domain objects
 			const dynamicDomains = {};
-			for (const license of cacheData.licenses) {
+			for (const license of licenses) {
 				if (license.name) {
 					dynamicDomains[license.name.toLowerCase()] = new Domain(license);
 				}
 			}
 
-			// Cache the result
-			cachedDynamicDomains = dynamicDomains;
-
-			lastCacheTimestamp = currentTimestamp;
+			// Cache the result with automatic expiration
+			domainsCache.set("dynamic-domains", dynamicDomains);
+			console.log(`Dynamic domains cached: ${Object.keys(dynamicDomains).length} domains`);
 
 			return dynamicDomains;
 		}
 	} catch (error) {
-		console.warn("Failed to load dynamic domains from cache:", error.message);
+		console.warn("Failed to load dynamic domains:", error.message);
 	}
 
 	return null;
 };
 
-const getSupportedDomains = () => {
-	const dynamicDomains = loadDynamicDomains();
+const getSupportedDomains = (licenses = null) => {
+	try {
+		const dynamicDomains = loadDynamicDomains(licenses);
 
-	if (dynamicDomains) {
-		// Merge dynamic domains with static ones
-		return { ...SUPPORTED_DOMAINS, ...dynamicDomains };
+		if (dynamicDomains) {
+			// Merge dynamic domains with static ones
+			return { ...SUPPORTED_DOMAINS, ...dynamicDomains };
+		}
+	} catch (error) {
+		console.warn("Error loading dynamic domains:", error.message);
 	}
 
-	console.log({ dynamicDomains });
-
 	// Fallback to static domains only
+	console.log("Using static domains as fallback");
 	return SUPPORTED_DOMAINS;
 };
 

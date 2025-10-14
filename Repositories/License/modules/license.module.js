@@ -4,87 +4,79 @@ const IPFS = require("../../../Repositories/IPFS/modules/ipfs.module");
 const ClientModule = require("../../Client/modules/client.module");
 const { decrypt } = require("../../ZelfProof/modules/zelf-proof.module");
 const moment = require("moment");
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
 const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
 const DefaultLicenseValues = require("./default-license.values");
 const { Domain } = require("../../Tags/modules/domain.class");
-const CACHE_DOMAINS = {};
-// Cache file path for development mode - moved outside project to avoid file watcher restarts
-const CACHE_FILE_PATH = path.join(os.homedir(), ".zelf-cache", "official-licenses-cache.json");
+const NodeCache = require("node-cache");
+
+// Initialize cache with 1 hour TTL and check period of 10 minutes
+const licenseCache = new NodeCache({
+	stdTTL: 3600, // 1 hour default TTL
+	checkperiod: 600, // Check for expired keys every 10 minutes
+	useClones: false, // Better performance for large objects
+});
 
 /**
- * Check if cache is valid (less than 1 hour old)
- * @param {Object} cacheData - Cache data object
- * @returns {boolean} - Whether cache is valid
- */
-const isCacheValid = (cacheData) => {
-	if (!cacheData || !cacheData.timestamp) return false;
-
-	const cacheTime = moment(cacheData.timestamp);
-	const oneHourAgo = moment().subtract(1, "hour");
-
-	return cacheTime.isAfter(oneHourAgo);
-};
-
-/**
- * Load cache from file
- * @returns {Object|null} - Cache data or null if not found/invalid
+ * Load licenses from cache
+ * @returns {Array|null} - Cached licenses or null if not found/expired
  */
 const loadCache = () => {
 	try {
-		if (!fs.existsSync(CACHE_FILE_PATH)) return null;
-
-		const cacheContent = CACHE_DOMAINS.timestamp ? CACHE_DOMAINS : fs.readFileSync(CACHE_FILE_PATH, "utf8");
-
-		const cacheData = CACHE_DOMAINS.timestamp ? CACHE_DOMAINS : JSON.parse(cacheContent);
-
-		CACHE_DOMAINS.timestamp = cacheData.timestamp;
-
-		CACHE_DOMAINS.licenses = cacheData.licenses;
-
-		return isCacheValid(cacheData) ? cacheData : null;
+		const cached = licenseCache.get("official-licenses");
+		if (cached) {
+			console.info("Loading official licenses from memory cache");
+			return cached;
+		}
+		return null;
 	} catch (error) {
-		console.error("Error loading cache:", error);
+		console.error("Error loading from cache:", error);
 		return null;
 	}
 };
 
 /**
- * Save cache to file
+ * Save licenses to cache
  * @param {Array} licenses - License data to cache
  */
 const saveCache = (licenses) => {
 	try {
-		// Check if we need to update the cache (avoid unnecessary writes)
+		// Check if we need to update the cache (avoid unnecessary operations)
 		const existingCache = loadCache();
-		if (existingCache && JSON.stringify(existingCache.licenses) === JSON.stringify(licenses)) {
-			console.log("Cache unchanged, skipping write to prevent file watcher restart");
+		if (existingCache && JSON.stringify(existingCache) === JSON.stringify(licenses)) {
+			console.log("Cache unchanged, skipping update");
 			return;
 		}
 
-		const cacheDir = path.dirname(CACHE_FILE_PATH);
-		if (!fs.existsSync(cacheDir)) {
-			fs.mkdirSync(cacheDir, { recursive: true });
-		}
+		// Save to memory cache with automatic expiration
+		licenseCache.set("official-licenses", licenses);
 
-		const cacheData = {
-			timestamp: moment().toISOString(),
-			licenses: licenses,
-		};
-
-		// Update in-memory cache
-		CACHE_DOMAINS.timestamp = cacheData.timestamp;
-		CACHE_DOMAINS.licenses = cacheData.licenses;
-
-		// Write to file system (moved outside project directory to avoid file watcher restarts)
-		fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cacheData, null, 2));
-
-		console.log("Official licenses cache saved successfully to:", CACHE_FILE_PATH);
+		console.log(
+			`Official licenses cached successfully (${licenses.length} licenses, TTL: ${
+				licenseCache.getTtl("official-licenses") ? Math.round((licenseCache.getTtl("official-licenses") - Date.now()) / 1000) : "N/A"
+			}s)`
+		);
 	} catch (error) {
-		console.error("Error saving cache:", error);
+		console.error("Error saving to cache:", error);
 	}
+};
+
+/**
+ * Clear the license cache (useful for testing or manual refresh)
+ */
+const clearCache = () => {
+	licenseCache.del("official-licenses");
+	console.log("License cache cleared");
+};
+
+/**
+ * Get cache statistics
+ */
+const getCacheStats = () => {
+	return {
+		keys: licenseCache.keys(),
+		stats: licenseCache.getStats(),
+		ttl: licenseCache.getTtl("official-licenses"),
+	};
 };
 
 /**
@@ -406,33 +398,54 @@ const _checkIfDomainIsRegistered = async (domain, accountEmail) => {
 };
 
 /**
- * Load official licenses
+ * Load official licenses with improved caching
+ * @param {boolean} force - Force reload from IPFS, bypassing cache
+ * @returns {Array} - Array of license objects
  */
 const loadOfficialLicenses = async (force = false) => {
-	const cachedData = loadCache();
-
-	if (cachedData && !force) {
-		console.info("Loading official licenses from cache");
-		return cachedData.licenses;
+	// Try to get from cache first (unless forced)
+	if (!force) {
+		const cachedData = loadCache();
+		if (cachedData) {
+			return cachedData;
+		}
 	}
 
 	console.info("Loading official licenses from IPFS...");
 
-	// Fetch from IPFS
-	const officialLicenses = await IPFS.get({ key: "type", value: "license" });
+	try {
+		// Fetch from IPFS
+		const officialLicenses = await IPFS.get({ key: "type", value: "license" });
 
-	const licenses = [];
+		const licenses = [];
 
-	for (const license of officialLicenses) {
-		const licenseData = await _loadLicenseJSON(license.url);
-		licenses.push(licenseData);
+		for (const license of officialLicenses) {
+			try {
+				const licenseData = await _loadLicenseJSON(license.url);
+				licenses.push(licenseData);
+			} catch (error) {
+				console.error(`Error loading license ${license.id}:`, error.message);
+				// Continue with other licenses
+			}
+		}
+
+		// Save to cache with automatic expiration
+		saveCache(licenses);
+
+		console.info(`Loaded ${licenses.length} official licenses successfully`);
+		return licenses;
+	} catch (error) {
+		console.error("Error loading official licenses:", error);
+
+		// Try to return cached data as fallback
+		const fallbackCache = loadCache();
+		if (fallbackCache) {
+			console.warn("Using cached data as fallback");
+			return fallbackCache;
+		}
+
+		throw error;
 	}
-
-	// Save to cache (will skip if unchanged)
-	saveCache(licenses);
-
-	console.info(`Loaded ${licenses.length} official licenses successfully`);
-	return licenses;
 };
 
 const _loadLicenseJSON = async (ipfsUrl) => {
@@ -562,7 +575,6 @@ const syncLicenseWithStripe = async (license, paymentData) => {
 };
 
 module.exports = {
-	CACHE_DOMAINS,
 	searchLicense,
 	getMyLicense,
 	createOrUpdateLicense,
@@ -570,4 +582,7 @@ module.exports = {
 	deleteLicense,
 	loadOfficialLicenses,
 	syncLicenseWithStripe,
+	// Cache management functions
+	clearCache,
+	getCacheStats,
 };
