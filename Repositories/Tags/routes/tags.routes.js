@@ -10,18 +10,6 @@ module.exports = (server) => {
 	const PATH = config.basePath(base);
 
 	// domain helper routes
-	server.get(`${PATH}/domains`, Controller.getDomains);
-	server.get(`${PATH}/domains/:domain`, Controller.getDomain);
-	// server.get(`${PATH}/domains/:domain/pricing`, Controller.getDomainPricing);
-	// server.get(`${PATH}/domains/:domain/payment-options`, Controller.getDomainPaymentOptions);
-
-	/**
-	 * @swagger
-	 * tags:
-	 *   - name: Tags Domains
-	 *     description: Domain configuration and management endpoints for Zelf tags
-	 */
-
 	/**
 	 * @swagger
 	 * /api/tags/domains:
@@ -218,39 +206,6 @@ module.exports = (server) => {
 	 *                             format: date
 	 *                             description: Domain launch date
 	 *                             example: "2023-01-01"
-	 *             examples:
-	 *               success:
-	 *                 summary: Successful response
-	 *                 value:
-	 *                   data:
-	 *                     zelf:
-	 *                       name: "zelf"
-	 *                       owner: "zelf-team"
-	 *                       status: "active"
-	 *                       type: "official"
-	 *                       description: "Official Zelf domain"
-	 *                       limits:
-	 *                         tags: 10000
-	 *                         zelfkeys: 10000
-	 *                       features:
-	 *                         - name: "Zelf Name Service"
-	 *                           code: "zns"
-	 *                           description: "Encryptions, Decryptions, previews of ZelfProofs"
-	 *                           enabled: true
-	 *                       validation:
-	 *                         minLength: 1
-	 *                         maxLength: 27
-	 *                         reserved: ["www", "api", "admin", "support", "help", "zelf"]
-	 *                       storage:
-	 *                         keyPrefix: "zelfName"
-	 *                         ipfsEnabled: true
-	 *                         arweaveEnabled: true
-	 *                       payment:
-	 *                         methods: ["coinbase", "crypto", "stripe"]
-	 *                         currencies: ["USD", "BTC", "ETH", "SOL"]
-	 *                       metadata:
-	 *                         version: "1.0.0"
-	 *                         documentation: "https://docs.zelf.world"
 	 *       401:
 	 *         description: Unauthorized - Invalid or missing authentication token
 	 *         content:
@@ -272,6 +227,7 @@ module.exports = (server) => {
 	 *                   type: string
 	 *                   example: "Internal server error"
 	 */
+	server.get(`${PATH}/domains`, Controller.getDomains);
 
 	/**
 	 * @swagger
@@ -549,22 +505,647 @@ module.exports = (server) => {
 	 *                   type: string
 	 *                   example: "Internal server error"
 	 */
+	server.get(`${PATH}/domains/:domain`, Controller.getDomain);
+	// server.get(`${PATH}/domains/:domain/pricing`, Controller.getDomainPricing);
+	// server.get(`${PATH}/domains/:domain/payment-options`, Controller.getDomainPaymentOptions);
 
-	// Route definitions
+	/**
+	 * @swagger
+	 * /api/tags/search:
+	 *   get:
+	 *     summary: Search for a tag - Multi-domain support
+	 *     description: Enhanced search functionality with multi-domain support. Supports .zelf, .avax, .btc, .tech, .bdag domains and more.
+	 *     tags: [Tags - Search]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     parameters:
+	 *       - in: query
+	 *         name: tagName
+	 *         schema:
+	 *           type: string
+	 *         description: Tag name to search for (supports multiple domains)
+	 *         example: "username.avax"
+	 *       - in: query
+	 *         name: domain
+	 *         schema:
+	 *           type: string
+	 *         description: Specific domain to search in
+	 *         example: "avax"
+	 *       - in: query
+	 *         name: key
+	 *         schema:
+	 *           type: string
+	 *         description: Search key for advanced search
+	 *         example: "email"
+	 *       - in: query
+	 *         name: value
+	 *         schema:
+	 *           type: string
+	 *         description: Search value for advanced search
+	 *         example: "user@example.com"
+	 *       - in: query
+	 *         name: os
+	 *         schema:
+	 *           type: string
+	 *           enum: [DESKTOP, ANDROID, IOS]
+	 *         description: Operating system
+	 *         example: "DESKTOP"
+	 *       - in: query
+	 *         name: captchaToken
+	 *         schema:
+	 *           type: string
+	 *         description: Captcha token for validation
+	 *         example: "captcha_token_here"
+	 *     responses:
+	 *       200:
+	 *         description: Search completed successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/TagSearchResponse'
+	 *       403:
+	 *         description: Session not active or rate limit exceeded
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/SessionError'
+	 *                 - $ref: '#/components/schemas/LimitError'
+	 *       409:
+	 *         description: Validation error, captcha failed, or domain not supported
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/CaptchaError'
+	 *                 - $ref: '#/components/schemas/DomainError'
+	 *                 - type: object
+	 *                   properties:
+	 *                     validationError:
+	 *                       type: string
+	 *                       example: "missing tagName or search by key|value"
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.get(`${PATH}/search`, Middleware.getValidation, Controller.searchTag); // [x]
+
+	/**
+	 * @swagger
+	 * /api/tags/search-by-domain:
+	 *   get:
+	 *     summary: Search tags by domain
+	 *     description: Search for tags within a specific domain and storage system
+	 *     tags: [Tags - Search]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     parameters:
+	 *       - in: query
+	 *         name: domain
+	 *         required: true
+	 *         schema:
+	 *           type: string
+	 *         description: Domain to search in
+	 *         example: "avax"
+	 *       - in: query
+	 *         name: storage
+	 *         required: true
+	 *         schema:
+	 *           type: string
+	 *           enum: ["IPFS", "Arweave", "Walrus"]
+	 *         description: Storage system to search
+	 *         example: "IPFS"
+	 *     responses:
+	 *       200:
+	 *         description: Search completed successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/TagSearchResponse'
+	 *       409:
+	 *         description: Validation error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 validationError:
+	 *                   type: string
+	 *                   example: "Domain and storage are required"
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.get(`${PATH}/search-by-domain`, Middleware.searchByDomainValidation, Controller.searchTagsByDomain); // [x]
+
+	/**
+	 * @swagger
+	 * /api/tags/preview:
+	 *   post:
+	 *     summary: Preview tag - Multi-domain support
+	 *     description: Enhanced preview functionality with multi-domain support.
+	 *     tags: [Tags - Preview & Decryption]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             $ref: '#/components/schemas/TagPreviewRequest'
+	 *     responses:
+	 *       200:
+	 *         description: Preview completed successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/TagPreviewResponse'
+	 *       403:
+	 *         description: Session not active or rate limit exceeded
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/SessionError'
+	 *                 - $ref: '#/components/schemas/LimitError'
+	 *       409:
+	 *         description: Validation error, captcha failed, or domain not supported
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/CaptchaError'
+	 *                 - $ref: '#/components/schemas/DomainError'
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.get(`${PATH}/preview`, Middleware.previewValidation, Controller.previewTag); // [x]
 
+	/**
+	 * @swagger
+	 * /api/tags/lease:
+	 *   post:
+	 *     summary: Lease a tag - Multi-domain support
+	 *     description: Enhanced lease functionality with multi-domain support. Supports creating and importing wallets for different domains.
+	 *     tags: [Tags - Leasing]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             $ref: '#/components/schemas/TagLeaseRequest'
+	 *     responses:
+	 *       200:
+	 *         description: Tag leased successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/TagLeaseResponse'
+	 *       403:
+	 *         description: Session not active or rate limit exceeded
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/SessionError'
+	 *                 - $ref: '#/components/schemas/LimitError'
+	 *       409:
+	 *         description: Validation error, captcha failed, domain not supported, or tag not available
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/CaptchaError'
+	 *                 - $ref: '#/components/schemas/DomainError'
+	 *                 - type: object
+	 *                   properties:
+	 *                     validationError:
+	 *                       type: string
+	 *                       example: "Not a valid tag name"
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseTag); // [x]
+
+	/**
+	 * @swagger
+	 * /api/tags/lease-recovery:
+	 *   post:
+	 *     summary: Recover and lease a new tag - Multi-domain support
+	 *     description: Recover access using an existing zelf proof and lease a new tag with multi-domain support.
+	 *     tags: [Tags - Leasing]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             $ref: '#/components/schemas/TagLeaseRecoveryRequest'
+	 *     responses:
+	 *       200:
+	 *         description: Recovery and lease completed successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/TagLeaseResponse'
+	 *       403:
+	 *         description: Session not active or rate limit exceeded
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/SessionError'
+	 *                 - $ref: '#/components/schemas/LimitError'
+	 *       409:
+	 *         description: Validation error, captcha failed, domain not supported, or recovery failed
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/CaptchaError'
+	 *                 - $ref: '#/components/schemas/DomainError'
+	 *                 - type: object
+	 *                   properties:
+	 *                     validationError:
+	 *                       type: string
+	 *                       example: "Invalid zelf proof"
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.post(`${PATH}/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery); // [x]
+
+	/**
+	 * @swagger
+	 * /api/tags/lease-offline:
+	 *   post:
+	 *     summary: Lease a tag offline - Multi-domain support
+	 *     description: Enhanced offline lease functionality with multi-domain support.
+	 *     tags: [Tags - Leasing]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             $ref: '#/components/schemas/TagOfflineLeaseRequest'
+	 *     responses:
+	 *       200:
+	 *         description: Offline lease completed successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/TagLeaseResponse'
+	 *       409:
+	 *         description: Validation error, domain not supported, or invalid tag name
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/DomainError'
+	 *                 - type: object
+	 *                   properties:
+	 *                     validationError:
+	 *                       type: string
+	 *                       example: "Not a valid tag name"
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOfflineTag); // [x]
 
+	/**
+	 * @swagger
+	 * /api/tags/delete:
+	 *   delete:
+	 *     summary: Delete a tag
+	 *     description: Delete a tag with biometric verification
+	 *     tags: [Tags - Management]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             type: object
+	 *             required:
+	 *               - domain
+	 *               - tagName
+	 *               - faceBase64
+	 *             properties:
+	 *               domain:
+	 *                 type: string
+	 *                 description: Domain of the tag to delete
+	 *                 example: "avax"
+	 *               tagName:
+	 *                 type: string
+	 *                 description: Name of the tag to delete
+	 *                 example: "username.avax"
+	 *               faceBase64:
+	 *                 type: string
+	 *                 format: base64
+	 *                 description: Base64 encoded face image for biometric verification
+	 *                 example: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ..."
+	 *               password:
+	 *                 type: string
+	 *                 description: Optional password for additional security
+	 *                 example: "secure_password"
+	 *     responses:
+	 *       200:
+	 *         description: Tag deleted successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 success:
+	 *                   type: boolean
+	 *                   example: true
+	 *                 message:
+	 *                   type: string
+	 *                   example: "Tag deleted successfully"
+	 *       400:
+	 *         description: Bad request - Invalid biometric verification
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 error:
+	 *                   type: string
+	 *                   example: "No face detected in the provided image"
+	 *       401:
+	 *         description: Unauthorized - User not authenticated
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 *       404:
+	 *         description: Tag not found
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.delete(`${PATH}/delete`, Middleware.deleteTagValidation, Controller.deleteTag); // [x]
 
+	/**
+	 * @swagger
+	 * /api/tags/preview-zelfproof:
+	 *   post:
+	 *     summary: Preview zelf proof
+	 *     description: Preview a zelf proof to validate and get preview data without processing.
+	 *     tags: [Tags - Preview & Decryption]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             $ref: '#/components/schemas/ZelfProofPreviewRequest'
+	 *     responses:
+	 *       200:
+	 *         description: Zelf proof preview completed successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/TagPreviewResponse'
+	 *       403:
+	 *         description: Session not active or rate limit exceeded
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/SessionError'
+	 *                 - $ref: '#/components/schemas/LimitError'
+	 *       409:
+	 *         description: Validation error or captcha failed
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/CaptchaError'
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.post(`${PATH}/preview-zelfproof`, Middleware.previewZelfProofValidation, Controller.previewZelfProof); // [x]
+
+	/**
+	 * @swagger
+	 * /api/tags/decrypt:
+	 *   post:
+	 *     summary: Decrypt tag - Multi-domain support
+	 *     description: Enhanced decryption functionality with multi-domain support.
+	 *     tags: [Tags - Preview & Decryption]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             $ref: '#/components/schemas/TagDecryptRequest'
+	 *     responses:
+	 *       200:
+	 *         description: Decryption completed successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/TagDecryptResponse'
+	 *       403:
+	 *         description: Session not active or rate limit exceeded
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/SessionError'
+	 *                 - $ref: '#/components/schemas/LimitError'
+	 *       409:
+	 *         description: Validation error, captcha failed, or domain not supported
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               oneOf:
+	 *                 - $ref: '#/components/schemas/CaptchaError'
+	 *                 - $ref: '#/components/schemas/DomainError'
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptTag); // [x]
+
+	/**
+	 * @swagger
+	 * /api/tags/revenue-cat:
+	 *   post:
+	 *     summary: RevenueCat webhook handler
+	 *     description: Handle RevenueCat subscription events and webhooks for payment processing.
+	 *     tags: [Tags - Rewards & Webhooks]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     requestBody:
+	 *       required: true
+	 *       content:
+	 *         application/json:
+	 *           schema:
+	 *             type: object
+	 *             properties:
+	 *               event:
+	 *                 $ref: '#/components/schemas/RevenueCatWebhookRequest'
+	 *     responses:
+	 *       200:
+	 *         description: Webhook processed successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 data:
+	 *                   type: object
+	 *                   description: Webhook processing result
+	 *       403:
+	 *         description: Access forbidden - unauthorized client or email
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 validationError:
+	 *                   type: string
+	 *                   example: "Access forbidden"
+	 *       409:
+	 *         description: Missing event payload or validation error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 validationError:
+	 *                   type: string
+	 *                   example: "Missing event payload"
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.post(`${PATH}/revenue-cat`, Middleware.revenueCatWebhookValidation, Controller.revenueCatWebhook);
+
+	/**
+	 * @swagger
+	 * /api/tags/purchase-rewards:
+	 *   post:
+	 *     summary: Release purchase rewards
+	 *     description: Release purchase rewards for the authenticated user. Requires super admin privileges.
+	 *     tags: [Tags - Rewards & Webhooks]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     responses:
+	 *       200:
+	 *         description: Purchase rewards released successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 data:
+	 *                   type: object
+	 *                   description: Purchase rewards data
+	 *       403:
+	 *         description: Unauthorized - requires super admin privileges
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 error:
+	 *                   type: string
+	 *                   example: "Unauthorized"
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.post(`${PATH}/purchase-rewards`, Middleware.referralRewardsValidation, Controller.purchaseRewards);
+
+	/**
+	 * @swagger
+	 * /api/tags/referral-rewards:
+	 *   post:
+	 *     summary: Release referral rewards
+	 *     description: Release referral rewards for the authenticated user. Requires super admin privileges.
+	 *     tags: [Tags - Rewards & Webhooks]
+	 *     security:
+	 *       - bearerAuth: []
+	 *     responses:
+	 *       200:
+	 *         description: Referral rewards released successfully
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 data:
+	 *                   type: object
+	 *                   description: Referral rewards data
+	 *       403:
+	 *         description: Unauthorized - requires super admin privileges
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               type: object
+	 *               properties:
+	 *                 error:
+	 *                   type: string
+	 *                   example: "Unauthorized"
+	 *       500:
+	 *         description: Internal server error
+	 *         content:
+	 *           application/json:
+	 *             schema:
+	 *               $ref: '#/components/schemas/Error'
+	 */
 	server.post(`${PATH}/referral-rewards`, Middleware.referralRewardsValidation, Controller.referralRewards);
 };
 
@@ -679,27 +1260,6 @@ module.exports = (server) => {
  *           type: string
  *           description: Captcha token for validation
  *           example: "captcha_token_here"
- *     TagLeaseConfirmationRequest:
- *       type: object
- *       required: [tagName, coin, network]
- *       properties:
- *         tagName:
- *           type: string
- *           description: Tag name for lease confirmation
- *           example: "username.tech"
- *         domain:
- *           type: string
- *           description: Specific domain for the tag
- *           example: "tech"
- *         coin:
- *           type: string
- *           description: Cryptocurrency for payment
- *           example: "USDC"
- *         network:
- *           type: string
- *           enum: [coinbase, CB, ETH, SOL, BTC]
- *           description: Payment network
- *           example: "ETH"
  *     TagPreviewRequest:
  *       type: object
  *       required: [tagName, os]
@@ -827,15 +1387,6 @@ module.exports = (server) => {
  *           type: string
  *           description: Environment (sandbox, production)
  *           example: "production"
- *     TagUpdateRequest:
- *       type: object
- *       required: [duration]
- *       properties:
- *         duration:
- *           type: string
- *           enum: ["1", "2", "3", "4", "5", "lifetime"]
- *           description: Lease duration in years or lifetime
- *           example: "1"
  *     TagSearchResponse:
  *       type: object
  *       properties:
@@ -920,15 +1471,6 @@ module.exports = (server) => {
  *             walletData:
  *               type: object
  *               description: Decrypted wallet data
- *     ZelfPayResponse:
- *       type: object
- *       properties:
- *         data:
- *           type: object
- *           properties:
- *             zelfPay:
- *               type: object
- *               description: ZelfPay data
  *     CaptchaError:
  *       type: object
  *       properties:
@@ -972,682 +1514,4 @@ module.exports = (server) => {
  *     description: Tag preview, decryption, and zelf proof endpoints with multi-domain support
  *   - name: Tags - Rewards & Webhooks
  *     description: Tag rewards, webhooks, and payment processing endpoints
- */
-
-/**
- * @swagger
- * /api/tags/search:
- *   get:
- *     summary: Search for a tag - Multi-domain support
- *     description: Enhanced search functionality with multi-domain support. Supports .zelf, .avax, .btc, .tech, .bdag domains and more.
- *     tags: [Tags - Search]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: tagName
- *         schema:
- *           type: string
- *         description: Tag name to search for (supports multiple domains)
- *         example: "username.avax"
- *       - in: query
- *         name: domain
- *         schema:
- *           type: string
- *         description: Specific domain to search in
- *         example: "avax"
- *       - in: query
- *         name: key
- *         schema:
- *           type: string
- *         description: Search key for advanced search
- *         example: "email"
- *       - in: query
- *         name: value
- *         schema:
- *           type: string
- *         description: Search value for advanced search
- *         example: "user@example.com"
- *       - in: query
- *         name: os
- *         schema:
- *           type: string
- *           enum: [DESKTOP, ANDROID, IOS]
- *         description: Operating system
- *         example: "DESKTOP"
- *       - in: query
- *         name: captchaToken
- *         schema:
- *           type: string
- *         description: Captcha token for validation
- *         example: "captcha_token_here"
- *     responses:
- *       200:
- *         description: Search completed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TagSearchResponse'
- *       403:
- *         description: Session not active or rate limit exceeded
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/SessionError'
- *                 - $ref: '#/components/schemas/LimitError'
- *       409:
- *         description: Validation error, captcha failed, or domain not supported
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/CaptchaError'
- *                 - $ref: '#/components/schemas/DomainError'
- *                 - type: object
- *                   properties:
- *                     validationError:
- *                       type: string
- *                       example: "missing tagName or search by key|value"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/search:
- *   post:
- *     summary: Search for a tag - POST - Multi-domain support
- *     description: Enhanced search functionality using POST method with multi-domain support. Same functionality as GET but with request body.
- *     tags: [Tags - Search]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/TagSearchRequest'
- *     responses:
- *       200:
- *         description: Search completed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TagSearchResponse'
- *       403:
- *         description: Session not active or rate limit exceeded
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/SessionError'
- *                 - $ref: '#/components/schemas/LimitError'
- *       409:
- *         description: Validation error, captcha failed, or domain not supported
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/CaptchaError'
- *                 - $ref: '#/components/schemas/DomainError'
- *                 - type: object
- *                   properties:
- *                     validationError:
- *                       type: string
- *                       example: "missing tagName or search by key|value"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/search-by-domain:
- *   get:
- *     summary: Search tags by domain
- *     description: Search for tags within a specific domain and storage system
- *     tags: [Tags - Search]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: domain
- *         required: true
- *         schema:
- *           type: string
- *         description: Domain to search in
- *         example: "avax"
- *       - in: query
- *         name: storage
- *         required: true
- *         schema:
- *           type: string
- *           enum: ["IPFS", "Arweave", "Walrus"]
- *         description: Storage system to search
- *         example: "IPFS"
- *     responses:
- *       200:
- *         description: Search completed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TagSearchResponse'
- *       409:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 validationError:
- *                   type: string
- *                   example: "Domain and storage are required"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/lease:
- *   post:
- *     summary: Lease a tag - Multi-domain support
- *     description: Enhanced lease functionality with multi-domain support. Supports creating and importing wallets for different domains.
- *     tags: [Tags - Leasing]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/TagLeaseRequest'
- *     responses:
- *       200:
- *         description: Tag leased successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TagLeaseResponse'
- *       403:
- *         description: Session not active or rate limit exceeded
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/SessionError'
- *                 - $ref: '#/components/schemas/LimitError'
- *       409:
- *         description: Validation error, captcha failed, domain not supported, or tag not available
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/CaptchaError'
- *                 - $ref: '#/components/schemas/DomainError'
- *                 - type: object
- *                   properties:
- *                     validationError:
- *                       type: string
- *                       example: "Not a valid tag name"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/lease-recovery:
- *   post:
- *     summary: Recover and lease a new tag - Multi-domain support
- *     description: Recover access using an existing zelf proof and lease a new tag with multi-domain support.
- *     tags: [Tags - Leasing]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/TagLeaseRecoveryRequest'
- *     responses:
- *       200:
- *         description: Recovery and lease completed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TagLeaseResponse'
- *       403:
- *         description: Session not active or rate limit exceeded
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/SessionError'
- *                 - $ref: '#/components/schemas/LimitError'
- *       409:
- *         description: Validation error, captcha failed, domain not supported, or recovery failed
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/CaptchaError'
- *                 - $ref: '#/components/schemas/DomainError'
- *                 - type: object
- *                   properties:
- *                     validationError:
- *                       type: string
- *                       example: "Invalid zelf proof"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/lease-offline:
- *   post:
- *     summary: Lease a tag offline - Multi-domain support
- *     description: Enhanced offline lease functionality with multi-domain support.
- *     tags: [Tags - Leasing]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/TagOfflineLeaseRequest'
- *     responses:
- *       200:
- *         description: Offline lease completed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TagLeaseResponse'
- *       409:
- *         description: Validation error, domain not supported, or invalid tag name
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/DomainError'
- *                 - type: object
- *                   properties:
- *                     validationError:
- *                       type: string
- *                       example: "Not a valid tag name"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/preview:
- *   post:
- *     summary: Preview tag - Multi-domain support
- *     description: Enhanced preview functionality with multi-domain support.
- *     tags: [Tags - Preview & Decryption]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/TagPreviewRequest'
- *     responses:
- *       200:
- *         description: Preview completed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TagPreviewResponse'
- *       403:
- *         description: Session not active or rate limit exceeded
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/SessionError'
- *                 - $ref: '#/components/schemas/LimitError'
- *       409:
- *         description: Validation error, captcha failed, or domain not supported
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/CaptchaError'
- *                 - $ref: '#/components/schemas/DomainError'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/delete:
- *   delete:
- *     summary: Delete a tag
- *     description: Delete a tag with biometric verification
- *     tags: [Tags - Management]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - domain
- *               - tagName
- *               - faceBase64
- *             properties:
- *               domain:
- *                 type: string
- *                 description: Domain of the tag to delete
- *                 example: "avax"
- *               tagName:
- *                 type: string
- *                 description: Name of the tag to delete
- *                 example: "username.avax"
- *               faceBase64:
- *                 type: string
- *                 format: base64
- *                 description: Base64 encoded face image for biometric verification
- *                 example: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ..."
- *               password:
- *                 type: string
- *                 description: Optional password for additional security
- *                 example: "secure_password"
- *     responses:
- *       200:
- *         description: Tag deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Tag deleted successfully"
- *       400:
- *         description: Bad request - Invalid biometric verification
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "No face detected in the provided image"
- *       401:
- *         description: Unauthorized - User not authenticated
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       404:
- *         description: Tag not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/preview-zelfproof:
- *   post:
- *     summary: Preview zelf proof
- *     description: Preview a zelf proof to validate and get preview data without processing.
- *     tags: [Tags - Preview & Decryption]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/ZelfProofPreviewRequest'
- *     responses:
- *       200:
- *         description: Zelf proof preview completed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TagPreviewResponse'
- *       403:
- *         description: Session not active or rate limit exceeded
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/SessionError'
- *                 - $ref: '#/components/schemas/LimitError'
- *       409:
- *         description: Validation error or captcha failed
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/CaptchaError'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/decrypt:
- *   post:
- *     summary: Decrypt tag - Multi-domain support
- *     description: Enhanced decryption functionality with multi-domain support.
- *     tags: [Tags - Preview & Decryption]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/TagDecryptRequest'
- *     responses:
- *       200:
- *         description: Decryption completed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TagDecryptResponse'
- *       403:
- *         description: Session not active or rate limit exceeded
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/SessionError'
- *                 - $ref: '#/components/schemas/LimitError'
- *       409:
- *         description: Validation error, captcha failed, or domain not supported
- *         content:
- *           application/json:
- *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/CaptchaError'
- *                 - $ref: '#/components/schemas/DomainError'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/revenue-cat:
- *   post:
- *     summary: RevenueCat webhook handler
- *     description: Handle RevenueCat subscription events and webhooks for payment processing.
- *     tags: [Tags - Rewards & Webhooks]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               event:
- *                 $ref: '#/components/schemas/RevenueCatWebhookRequest'
- *     responses:
- *       200:
- *         description: Webhook processed successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: object
- *                   description: Webhook processing result
- *       403:
- *         description: Access forbidden - unauthorized client or email
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 validationError:
- *                   type: string
- *                   example: "Access forbidden"
- *       409:
- *         description: Missing event payload or validation error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 validationError:
- *                   type: string
- *                   example: "Missing event payload"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/purchase-rewards:
- *   post:
- *     summary: Release purchase rewards
- *     description: Release purchase rewards for the authenticated user. Requires super admin privileges.
- *     tags: [Tags - Rewards & Webhooks]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Purchase rewards released successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: object
- *                   description: Purchase rewards data
- *       403:
- *         description: Unauthorized - requires super admin privileges
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Unauthorized"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-
-/**
- * @swagger
- * /api/tags/referral-rewards:
- *   post:
- *     summary: Release referral rewards
- *     description: Release referral rewards for the authenticated user. Requires super admin privileges.
- *     tags: [Tags - Rewards & Webhooks]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Referral rewards released successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: object
- *                   description: Referral rewards data
- *       403:
- *         description: Unauthorized - requires super admin privileges
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Unauthorized"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
  */

@@ -38,7 +38,8 @@ const searchTag = async (params, authUser) => {
 			ipfs: ipfsResults,
 			arweave: arweaveResults,
 			available: ipfsResults.length === 0 && arweaveResults.length === 0,
-			tagName: tagName,
+			tagName,
+			domain,
 		};
 
 		// If results found, return the first one
@@ -77,8 +78,8 @@ const searchTag = async (params, authUser) => {
 		return {
 			available: false,
 			error: error.message,
-			tagName: tagName,
-			domain: domain,
+			tagName,
+			domain,
 		};
 	}
 };
@@ -172,8 +173,8 @@ const searchHoldDomain = async (params, authUser) => {
 		return {
 			available: false,
 			error: `Domain '${domain}' is not active`,
-			domain: domain,
-			name: name,
+			domain,
+			name,
 		};
 	}
 
@@ -189,8 +190,8 @@ const searchHoldDomain = async (params, authUser) => {
 			ipfs: ipfsResults,
 			arweave: arweaveResults,
 			available: ipfsResults.length === 0 && arweaveResults.length === 0,
-			domain: domain,
-			name: name,
+			domain,
+			name,
 		};
 
 		// If results found, return the first one
@@ -203,11 +204,12 @@ const searchHoldDomain = async (params, authUser) => {
 		return combinedResults;
 	} catch (error) {
 		console.error("Error searching hold domain:", error);
+
 		return {
 			available: false,
 			error: error.message,
-			domain: domain,
-			name: name,
+			domain,
+			name,
 		};
 	}
 };
@@ -229,7 +231,7 @@ const searchByDomain = async (params, authUser) => {
 		return {
 			available: false,
 			error: `Domain '${domain}' is not active`,
-			domain: domain,
+			domain,
 		};
 	}
 
@@ -257,8 +259,8 @@ const searchByStorageKey = async (params, authUser) => {
 		return {
 			available: false,
 			error: `Domain '${domain}' is not active`,
-			domain: domain,
-			name: name,
+			domain,
+			name,
 		};
 	}
 
@@ -274,8 +276,8 @@ const searchByStorageKey = async (params, authUser) => {
 			ipfs: ipfsResults,
 			arweave: arweaveResults,
 			available: ipfsResults.length === 0 && arweaveResults.length === 0,
-			domain: domain,
-			name: name,
+			domain,
+			name,
 		};
 
 		// If results found, return the first one
@@ -302,8 +304,8 @@ const searchByStorageKey = async (params, authUser) => {
 		return {
 			available: false,
 			error: error.message,
-			domain: domain,
-			name: name,
+			domain,
+			name,
 		};
 	}
 };
@@ -324,7 +326,7 @@ const getDomainStats = async (domain, authUser) => {
 
 		// Combine statistics
 		const combinedStats = {
-			domain: domain,
+			domain,
 			totalTags: (ipfsStats.totalTags || 0) + (arweaveStats.totalTags || 0),
 			holdDomains: (ipfsStats.holdDomains || 0) + (arweaveStats.holdDomains || 0),
 			activeTags: (ipfsStats.activeTags || 0) + (arweaveStats.activeTags || 0),
@@ -336,7 +338,7 @@ const getDomainStats = async (domain, authUser) => {
 	} catch (error) {
 		console.error("Error getting domain stats:", error);
 		return {
-			domain: domain,
+			domain,
 			totalTags: 0,
 			holdDomains: 0,
 			activeTags: 0,
