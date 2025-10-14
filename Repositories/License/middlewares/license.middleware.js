@@ -4,9 +4,10 @@ const config = require("../../../Core/config");
 const schemas = {
 	search: {
 		domain: string().pattern(/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/),
+		withJSON: boolean().default(true),
 	},
 	getMyLicense: {
-		// No specific validation needed for getting user's own licenses
+		withJSON: boolean().default(true),
 	},
 	create: {
 		domain: string()
@@ -103,10 +104,11 @@ const schemas = {
 const searchValidation = async (ctx, next) => {
 	const payload = Object.assign(ctx.request.query, ctx.request.body);
 
-	const { domain } = payload;
+	const { domain, withJSON } = payload;
 
 	const valid = validate(schemas.search, {
 		domain,
+		withJSON,
 	});
 
 	if (valid.error) {

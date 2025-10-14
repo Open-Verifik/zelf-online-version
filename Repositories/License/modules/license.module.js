@@ -6,12 +6,13 @@ const { decrypt } = require("../../ZelfProof/modules/zelf-proof.module");
 const moment = require("moment");
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
 const DefaultLicenseValues = require("./default-license.values");
 const { Domain } = require("../../Tags/modules/domain.class");
 const CACHE_DOMAINS = {};
-// Cache file path for development mode
-const CACHE_FILE_PATH = path.join(__dirname, "../../../cache/official-licenses-cache.json");
+// Cache file path for development mode - moved outside project to avoid file watcher restarts
+const CACHE_FILE_PATH = path.join(os.homedir(), ".zelf-cache", "official-licenses-cache.json");
 
 /**
  * Check if cache is valid (less than 1 hour old)
@@ -56,6 +57,13 @@ const loadCache = () => {
  */
 const saveCache = (licenses) => {
 	try {
+		// Check if we need to update the cache (avoid unnecessary writes)
+		const existingCache = loadCache();
+		if (existingCache && JSON.stringify(existingCache.licenses) === JSON.stringify(licenses)) {
+			console.log("Cache unchanged, skipping write to prevent file watcher restart");
+			return;
+		}
+
 		const cacheDir = path.dirname(CACHE_FILE_PATH);
 		if (!fs.existsSync(cacheDir)) {
 			fs.mkdirSync(cacheDir, { recursive: true });
@@ -66,12 +74,14 @@ const saveCache = (licenses) => {
 			licenses: licenses,
 		};
 
+		// Update in-memory cache
 		CACHE_DOMAINS.timestamp = cacheData.timestamp;
-
 		CACHE_DOMAINS.licenses = cacheData.licenses;
 
+		// Write to file system (moved outside project directory to avoid file watcher restarts)
 		fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cacheData, null, 2));
-		console.log("Official licenses cache saved successfully");
+
+		console.log("Official licenses cache saved successfully to:", CACHE_FILE_PATH);
 	} catch (error) {
 		console.error("Error saving cache:", error);
 	}
@@ -84,17 +94,45 @@ const saveCache = (licenses) => {
  * @returns {Object} - License data or null
  */
 const searchLicense = async (query, user) => {
-	const { domain } = query;
+	const { domain, withJSON = true } = query;
 
 	if (domain) {
 		const existingLicense = await IPFS.get({ key: "licenseDomain", value: domain });
 
 		if (!existingLicense.length) throw new Error("404:license_not_found");
 
-		return existingLicense[0];
+		const licenseRecord = existingLicense[0];
+
+		// Fetch the complete JSON content from IPFS URL if requested
+		if (withJSON) {
+			try {
+				const jsonResponse = await axios.get(licenseRecord.url);
+				licenseRecord.domainConfig = jsonResponse.data;
+			} catch (error) {
+				console.error("Error getting license JSON from url:", error);
+				throw error;
+			}
+		}
+
+		return licenseRecord;
 	}
 
-	return IPFS.get({ key: "type", value: "license" });
+	// For getting all licenses, also fetch JSON content
+	const allLicenses = await IPFS.get({ key: "type", value: "license" });
+
+	if (withJSON) {
+		for (const license of allLicenses) {
+			try {
+				const jsonResponse = await axios.get(license.url);
+				license.domainConfig = jsonResponse.data;
+			} catch (error) {
+				console.error(`Error getting license JSON for ${license.id}:`, error);
+				// Continue with other licenses even if one fails
+			}
+		}
+	}
+
+	return allLicenses;
 };
 
 /**
@@ -378,6 +416,8 @@ const loadOfficialLicenses = async () => {
 		return cachedData.licenses;
 	}
 
+	console.info("Loading official licenses from IPFS...");
+
 	// Fetch from IPFS
 	const officialLicenses = await IPFS.get({ key: "type", value: "license" });
 
@@ -388,8 +428,10 @@ const loadOfficialLicenses = async () => {
 		licenses.push(licenseData);
 	}
 
+	// Save to cache (will skip if unchanged)
 	saveCache(licenses);
 
+	console.info(`Loaded ${licenses.length} official licenses successfully`);
 	return licenses;
 };
 

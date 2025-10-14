@@ -1,0 +1,11 @@
+# Cursor IDE ignore file
+# Exclude cache directory from file watching to prevent server restarts
+cache/
+*.cache
+*.log
+node_modules/
+.env
+.DS_Store
+coverage/
+dist/
+build/

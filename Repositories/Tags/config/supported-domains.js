@@ -1,9 +1,10 @@
 const { Domain } = require("../modules/domain.class");
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 
-// Cache file path for license data
-const CACHE_FILE_PATH = path.join(__dirname, "../../../cache/official-licenses-cache.json");
+// Cache file path for license data - updated to use new location outside project directory
+const CACHE_FILE_PATH = path.join(os.homedir(), ".zelf-cache", "official-licenses-cache.json");
 
 // In-memory cache for dynamic domains
 let cachedDynamicDomains = null;
@@ -460,6 +461,7 @@ const loadDynamicDomains = () => {
 
 			// Cache the result
 			cachedDynamicDomains = dynamicDomains;
+
 			lastCacheTimestamp = currentTimestamp;
 
 			return dynamicDomains;
@@ -478,6 +480,8 @@ const getSupportedDomains = () => {
 		// Merge dynamic domains with static ones
 		return { ...SUPPORTED_DOMAINS, ...dynamicDomains };
 	}
+
+	console.log({ dynamicDomains });
 
 	// Fallback to static domains only
 	return SUPPORTED_DOMAINS;

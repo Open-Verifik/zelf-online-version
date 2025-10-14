@@ -81,6 +81,9 @@ class Domain {
 
 		// Metadata
 		this.metadata = domainData.metadata || {};
+
+		// Theme Settings - preserve complete themeSettings from license data
+		this.themeSettings = domainData.themeSettings || {};
 	}
 
 	/**
@@ -313,6 +316,7 @@ class Domain {
 			storage: this.tags.storage,
 			stripe: this.stripe,
 			metadata: this.metadata,
+			themeSettings: this.themeSettings, // Include complete themeSettings in JSON output
 		};
 	}
 
