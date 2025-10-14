@@ -168,6 +168,8 @@ const create = async (data) => {
 		{ pro: true }
 	);
 
+	zelfAccount.publicData = zelfAccount.keyvalues;
+	delete zelfAccount.keyvalues;
 	zelfAccount.publicData.name = data.name;
 
 	return {
