@@ -408,10 +408,10 @@ const _checkIfDomainIsRegistered = async (domain, accountEmail) => {
 /**
  * Load official licenses
  */
-const loadOfficialLicenses = async () => {
+const loadOfficialLicenses = async (force = false) => {
 	const cachedData = loadCache();
 
-	if (cachedData) {
+	if (cachedData && !force) {
 		console.info("Loading official licenses from cache");
 		return cachedData.licenses;
 	}

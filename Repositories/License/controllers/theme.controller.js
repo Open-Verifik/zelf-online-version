@@ -1,5 +1,6 @@
 const Module = require("../modules/theme.module");
 const { errorHandler } = require("../../../Core/http-handler");
+const LicenseModule = require("../modules/license.module");
 
 /**
  * Get user's theme settings
@@ -38,6 +39,9 @@ const updateThemeSettings = async (ctx) => {
 			},
 			ctx.state.user
 		);
+
+		// reload the official licenses in the cache file
+		await LicenseModule.loadOfficialLicenses(true);
 
 		ctx.body = { data };
 	} catch (error) {

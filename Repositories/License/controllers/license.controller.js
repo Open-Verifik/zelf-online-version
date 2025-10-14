@@ -48,6 +48,9 @@ const createOrUpdateLicense = async (ctx) => {
 	try {
 		const data = await Module.createOrUpdateLicense(ctx.request.body, ctx.state.user);
 
+		// reload the official licenses in the cache file
+		await Module.loadOfficialLicenses(true);
+
 		ctx.body = { data };
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);
@@ -66,6 +69,9 @@ const createOrUpdateLicense = async (ctx) => {
 const deleteLicense = async (ctx) => {
 	try {
 		const data = await Module.deleteLicense(ctx.request.body, ctx.state.user);
+
+		// reload the official licenses in the cache file
+		await Module.loadOfficialLicenses(true);
 
 		ctx.body = { data };
 	} catch (error) {
