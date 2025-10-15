@@ -1,4 +1,4 @@
-const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
+const { string, validate, boolean, number, stringEnum, stringOptionalEmptyAsNull } = require("../../../Core/JoiUtils");
 const captchaService = require("../../../Core/captcha");
 const Session = require("../../Session/models/session.model");
 const { validateDomainName, isDomainActive } = require("../modules/domain-registry.module");
@@ -10,7 +10,7 @@ const schemas = {
 		key: string(),
 		value: string(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]),
-		captchaToken: string(),
+		captchaToken: stringOptionalEmptyAsNull(),
 		duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]),
 	},
 	searchByDomain: {
@@ -41,7 +41,7 @@ const schemas = {
 		faceBase64: string().required(),
 		type: stringEnum(["create", "import"]).required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string(),
+		captchaToken: stringOptionalEmptyAsNull().optional(),
 	},
 	leaseRecovery: {
 		zelfProof: string().required(),
@@ -50,7 +50,7 @@ const schemas = {
 		faceBase64: string().required(),
 		password: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string(),
+		captchaToken: stringOptionalEmptyAsNull().optional(),
 	},
 	decrypt: {
 		faceBase64: string().required(),
@@ -59,18 +59,18 @@ const schemas = {
 		domain: string().required(),
 		addServerPassword: boolean(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string(),
+		captchaToken: stringOptionalEmptyAsNull().optional(),
 	},
 	preview: {
 		tagName: string().required(),
 		domain: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string(),
+		captchaToken: stringOptionalEmptyAsNull().optional(),
 	},
 	previewZelfProof: {
 		zelfProof: string().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
-		captchaToken: string(),
+		captchaToken: stringOptionalEmptyAsNull().optional(),
 	},
 	revenueCatWebhook: {
 		event: {

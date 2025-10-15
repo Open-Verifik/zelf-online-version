@@ -159,6 +159,14 @@ const stringKeyValueObject = () =>
 		.pattern(Joi.string(), Joi.string()) // All keys and values must be strings
 		.error(_customErrors);
 
+const stringOptionalEmptyAsNull = () =>
+	Joi.string()
+		.allow("")
+		.custom((value, helpers) => {
+			return value === "" ? null : value;
+		})
+		.error(_customErrors);
+
 module.exports = {
 	alternative,
 	alternativeMany,
@@ -186,6 +194,7 @@ module.exports = {
 	string,
 	stringEnum,
 	stringKeyValueObject,
+	stringOptionalEmptyAsNull,
 	stringOrNumber,
 	symbol,
 	urlSecure,

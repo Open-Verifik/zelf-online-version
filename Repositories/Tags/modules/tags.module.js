@@ -100,7 +100,22 @@ const leaseTag = async (params, authUser) => {
 		tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
 	}
 
-	return tagObject;
+	const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui }, password);
+
+	return {
+		ipfs: [tagObject.ipfs],
+		available: false,
+		name: tagName,
+		tagName: `${tagName}.${domain}`,
+		domain,
+		arweave: tagObject.arweave ? [tagObject.arweave] : [],
+		tagObject: {
+			...tagObject.ipfs,
+			zelfProof: tagObject.zelfProof,
+			zelfProofQRCode: tagObject.zelfProofQRCode,
+		},
+		pgp,
+	};
 };
 
 /**
@@ -249,8 +264,20 @@ const previewZelfProof = async (params, authUser) => {
 		addServerPassword: Boolean(params.addServerPassword),
 	});
 
+	// get any key that has "Name" in the public data
+	const tagKey = Object.keys(previewResult.publicData).find((key) => key.includes("Name"));
+
+	const tagName = previewResult.publicData[tagKey];
+
+	const name = tagName.split(".")[0];
+
+	const domain = tagName.split(".")[1];
+
 	return {
 		preview: previewResult,
+		name,
+		tagName,
+		domain,
 		zelfProof,
 	};
 };

@@ -392,6 +392,36 @@ const getTagNameFromPublicData = (tagObject, type = "full", domainConfig) => {
 	}
 };
 
+const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
+	const { eth, solana, sui } = addresses;
+
+	const { mnemonic, zkProof } = dataToEncrypt.metadata;
+
+	let encryptedMessage;
+
+	let privateKey;
+
+	const pgpKeys = await SessionModule.walletEncrypt(
+		{
+			mnemonic,
+			zkProof,
+			solanaPrivateKey: solana.secretKey,
+			suiSecretKey: sui.secretKey,
+		},
+		eth.address,
+		password
+	);
+
+	encryptedMessage = pgpKeys.encryptedMessage;
+
+	privateKey = pgpKeys.privateKey;
+
+	return {
+		encryptedMessage,
+		privateKey,
+	};
+};
+
 module.exports = {
 	decryptParams,
 	encryptParams,
@@ -407,4 +437,5 @@ module.exports = {
 	generateZelfProof: _generateZelfProof,
 	getFullTagName,
 	getTagNameFromPublicData,
+	generatePGPKeys,
 };
