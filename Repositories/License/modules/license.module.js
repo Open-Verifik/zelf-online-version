@@ -7,15 +7,11 @@ const moment = require("moment");
 const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
 const DefaultLicenseValues = require("./default-license.values");
 const { Domain } = require("../../Tags/modules/domain.class");
-const NodeCache = require("node-cache");
+
+const { initCacheInstance } = require("../../../cache/manager");
 
 // Initialize cache with 1 hour TTL and check period of 10 minutes
-const licenseCache = new NodeCache({
-	stdTTL: 3600, // 1 hour default TTL
-	checkperiod: 600, // Check for expired keys every 10 minutes
-	useClones: false, // Better performance for large objects
-});
-
+const licenseCache = initCacheInstance();
 /**
  * Load licenses from cache
  * @returns {Array|null} - Cached licenses or null if not found/expired
@@ -47,8 +43,13 @@ const saveCache = (licenses) => {
 			return;
 		}
 
+		const licensesMap = licenses.reduce((acc, license) => {
+			acc[license.name.toLowerCase()] = license;
+			return acc;
+		}, {});
+
 		// Save to memory cache with automatic expiration
-		licenseCache.set("official-licenses", licenses);
+		licenseCache.set("official-licenses", licensesMap);
 
 		console.log(
 			`Official licenses cached successfully (${licenses.length} licenses, TTL: ${
@@ -433,6 +434,7 @@ const loadOfficialLicenses = async (force = false) => {
 		saveCache(licenses);
 
 		console.info(`Loaded ${licenses.length} official licenses successfully`);
+
 		return licenses;
 	} catch (error) {
 		console.error("Error loading official licenses:", error);
@@ -531,6 +533,8 @@ const syncLicenseWithStripe = async (license, paymentData) => {
 
 	const licenseObject = new Domain(licenseData);
 
+	console.log({ paymentData });
+
 	licenseObject.limits = plan.limits;
 	licenseObject.subscriptionId = paymentData.subscriptionId;
 	licenseObject.startDate = moment(new Date(paymentData.subscription.current_period_start * 1000)).format("YYYY-MM-DD HH:mm:ss");
@@ -540,11 +544,14 @@ const syncLicenseWithStripe = async (license, paymentData) => {
 		.format("YYYY-MM-DD HH:mm:ss");
 
 	licenseObject.stripe = {
-		productId: paymentData.productId,
+		subscriptionId: paymentData.subscriptionId,
+		customerId: paymentData.customerId,
+		productId: paymentData.subscription.items?.data[0]?.plan?.product,
 		priceId: paymentData.priceId,
 		latestInvoiceId: paymentData.invoiceId,
 		amountPaid: paymentData.amountPaid,
 		paidAt: paymentData.paidAt,
+		status: paymentData.status,
 	};
 
 	// now we will create it with the new details

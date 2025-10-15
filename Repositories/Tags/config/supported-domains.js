@@ -1,12 +1,8 @@
 const { Domain } = require("../modules/domain.class");
-const NodeCache = require("node-cache");
+const { initCacheInstance } = require("../../../cache/manager");
 
 // Initialize cache for dynamic domains with 1 hour TTL
-const domainsCache = new NodeCache({
-	stdTTL: 3600, // 1 hour TTL
-	checkperiod: 600, // Check every 10 minutes
-	useClones: false,
-});
+const domainsCache = initCacheInstance();
 
 /**
  * Supported Domains Configuration
@@ -38,7 +34,11 @@ const getDomainConfig = (domain) => {
 
 	const supportedDomains = getSupportedDomains();
 
-	return supportedDomains[domain.toLowerCase()] || null;
+	const selectedDomain = supportedDomains[domain.toLowerCase()];
+
+	const domainObject = selectedDomain ? new Domain(selectedDomain) : null;
+
+	return domainObject;
 };
 
 /**
@@ -106,6 +106,7 @@ const validateDomainName = (domain, name) => {
  */
 const isDomainActive = (domain) => {
 	const config = getDomainConfig(domain);
+
 	return config && config.status === "active";
 };
 
@@ -215,7 +216,8 @@ const getDomainLimits = (domain) => {
 const loadDynamicDomains = (licenses = null) => {
 	try {
 		// Check if we have cached domains
-		let cachedDomains = domainsCache.get("dynamic-domains");
+		let cachedDomains = domainsCache.get("official-licenses");
+
 		if (cachedDomains) {
 			return cachedDomains;
 		}
@@ -224,6 +226,7 @@ const loadDynamicDomains = (licenses = null) => {
 		if (licenses && Array.isArray(licenses)) {
 			// Convert license data to Domain objects
 			const dynamicDomains = {};
+
 			for (const license of licenses) {
 				if (license.name) {
 					dynamicDomains[license.name.toLowerCase()] = new Domain(license);
@@ -231,7 +234,8 @@ const loadDynamicDomains = (licenses = null) => {
 			}
 
 			// Cache the result with automatic expiration
-			domainsCache.set("dynamic-domains", dynamicDomains);
+			domainsCache.set("official-licenses", dynamicDomains);
+
 			console.log(`Dynamic domains cached: ${Object.keys(dynamicDomains).length} domains`);
 
 			return dynamicDomains;

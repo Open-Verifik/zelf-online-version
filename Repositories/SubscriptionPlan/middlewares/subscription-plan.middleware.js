@@ -38,7 +38,12 @@ const subscribeValidation = async (ctx, next) => {
 	await next();
 };
 
+const mySubscriptionValidation = async (ctx, next) => {
+	await next();
+};
+
 module.exports = {
 	getByIdValidation,
 	subscribeValidation,
+	mySubscriptionValidation,
 };

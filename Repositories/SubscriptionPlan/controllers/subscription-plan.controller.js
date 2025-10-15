@@ -49,8 +49,23 @@ const subscribe = async (ctx) => {
 	}
 };
 
+const mySubscription = async (ctx) => {
+	try {
+		const data = await Module.getMySubscription(ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
 module.exports = {
 	list,
 	getById,
 	subscribe,
+	mySubscription,
 };

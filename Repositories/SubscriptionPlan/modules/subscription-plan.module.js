@@ -1,5 +1,6 @@
 const Stripe = require("stripe");
 const config = require("../../../Core/config");
+const { getMyLicense } = require("../../License/modules/license.module");
 
 /**
  * Get Stripe client
@@ -144,8 +145,18 @@ const createCheckoutSession = async (productId, priceId, customerEmail = null) =
 	return session;
 };
 
+const getMySubscription = async (authToken) => {
+	const myLicense = await getMyLicense(authToken, true);
+
+	return myLicense;
+	// const stripe = getStripeClient();
+
+	// const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+};
+
 module.exports = {
 	listSubscriptionPlans,
 	getSubscriptionPlan,
 	createCheckoutSession,
+	getMySubscription,
 };

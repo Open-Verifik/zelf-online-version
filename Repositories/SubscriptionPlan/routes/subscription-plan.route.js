@@ -9,6 +9,9 @@ module.exports = (server) => {
 	// GET /api/subscription-plans - list plans
 	server.get(`${PATH}`, Controller.list);
 
+	// get my subscription
+	server.get(`${PATH}/my-subscription`, Middleware.mySubscriptionValidation, Controller.mySubscription);
+
 	// GET /api/subscription-plans/:productId - get specific plan by product ID
 	server.get(`${PATH}/:productId`, Middleware.getByIdValidation, Controller.getById);
 
