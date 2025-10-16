@@ -98,8 +98,8 @@ const getTokens = async (params, query) => {
 		);
 
 		const tokenHoldings = {
-			total: data.data.hits.length,
-			balance: data.data.extend.valueTotal,
+			total: data.data.hits?.length || 0,
+			balance: data.data.extend?.valueTotal || 0,
 			fiatBalance: 0,
 			tokens: [],
 		};

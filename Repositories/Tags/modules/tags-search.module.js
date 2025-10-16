@@ -53,7 +53,7 @@ const searchTag = async (params, authUser) => {
 			combinedResults.tagObject.ipfsId = ipfsResults[0].id;
 		}
 
-		if (combinedResults.available) {
+		if (combinedResults.available && domainConfig) {
 			combinedResults.price = domainConfig.getPrice(tagName, duration);
 		}
 
@@ -101,7 +101,7 @@ const searchIPFS = async (params, authUser) => {
 
 	const ipfsRecords = [];
 
-	const _tagName = TagsPartsModule.getFullTagName(tagName, domainConfig.name);
+	const _tagName = tagName ? TagsPartsModule.getFullTagName(tagName, domainConfig.name) : tagName;
 
 	try {
 		switch (type) {

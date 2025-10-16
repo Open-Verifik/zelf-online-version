@@ -25,7 +25,7 @@ const leaseRecovery = async (payload, authUser) => {
 		return { ...zelfProofRecord.tagObject, message: "Zelf Proof found and is being used by another tag" };
 	}
 
-	const { price } = await TagsModule._findDuplicatedTag(tagName, domain, domainConfig);
+	await TagsModule._findDuplicatedTag(tagName, domain, domainConfig);
 
 	const { face, password } = await TagsPartsModule.decryptParams(payload, authUser);
 
@@ -86,7 +86,22 @@ const leaseRecovery = async (payload, authUser) => {
 		await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
 	}
 
-	return tagObject;
+	const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui }, password);
+
+	return {
+		ipfs: [tagObject.ipfs],
+		available: false,
+		name: tagName,
+		tagName: `${tagName}.${domain}`,
+		domain,
+		arweave: tagObject.arweave ? [tagObject.arweave] : [],
+		tagObject: {
+			...tagObject.ipfs,
+			zelfProof: tagObject.zelfProof,
+			zelfProofQRCode: tagObject.zelfProofQRCode,
+		},
+		pgp,
+	};
 };
 
 const _generatePGPKeys = async (dataToEncrypt, addresses, password) => {

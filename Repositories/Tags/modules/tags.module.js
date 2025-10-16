@@ -276,6 +276,7 @@ const previewZelfProof = async (params, authUser) => {
 	return {
 		preview: previewResult,
 		name,
+		tagKey,
 		tagName,
 		domain,
 		zelfProof,
