@@ -412,8 +412,6 @@ const loadOfficialLicenses = async (force = false) => {
 		}
 	}
 
-	console.info("Loading official licenses from IPFS...");
-
 	try {
 		// Fetch from IPFS
 		const officialLicenses = await IPFS.get({ key: "type", value: "license" });

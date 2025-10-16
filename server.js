@@ -43,7 +43,7 @@ const server = app.listen(config.port, () => {
 
 		serverLog(`Connected MongoDB`);
 
-		await loadOfficialLicenses();
+		await loadOfficialLicenses(true);
 
 		// Swagger documentation setup
 		app.use(async (ctx, next) => {
@@ -127,6 +127,8 @@ const server = app.listen(config.port, () => {
 					if (_indexOfToken !== -1) {
 						return token?.substring(_indexOfToken);
 					}
+
+					loadOfficialLicenses();
 
 					return null;
 				},
