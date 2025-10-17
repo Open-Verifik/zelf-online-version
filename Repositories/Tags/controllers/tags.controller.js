@@ -373,6 +373,7 @@ const getDomains = async (ctx, next) => {
 	try {
 		// Load licenses first to ensure we have the latest data
 		const { loadOfficialLicenses } = require("../../License/modules/license.module");
+
 		const licenses = await loadOfficialLicenses();
 
 		// Get domains with the loaded licenses

@@ -355,6 +355,7 @@ const leaseOfflineValidation = async (ctx, next) => {
 
 	// Validate domain and tag name
 	const { domain: extractedDomain, name } = extractDomainAndName(tagName, domain);
+
 	const domainValidation = await validateDomainAndName(extractedDomain, name);
 
 	if (!domainValidation.valid) {
@@ -365,6 +366,7 @@ const leaseOfflineValidation = async (ctx, next) => {
 
 	// Add extracted domain and name to context
 	ctx.state.extractedDomain = extractedDomain;
+
 	ctx.state.extractedName = name;
 
 	await next();
