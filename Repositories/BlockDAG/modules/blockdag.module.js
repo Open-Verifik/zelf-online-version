@@ -213,21 +213,88 @@ const getTokens = async (params, query) => {
 	try {
 		const { address } = params;
 
-		// BlockDAG is EVM compatible, so we can use similar logic to get ERC20 tokens
-		// For now, return empty array as BlockDAG explorer API integration would be needed
-		// This can be expanded when BlockDAG provides a token API endpoint
+		// Try to get common/popular BlockDAG tokens via RPC
+		const commonTokens = require("../data/common-tokens.json");
+
+		if (commonTokens.length === 0) {
+			// No common tokens configured yet
+			return {
+				balance: "0",
+				total: 0,
+				totalFiatBalance: 0,
+				tokens: [],
+			};
+		}
+
+		const tokens = [];
+		let totalFiatBalance = 0;
+
+		for (const token of commonTokens) {
+			try {
+				// Get token balance using ERC20 balanceOf function via RPC
+				const balanceResponse = await instance.post(
+					BLOCKDAG_RPC,
+					{
+						jsonrpc: "2.0",
+						method: "eth_call",
+						params: [
+							{
+								to: token.contractAddress,
+								data: "0x70a08231" + "000000000000000000000000" + address.slice(2), // balanceOf(address)
+							},
+							"latest",
+						],
+						id: 1,
+					},
+					{
+						headers: { "Content-Type": "application/json" },
+					}
+				);
+
+				if (balanceResponse.data.result && balanceResponse.data.result !== "0x" && balanceResponse.data.result !== "0x0") {
+					const balance = parseInt(balanceResponse.data.result, 16);
+					if (balance > 0) {
+						const amount = balance / Math.pow(10, token.decimals);
+						const price = token.price || "0";
+						const fiatBalance = amount * parseFloat(price);
+
+						tokens.push({
+							address: token.contractAddress,
+							symbol: token.symbol,
+							name: token.name,
+							decimals: token.decimals,
+							amount: amount.toString(),
+							price: price,
+							fiatBalance: fiatBalance,
+							image: token.image || "https://cryptologos.cc/logos/blockdag-bdag-logo.png",
+							tokenType: "ERC20",
+							owner: address,
+							contractAddress: token.contractAddress,
+							rawAmount: balance.toString(),
+						});
+
+						totalFiatBalance += fiatBalance;
+					}
+				}
+			} catch (tokenError) {
+				console.log(`Error fetching token ${token.symbol}:`, tokenError.message);
+				// Continue with next token if one fails
+				continue;
+			}
+		}
 
 		return {
-			balance: "0",
-			total: 0,
-			totalFiatBalance: 0,
-			tokens: [],
+			balance: totalFiatBalance.toFixed(2),
+			total: tokens.length,
+			totalFiatBalance: totalFiatBalance,
+			tokens: tokens,
 		};
 	} catch (error) {
 		console.error("Error getting BlockDAG tokens:", error.message || "Unknown error");
 		return {
 			balance: "0",
 			total: 0,
+			totalFiatBalance: 0,
 			tokens: [],
 		};
 	}

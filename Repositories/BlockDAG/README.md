@@ -158,9 +158,11 @@ The integration uses the following JSON-RPC methods:
 - Uses `eth_getTransactionReceipt` for transaction status and gas used
 
 ### Token Queries
-- Currently returns empty array (placeholder)
-- Can be expanded with ERC20 token detection
-- Would use `eth_call` with balanceOf function
+- Uses `eth_call` with ERC20 `balanceOf` function to check token balances
+- Checks all tokens listed in `data/common-tokens.json`
+- Only returns tokens with non-zero balances
+- Automatically calculates fiat value for each token
+- To add tokens, simply update `data/common-tokens.json` with contract addresses
 
 ### Gas Tracker
 - Uses `eth_gasPrice` to get current gas price
@@ -175,10 +177,34 @@ All functions include comprehensive error handling:
 - Detailed error logging
 - User-friendly error messages
 
+## Adding Popular Tokens
+
+To enable token detection for popular BlockDAG tokens:
+
+1. Find the contract addresses of popular tokens on BlockDAG
+2. Edit `/data/common-tokens.json`:
+
+```json
+[
+  {
+    "contractAddress": "0x1234...",
+    "symbol": "USDT",
+    "name": "Tether USD",
+    "decimals": 6,
+    "price": "1.0",
+    "image": "https://..."
+  }
+]
+```
+
+3. The system will automatically check and display these tokens for all users
+
+See `/data/README.md` and `/data/common-tokens.example.json` for more details.
+
 ## Future Enhancements
 
 1. **Explorer Integration**: Integrate with BlockDAG explorer API for detailed transaction history
-2. **Token Detection**: Add automatic ERC20 token detection and balance fetching
+2. **Token Discovery**: Add automatic token discovery (scan events/logs for token transfers)
 3. **Price Feeds**: Add proper BDAG price feed when listed on exchanges
 4. **Caching**: Implement Redis caching for frequently accessed data
 5. **WebSocket Support**: Add real-time updates for transactions and balances
