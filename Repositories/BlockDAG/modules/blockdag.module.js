@@ -242,66 +242,15 @@ const getTransactionsList = async (query) => {
 	try {
 		const { address, page = "0", show = "100" } = query;
 
-		// Get BDAG price for transaction formatting
-		let price = "0.001"; // Default placeholder price
-		try {
-			const priceData = await getTickerPrice({ symbol: "BDAG" });
-			price = priceData.price || "0.001";
-		} catch (priceError) {
-			console.log("Price fetch failed, using default:", priceError.message);
-		}
-
-		// Get transaction count via RPC
-		let transactionCount = 0;
-		try {
-			const nonceResponse = await instance.post(
-				BLOCKDAG_RPC,
-				{
-					jsonrpc: "2.0",
-					method: "eth_getTransactionCount",
-					params: [address, "latest"],
-					id: 1,
-				},
-				{
-					headers: { "Content-Type": "application/json" },
-				}
-			);
-			transactionCount = nonceResponse.data.result ? parseInt(nonceResponse.data.result, 16) : 0;
-		} catch (error) {
-			console.error("Transaction count fetch failed:", error.message);
-		}
-
-		// Try to get transaction history from BlockDAG explorer if available
-		// For now, return transaction count info
-		const placeholderTransaction = {
-			age: moment().fromNow(),
-			amount: "0",
-			assetPrice: price.toString(),
-			block: "N/A",
-			confirmations: "0",
-			date: moment().format("YYYY-MM-DD HH:mm:ss"),
-			from: address,
-			gasPrice: "0",
-			hash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-			image: "https://cryptologos.cc/logos/blockdag-bdag-logo.png",
-			status: "Info",
-			to: address,
-			txnFee: "0",
-			type: "info",
-			traffic: "INFO",
-			method: "Info",
-			asset: "BDAG",
-			fiatAmount: "0.00",
-			note: `This address has ${transactionCount} transactions. BlockDAG explorer integration can be expanded for detailed transaction history.`,
-		};
-
+		// Return empty transactions until BlockDAG provides proper API documentation
+		// TODO: Implement when BlockDAG explorer API or transaction endpoints are available
 		return {
 			pagination: {
-				records: transactionCount > 0 ? "1" : "0",
-				pages: "1",
+				records: "0",
+				pages: "0",
 				page: page,
 			},
-			transactions: transactionCount > 0 ? [placeholderTransaction] : [],
+			transactions: [],
 		};
 	} catch (error) {
 		console.error("Error getting BlockDAG transactions:", error.message || "Unknown error");

@@ -152,8 +152,9 @@ The integration uses the following JSON-RPC methods:
 - Calculates fiat value using BDAG price from Binance
 
 ### Transaction Queries
-- Uses `eth_getTransactionCount` to get total transaction count
-- Uses `eth_getTransactionByHash` for specific transaction details
+- Currently returns empty array
+- Will be implemented when BlockDAG provides proper API documentation
+- Uses `eth_getTransactionByHash` for specific transaction details (works for known transaction hashes)
 - Uses `eth_getTransactionReceipt` for transaction status and gas used
 
 ### Token Queries
