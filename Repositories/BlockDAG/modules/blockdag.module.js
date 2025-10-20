@@ -89,6 +89,7 @@ const getAddress = async (query) => {
 			try {
 				// Try to get BDAG price from Binance
 				const priceData = await getTickerPrice({ symbol: "BDAG" });
+
 				bdagPrice = priceData.price || "0";
 			} catch (error) {
 				console.log("BlockDAG price fetch failed, using default:", error.message);
@@ -118,7 +119,7 @@ const getAddress = async (query) => {
 				symbol: "BDAG",
 				name: "BlockDAG",
 				price: bdagPrice,
-				amount: parseFloat(bdagBalance),
+				amount: bdagBalance,
 				image: "https://cryptologos.cc/logos/blockdag-bdag-logo.png", // Placeholder image
 				address: address, // Native token uses the wallet address
 				decimals: 18,
@@ -452,8 +453,8 @@ const getPortfolioSummary = async (params) => {
 			bdagPrice: bdagPrice,
 			tokenCount: tokens.length,
 			totalTokenValue: totalTokenValue.toFixed(2),
-			transactionCount: transactionCount,
-			tokens: tokens,
+			transactionCount,
+			tokens,
 			lastUpdated: new Date().toISOString(),
 		};
 	} catch (error) {
@@ -510,4 +511,3 @@ module.exports = {
 	getPortfolioSummary,
 	getLatestBlock,
 };
-
