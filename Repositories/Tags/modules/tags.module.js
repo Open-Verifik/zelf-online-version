@@ -8,7 +8,6 @@ const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
 const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module");
 const OfflineProofModule = require("../../Mina/offline-proof");
-
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
 const { initTagUpdates, updateTags } = require("./sync-tag-records.module");
@@ -20,6 +19,7 @@ const { extractZelfProofFromQR } = require("./qr-zelfproof-extractor.module");
 const SessionModule = require("../../Session/modules/session.module");
 const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
 const { unPinFiles } = require("./tags-ipfs.module");
+const jwt = require("jsonwebtoken");
 
 /**
  * Generate domain-specific hold domain
@@ -195,6 +195,8 @@ const decryptTag = async (params, authUser) => {
 
 	const { mnemonic, zkProof, solanaSecretKey } = decryptedZelfProof.metadata;
 
+	const tagKey = domainConfig.getTagKey();
+
 	const { encryptedMessage, privateKey, tagsToAdd } = await initTagUpdates(tagObject, {
 		mnemonic,
 		zkProof,
@@ -217,11 +219,15 @@ const decryptTag = async (params, authUser) => {
 	return {
 		...tagObject,
 		domain,
-		metadata: {
-			mnemonic,
-			zkProof,
-			solanaSecretKey,
-		},
+		pgp: { encryptedMessage, privateKey },
+		durationToken: jwt.sign(
+			{
+				tagName: tagObject.publicData[tagKey],
+				exp: moment().add(1, "month").unix(),
+			},
+			config.JWT_SECRET
+		),
+		metadata: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey } : undefined,
 	};
 };
 

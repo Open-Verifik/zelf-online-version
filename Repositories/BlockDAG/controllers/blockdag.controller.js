@@ -16,7 +16,7 @@ const address = async (ctx) => {
 		const { address } = ctx.request.params;
 
 		const data = await getAddress({ address, ...ctx.request.query });
-		ctx.body = data;
+		ctx.body = { data };
 	} catch (error) {
 		console.error("BlockDAG address controller error:", error.message);
 		ctx.status = 500;
@@ -33,7 +33,7 @@ const tokens = async (ctx) => {
 		const { address } = ctx.request.params;
 
 		const data = await getTokens({ address }, ctx.request.query);
-		ctx.body = data;
+		ctx.body = { data };
 	} catch (error) {
 		console.error("BlockDAG tokens controller error:", error.message);
 		ctx.status = 500;
@@ -50,7 +50,7 @@ const transactions = async (ctx) => {
 		const { address } = ctx.request.params;
 
 		const data = await getTransactionsList({ address, ...ctx.request.query });
-		ctx.body = data;
+		ctx.body = { data };
 	} catch (error) {
 		console.error("BlockDAG transactions controller error:", error.message);
 		ctx.status = 500;
@@ -67,7 +67,7 @@ const transactionStatus = async (ctx) => {
 		const { id } = ctx.params;
 
 		const data = await getTransactionStatus({ id });
-		ctx.body = data;
+		ctx.body = { data };
 	} catch (error) {
 		console.error("BlockDAG transaction status controller error:", error.message);
 		ctx.status = 500;
@@ -82,7 +82,7 @@ const transactionStatus = async (ctx) => {
 const gasTracker = async (ctx) => {
 	try {
 		const data = await getGasTracker(ctx.request.query);
-		ctx.body = data;
+		ctx.body = { data };
 	} catch (error) {
 		console.error("BlockDAG gas tracker controller error:", error.message);
 		ctx.status = 500;
@@ -99,7 +99,7 @@ const portfolioSummary = async (ctx) => {
 		const { address } = ctx.request.params;
 
 		const data = await getPortfolioSummary({ address });
-		ctx.body = data;
+		ctx.body = { data };
 	} catch (error) {
 		console.error("BlockDAG portfolio summary controller error:", error.message);
 		ctx.status = 500;
