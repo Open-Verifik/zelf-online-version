@@ -9,6 +9,7 @@ const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const ZNSPartsModule = require("./zns-parts.module");
 const { addReferralReward, addPurchaseReward, getPurchaseReward } = require("./zns-token.module");
+const { getDomainConfig } = require("../../Tags/config/supported-domains");
 
 const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
 	const chargeID = coinbase_hosted_url?.split("/pay/")[1];
@@ -414,23 +415,17 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 };
 
 const howToRenewMyZelfName = async (params) => {
-	const zelfName = params.zelfName.toLowerCase();
+	const { domain, tagName } = params;
+
+	const domainConfig = getDomainConfig(domain);
+
+	if (!domainConfig) throw new Error(`Unsupported domain: ${domain}`);
+
+	const searchResult = await searchTag({ tagName, domain, domainConfig, environment: "all" }, authUser);
+
+	if (searchResult.available) return searchResult;
 
 	const duration = params.duration === "lifetime" ? "lifetime" : parseInt(params.duration || 1);
-
-	const publicKeys = await searchZelfName({ zelfName });
-
-	const zelfNameObject = publicKeys.ipfs?.length ? publicKeys.ipfs[0] : publicKeys.arweave?.length ? publicKeys.arweave[0] : null;
-
-	if (!zelfNameObject) {
-		const error = new Error("zelfName_not_found");
-		error.status = 404;
-		throw error;
-	}
-
-	if (!zelfNameObject.publicData.registeredAt) {
-		await _updateOldZelfNameObject(zelfNameObject);
-	}
 
 	const recordsWithSameName = publicKeys.ipfs?.length || publicKeys.arweave?.length;
 

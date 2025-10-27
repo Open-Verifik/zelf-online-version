@@ -151,6 +151,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 
 	const paymentAddress = {
 		ethAddress: renewTagPayObject?.publicData?.ethAddress,
+		avalancheAddress: renewTagPayObject?.publicData?.ethAddress,
 		btcAddress: renewTagPayObject?.publicData?.btcAddress,
 		solanaAddress: renewTagPayObject?.publicData?.solanaAddress,
 	};
@@ -162,19 +163,19 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 		AVAX: null,
 	};
 
-	if (domainConfig?.payment?.currencies?.includes("ETH")) {
+	if (domainConfig?.tags?.payment?.currencies?.includes("ETH")) {
 		prices.ETH = await calculateCryptoValue("ETH", priceDetails.price);
 	}
 
-	if (domainConfig?.payment?.currencies?.includes("SOL")) {
+	if (domainConfig?.tags?.payment?.currencies?.includes("SOL")) {
 		prices.SOL = await calculateCryptoValue("SOL", priceDetails.price);
 	}
 
-	if (domainConfig?.payment?.currencies?.includes("BTC")) {
+	if (domainConfig?.tags?.payment?.currencies?.includes("BTC")) {
 		prices.BTC = await calculateCryptoValue("BTC", priceDetails.price);
 	}
 
-	if (domainConfig?.payment?.currencies?.includes("AVAX")) {
+	if (domainConfig?.tags?.payment?.currencies?.includes("AVAX")) {
 		prices.AVAX = await calculateCryptoValue("AVAX", priceDetails.price);
 	}
 
@@ -189,6 +190,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 		coinbase_hosted_url: renewTagPayObject.publicData.coinbase_hosted_url,
 		coinbase_expires_at: renewTagPayObject.publicData.coinbase_expires_at,
 		count: parseInt(renewTagPayObject.publicData.count),
+		publicData: renewTagPayObject.publicData,
 		payment: {
 			registeredAt: renewTagPayObject.publicData.registeredAt,
 			expiresAt: renewTagPayObject.publicData.expiresAt,
@@ -370,7 +372,7 @@ const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount,
 		tagPayObject.publicData.solanaAddress = solana.address;
 	}
 
-	if (domainConfig?.payment?.methods?.includes("coinbase")) {
+	if (domainConfig?.tags?.payment?.methods?.includes("coinbase")) {
 		coinbaseCharge = await _createCoinbaseCharge(tagPayObject.tagPayName, priceDetails, currentCount, {
 			ethAddress: tagPayObject.publicData.ethAddress,
 			btcAddress: tagPayObject.publicData.btcAddress,
@@ -575,7 +577,6 @@ const processEnterprisePayment = async (paymentData, authUser) => {
  * @returns {Object} - Pricing table
  */
 const getPricingTable = () => {
-	const domains = Object.keys(getDomainConfig("zelf") ? {} : {}); // Get all domains
 	const pricingTable = {};
 
 	Object.entries(require("../config/supported-domains").SUPPORTED_DOMAINS).forEach(([domain, config]) => {

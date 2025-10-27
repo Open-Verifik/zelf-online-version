@@ -1,6 +1,7 @@
 const { string, validate, boolean, number, stringEnum } = require("../../../Core/JoiUtils");
 const Session = require("../../Session/models/session.model");
 const moment = require("moment");
+const { validateDomainAndName } = require("../../Tags/middlewares/tags.middleware");
 
 const schemas = {
 	transfer: {
@@ -13,7 +14,8 @@ const schemas = {
 		token: string().required(),
 	},
 	howToRenew: {
-		zelfName: string().required(),
+		domain: string().required(),
+		tagName: string().required(),
 	},
 };
 
@@ -43,10 +45,7 @@ const transferValidation = async (ctx, next) => {
  * @param {Object} next
  */
 const howToRenewValidation = async (ctx, next) => {
-	const valid = validate(schemas.howToRenew, {
-		...ctx.request.query,
-		...ctx.request.params,
-	});
+	const valid = validate(schemas.howToRenew, ctx.request.query);
 
 	if (valid.error) {
 		ctx.status = 409;
@@ -54,34 +53,17 @@ const howToRenewValidation = async (ctx, next) => {
 		return;
 	}
 
-	const { zelfName } = { ...ctx.request.params, ...ctx.request.query };
+	const { domain, tagName } = ctx.request.query;
 
-	const failed = validateZelfName(zelfName, ctx);
+	const domainValidation = await validateDomainAndName(domain, tagName);
 
-	if (failed) return;
+	if (!domainValidation.valid) {
+		ctx.status = 409;
+		ctx.body = { validationError: domainValidation.error };
+		return;
+	}
 
 	await next();
-};
-
-const validateZelfName = (zelfName, ctx) => {
-	// check that name includes .zelf
-	if (!zelfName.includes(".zelf")) {
-		ctx.status = 409;
-		ctx.body = { validationError: "Not a valid zelf name" };
-		return {
-			failed: true,
-		};
-	}
-
-	if (zelfName.length < 6) {
-		ctx.status = 409;
-		ctx.body = { validationError: "ZelfName should be 1 character or more." };
-		return {
-			failed: true,
-		};
-	}
-
-	return null;
 };
 
 const renewValidation = async (ctx, next) => {
