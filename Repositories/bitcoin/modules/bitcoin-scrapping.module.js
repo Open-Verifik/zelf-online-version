@@ -234,7 +234,7 @@ const getBalanceFromBlockstream = async (params) => {
 		const formatBTC = convertSatoshiToBTC(balanceSatoshi);
 
 		// Get transactions using Blockstream
-		const transactions = await getTransactionsListFromBlockstream({ id: params.id });
+		const { transactions } = await getTransactionsListFromBlockstream({ id: params.id });
 
 		return {
 			address: params.id,
