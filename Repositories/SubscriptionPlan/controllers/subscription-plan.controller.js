@@ -63,9 +63,27 @@ const mySubscription = async (ctx) => {
 	}
 };
 
+const createPortalSession = async (ctx) => {
+	try {
+		const session = await Module.createPortalSession(ctx.state.user);
+
+		ctx.body = {
+			url: session.url,
+			success: true,
+		};
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
 module.exports = {
 	list,
 	getById,
 	subscribe,
 	mySubscription,
+	createPortalSession,
 };

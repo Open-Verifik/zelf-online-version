@@ -17,4 +17,7 @@ module.exports = (server) => {
 
 	// now we need to create a subscribe action > will open a stripe checkout session
 	server.post(`${PATH}/subscribe`, Middleware.subscribeValidation, Controller.subscribe);
+
+	// create portal session for subscription management
+	server.post(`${PATH}/create-portal-session`, Middleware.createPortalSessionValidation, Controller.createPortalSession);
 };

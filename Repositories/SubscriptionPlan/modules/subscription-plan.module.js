@@ -146,12 +146,43 @@ const createCheckoutSession = async (productId, priceId, customerEmail = null) =
 };
 
 const getMySubscription = async (authToken) => {
-	const myLicense = await getMyLicense(authToken, true);
+	const { myLicense, zelfAccount } = await getMyLicense(authToken, true);
 
-	return myLicense;
-	// const stripe = getStripeClient();
+	const stripe = getStripeClient();
 
-	// const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+	const subscription = await stripe.subscriptions.retrieve(myLicense.domainConfig.stripe?.subscriptionId);
+
+	const product = await stripe.products.retrieve(myLicense.domainConfig.stripe?.productId);
+
+	return { myLicense, zelfAccount, subscription, product };
+};
+
+/**
+ * Create a Stripe customer portal session for subscription management
+ * @param {Object} authToken - Authentication token containing user info
+ * @returns {Promise<Object>} - Stripe portal session
+ */
+const createPortalSession = async (authToken) => {
+	const stripe = getStripeClient();
+
+	// Get the user's subscription to find the customer ID
+	const { myLicense } = await getMyLicense(authToken, true);
+
+	if (!myLicense?.domainConfig?.stripe?.customerId) {
+		throw new Error("400:no_customer_found");
+	}
+
+	const customerId = myLicense.domainConfig.stripe.customerId;
+
+	// Create portal session
+	const sessionParams = {
+		customer: customerId,
+		return_url: config.stripe.frontendUrl + "/settings/plan-billing",
+	};
+
+	const session = await stripe.billingPortal.sessions.create(sessionParams);
+
+	return session;
 };
 
 module.exports = {
@@ -159,4 +190,5 @@ module.exports = {
 	getSubscriptionPlan,
 	createCheckoutSession,
 	getMySubscription,
+	createPortalSession,
 };

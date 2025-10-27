@@ -42,8 +42,15 @@ const mySubscriptionValidation = async (ctx, next) => {
 	await next();
 };
 
+const createPortalSessionValidation = async (ctx, next) => {
+	// No specific validation needed for portal session creation
+	// The user authentication is handled by the auth middleware
+	await next();
+};
+
 module.exports = {
 	getByIdValidation,
 	subscribeValidation,
 	mySubscriptionValidation,
+	createPortalSessionValidation,
 };
