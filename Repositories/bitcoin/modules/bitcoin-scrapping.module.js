@@ -71,9 +71,21 @@ const getTransactionDetail = async (params) => {
 	return extractTransactionData([data]);
 };
 
+// Detect if address is testnet
+const isTestnetAddress = (address) => {
+	return address && (address.startsWith("tb1") || address.startsWith("2M") || address.startsWith("n1") || address.startsWith("m1"));
+};
+
 // Obtener balance de una dirección
 const getBalance = async (params) => {
+	// Auto-detect testnet addresses and route to testnet handler
+	if (isTestnetAddress(params.id)) {
+		console.log(`Testnet address detected: ${params.id}, routing to testnet handler`);
+		return await getTestnetBalance(params);
+	}
+
 	try {
+		// Try mainnet with Blockchain.info
 		const data = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`);
 
 		const { price } = await getTickerPrice({ symbol: "BTC" });
@@ -112,9 +124,18 @@ const getBalance = async (params) => {
 			transactions,
 		};
 	} catch (e) {
-		const error = new Error("not_found");
-		error.status = 404;
-		throw error;
+		console.error({ e });
+
+		// Fallback: Try Blockstream.info as an alternative
+		console.log("Blockchain.info failed, trying Blockstream as fallback...");
+		try {
+			return await getBalanceFromBlockstream(params);
+		} catch (fallbackError) {
+			console.error("All API sources failed:", fallbackError);
+			const error = new Error("not_found");
+			error.status = 404;
+			throw error;
+		}
 	}
 };
 
@@ -145,6 +166,52 @@ function extractTransactionData(transactions) {
 	});
 }
 
+// Get transactions from Blockstream mainnet API
+const getTransactionsListFromBlockstream = async (params, query = { show: "25" }) => {
+	try {
+		const txsData = await makeApiRequest(`https://blockstream.info/api/address/${params.id}/txs`);
+
+		if (!txsData || txsData.length === 0) return { transactions: [] };
+
+		return { transactions: extractTransactionDataFromBlockstream(txsData) };
+	} catch (error) {
+		console.error("Blockstream transactions error:", error);
+		return { transactions: [] };
+	}
+};
+
+// Extract transaction data from Blockstream API format
+function extractTransactionDataFromBlockstream(transactions) {
+	return transactions.map((tx) => {
+		// Find the outputs that are the address we care about
+		const relevantOutputs = tx.vout.filter((vout) => vout.scriptpubkey_address);
+
+		const fromAddress = transactions[0]?.vin?.[0]?.prevout?.scriptpubkey_address || "";
+		const toAddresses = relevantOutputs.map((vout) => vout.scriptpubkey_address).filter(Boolean);
+
+		// Calculate amount in satoshis
+		const amountSats = relevantOutputs.reduce((sum, vout) => sum + (vout.value || 0), 0);
+		const amountBTC = amountSats / 1e8;
+
+		return {
+			amount: amountBTC,
+			amountSats: amountSats,
+			blockNumber: tx.status?.block_height || null,
+			decimals: 8,
+			from: fromAddress || "",
+			hash: tx.txid,
+			logoURI: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
+			networkFee: (tx.fee || 0) / 1e8,
+			networkFeePayer: fromAddress || "",
+			networkFeeSats: tx.fee || 0,
+			status: tx.status?.confirmed ? "confirmed" : "pending",
+			symbol: "BTC",
+			to: toAddresses,
+			tokenType: "coin",
+		};
+	});
+}
+
 const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
 	const txsData = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}/txs`);
 
@@ -155,12 +222,64 @@ const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
 	return { transactions: extractTransactionData(txsData) };
 };
 
+// Get balance from Blockstream API (alternative to Blockchain.info)
+const getBalanceFromBlockstream = async (params) => {
+	try {
+		const data = await makeApiRequest(`https://blockstream.info/api/address/${params.id}`);
+
+		const { price } = await getTickerPrice({ symbol: "BTC" });
+
+		// Blockstream API structure: chain_stats.funded_txo_sum
+		const balanceSatoshi = data.chain_stats?.funded_txo_sum - (data.chain_stats?.spent_txo_sum || 0);
+		const formatBTC = convertSatoshiToBTC(balanceSatoshi);
+
+		// Get transactions using Blockstream
+		const transactions = await getTransactionsListFromBlockstream({ id: params.id });
+
+		return {
+			address: params.id,
+			balance: formatBTC.toString(),
+			fiatBalance: formatBTC * price,
+			fullName: "BTC",
+			account: {
+				asset: "BTC",
+				fiatBalance: (formatBTC * price).toString(),
+				price: price,
+			},
+			tokenHoldings: {
+				balance: formatBTC,
+				total: formatBTC,
+				tokens: [
+					{
+						address: params.id,
+						amount: formatBTC.toString(),
+						decimals: 8,
+						fiatBalance: formatBTC * price,
+						image: "https://static.okx.com/cdn/wallet/logo/BTC.png",
+						name: "Bitcoin",
+						network: "Bitcoin",
+						price: price,
+						symbol: "BTC",
+						tokenType: "BTC",
+					},
+				],
+			},
+			transactions,
+		};
+	} catch (e) {
+		console.error("Blockstream API error:", e);
+		throw e;
+	}
+};
+
 const getTestnetBalance = async (params) => {
 	try {
 		const data = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}`);
 
 		const { price } = await getTickerPrice({ symbol: "BTC" });
-		const formatBTC = convertSatoshiToBTC(data.chain_stats.funded_txo_sum);
+		// Calculate actual balance: funded - spent
+		const balanceSatoshi = (data.chain_stats?.funded_txo_sum || 0) - (data.chain_stats?.spent_txo_sum || 0);
+		const formatBTC = convertSatoshiToBTC(balanceSatoshi);
 
 		const { transactions } = await getTestnetTransactionsList(params);
 
