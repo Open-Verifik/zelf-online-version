@@ -115,7 +115,7 @@ const getTokens = async (params, query) => {
 		};
 
 		try {
-			for (let index = 0; index < data.data.hits.length; index++) {
+			for (let index = 0; index < data.data.hits?.length || 0; index++) {
 				const token = data.data.hits[index];
 
 				tokenHoldings.fiatBalance += parseFloat(token.valueUsd) || 0;
