@@ -6,6 +6,7 @@ const TagsOfflineModule = require("../modules/tags-offline.module");
 const TagsSearchModule = require("../modules/tags-search.module");
 const { getAllSupportedDomains } = require("../modules/domain-registry.module");
 const { errorHandler } = require("../../../Core/http-handler");
+const configuration = require("../../../Core/config");
 
 /**
  * Handle zelfPay logic for searchTag functions
@@ -376,8 +377,13 @@ const getDomains = async (ctx, next) => {
 
 		const licenses = await loadOfficialLicenses();
 
+		const { includeNonPaid } = ctx.request.query;
+
 		// Get domains with the loaded licenses
-		const domains = getAllSupportedDomains(licenses);
+		const domains = getAllSupportedDomains(
+			licenses,
+			includeNonPaid !== undefined ? !Boolean(includeNonPaid === "true") : configuration.env === "development" ? false : true
+		);
 
 		ctx.body = { data: domains };
 	} catch (error) {

@@ -56,8 +56,22 @@ const isSupported = (domain) => {
  * @param {Array} licenses - Optional array of license objects
  * @returns {Object} - All supported domains
  */
-const getAllSupportedDomains = (licenses = null) => {
-	return getSupportedDomains(licenses);
+const getAllSupportedDomains = (licenses = null, paid = false) => {
+	const domains = getSupportedDomains(licenses);
+
+	if (paid) {
+		const paidDomains = {};
+
+		for (const domain in domains) {
+			if (domains[domain].stripe?.amountPaid > 0) {
+				paidDomains[domain] = domains[domain];
+			}
+		}
+
+		return paidDomains;
+	}
+
+	return domains;
 };
 
 /**
