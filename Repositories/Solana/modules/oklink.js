@@ -32,7 +32,7 @@ const getAddress = async (params) => {
 			.text()
 			.split("$")[1];
 
-		const fia = $(
+		const fiat = $(
 			"#root > main > div > div > div.single-pannel > div.index_info__kvp1Q.index_layout__2uO5I > div.index_title__064bd.index_card__GOZsN > div > div > div:nth-child(2) > div > div > div > span.index_usdValue__M2TO1 > div > div"
 		)
 			.text()
@@ -47,19 +47,19 @@ const getAddress = async (params) => {
 			type: "system_account",
 			account: {
 				asset: "SOL",
-				fiatBalance: `${parseFloat(fia) || 0}`,
+				fiatBalance: `${parseFloat(fiat) || 0}`,
 				price: price || 0,
 			},
 		};
 
 		data.tokenHoldings = await getTokens({ id: address }, { page: 0, show: 10 });
 
-		const hasSolToken = data.tokenHoldings?.tokens?.some((token) => token.tokenType === "SOL");
+		const hasSolToken = data.tokenHoldings?.tokens?.some((token) => token.symbol === "SOL");
 
 		if (!hasSolToken) {
 			data.tokenHoldings.tokens.unshift({
 				amount: data.balance,
-				fiatBalance: fia,
+				fiatBalance: fiat,
 				image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
 				name: "Solana",
 				price: data.account.price,

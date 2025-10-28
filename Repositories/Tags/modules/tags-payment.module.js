@@ -187,15 +187,15 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 		expiresAt: tagObject.publicData.expiresAt,
 		ttl: moment().add("2", "hours").unix(),
 		duration: parseInt(duration || 1),
-		coinbase_hosted_url: renewTagPayObject.publicData.coinbase_hosted_url,
-		coinbase_expires_at: renewTagPayObject.publicData.coinbase_expires_at,
-		count: parseInt(renewTagPayObject.publicData.count),
+		coinbase_hosted_url: renewTagPayObject.publicData?.coinbase_hosted_url,
+		coinbase_expires_at: renewTagPayObject.publicData?.coinbase_expires_at,
+		count: parseInt(renewTagPayObject.publicData?.count),
 		publicData: renewTagPayObject.publicData,
 		payment: {
-			registeredAt: renewTagPayObject.publicData.registeredAt,
-			expiresAt: renewTagPayObject.publicData.expiresAt,
-			referralTagName: tagObject.publicData.referralTagName,
-			referralSolanaAddress: tagObject.publicData.referralSolanaAddress,
+			registeredAt: renewTagPayObject.publicData?.registeredAt,
+			expiresAt: renewTagPayObject.publicData?.expiresAt,
+			referralTagName: tagObject.publicData?.referralTagName,
+			referralSolanaAddress: tagObject.publicData?.referralSolanaAddress,
 		},
 	};
 
