@@ -185,6 +185,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 		tagName: `${tagData.tagName}.${domain}`,
 		tagPayName: `${tagData.tagName}.${domain}pay`,
 		expiresAt: tagObject.publicData.expiresAt,
+		initiatedAt: moment().unix(),
 		ttl: moment().add("2", "hours").unix(),
 		duration: parseInt(duration || 1),
 		coinbase_hosted_url: renewTagPayObject.publicData?.coinbase_hosted_url,

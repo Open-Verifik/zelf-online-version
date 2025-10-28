@@ -40,7 +40,7 @@ const paymentConfirmation = async (ctx) => {
 	try {
 		const { tagName, domain, network, token } = ctx.request.body;
 
-		const data = await Module.verifyPaymentConfirmation(tagName, domain, network, token, ctx.state.user);
+		const data = await Module.verifyPaymentConfirmation(tagName, domain, network, token);
 
 		ctx.body = { data };
 	} catch (error) {

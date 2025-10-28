@@ -133,7 +133,7 @@ const paymentConfirmationValidation = async (ctx, next) => {
 	}
 
 	// now validate the network and coin
-	if (!tokenDecoded.prices[network]) {
+	if (!tokenDecoded.prices[network] && network !== "coinbase" && network !== "CB") {
 		ctx.status = 409;
 		ctx.body = { validationError: "invalid_network" };
 		return;

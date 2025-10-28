@@ -2,10 +2,13 @@ const config = require("../../../Core/config");
 const { searchTag } = require("./tags.module");
 const moment = require("moment");
 const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
-const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
 const { addPurchaseReward } = require("./tags-token.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const jwt = require("jsonwebtoken");
+const bitcoinModule = require("../../bitcoin/modules/bitcoin-scrapping.module");
+const ETHModule = require("../../etherscan/modules/etherscan-scrapping.module");
+const solanaModule = require("../../Solana/modules/solana-scrapping.module");
+const AvalancheModule = require("../../Avalanche/modules/avalanche-scrapping.module");
 
 /**
  * Confirm payment with Coinbase
@@ -42,44 +45,39 @@ const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
 	}
 
 	return {
-		...charge,
+		charge,
 		confirmed: config.coinbase.forceApproval || confirmed,
+		amountReceived: config.coinbase.forceApproval || confirmed ? charge.pricing.settlement?.amount : 0,
 	};
 };
 
 /**
  * Renew my tag
- * @param {Object} params
- * @param {Object} authUser
+ * @param {string} tagName
+ * @param {string} domain
+ * @param {string} network
+ * @param {string} token
  */
-const verifyPaymentConfirmation = async (tagName, domain, network, token, authUser) => {
+const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
 	const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
-
-	return {
-		tokenDecoded,
-		authUser,
-		tagName,
-		domain,
-		network,
-	};
 
 	const domainConfig = getDomainConfig(domain);
 
-	if (!authUser || !authUser.tagName) {
+	if (!tokenDecoded || !tokenDecoded.tagName || !tokenDecoded.tagPayName) {
 		const error = new Error("tag_not_authenticated");
 		error.status = 401;
 		throw error;
 	}
 
 	// Verify the tag belongs to the user
-	if (authUser.tagName !== `${tagName}.${domain}`) {
+	if (tokenDecoded.tagName !== `${tagName}.${domain}`) {
 		const error = new Error("tag_not_owned");
 		error.status = 403;
 		throw error;
 	}
 
 	// Get current tag data
-	const tagData = await searchTag({ tagName, domain }, authUser);
+	const tagData = await searchTag({ tagName, domain }, {});
 
 	if (tagData.available) {
 		const error = new Error("tag_not_found");
@@ -89,35 +87,20 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token, authUs
 
 	const tagObject = tagData.tagObject;
 
-	// Check if tag is expired
-	const expiresAt = moment(tagObject.publicData.expiresAt);
-	const now = moment();
+	const amountToPay = tokenDecoded.prices[network]?.amountToSend;
 
-	if (expiresAt.isAfter(now)) {
-		const error = new Error("tag_not_expired");
-		error.status = 409;
-		throw error;
-	}
+	const addressMapping = {
+		ETH: tokenDecoded.paymentAddress.ethAddress,
+		SOL: tokenDecoded.paymentAddress.solanaAddress,
+		BTC: tokenDecoded.paymentAddress.btcAddress,
+		coinbase: tokenDecoded.coinbase_hosted_url,
+		CB: tokenDecoded.coinbase_hosted_url,
+		AVAX: tokenDecoded.paymentAddress.avalancheAddress || tokenDecoded.paymentAddress.ethAddress,
+	};
 
-	// Get renewal price
-	const renewalPrice = domainConfig.price || 0;
+	const paymentConfirmation = await confirmPayUniqueAddress(network, addressMapping[network], amountToPay);
 
-	if (renewalPrice > 0) {
-		// Verify payment
-		const paymentConfirmation = await confirmPayUniqueAddress({
-			tagName: `${tagName}.${domain}`,
-			domain,
-			domainConfig,
-			network,
-			token,
-		});
-
-		if (!paymentConfirmation.confirmed) {
-			const error = new Error("payment_not_confirmed");
-			error.status = 402;
-			throw error;
-		}
-	}
+	return { confirmed: paymentConfirmation.confirmed, paymentConfirmation, amountReceived: paymentConfirmation.amountReceived };
 
 	// Renew the tag
 	const renewedTag = await updateTag({ tagName, domain, duration: 1 }, authUser);
@@ -133,6 +116,153 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token, authUs
 		expiresAt: renewedTag.expiresAt,
 		renewedAt: moment().toISOString(),
 	};
+};
+
+const isETHPaymentConfirmed = async (address, amountToPay) => {
+	try {
+		const response = await ETHModule.getAddress({ address });
+
+		if (response?.balance && Number(response?.balance) <= amountToPay) {
+			return {
+				confirmed: false,
+				amountReceived: 0,
+				amountToPay,
+				transactions: response?.transactions,
+				balance: response?.balance,
+				checkedFactor: "balance",
+			};
+		}
+
+		const amountReceived = response.transactions
+			.filter((transaction) => transaction.traffic === "IN")
+			.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+
+		return {
+			confirmed: amountReceived >= amountToPay,
+			amountReceived,
+			amountToPay,
+			transactions: response?.transactions,
+			balance: response?.balance,
+			checkedFactor: "transactions",
+		};
+	} catch (error) {
+		console.error(error);
+	}
+
+	return false;
+};
+
+const isSolanaPaymentConfirmed = async (address, amountToPay) => {
+	try {
+		const response = await solanaModule.getAddress({ id: address });
+
+		if (response?.balance && Number(response?.balance) <= amountToPay) {
+			return {
+				confirmed: false,
+				amountReceived: 0,
+				amountToPay,
+				transactions: response?.transactions,
+				balance: response?.balance,
+				checkedFactor: "balance",
+			};
+		}
+
+		const amountReceived = response?.transactions
+			.filter((transaction) => transaction.traffic === "IN")
+			.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+
+		return {
+			confirmed: amountReceived >= amountToPay,
+			amountReceived,
+			amountToPay,
+			transactions: response?.transactions,
+			balance: response?.balance,
+			checkedFactor: "transactions",
+		};
+	} catch (error) {}
+
+	return false;
+};
+
+const isAvalanchePaymentConfirmed = async (address, amountToPay) => {
+	try {
+		const response = await AvalancheModule.getAddress({ id: address });
+
+		if (response?.balance && Number(response?.balance) <= amountToPay) {
+			return {
+				confirmed: false,
+				amountReceived: 0,
+				amountToPay,
+				transactions: response?.transactions,
+				balance: response?.balance,
+				checkedFactor: "balance",
+			};
+		}
+
+		const amountReceived = response?.transactions
+			.filter((transaction) => transaction.traffic === "IN")
+			.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+
+		return {
+			confirmed: amountReceived >= amountToPay,
+			amountReceived,
+			amountToPay,
+			transactions: response?.transactions,
+			balance: response?.balance,
+			checkedFactor: "transactions",
+		};
+	} catch (error) {
+		console.error(error);
+	}
+
+	return false;
+};
+
+/**
+ * checkout BTC comparison
+ * @param {String} address
+ * @param {Number} amountDetected
+ * @returns Boolean
+ */
+const isBTCPaymentConfirmed = async (address, zelfNamePrice) => {
+	try {
+		const response = await bitcoinModule.getBalance({
+			id: address,
+		});
+
+		const amountReceived = Number(response.balance).toFixed(7);
+
+		return {
+			amountReceived,
+			confirmed: Number(amountReceived) === Number(zelfNamePrice),
+			zelfNamePrice,
+		};
+	} catch (error) {}
+
+	return false;
+};
+
+const confirmPayUniqueAddress = async (network, address, amountToPay) => {
+	const map = {
+		ETH: isETHPaymentConfirmed,
+		SOL: isSolanaPaymentConfirmed,
+		BTC: isBTCPaymentConfirmed,
+		AVAX: isAvalanchePaymentConfirmed,
+		coinbase: _confirmPaymentWithCoinbase,
+	};
+
+	try {
+		const confirmation = await map[network](address, amountToPay);
+		console.log({ confirmation });
+		return confirmation;
+	} catch (exception) {
+		console.error(exception);
+
+		const error = new Error("payment_confirmation_failed");
+		error.status = 500;
+
+		throw error;
+	}
 };
 
 /**
