@@ -54,7 +54,17 @@ const getAddress = async (params) => {
 
 		data.tokenHoldings = await getTokens({ id: address }, { page: 0, show: 10 });
 
-		const hasSolToken = data.tokenHoldings?.tokens?.some((token) => token.symbol === "SOL");
+		let hasSolToken = false;
+
+		for (let index = 0; index < data.tokenHoldings.tokens.length; index++) {
+			const token = data.tokenHoldings.tokens[index];
+
+			if (token.symbol === "SOL") {
+				token.tokenType = "SOL";
+
+				hasSolToken = true;
+			}
+		}
 
 		if (!hasSolToken) {
 			data.tokenHoldings.tokens.unshift({
