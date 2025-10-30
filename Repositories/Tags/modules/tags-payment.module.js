@@ -1,5 +1,5 @@
 const { getDomainConfig, getDomainPrice, getDomainPaymentMethods, getDomainCurrencies, getDomainLimits } = require("../config/supported-domains");
-const tagsIpfsModule = require("./tags-ipfs.module");
+const TagsIpfsModule = require("./tags-ipfs.module");
 const TagsPartsModule = require("./tags-parts.module");
 const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
@@ -11,80 +11,8 @@ const { searchTag } = require("./tags.module");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const jwt = require("jsonwebtoken");
 const config = require("../../../Core/config");
-
-/**
- * Tags Payment Module
- * Handles payment logic for multi-domain tags system
- * Integrates with domain registry for pricing and payment methods
- */
-
-/**
- * Calculate payment amount for tag creation/renewal
- * @param {string} domain - Domain name
- * @param {string} duration - Duration ('yearly', 'lifetime')
- * @param {Object} options - Additional options
- * @returns {Object} - Payment calculation result
- */
-const calculatePayment = (domain, duration = "yearly", options = {}) => {
-	const domainConfig = getDomainConfig(domain);
-	if (!domainConfig) {
-		return { success: false, error: "Domain not supported" };
-	}
-
-	const basePrice = domainConfig.price;
-	const discount = domainConfig.payment?.discounts?.[duration] || 0;
-	const finalPrice = Math.round(basePrice * (1 - discount));
-
-	// Apply additional discounts if provided
-	let totalDiscount = discount;
-	if (options.bulkDiscount) {
-		totalDiscount += options.bulkDiscount;
-	}
-	if (options.earlyBirdDiscount) {
-		totalDiscount += options.earlyBirdDiscount;
-	}
-
-	const finalAmount = Math.round(basePrice * (1 - totalDiscount));
-
-	return {
-		success: true,
-		domain,
-		duration,
-		basePrice,
-		discount: totalDiscount,
-		finalAmount,
-		currency: "USD", // Base currency
-		paymentMethods: getDomainPaymentMethods(domain),
-		supportedCurrencies: getDomainCurrencies(domain),
-		discountBreakdown: {
-			duration: discount,
-			bulk: options.bulkDiscount || 0,
-			earlyBird: options.earlyBirdDiscount || 0,
-		},
-	};
-};
-
-/**
- * Validate payment method for domain
- * @param {string} domain - Domain name
- * @param {string} paymentMethod - Payment method
- * @returns {Object} - Validation result
- */
-const validatePaymentMethod = (domain, paymentMethod) => {
-	const domainConfig = getDomainConfig(domain);
-	if (!domainConfig) {
-		return { valid: false, error: "Domain not supported" };
-	}
-
-	const supportedMethods = getDomainPaymentMethods(domain);
-	const isValid = supportedMethods.includes(paymentMethod);
-
-	return {
-		valid: isValid,
-		error: isValid ? null : `Payment method '${paymentMethod}' not supported for domain '${domain}'`,
-		supportedMethods,
-	};
-};
+const WalrusModule = require("../../Walrus/modules/walrus.module");
+const TagsArweaveModule = require("./tags-arweave.module");
 
 /**
  * Validate currency for domain
@@ -94,6 +22,7 @@ const validatePaymentMethod = (domain, paymentMethod) => {
  */
 const validateCurrency = (domain, currency) => {
 	const domainConfig = getDomainConfig(domain);
+
 	if (!domainConfig) {
 		return { valid: false, error: "Domain not supported" };
 	}
@@ -121,24 +50,20 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 	// Get current tag data
 	const tagData = await searchTag({ tagName, domain, domainConfig }, authUser);
 
-	if (tagData.available) {
-		const error = new Error("tag_not_found");
-		error.status = 404;
-		throw error;
-	}
+	if (tagData.available) throw new Error("404:tag_not_found");
 
 	const tagObject = tagData.tagObject;
 
 	const priceDetails = domainConfig.getPrice(tagName, duration);
 
-	const recordsWithSameName = tagData.ipfs?.length || tagData.arweave?.length;
+	const zelfPayCount = tagData.ipfs?.length || tagData.arweave?.length;
 
 	const renewTagPayObject = await _fetchTagPayRecord(
 		{
 			tagName: `${tagData.tagName}.${domain}`,
 			publicData: tagObject.publicData,
 		},
-		recordsWithSameName,
+		zelfPayCount,
 		priceDetails,
 		domainConfig
 	);
@@ -236,7 +161,7 @@ const _requiresUpdate = async (tagPayObject, priceDetails) => {
 	const sameDuration = !tagPayObject || tagPayObject?.publicData?.duration == priceDetails.duration;
 
 	if (!sameDuration && tagPayObject?.zelfProofQRCode) {
-		await tagsIpfsModule.unPinFiles([tagPayObject.id]);
+		await TagsIpfsModule.unPinFiles([tagPayObject.id]);
 
 		return true;
 	}
@@ -244,7 +169,7 @@ const _requiresUpdate = async (tagPayObject, priceDetails) => {
 	// now check if the coinbase_expires_at is before the current date
 	if (tagPayObject?.publicData?.coinbase_expires_at && moment(tagPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
 		console.log("deleting tag pay object...");
-		await tagsIpfsModule.unPinFiles([tagPayObject.id]);
+		await TagsIpfsModule.unPinFiles([tagPayObject.id]);
 
 		return true;
 	}
@@ -332,10 +257,6 @@ const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, { e
  * @returns {Object} - Tag pay object
  */
 const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount, domainConfig) => {
-	// we will get the price calculated,
-
-	// const zkProof = await OfflineProofModule.createProof(mnemonic);
-
 	let coinbaseCharge = null;
 
 	if (!tagPayObject.zelfProofQRCode) {
@@ -409,9 +330,9 @@ const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount,
 		});
 	}
 
-	let ipfs = await tagsIpfsModule.insert(payload, { pro: true });
+	let ipfs = await TagsIpfsModule.insert(payload, { pro: true });
 
-	ipfs = tagsIpfsModule.formatRecord(ipfs);
+	ipfs = TagsIpfsModule.formatRecord(ipfs);
 
 	return {
 		ipfs: [ipfs],
@@ -422,154 +343,6 @@ const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount,
 		},
 		available: false,
 		arweave: [],
-	};
-};
-
-/**
- * Process payment for tag operation
- * @param {Object} paymentData - Payment data
- * @param {Object} authUser - Authenticated user
- * @returns {Object} - Payment processing result
- */
-const processPayment = async (paymentData, authUser) => {
-	const { domain, amount, currency, paymentMethod, duration, tagName } = paymentData;
-
-	// Validate domain
-	const domainConfig = getDomainConfig(domain);
-	if (!domainConfig) {
-		return { success: false, error: "Domain not supported" };
-	}
-
-	// Validate payment method
-	const methodValidation = validatePaymentMethod(domain, paymentMethod);
-	if (!methodValidation.valid) {
-		return { success: false, error: methodValidation.error };
-	}
-
-	// Validate currency
-	const currencyValidation = validateCurrency(domain, currency);
-	if (!currencyValidation.valid) {
-		return { success: false, error: currencyValidation.error };
-	}
-
-	// Calculate expected amount
-	const expectedAmount = getDomainPrice(domain, duration);
-	if (amount !== expectedAmount) {
-		return {
-			success: false,
-			error: `Amount mismatch. Expected: ${expectedAmount}, Received: ${amount}`,
-		};
-	}
-
-	// Process payment based on method
-	try {
-		let paymentResult;
-
-		switch (paymentMethod) {
-			case "coinbase":
-				paymentResult = await processCoinbasePayment(paymentData, authUser);
-				break;
-			case "crypto":
-				paymentResult = await processCryptoPayment(paymentData, authUser);
-				break;
-			case "wallet":
-				paymentResult = await processWalletPayment(paymentData, authUser);
-				break;
-			case "enterprise":
-				paymentResult = await processEnterprisePayment(paymentData, authUser);
-				break;
-			default:
-				return { success: false, error: "Unsupported payment method" };
-		}
-
-		return {
-			success: true,
-			paymentId: paymentResult.paymentId,
-			transactionId: paymentResult.transactionId,
-			amount: paymentResult.amount,
-			currency: paymentResult.currency,
-			domain,
-			tagName,
-			duration,
-			timestamp: new Date().toISOString(),
-		};
-	} catch (error) {
-		return {
-			success: false,
-			error: `Payment processing failed: ${error.message}`,
-		};
-	}
-};
-
-/**
- * Process Coinbase payment
- * @param {Object} paymentData - Payment data
- * @param {Object} authUser - Authenticated user
- * @returns {Object} - Payment result
- */
-const processCoinbasePayment = async (paymentData, authUser) => {
-	// TODO: Integrate with Coinbase Commerce API
-	// This is a placeholder implementation
-	return {
-		paymentId: `coinbase_${Date.now()}`,
-		transactionId: `tx_${Date.now()}`,
-		amount: paymentData.amount,
-		currency: paymentData.currency,
-		status: "completed",
-	};
-};
-
-/**
- * Process crypto payment
- * @param {Object} paymentData - Payment data
- * @param {Object} authUser - Authenticated user
- * @returns {Object} - Payment result
- */
-const processCryptoPayment = async (paymentData, authUser) => {
-	// TODO: Integrate with crypto payment processors
-	// This is a placeholder implementation
-	return {
-		paymentId: `crypto_${Date.now()}`,
-		transactionId: `tx_${Date.now()}`,
-		amount: paymentData.amount,
-		currency: paymentData.currency,
-		status: "completed",
-	};
-};
-
-/**
- * Process wallet payment
- * @param {Object} paymentData - Payment data
- * @param {Object} authUser - Authenticated user
- * @returns {Object} - Payment result
- */
-const processWalletPayment = async (paymentData, authUser) => {
-	// TODO: Integrate with user wallet system
-	// This is a placeholder implementation
-	return {
-		paymentId: `wallet_${Date.now()}`,
-		transactionId: `tx_${Date.now()}`,
-		amount: paymentData.amount,
-		currency: paymentData.currency,
-		status: "completed",
-	};
-};
-
-/**
- * Process enterprise payment
- * @param {Object} paymentData - Payment data
- * @param {Object} authUser - Authenticated user
- * @returns {Object} - Payment result
- */
-const processEnterprisePayment = async (paymentData, authUser) => {
-	// TODO: Integrate with enterprise billing system
-	// This is a placeholder implementation
-	return {
-		paymentId: `enterprise_${Date.now()}`,
-		transactionId: `tx_${Date.now()}`,
-		amount: paymentData.amount,
-		currency: paymentData.currency,
-		status: "completed",
 	};
 };
 
@@ -595,72 +368,94 @@ const getPricingTable = () => {
 	return pricingTable;
 };
 
-/**
- * Check if user can afford tag operation
- * @param {string} domain - Domain name
- * @param {string} duration - Duration
- * @param {Object} userWallet - User wallet data
- * @returns {Object} - Affordability check result
- */
-const checkAffordability = (domain, duration, userWallet) => {
-	const domainConfig = getDomainConfig(domain);
-	if (!domainConfig) {
-		return { canAfford: false, error: "Domain not supported" };
+const buildMetadata = (params, tagObject, domainConfig) => {
+	tagObject.fullTagName = `${params.tagName}.${params.domain}`;
+
+	const storageKey = domainConfig.getTagKey();
+	const domain = tagObject.domain || "zelf";
+	const price = params.price || tagObject.publicData.price;
+	const duration = params.duration || tagObject.publicData.duration;
+
+	const metadata = {
+		[storageKey]: tagObject.fullTagName,
+		domain,
+		ethAddress: tagObject.publicData.ethAddress,
+		solanaAddress: tagObject.publicData.solanaAddress,
+		btcAddress: tagObject.publicData.btcAddress,
+		extraParams: {
+			origin: tagObject.publicData.origin || "online",
+			price,
+			duration: tagObject.publicData.duration ? `${Number(tagObject.publicData.duration) + Number(duration)}` : duration,
+			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+			renewedAt: tagObject.publicData.type === "mainnet" ? moment().format("YYYY-MM-DD HH:mm:ss") : undefined,
+			expiresAt: moment(tagObject.publicData.expiresAt).add(duration, "year").format("YYYY-MM-DD HH:mm:ss"),
+			type: "mainnet",
+			hasPassword: tagObject.publicData.hasPassword,
+		},
+		suiAddress: tagObject.publicData.suiAddress,
+	};
+
+	if (tagObject.publicData.referralTagName) {
+		metadata.referral = {
+			tagName: tagObject.publicData.referralTagName,
+			solanaAddress: tagObject.publicData.referralSolanaAddress,
+		};
+
+		metadata.referral = JSON.stringify(metadata.referral);
 	}
 
-	const requiredAmount = getDomainPrice(domain, duration);
-	const userBalance = userWallet.balance || 0;
+	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
-	return {
-		canAfford: userBalance >= requiredAmount,
-		requiredAmount,
-		userBalance,
-		shortfall: Math.max(0, requiredAmount - userBalance),
-		domain,
-		duration,
-	};
+	return { metadata, fullTagName: tagObject.fullTagName };
 };
 
-/**
- * Apply bulk discount
- * @param {number} basePrice - Base price
- * @param {number} quantity - Number of tags
- * @returns {number} - Discount percentage
- */
-const calculateBulkDiscount = (basePrice, quantity) => {
-	if (quantity >= 100) return 0.5; // 50% discount for 100+ tags
-	if (quantity >= 50) return 0.3; // 30% discount for 50+ tags
-	if (quantity >= 20) return 0.2; // 20% discount for 20+ tags
-	if (quantity >= 10) return 0.1; // 10% discount for 10+ tags
-	return 0; // No discount
+const storeInWalrus = async (tagObject, domainConfig, metadata) => {
+	tagObject.walrus = await WalrusModule.tagRegistration(
+		tagObject.zelfProofQRCode,
+		{ hasPassword: metadata.hasPassword, zelfProof: metadata.zelfProof, publicData: metadata },
+		domainConfig
+	);
+
+	tagObject.walrus = tagObject.walrus?.blobId;
+
+	return tagObject.walrus;
 };
 
-/**
- * Apply early bird discount
- * @param {string} domain - Domain name
- * @param {Date} launchDate - Domain launch date
- * @returns {number} - Discount percentage
- */
-const calculateEarlyBirdDiscount = (domain, launchDate) => {
-	const now = new Date();
-	const daysSinceLaunch = Math.floor((now - launchDate) / (1000 * 60 * 60 * 24));
+const storeInIPFS = async (tagObject, domainConfig, metadata) => {
+	const deletedIpfsRecord = await TagsIpfsModule.deleteFiles([tagObject.ipfsId || tagObject.id]);
 
-	// 20% discount for first 30 days
-	if (daysSinceLaunch <= 30) return 0.2;
-	// 10% discount for first 90 days
-	if (daysSinceLaunch <= 90) return 0.1;
+	tagObject.ipfs = await TagsIpfsModule.insert(
+		{
+			base64: tagObject.zelfProofQRCode,
+			name: tagObject.fullTagName,
+			metadata,
+			pinIt: true,
+		},
+		{ pro: true }
+	);
 
-	return 0; // No discount
+	tagObject.ipfs = TagsIpfsModule.formatRecord(tagObject.ipfs);
+
+	return tagObject.ipfs;
+};
+
+const storeInArweave = async (tagObject, domainConfig, metadata) => {
+	tagObject.arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
+		hasPassword: metadata.hasPassword,
+		zelfProof: metadata.zelfProof,
+		publicData: metadata,
+		fileName: tagObject.tagName,
+	});
+
+	return tagObject.arweave;
 };
 
 module.exports = {
-	calculatePayment,
-	validatePaymentMethod,
 	validateCurrency,
 	getPaymentOptions,
-	processPayment,
 	getPricingTable,
-	checkAffordability,
-	calculateBulkDiscount,
-	calculateEarlyBirdDiscount,
+	buildMetadata,
+	storeInWalrus,
+	storeInIPFS,
+	storeInArweave,
 };

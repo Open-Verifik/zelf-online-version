@@ -1,7 +1,7 @@
 const Module = require("../modules/my-tags.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const TagsPaymentModule = require("../modules/tags-payment.module");
-
+const { errorHandler } = require("../../../Core/http-handler");
 /**
  * Transfer tag
  * @param {Object} ctx - Koa context
@@ -44,11 +44,11 @@ const paymentConfirmation = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
+		const _exception = errorHandler(error, ctx);
 
-		ctx.status = error.status || 500;
+		ctx.status = _exception.status;
 
-		ctx.body = { error: error.message };
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -65,11 +65,30 @@ const paymentOptions = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
+		const _exception = errorHandler(error, ctx);
 
-		ctx.status = error.status || 500;
+		ctx.status = _exception.status;
 
-		ctx.body = { error: error.message };
+		ctx.body = {
+			message: _exception.message,
+			code: _exception.code,
+		};
+	}
+};
+
+const receiptEmail = async (ctx) => {
+	try {
+		const { tagName, domain, network, email, token } = ctx.request.body;
+
+		const data = await Module.sendEmailReceipt(tagName, domain, network, email, token);
+
+		ctx.body = { data, payload: { tagName, domain, network, token } };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -77,4 +96,5 @@ module.exports = {
 	transferTag,
 	paymentConfirmation,
 	paymentOptions,
+	receiptEmail,
 };

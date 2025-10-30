@@ -15,13 +15,20 @@ const schemas = {
 	paymentConfirmation: {
 		tagName: string().required(),
 		domain: string(),
-		network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC"]).required(),
+		network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX"]).required(),
 		token: string().required(),
 	},
 	paymentOptions: {
 		tagName: string().required(),
 		domain: string(),
 		duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
+	},
+	receiptEmail: {
+		tagName: string().required(),
+		domain: string(),
+		network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX"]).required(),
+		email: string().email().required(),
+		token: string().required(),
 	},
 };
 
@@ -142,8 +149,39 @@ const paymentConfirmationValidation = async (ctx, next) => {
 	await next();
 };
 
+const receiptEmailValidation = async (ctx, next) => {
+	const { network, token } = ctx.request.body;
+
+	const valid = validate(schemas.receiptEmail, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	// now also validate the token is valid that we encrypted with jwt
+	const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+
+	if (!tokenDecoded) {
+		ctx.status = 409;
+		ctx.body = { validationError: "invalid_token" };
+		return;
+	}
+
+	// now validate the network and coin
+	if (!tokenDecoded.prices[network] && network !== "coinbase" && network !== "CB") {
+		ctx.status = 409;
+		ctx.body = { validationError: "invalid_network" };
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	transferValidation,
 	paymentOptionsValidation,
 	paymentConfirmationValidation,
+	receiptEmailValidation,
 };

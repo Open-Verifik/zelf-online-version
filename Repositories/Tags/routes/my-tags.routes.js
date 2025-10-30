@@ -17,6 +17,9 @@ module.exports = (server) => {
 
 	// payment confirmation
 	server.post(`${PATH}/payment-confirmation`, Middleware.paymentConfirmationValidation, Controller.paymentConfirmation);
+
+	// receipt email
+	server.post(`${PATH}/email-receipt`, Middleware.receiptEmailValidation, Controller.receiptEmail);
 };
 
 /**

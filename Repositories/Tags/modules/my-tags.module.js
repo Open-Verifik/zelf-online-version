@@ -2,13 +2,15 @@ const config = require("../../../Core/config");
 const { searchTag } = require("./tags.module");
 const moment = require("moment");
 const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
-const { addPurchaseReward } = require("./tags-token.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const jwt = require("jsonwebtoken");
 const bitcoinModule = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const ETHModule = require("../../etherscan/modules/etherscan-scrapping.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 const AvalancheModule = require("../../Avalanche/modules/avalanche-scrapping.module");
+const TagsArweaveModule = require("./tags-arweave.module");
+const { sendEmail } = require("../../purchase-zelf/modules/purchase.module");
+const { buildMetadata, storeInIPFS, storeInWalrus, storeInArweave } = require("./tags-payment.module");
 
 /**
  * Confirm payment with Coinbase
@@ -100,21 +102,41 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
 
 	const paymentConfirmation = await confirmPayUniqueAddress(network, addressMapping[network], amountToPay);
 
-	return { confirmed: paymentConfirmation.confirmed, paymentConfirmation, amountReceived: paymentConfirmation.amountReceived };
+	const initiatedAt = tokenDecoded.initiatedAt ? moment.unix(tokenDecoded.initiatedAt) : null;
 
-	// Renew the tag
-	const renewedTag = await updateTag({ tagName, domain, duration: 1 }, authUser);
+	const renewedAtCondition = Boolean(tagObject.publicData.renewedAt && initiatedAt && moment(tagObject.publicData.renewedAt).isAfter(initiatedAt));
 
-	// Add purchase reward
-	await addPurchaseReward(authUser, domain, renewalPrice);
+	const registeredAtCondition = Boolean(tokenDecoded.initiatedAt && moment(tagObject.publicData.registeredAt).isAfter(initiatedAt));
+
+	if (renewedAtCondition || registeredAtCondition) {
+		return {
+			cache: true,
+			confirmed: paymentConfirmation.confirmed,
+			amountReceived: paymentConfirmation.amountReceived,
+			paymentConfirmation,
+			publicData: tagObject.publicData,
+			reward: "pending_to_code",
+			//await getPurchaseReward(zelfNameObject.publicData.zelfName, moment(authUser.payment.registeredAt)),
+		};
+	}
+	// logic to extend the duration of the tag
+	await addDurationToTag(
+		{
+			tagName: tagObject.publicData[domainConfig.getTagKey()].split(".")[0],
+			price: amountToPay,
+			domain,
+			duration: tokenDecoded.duration || 1,
+			domainConfig,
+		},
+		tagObject
+	);
 
 	return {
-		tagName: `${tagName}.${domain}`,
-		domain,
-		domainConfig,
-		renewedTag,
-		expiresAt: renewedTag.expiresAt,
-		renewedAt: moment().toISOString(),
+		tagObject,
+		confirmed: paymentConfirmation.confirmed,
+		amountReceived: paymentConfirmation.amountReceived,
+		// paymentConfirmation,
+		amountReceived: paymentConfirmation.amountReceived,
 	};
 };
 
@@ -122,7 +144,9 @@ const isETHPaymentConfirmed = async (address, amountToPay) => {
 	try {
 		const response = await ETHModule.getAddress({ address });
 
-		if (response?.balance && Number(response?.balance) <= amountToPay) {
+		const numericBalance = Number(response?.balance ?? 0);
+
+		if (!Number.isNaN(numericBalance) && numericBalance <= amountToPay) {
 			return {
 				confirmed: false,
 				amountReceived: 0,
@@ -133,7 +157,7 @@ const isETHPaymentConfirmed = async (address, amountToPay) => {
 			};
 		}
 
-		const amountReceived = response.transactions
+		const amountReceived = response?.transactions
 			.filter((transaction) => transaction.traffic === "IN")
 			.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
 
@@ -156,7 +180,9 @@ const isSolanaPaymentConfirmed = async (address, amountToPay) => {
 	try {
 		const response = await solanaModule.getAddress({ id: address });
 
-		if (response?.balance && Number(response?.balance) <= amountToPay) {
+		const numericBalance = Number(response?.balance ?? 0);
+
+		if (!Number.isNaN(numericBalance) && numericBalance <= amountToPay) {
 			return {
 				confirmed: false,
 				amountReceived: 0,
@@ -188,7 +214,9 @@ const isAvalanchePaymentConfirmed = async (address, amountToPay) => {
 	try {
 		const response = await AvalancheModule.getAddress({ id: address });
 
-		if (response?.balance && Number(response?.balance) <= amountToPay) {
+		const numericBalance = Number(response?.balance ?? 0);
+
+		if (!Number.isNaN(numericBalance) && numericBalance <= amountToPay) {
 			return {
 				confirmed: false,
 				amountReceived: 0,
@@ -230,11 +258,12 @@ const isBTCPaymentConfirmed = async (address, zelfNamePrice) => {
 			id: address,
 		});
 
-		const amountReceived = Number(response.balance).toFixed(7);
+		const numericReceived = Number(response?.balance ?? 0);
+		const amountReceived = Number.isNaN(numericReceived) ? "0" : numericReceived.toFixed(7);
 
 		return {
 			amountReceived,
-			confirmed: Number(amountReceived) === Number(zelfNamePrice),
+			confirmed: !Number.isNaN(numericReceived) && numericReceived === Number(zelfNamePrice),
 			zelfNamePrice,
 		};
 	} catch (error) {}
@@ -253,7 +282,7 @@ const confirmPayUniqueAddress = async (network, address, amountToPay) => {
 
 	try {
 		const confirmation = await map[network](address, amountToPay);
-		console.log({ confirmation });
+
 		return confirmation;
 	} catch (exception) {
 		console.error(exception);
@@ -289,8 +318,78 @@ const updateOldTagObject = async (tagObject, domain = "zelf") => {
  * @param {Object} preview - Tag preview object
  * @returns {Object} - Updated tag records
  */
-const addDurationToTag = async (params, preview) => {
-	return "not-implemented";
+const addDurationToTag = async (params, tagObject) => {
+	const { tagName, domain, duration, price } = params;
+
+	const domainConfig = params.domainConfig || getDomainConfig(domain || "zelf");
+
+	const { metadata } = buildMetadata(params, tagObject, domainConfig);
+
+	if (domainConfig.tags.storage.walrusEnabled) {
+		// await storeInWalrus(tagObject, domainConfig, metadata);
+	}
+
+	if (domainConfig.tags.storage.ipfsEnabled) {
+		await storeInIPFS(tagObject, domainConfig, metadata);
+	}
+
+	if (domainConfig.tags.storage.arweaveEnabled) {
+		await storeInArweave(tagObject, domainConfig, metadata);
+	}
+};
+
+const sendEmailReceipt = async (tagName, domain, network, email, token) => {
+	const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+
+	if (!tokenDecoded) {
+		throw new Error("invalid_token");
+	}
+
+	// Get current tag data
+	const tagData = await searchTag({ tagName, domain }, {});
+
+	if (tagData.available) {
+		const error = new Error("tag_not_found");
+		error.status = 404;
+		throw error;
+	}
+
+	const tagObject = tagData.tagObject;
+
+	const price =
+		tokenDecoded.prices[network]?.price ||
+		tokenDecoded.prices.ETH?.price ||
+		tokenDecoded.prices.SOL?.price ||
+		tokenDecoded.prices.BTC?.price ||
+		tokenDecoded.prices.AVAX?.price;
+
+	const emailBody = {
+		transactionDate: tagObject.publicData.registeredAt,
+		price: tagObject.publicData.price || tokenDecoded.publicData?.price || tokenDecoded.prices[network]?.amountToSend,
+		tagName: tokenDecoded.tagName,
+		domain,
+		network,
+		expires: tagObject.publicData.expiresAt,
+		price,
+		subtotal: price,
+		discount: tokenDecoded.discount || 0,
+		year: tokenDecoded.duration,
+		// tokenDecoded,
+		duration: tokenDecoded.duration,
+	};
+
+	return await sendEmail({
+		language: tokenDecoded.language || "es",
+		template: "Purchase_receipt",
+		tagName: tokenDecoded.tagName,
+		transactionDate: tagObject.publicData.registeredAt,
+		price,
+		subtotal: price,
+		discount: tokenDecoded.discount || 0,
+		expires: tagObject.publicData.expiresAt,
+		year: tokenDecoded.duration,
+		email,
+	});
 };
 
 module.exports = {
@@ -300,4 +399,5 @@ module.exports = {
 	addDurationToTag,
 	// Utility functions
 	_confirmPaymentWithCoinbase,
+	sendEmailReceipt,
 };

@@ -4,7 +4,7 @@ const Mailgun = require("../../../Core/mailgun");
 const Model = require("../../Subscribers/models/subscriber.model");
 const MongoORM = require("../../../Core/mongo-orm");
 const { calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns-parts.module");
-const { createZelfPay, previewZelfName, searchZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
+const { createZelfPay, searchZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 const ZNSPartsModule = require("../../ZelfNameService/modules/zns-parts.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
@@ -353,6 +353,9 @@ const sendEmail = async (payload) => {
 
 	const emailTemplate = templatesMap[payload.language] ? templatesMap[payload.language][payload.template] : templatesMap.en[payload.template];
 
+	// Format year label to be singular or plural
+	const yearLabel = payload.year === 1 ? "1 YEAR" : `${payload.year} YEARS`;
+
 	const extraParams = {
 		"recipient-variables": {
 			[payload.email]: {
@@ -362,7 +365,8 @@ const sendEmail = async (payload) => {
 				total: payload.price,
 				expires: payload.expires,
 				year: payload.year,
-				zelfName: payload.zelfName,
+				yearLabel: yearLabel,
+				tagName: payload.tagName,
 			},
 		},
 	};
@@ -425,4 +429,5 @@ module.exports = {
 	getReceiptEmail,
 	selectMethod,
 	pay,
+	sendEmail,
 };
