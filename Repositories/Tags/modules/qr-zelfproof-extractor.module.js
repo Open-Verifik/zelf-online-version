@@ -40,7 +40,9 @@ class QRZelfProofExtractor {
 	 * @returns {Promise<string|null>} - Base64 encoded ZelfProof or null if extraction fails
 	 */
 	static async extractZelfProof(base64Image) {
-		if (base64Image.includes("https")) {
+		if (!base64Image) return null;
+
+		if (base64Image?.includes("https")) {
 			const response = await fetch(base64Image);
 
 			const buffer = await response.arrayBuffer();

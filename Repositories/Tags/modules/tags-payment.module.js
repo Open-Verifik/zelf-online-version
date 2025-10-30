@@ -157,8 +157,10 @@ const calculateCryptoValue = async (token = "ETH", price_) => {
  * @param {Object} priceDetails
  * @returns {boolean} - true if the tag pay object requires an update, false otherwise
  */
-const _requiresUpdate = async (tagPayObject, priceDetails) => {
+const _requiresUpdate = async (tagPayObject, priceDetails, tagObject) => {
 	const sameDuration = !tagPayObject || tagPayObject?.publicData?.duration == priceDetails.duration;
+
+	if (!tagPayObject) return false;
 
 	if (!sameDuration && tagPayObject?.zelfProofQRCode) {
 		await TagsIpfsModule.unPinFiles([tagPayObject.id]);
@@ -174,7 +176,20 @@ const _requiresUpdate = async (tagPayObject, priceDetails) => {
 		return true;
 	}
 
-	return false;
+	// we need to check registeredAt and renewedAt
+	const registeredAtCondition = Boolean(
+		tagObject.publicData.registeredAt &&
+			tagPayObject?.publicData?.registeredAt &&
+			moment(tagObject.publicData.registeredAt).isAfter(moment(tagPayObject?.publicData?.registeredAt))
+	);
+
+	// console.info({
+	// 	registeredAt: tagObject.publicData.registeredAt,
+	// 	renewedAt: tagObject.publicData.renewedAt,
+	// 	registeredAtCondition,
+	// });
+
+	return registeredAtCondition;
 };
 
 /**
@@ -194,7 +209,16 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
 
 	const tagPayObject = tagPayRecords.tagObject || {};
 
-	const requiresUpdate = await _requiresUpdate(tagPayObject, priceDetails);
+	const requiresUpdate = await _requiresUpdate(tagPayObject, priceDetails, tagObject);
+
+	console.log({
+		requiresUpdate,
+		priceDetails,
+		// tagPayObject,
+		// priceDetails,
+		// currentCount,
+		// domainConfig,
+	});
 
 	if (!tagPayObject?.id || requiresUpdate) {
 		const newTagPayObject = await createTagPay(
@@ -259,40 +283,38 @@ const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, { e
 const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount, domainConfig) => {
 	let coinbaseCharge = null;
 
-	if (!tagPayObject.zelfProofQRCode) {
-		const mnemonic = generateMnemonic(12);
-		const jsonfile = require("../../../config/0012589021.json");
-		const eth = createEthWallet(mnemonic);
-		const btc = createBTCWallet(mnemonic);
-		const solana = await createSolanaWallet(mnemonic);
+	const mnemonic = generateMnemonic(12);
+	const jsonfile = require("../../../config/0012589021.json");
+	const eth = createEthWallet(mnemonic);
+	const btc = createBTCWallet(mnemonic);
+	const solana = await createSolanaWallet(mnemonic);
 
-		const dataToEncrypt = {
-			publicData: {
-				ethAddress: eth.address,
-				solanaAddress: solana.address,
-				btcAddress: btc.address,
-				customerZelfName: tagObject.tagName,
-				[domainConfig.getTagKey()]: tagPayObject.tagPayName,
-				currentCount: `${currentCount}`,
-			},
-			metadata: {
-				mnemonic,
-			},
-			faceBase64: jsonfile.faceBase64,
-			password: jsonfile.password,
-			_id: tagPayObject.tagPayName,
-			tolerance: "REGULAR",
-			addServerPassword: true,
-		};
+	const dataToEncrypt = {
+		publicData: {
+			ethAddress: eth.address,
+			solanaAddress: solana.address,
+			btcAddress: btc.address,
+			customerZelfName: tagObject.tagName,
+			[domainConfig.getTagKey()]: tagPayObject.tagPayName,
+			currentCount: `${currentCount}`,
+		},
+		metadata: {
+			mnemonic,
+		},
+		faceBase64: jsonfile.faceBase64,
+		password: jsonfile.password,
+		_id: tagPayObject.tagPayName,
+		tolerance: "REGULAR",
+		addServerPassword: true,
+	};
 
-		await TagsPartsModule.generateZelfProof(dataToEncrypt, tagPayObject);
+	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagPayObject);
 
-		if (!tagPayObject.publicData) tagPayObject.publicData = {};
+	if (!tagPayObject.publicData) tagPayObject.publicData = {};
 
-		tagPayObject.publicData.ethAddress = eth.address;
-		tagPayObject.publicData.btcAddress = btc.address;
-		tagPayObject.publicData.solanaAddress = solana.address;
-	}
+	tagPayObject.publicData.ethAddress = eth.address;
+	tagPayObject.publicData.btcAddress = btc.address;
+	tagPayObject.publicData.solanaAddress = solana.address;
 
 	if (domainConfig?.tags?.payment?.methods?.includes("coinbase")) {
 		coinbaseCharge = await _createCoinbaseCharge(tagPayObject.tagPayName, priceDetails, currentCount, {
