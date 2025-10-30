@@ -336,6 +336,8 @@ const addDurationToTag = async (params, tagObject) => {
 	if (domainConfig.tags.storage.arweaveEnabled) {
 		await storeInArweave(tagObject, domainConfig, metadata);
 	}
+
+	return tagObject;
 };
 
 const sendEmailReceipt = async (tagName, domain, network, email, token) => {

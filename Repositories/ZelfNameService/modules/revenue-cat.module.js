@@ -1,7 +1,8 @@
 const config = require("../../../Core/config");
 const ZelfNameServiceModule = require("./zns.v2.module");
-
+const TagsModule = require("../../Tags/modules/tags.module");
 const myZnsModule = require("./my-zns.module");
+const myTagsModule = require("../../Tags/modules/my-tags.module");
 
 const webhookHandler = async (payload) => {
 	// we going to check for the event and confirm the information
@@ -38,29 +39,26 @@ const _handleWebhook = async (event) => {
 		attributes[attributeKey] = event.subscriber_attributes[attributeKey].value;
 	}
 
+	const extractedTagName = attributes.zelfName.split(".")[0];
+
+	const extractedDomain = attributes.domain || attributes.zelfName.split(".")[1] || "zelf";
+
 	const previewQuery = {
 		key: "zelfName",
-		value: attributes.zelfName,
+		tagName: extractedTagName,
 		environment: "both",
+		domain: extractedDomain,
 	};
 
-	if (!previewQuery.value) {
+	if (!previewQuery.tagName || !previewQuery.domain) {
 		const error = new Error("zelfName_not_found");
 		error.status = 404;
 		throw error;
 	}
 
-	const previewResult = await ZelfNameServiceModule.previewZelfName(previewQuery, {});
+	const previewResult = await TagsModule.previewTag(previewQuery, {});
 
-	const zelfNameRecords = previewResult.arweave ? previewResult.arweave : previewResult.ipfs ? previewResult.ipfs : previewResult;
-
-	if (!zelfNameRecords.length) {
-		const error = new Error("zelfName_not_found");
-		error.status = 404;
-		throw error;
-	}
-
-	const zelfNameObject = zelfNameRecords[0];
+	const zelfNameObject = previewResult.tagObject;
 
 	if (zelfNameObject.publicData.eventID === event.id) {
 		const error = new Error("webhook_already_processed");
@@ -72,28 +70,23 @@ const _handleWebhook = async (event) => {
 
 	zelfNameObject.publicData.duration = attributes.duration || zelfNameObject.publicData.duration || "1";
 
-	if (preview.publicData.ethAddress !== attributes.ethAddress) {
+	if (zelfNameObject.publicData.ethAddress !== attributes.ethAddress) {
 		const error = new Error("zelfProof_does_not_match");
 
 		error.status = 409;
 		throw error;
 	}
 
-	const { masterArweaveRecord, masterIPFSRecord } = await myZnsModule.addDurationToZelfName(
+	return myTagsModule.addDurationToTag(
 		{
-			zelfName: zelfNameObject.publicData.zelfName,
-			duration: zelfNameObject.publicData.duration,
+			tagName: extractedTagName,
+			domain: extractedDomain,
+			duration: attributes.duration ? Number(attributes.duration) : 1,
 			eventID: event.id,
-			eventPRice: event.price,
+			eventPrice: event.price,
 		},
-		preview
+		zelfNameObject
 	);
-
-	return {
-		renewed: true,
-		ipfs: [masterIPFSRecord],
-		arweave: [masterArweaveRecord],
-	};
 };
 
 // const _addDurationToZelfName = async (preview, zelfNameObject) => {

@@ -413,6 +413,8 @@ const buildMetadata = (params, tagObject, domainConfig) => {
 			expiresAt: moment(tagObject.publicData.expiresAt).add(duration, "year").format("YYYY-MM-DD HH:mm:ss"),
 			type: "mainnet",
 			hasPassword: tagObject.publicData.hasPassword,
+			eventID: params.eventID || undefined,
+			eventPrice: params.eventPrice || undefined,
 		},
 		suiAddress: tagObject.publicData.suiAddress,
 	};
