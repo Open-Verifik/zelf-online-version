@@ -54,7 +54,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 
 	const tagObject = tagData.tagObject;
 
-	const priceDetails = domainConfig.getPrice(tagName, duration);
+	const priceDetails = domainConfig.getPrice(tagName, duration, tagObject.publicData.referralTagName);
 
 	const zelfPayCount = tagData.ipfs?.length || tagData.arweave?.length;
 
@@ -202,15 +202,6 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
 	const tagPayObject = tagPayRecords.tagObject || {};
 
 	const requiresUpdate = await _requiresUpdate(tagPayObject, priceDetails, tagObject);
-
-	console.log({
-		requiresUpdate,
-		priceDetails,
-		// tagPayObject,
-		// priceDetails,
-		// currentCount,
-		// domainConfig,
-	});
 
 	if (!tagPayObject?.id || requiresUpdate) {
 		const newTagPayObject = await createTagPay(

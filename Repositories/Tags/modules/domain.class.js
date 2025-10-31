@@ -173,12 +173,12 @@ class Domain {
 			price = price - price * 0.1;
 		}
 
-		// Round up to 2 decimal places
+		// Round to 2 decimal places (nearest cent)
 		return {
 			duration,
-			price: Math.max(Math.ceil(price * 100) / 100, 0),
+			price: Math.max(Math.round(price * 100) / 100, 0),
 			currency: "USD",
-			reward: Math.max(Math.ceil((price / this.tags?.payment.rewardPrice) * 100) / 100, 0),
+			reward: Math.max(Math.round((price / this.tags?.payment.rewardPrice) * 100) / 100, 0),
 			discount,
 			priceWithoutDiscount,
 			discountType,

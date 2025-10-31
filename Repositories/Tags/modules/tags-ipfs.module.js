@@ -74,6 +74,16 @@ const _formatRecord = (item) => {
 		delete formattedResult.publicData.extraParams;
 	}
 
+	if (formattedResult?.publicData?.referral) {
+		const referral = JSON.parse(formattedResult.publicData.referral);
+
+		formattedResult.publicData.referralTagName = referral.tagName;
+
+		formattedResult.publicData.referralSolanaAddress = referral.solanaAddress;
+
+		delete formattedResult.publicData.referral;
+	}
+
 	if (formattedResult.publicData?.ethAddress) {
 		formattedResult.publicData.blockDAGAddress = formattedResult.publicData.ethAddress;
 
