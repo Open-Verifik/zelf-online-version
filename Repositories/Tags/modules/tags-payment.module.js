@@ -377,7 +377,7 @@ const buildMetadata = (params, tagObject, domainConfig) => {
 	tagObject.fullTagName = `${params.tagName}.${params.domain}`;
 
 	const storageKey = domainConfig.getTagKey();
-	const domain = tagObject.domain || "zelf";
+	const domain = tagObject.publicData.domain || params.domain || "zelf";
 	const price = params.price || tagObject.publicData.price;
 	const duration = params.duration || tagObject.publicData.duration;
 
