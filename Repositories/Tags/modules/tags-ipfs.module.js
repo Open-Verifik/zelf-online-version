@@ -202,13 +202,21 @@ const unPinFiles = async (ids = []) => {
  * @returns {Array} - Search results
  */
 const searchByDomain = async (params, authUser) => {
-	const { domain } = params;
+	const { domain, limit, pageOffset } = params;
 
 	const domainConfig = getDomainConfig(domain);
 
 	if (!domainConfig) throw new Error("Domain not supported");
 
-	return await IPFS.filter("domain", domain);
+	// Default to 50 records, support 25, 50, 100, 250, 500
+	const paginationOptions = {
+		limit: limit ? parseInt(limit, 10) : 50,
+		pageOffset: pageOffset ? parseInt(pageOffset, 10) : 0,
+	};
+
+	const records = await IPFS.filter("domain", domain, paginationOptions);
+
+	return _formatSearchResults(records);
 };
 
 /**

@@ -206,20 +206,55 @@ const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "i
 	}
 };
 
-const filter = async (property = "name", value) => {
+const filter = async (property = "name", value, options = {}) => {
 	let files;
 
 	try {
+		// Default to 50 records, with support for 25, 50, 100, 250, 500
+		const limit = options.limit || 50;
+		const pageOffset = options.pageOffset || 0;
+
+		// Validate limit is one of the allowed values, default to 50 if invalid
+		const allowedLimits = [25, 50, 100, 250, 500];
+		const validLimit = allowedLimits.includes(limit) ? limit : 50;
+
 		// Use the new Pinata SDK v2.5.0 with JWT authentication
+		let response;
 		if (property === "name") {
-			const nameResponse = await web3Instance.files.public.list().name(value);
-
-			files = nameResponse.files || [];
+			const query = web3Instance.files.public.list().name(value);
+			// Add pagination if methods are available
+			if (typeof query.limit === "function") {
+				const limitedQuery = query.limit(validLimit);
+				// Handle offset/pageOffset if available
+				if (typeof limitedQuery.pageOffset === "function") {
+					response = await limitedQuery.pageOffset(pageOffset);
+				} else if (typeof limitedQuery.offset === "function") {
+					response = await limitedQuery.offset(pageOffset);
+				} else {
+					response = await limitedQuery;
+				}
+			} else {
+				response = await query;
+			}
 		} else {
-			const keyvaluesResponse = await web3Instance.files.public.list().keyvalues({ [property]: value });
-
-			files = keyvaluesResponse.files || [];
+			const query = web3Instance.files.public.list().keyvalues({ [property]: value });
+			// Add pagination if methods are available
+			if (typeof query.limit === "function") {
+				const limitedQuery = query.limit(validLimit);
+				// Handle offset/pageOffset if available
+				if (typeof limitedQuery.pageOffset === "function") {
+					response = await limitedQuery.pageOffset(pageOffset);
+				} else if (typeof limitedQuery.offset === "function") {
+					response = await limitedQuery.offset(pageOffset);
+				} else {
+					response = await limitedQuery;
+				}
+			} else {
+				response = await query;
+			}
 		}
+
+		files = response.files || [];
 
 		if (!files || !files.length) return [];
 

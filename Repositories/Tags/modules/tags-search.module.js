@@ -224,7 +224,7 @@ const searchHoldDomain = async (params, authUser) => {
  * @returns {Object} - Domain search results
  */
 const searchByDomain = async (params, authUser) => {
-	const { domain, storage } = params;
+	const { domain, storage, limit, pageOffset } = params;
 
 	// Validate domain
 	if (!isDomainActive(domain)) {
@@ -237,7 +237,7 @@ const searchByDomain = async (params, authUser) => {
 
 	switch (storage) {
 		case "IPFS":
-			return await TagsIPFSModule.searchByDomain({ domain }, authUser);
+			return await TagsIPFSModule.searchByDomain({ domain, limit, pageOffset }, authUser);
 		case "Arweave":
 			return await TagsArweaveModule.searchByDomain({ domain }, authUser);
 	}
