@@ -162,34 +162,26 @@ const _requiresUpdate = async (tagPayObject, priceDetails, tagObject) => {
 
 	if (!tagPayObject) return false;
 
-	if (!sameDuration && tagPayObject?.zelfProofQRCode) {
-		await TagsIpfsModule.unPinFiles([tagPayObject.id]);
-
-		return true;
-	}
-
-	// now check if the coinbase_expires_at is before the current date
-	if (tagPayObject?.publicData?.coinbase_expires_at && moment(tagPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
-		console.log("deleting tag pay object...");
-		await TagsIpfsModule.unPinFiles([tagPayObject.id]);
-
-		return true;
-	}
-
-	// we need to check registeredAt and renewedAt
 	const registeredAtCondition = Boolean(
 		tagObject.publicData.registeredAt &&
 			tagPayObject?.publicData?.registeredAt &&
 			moment(tagObject.publicData.registeredAt).isAfter(moment(tagPayObject?.publicData?.registeredAt))
 	);
 
-	// console.info({
-	// 	registeredAt: tagObject.publicData.registeredAt,
-	// 	renewedAt: tagObject.publicData.renewedAt,
-	// 	registeredAtCondition,
-	// });
+	if (registeredAtCondition) return true;
 
-	return registeredAtCondition;
+	if (!sameDuration && tagPayObject?.zelfProofQRCode) {
+		await TagsIpfsModule.unPinFiles([tagPayObject.ipfsId]);
+
+		return true;
+	}
+
+	// now check if the coinbase_expires_at is before the current date
+	if (tagPayObject?.publicData?.coinbase_expires_at && moment(tagPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
+		await TagsIpfsModule.unPinFiles([tagPayObject.ipfsId]);
+
+		return true;
+	}
 };
 
 /**
@@ -205,7 +197,7 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
 
 	const tagPayName = `${tagName}pay`;
 
-	let tagPayRecords = await searchTag({ tagName: tagPayName, domainConfig });
+	let tagPayRecords = await searchTag({ tagName: tagPayName, domainConfig, environment: "ipfs", type: "mainnet" });
 
 	const tagPayObject = tagPayRecords.tagObject || {};
 
