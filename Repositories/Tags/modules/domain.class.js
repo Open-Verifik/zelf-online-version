@@ -125,7 +125,8 @@ class Domain {
 
 		const splitTagName = tagName.split(".");
 
-		referralTagName = referralTagName.replace(".hold", "");
+		// Ensure referralTagName is a string before calling replace
+		referralTagName = (referralTagName || "").replace(".hold", "");
 
 		const length = splitTagName[0].length;
 

@@ -148,6 +148,10 @@ const createCheckoutSession = async (productId, priceId, customerEmail = null) =
 const getMySubscription = async (authToken) => {
 	const { myLicense, zelfAccount } = await getMyLicense(authToken, true);
 
+	if (!myLicense?.domainConfig?.stripe?.subscriptionId) {
+		throw new Error("404:subscription_not_found");
+	}
+
 	const stripe = getStripeClient();
 
 	const subscription = await stripe.subscriptions.retrieve(myLicense.domainConfig.stripe?.subscriptionId);
