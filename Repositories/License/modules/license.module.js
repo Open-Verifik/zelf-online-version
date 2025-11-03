@@ -531,8 +531,6 @@ const syncLicenseWithStripe = async (license, paymentData) => {
 
 	const licenseObject = new Domain(licenseData);
 
-	console.log({ paymentData });
-
 	licenseObject.limits = plan.limits;
 	licenseObject.subscriptionId = paymentData.subscriptionId;
 	licenseObject.startDate = moment(new Date(paymentData.subscription.current_period_start * 1000)).format("YYYY-MM-DD HH:mm:ss");
