@@ -9,6 +9,11 @@ const TagsSearchModule = require("../../Tags/modules/tags-search.module");
 //qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE
 ARIO.init({ processId: config.arns.processId });
 
+const mappingOfSites = {
+	bdag: config.arns.blockdag_transaction_id,
+	zelf: config.arns.index_transaction_id,
+};
+
 /**
  * Get AR-IO ARNs for a user
  * @param {Object} params - Query parameters
@@ -47,7 +52,7 @@ const get = async (params, authUser = {}) => {
 		success: true,
 		exists: true,
 		record: record,
-		upToDate: record.transactionId === config.arns.index_transaction_id,
+		upToDate: record.transactionId === mappingOfSites[domain],
 		zelfName: tagName,
 		tagName,
 		domain,
@@ -81,12 +86,14 @@ const create = async (data, authUser = {}) => {
 
 	const secondaryUrl = domain === "zelf" ? `https://${tagName}_zelf.arweave.net` : `https://${tagName}_${domain}_zelf.arweave.net`;
 
-	if (records[recordKey] && records[recordKey].transactionId === config.arns.index_transaction_id) {
+	const transactionId = mappingOfSites[domain] || config.arns.index_transaction_id;
+
+	if (records[recordKey] && records[recordKey].transactionId === transactionId) {
 		return {
 			success: true,
 			exists: true,
 			record: records[recordKey],
-			upToDate: records[recordKey].transactionId === config.arns.index_transaction_id,
+			upToDate: records[recordKey].transactionId === transactionId,
 			zelfName,
 			tagName,
 			domain,
@@ -99,7 +106,7 @@ const create = async (data, authUser = {}) => {
 	const record = await ant.setRecord(
 		{
 			undername: recordKey,
-			transactionId: config.arns.index_transaction_id,
+			transactionId,
 			ttlSeconds: 3600,
 		},
 		{

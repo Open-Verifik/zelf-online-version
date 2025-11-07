@@ -112,6 +112,7 @@ const configuration = {
 	arns: {
 		processId: process.env.ARNS_PROCESS_ID,
 		index_transaction_id: process.env.ARNS_INDEX_TRANSACTION_ID,
+		blockdag_transaction_id: process.env.ARNS_BLOCKDAG_TRANSACTION_ID || "9Kz-HCKRaWmM5fAc9A2q7sJbUIRAGQ5X9GDKdI7l76Q",
 	},
 	walrus: {
 		network: process.env.WALRUS_NETWORK || "testnet",
