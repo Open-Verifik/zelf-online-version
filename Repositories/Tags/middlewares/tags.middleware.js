@@ -12,6 +12,8 @@ const schemas = {
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]),
 		captchaToken: stringOptionalEmptyAsNull(),
 		duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]),
+		environment: stringEnum(["ipfs", "arweave", "walrus", "all"]),
+		type: stringEnum(["both", "mainnet", "hold"]),
 	},
 	searchByDomain: {
 		domain: string().required(),
@@ -150,7 +152,7 @@ const validateDomainAndName = async (domain, name) => {
  * @param {*} next - Next middleware
  */
 const getValidation = async (ctx, next) => {
-	const { tagName, domain, key, value, captchaToken, os } = ctx.request.query;
+	const { tagName, domain, key, value, captchaToken, os, environment, type } = ctx.request.query;
 
 	const valid = validate(schemas.search, {
 		tagName,
@@ -159,11 +161,15 @@ const getValidation = async (ctx, next) => {
 		value,
 		captchaToken,
 		os,
+		environment,
+		type,
 	});
 
 	if (valid.error) {
 		ctx.status = 409;
+
 		ctx.body = { validationError: valid.error.message };
+
 		return;
 	}
 

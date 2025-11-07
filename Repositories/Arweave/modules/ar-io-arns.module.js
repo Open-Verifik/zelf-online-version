@@ -4,7 +4,7 @@
 
 const { ARIO, ArweaveSigner, ANT } = require("@ar.io/sdk");
 const config = require("../../../Core/config");
-const ZNSSearchModule = require("../../ZelfNameService/modules/zns-search.module");
+const TagsSearchModule = require("../../Tags/modules/tags-search.module");
 
 //qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE
 ARIO.init({ processId: config.arns.processId });
@@ -16,33 +16,43 @@ ARIO.init({ processId: config.arns.processId });
  * @returns {Promise<Object>} AR-IO ARNs data
  */
 const get = async (params, authUser = {}) => {
-	const zelfName = await _validateZelfName(params.zelfName, authUser);
+	const { tagObject, tagName, domain } = await _validateTagName(params.zelfName.split(".")[0], params.zelfName.split(".")[1], authUser);
 
 	const ant = _initWallet();
 
 	// Get all records and search for the specific one
 	const records = await ant.getRecords();
 
+	const recordKey = domain === "zelf" ? `${tagName}` : `${tagName}_${domain}`;
+
 	// Find the specific record by undername
-	const record = records[zelfName] || null;
+	const record = records[recordKey] || null;
 
 	if (!record) {
 		return {
 			success: true,
 			exists: false,
 			record: null,
-			zelfName,
+			zelfName: tagName,
+			tagName,
+			domain,
 		};
 	}
+
+	const primaryUrl = domain === "zelf" ? `https://${tagName}_zelf.arweave.zelf.world` : `https://${tagName}_${domain}_zelf.arweave.zelf.world`;
+
+	const secondaryUrl = domain === "zelf" ? `https://${tagName}_zelf.arweave.net` : `https://${tagName}_${domain}_zelf.arweave.net`;
 
 	return {
 		success: true,
 		exists: true,
 		record: record,
 		upToDate: record.transactionId === config.arns.index_transaction_id,
-		zelfName,
-		primaryUrl: `https://${zelfName}_zelf.arweave.zelf.world`,
-		secondaryUrl: `https://${zelfName}_zelf.arweave.net`,
+		zelfName: tagName,
+		tagName,
+		domain,
+		primaryUrl,
+		secondaryUrl,
 	};
 };
 
@@ -53,7 +63,10 @@ const get = async (params, authUser = {}) => {
  * @returns {Promise<Object>} Created ARN data
  */
 const create = async (data, authUser = {}) => {
-	const zelfName = await _validateZelfName(data.zelfName, authUser);
+	const tagName = data.zelfName.split(".")[0];
+	const domain = data.zelfName.split(".")[1];
+
+	const zelfName = await _validateTagName(data.zelfName.split(".")[0], data.zelfName.split(".")[1], authUser);
 
 	const ant = _initWallet();
 
@@ -62,22 +75,30 @@ const create = async (data, authUser = {}) => {
 	// Get all records and search for the specific one
 	const records = await ant.getRecords();
 
-	if (records[zelfName] && records[zelfName].transactionId === config.arns.index_transaction_id) {
+	const recordKey = domain === "zelf" ? `${tagName}` : `${tagName}_${domain}`;
+
+	const primaryUrl = domain === "zelf" ? `https://${tagName}_zelf.arweave.zelf.world` : `https://${tagName}_${domain}_zelf.arweave.zelf.world`;
+
+	const secondaryUrl = domain === "zelf" ? `https://${tagName}_zelf.arweave.net` : `https://${tagName}_${domain}_zelf.arweave.net`;
+
+	if (records[recordKey] && records[recordKey].transactionId === config.arns.index_transaction_id) {
 		return {
 			success: true,
 			exists: true,
-			record: records[zelfName],
-			upToDate: records[zelfName].transactionId === config.arns.index_transaction_id,
-			zelfName: zelfName,
-			primaryUrl: `https://${zelfName}_zelf.arweave.zelf.world`,
-			secondaryUrl: `https://${zelfName}_zelf.arweave.net`,
+			record: records[recordKey],
+			upToDate: records[recordKey].transactionId === config.arns.index_transaction_id,
+			zelfName,
+			tagName,
+			domain,
+			primaryUrl,
+			secondaryUrl,
 		};
 	}
 
 	// Create the under name
 	const record = await ant.setRecord(
 		{
-			undername: zelfName,
+			undername: recordKey,
 			transactionId: config.arns.index_transaction_id,
 			ttlSeconds: 3600,
 		},
@@ -88,8 +109,8 @@ const create = async (data, authUser = {}) => {
 
 	return {
 		...record,
-		primaryUrl: `https://${zelfName}_zelf.arweave.zelf.world`,
-		secondaryUrl: `https://${zelfName}_zelf.arweave.net`,
+		primaryUrl,
+		secondaryUrl,
 	};
 };
 
@@ -118,24 +139,24 @@ const _initWallet = () => {
 	return ant;
 };
 
-const _validateZelfName = async (zelfName, authUser) => {
-	if (zelfName.endsWith(".zelf")) {
-		zelfName = zelfName.slice(0, -5);
-	}
-
-	const searchResult = await ZNSSearchModule.searchZelfName(
+const _validateTagName = async (tagName, domain, authUser) => {
+	const tagResult = await TagsSearchModule.searchTag(
 		{
-			zelfName,
-			environment: "arweave",
+			tagName,
+			domain,
+			environment: "all",
+			type: "mainnet",
 		},
 		authUser
 	);
 
-	if (!searchResult.arweave.length) {
-		throw new Error("404:not_found_in_arweave");
-	}
+	if (!tagResult.tagObject) throw new Error("404:not_found_in_arweave");
 
-	return zelfName;
+	return {
+		tagObject: tagResult.tagObject,
+		tagName,
+		domain,
+	};
 };
 
 module.exports = {

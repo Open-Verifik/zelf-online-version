@@ -1,5 +1,8 @@
 const { Domain } = require("../modules/domain.class");
 const { initCacheInstance } = require("../../../cache/manager");
+const { cache } = require("joi");
+const axios = require("../../../Core/axios").getEncryptionInstance();
+const IPFS = require("../../../Repositories/IPFS/modules/ipfs.module");
 
 // Initialize cache for dynamic domains with 1 hour TTL
 const domainsCache = initCacheInstance();
@@ -223,21 +226,77 @@ const getDomainLimits = (domain) => {
 };
 
 /**
- * Load dynamic domains from provided licenses data
- * @param {Array} licenses - Array of license objects
- * @returns {Object|null} - Dynamic domains object or null if not available
+ * Load domains from cache
+ * @returns {Object|null} - Cached domains or null if not found/expired
  */
-const loadDynamicDomains = (licenses = null) => {
+const loadCache = () => {
 	try {
-		// Check if we have cached domains
-		let cachedDomains = domainsCache.get("official-licenses");
+		const cached = domainsCache.get("official-licenses");
 
-		if (cachedDomains) {
-			return cachedDomains;
+		if (cached) {
+			console.info("Loading dynamic domains from memory cache");
+			return cached;
+		}
+		return null;
+	} catch (error) {
+		console.error("Error loading from cache:", error);
+		return null;
+	}
+};
+
+/**
+ * Save domains to cache
+ * @param {Object} domains - Domain objects to cache
+ */
+const saveCache = (domains) => {
+	try {
+		// Check if we need to update the cache (avoid unnecessary operations)
+		const existingCache = loadCache();
+
+		if (existingCache && JSON.stringify(existingCache) === JSON.stringify(domains)) {
+			console.log("Cache unchanged, skipping update");
+			return;
 		}
 
-		// If licenses are provided, use them to create domains
-		if (licenses && Array.isArray(licenses)) {
+		// Save to memory cache with automatic expiration
+		domainsCache.set("official-licenses", domains);
+
+		console.log(
+			`Dynamic domains cached successfully (${Object.keys(domains).length} domains, TTL: ${
+				domainsCache.getTtl("official-licenses") ? Math.round((domainsCache.getTtl("official-licenses") - Date.now()) / 1000) : "N/A"
+			}s)`
+		);
+	} catch (error) {
+		console.error("Error saving to cache:", error);
+	}
+};
+
+/**
+ * Load license JSON from IPFS URL
+ * @param {string} ipfsUrl - IPFS URL to fetch JSON from
+ * @returns {Object} - License JSON data
+ */
+const _loadLicenseJSON = async (ipfsUrl) => {
+	const jsonData = await axios.get(ipfsUrl);
+	return jsonData.data;
+};
+
+/**
+ * Load dynamic domains from provided licenses data or fetch from IPFS
+ * @param {Array} licenses - Optional array of license objects
+ * @param {boolean} force - Force reload from IPFS, bypassing cache
+ * @returns {Object|null} - Dynamic domains object or null if not available
+ */
+const loadDynamicDomains = async (licenses = null, force = false) => {
+	// Try to get from cache first (unless forced)
+	if (!force) {
+		const cachedData = loadCache();
+		if (cachedData) return cachedData;
+	}
+
+	// If licenses are provided, use them to create domains
+	if (licenses && Array.isArray(licenses)) {
+		try {
 			// Convert license data to Domain objects
 			const dynamicDomains = {};
 
@@ -248,27 +307,85 @@ const loadDynamicDomains = (licenses = null) => {
 			}
 
 			// Cache the result with automatic expiration
-			domainsCache.set("official-licenses", dynamicDomains);
+			saveCache(dynamicDomains);
 
 			console.log(`Dynamic domains cached: ${Object.keys(dynamicDomains).length} domains`);
 
 			return dynamicDomains;
+		} catch (error) {
+			console.warn("Failed to process provided licenses:", error.message);
 		}
-	} catch (error) {
-		console.warn("Failed to load dynamic domains:", error.message);
 	}
 
-	return null;
+	// If no licenses provided or processing failed, try fetching from IPFS
+	try {
+		// Fetch from IPFS
+		const officialLicenses = await IPFS.get({ key: "type", value: "license" });
+
+		const dynamicDomains = {};
+
+		for (const license of officialLicenses) {
+			try {
+				const licenseData = await _loadLicenseJSON(license.url);
+				if (licenseData.name) {
+					dynamicDomains[licenseData.name.toLowerCase()] = new Domain(licenseData);
+				}
+			} catch (error) {
+				console.error(`Error loading license ${license.id}:`, error.message);
+				// Continue with other licenses
+			}
+		}
+
+		// Save to cache with automatic expiration
+		saveCache(dynamicDomains);
+
+		console.info(`Loaded ${Object.keys(dynamicDomains).length} dynamic domains from IPFS successfully`);
+
+		return dynamicDomains;
+	} catch (error) {
+		console.error("Error loading dynamic domains from IPFS:", error);
+
+		// Try to return cached data as fallback
+		const fallbackCache = loadCache();
+		if (fallbackCache) {
+			console.warn("Using cached domains as fallback");
+			return fallbackCache;
+		}
+
+		return null;
+	}
 };
 
 const getSupportedDomains = (licenses = null) => {
 	try {
-		const dynamicDomains = loadDynamicDomains(licenses);
-
-		if (dynamicDomains) {
-			// Merge dynamic domains with static ones
-			return { ...SUPPORTED_DOMAINS, ...dynamicDomains };
+		// First, try to get from cache (synchronous)
+		const cachedDomains = loadCache();
+		if (cachedDomains) {
+			// Merge cached dynamic domains with static ones
+			return { ...SUPPORTED_DOMAINS, ...cachedDomains };
 		}
+
+		// If licenses are provided, process them synchronously
+		// (Note: This is a legacy path - in practice, licenses should be pre-loaded)
+		if (licenses && Array.isArray(licenses)) {
+			const dynamicDomains = {};
+			for (const license of licenses) {
+				if (license.name) {
+					dynamicDomains[license.name.toLowerCase()] = new Domain(license);
+				}
+			}
+			if (Object.keys(dynamicDomains).length > 0) {
+				saveCache(dynamicDomains);
+				return { ...SUPPORTED_DOMAINS, ...dynamicDomains };
+			}
+		}
+
+		// If no cache and no licenses provided, trigger async fetch in background
+		// but return static domains immediately for this call
+		// The cache will be populated for subsequent calls
+		loadDynamicDomains(null, false).catch((error) => {
+			console.error("Background fetch of domains failed:", error);
+		});
 	} catch (error) {
 		console.warn("Error loading dynamic domains:", error.message);
 	}
@@ -294,4 +411,5 @@ module.exports = {
 	getDomainCurrencies,
 	getDomainLimits,
 	validateDomainName,
+	loadDynamicDomains,
 };

@@ -3,16 +3,18 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Zelf Name</title>
+		<title>Zelf Name Service</title>
 		<!-- add main.css  -->
 		<link
 			rel="stylesheet"
-			href="https://4oce67he6xqarnknxj3fdqslubkdujb5v3ha6rsv3syivrunn7tq.arweave.net/44RPfOT14Ai1Tbp2UcJLoFQ6JD2uzg9GVdywisaNb-c"
+			href="https://julbanlrcguieirrv5cj6olf5ocqpt737jcxgc2dskm2ivg5afpa.arweave.net/TRYQNXERqIIiMa9Enzll64UHz_v6RXMLQ5KZpFTdAV4"
 		/>
+
+		<!-- icon for the tab -->
 		<link
 			rel="icon"
 			type="image/x-icon"
-			href="https://4oce67he6xqarnknxj3fdqslubkdujb5v3ha6rsv3syivrunn7tq.arweave.net/44RPfOT14Ai1Tbp2UcJLoFQ6JD2uzg9GVdywisaNb-c"
+			href="https://dthn3plzgi5c3d3hfrpkahrp7ljvept54k2v5hzavyuvvaum4fhq.arweave.net/HM7dvXkyOi2PZyxeoB4v-tNSPn3itV6fIK4pWoKM4U8"
 		/>
 		<link
 			rel="icon"
@@ -64,7 +66,7 @@
 					/>
 				</div>
 				<div class="cta">
-					<div class="text">Get your Zelf Name now</div>
+					<div class="text">Download Zelf Name Service</div>
 					<div class="button" id="downloadButton">
 						<div>Download App</div>
 					</div>
@@ -83,9 +85,9 @@
 				<div class="addresses-grid" id="addressesGrid"></div>
 
 				<div class="promo-div">
-					<h3>DO YOU WANT TO GET YOUR OWN ZELF NAME?</h3>
+					<h3>DO YOU WANT TO GET YOUR OWN TAG NAME?</h3>
 
-					<span> Use my <strong>Zelf Name</strong> and get 10% off on your first purchase </span>
+					<span> Use my <strong>Tag Name</strong> and get 10% off on your first tag!</span>
 
 					<div class="referral-code-div" id="copyReferralCode">
 						<span id="zelf-name-copy">...</span>
@@ -104,6 +106,16 @@
 
 		<!-- Link the external JavaScript file -->
 		<div class="toast-container" id="toastContainer"></div>
-		<script src="https://tk5ukr34eatt2u6zfoo63si2oejgajbhsnzgfwazmkspwyoujfsa.arweave.net/mrtFR3wgJz1T2Sud7ckacRJgJCeTcmLYGWKk-2HUSWQ"></script>
+		<script>
+			// Conditionally load script based on hostname
+			const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+			const script = document.createElement("script");
+
+			console.log({ isLocalhost });
+			script.src = isLocalhost
+				? "./main_v2.js"
+				: "https://qhd7a5b57lc7cq4n4dtx66bfpxykmynykgfq2wc5ewx2vvngiphq.arweave.net/gcfwdD36xfFDjeDnf3glffCmYbhRiw1YXSWvqtWmQ88";
+			document.body.appendChild(script);
+		</script>
 	</body>
 </html>

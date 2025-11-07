@@ -407,9 +407,8 @@ const loadOfficialLicenses = async (force = false) => {
 	// Try to get from cache first (unless forced)
 	if (!force) {
 		const cachedData = loadCache();
-		if (cachedData) {
-			return cachedData;
-		}
+
+		if (cachedData) return cachedData;
 	}
 
 	try {

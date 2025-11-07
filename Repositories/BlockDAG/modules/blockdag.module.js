@@ -25,6 +25,7 @@ const generateRandomUserAgent = () => {
 
 // BlockDAG RPC endpoint from the image
 const BLOCKDAG_RPC = "http://13.234.176.105:18545";
+const BLOCKDAG_TESTNET_RPC = "https://testnet-rpc.blockdag.network";
 const BLOCKDAG_EXPLORER = "https://primordial.bdagscan.com";
 
 // Helper function to get latest block number
@@ -308,16 +309,130 @@ const getTokens = async (params, query) => {
 const getTransactionsList = async (query) => {
 	try {
 		const { address, page = "0", show = "100" } = query;
+		const pageNum = parseInt(page, 10);
+		const showNum = parseInt(show, 10);
 
-		// Return empty transactions until BlockDAG provides proper API documentation
-		// TODO: Implement when BlockDAG explorer API or transaction endpoints are available
+		// Try testnet RPC first, fallback to mainnet RPC
+		let rpcUrl = BLOCKDAG_RPC;
+		let response = null;
+
+		try {
+			response = await instance.post(
+				rpcUrl,
+				{
+					jsonrpc: "2.0",
+					method: "getAddressTxs",
+					params: [address],
+					id: 1,
+				},
+				{
+					headers: { "Content-Type": "application/json" },
+				}
+			);
+		} catch (testnetError) {
+			console.log("Testnet RPC failed, trying mainnet RPC:", testnetError.message);
+			// Fallback to mainnet RPC
+			rpcUrl = BLOCKDAG_RPC;
+			try {
+				response = await instance.post(
+					rpcUrl,
+					{
+						jsonrpc: "2.0",
+						method: "getAddressTxs",
+						params: [address],
+						id: 1,
+					},
+					{
+						headers: { "Content-Type": "application/json" },
+					}
+				);
+			} catch (mainnetError) {
+				console.error("Both RPC endpoints failed:", mainnetError.message);
+				throw mainnetError;
+			}
+		}
+
+		if (!response || !response.data || response.data.error) {
+			const errorMsg = response?.data?.error?.message || "Unknown error";
+			const errorCode = response?.data?.error?.code;
+
+			// Log if method doesn't exist (code -32601)
+			if (errorCode === -32601) {
+				console.log(`BlockDAG RPC: getAddressTxs method not available on ${rpcUrl}. Returning empty transactions.`);
+			} else {
+				console.error("RPC error:", response?.data?.error || "Unknown error");
+			}
+
+			return {
+				pagination: {
+					records: "0",
+					pages: "0",
+					page: page,
+				},
+				transactions: [],
+			};
+		}
+
+		// Parse the RPC response
+		const transactionsData = response.data.result || [];
+		const totalRecords = transactionsData.length;
+		const totalPages = Math.ceil(totalRecords / showNum);
+
+		// Apply pagination
+		const startIndex = pageNum * showNum;
+		const endIndex = startIndex + showNum;
+		const paginatedTransactions = transactionsData.slice(startIndex, endIndex);
+
+		// Transform transactions to expected format
+		const transactions = paginatedTransactions.map((tx) => {
+			// Parse transaction data - adjust based on actual RPC response format
+			const value = tx.value ? (parseInt(tx.value, 16) / Math.pow(10, 18)).toFixed(6) : "0";
+			const gasPrice = tx.gasPrice ? parseInt(tx.gasPrice, 16) : 0;
+			const gasUsed = tx.gasUsed ? parseInt(tx.gasUsed, 16) : 0;
+			const txnFee = (gasPrice * gasUsed) / Math.pow(10, 18);
+
+			// Determine transaction type/direction
+			const isOutgoing = tx.from && tx.from.toLowerCase() === address.toLowerCase();
+			const traffic = isOutgoing ? "OUT" : "IN";
+			const method = tx.input && tx.input !== "0x" && tx.input.length > 10 ? "Contract" : "Transfer";
+
+			// Get block timestamp if available
+			let date = "N/A";
+			let age = "N/A";
+			if (tx.timestamp) {
+				const timestamp = typeof tx.timestamp === "string" ? parseInt(tx.timestamp, 16) : tx.timestamp;
+				date = moment.unix(timestamp).format("YYYY-MM-DD HH:mm:ss");
+				age = moment.unix(timestamp).fromNow();
+			} else if (tx.blockNumber) {
+				// If we have block number but no timestamp, we can't calculate age accurately
+				date = "N/A";
+				age = "N/A";
+			}
+
+			return {
+				hash: tx.hash || tx.transactionHash || "0x" + "0".repeat(64),
+				method: method,
+				block: tx.blockNumber ? (typeof tx.blockNumber === "string" ? parseInt(tx.blockNumber, 16) : tx.blockNumber).toString() : "N/A",
+				age: age,
+				date: date,
+				from: tx.from || address,
+				traffic: traffic,
+				to: tx.to || address,
+				fiatAmount: "0.00", // Will be calculated if price is available
+				amount: value,
+				asset: "BDAG",
+				txnFee: txnFee.toFixed(6),
+				note: tx.note || "",
+			};
+		});
+
 		return {
 			pagination: {
-				records: "0",
-				pages: "0",
+				records: totalRecords.toString(),
+				pages: totalPages.toString(),
 				page: page,
 			},
-			transactions: [],
+			transactions: transactions,
 		};
 	} catch (error) {
 		console.error("Error getting BlockDAG transactions:", error.message || "Unknown error");
