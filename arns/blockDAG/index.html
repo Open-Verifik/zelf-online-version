@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>BlockDAG Name Service</title>
+		<link rel="stylesheet" href="./blockdag.css" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Anek+Devanagari:wght@400;600;700&display=swap"
+			rel="stylesheet"
+		/>
+	</head>
+	<body>
+		<div class="container">
+			<!-- Left Column (now with BDAG name and QR code) -->
+			<div class="right-column">
+				<div class="right-content">
+					<!-- BDAG Name Display -->
+					<h1 class="bdag-name" id="bdagName">[YOUR_NAME].BDAG</h1>
+
+					<!-- QR Code Card -->
+					<div class="qr-section">
+						<div class="qr-card">
+							<img
+								id="bdagproof"
+								src="https://wm24ac7zcjxdpc5qd3q23ghuosapxxdgisidmd2vjfeoke4alo3q.arweave.zelf.world/szXAC_kSbjeLsB7hrZj0dID73GZEkDYPVUlI5ROAW7c"
+								alt="BDAG Proof QR Code"
+							/>
+						</div>
+
+						<!-- Download Section -->
+						<div class="download-section">
+							<p class="download-text">Get your BDAG name now</p>
+							<button class="download-button" id="downloadButton">
+								<span>Download App</span>
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Right Column (now with address cards and referral) -->
+			<div class="left-column">
+				<div class="background-pattern"></div>
+				<div class="left-content">
+					<!-- BlockDAG Logo -->
+					<div class="blockdag-logo">
+						<img
+							src="https://ea6qpotnglt3fspxanhhhlszwvb5u2ijzmq45giaw2x6llau3f5q.arweave.net/ID0Hum0y57LJ9wNOc65ZtUPaaQnLIc6ZALav5awU2Xs"
+							alt="BlockDAG Logo"
+						/>
+					</div>
+					<!-- Address Cards Grid -->
+					<div class="addresses-grid" id="addressesGrid"></div>
+
+					<!-- Referral Section -->
+					<div class="referral-section">
+						<div class="referral-header">
+							<h2 class="referral-title">Do you want to get your own BDAG name?</h2>
+							<p class="referral-subtitle">Use my BDAG name and get 10% off on your first purchase</p>
+						</div>
+						<div class="referral-code-container" id="copyReferralCode">
+							<span class="referral-code" id="bdag-name-copy">...</span>
+							<button class="copy-button-secondary">
+								<span>Copy</span>
+								<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+									<path
+										d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z"
+										fill="white"
+									/>
+								</svg>
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Loading Badge -->
+		<div class="loading-badge" id="loadingBadge" style="display: none">
+			<div class="spinner"></div>
+			<span class="badge-label">Loading from <span class="badge-source">Arweave</span></span>
+		</div>
+
+		<!-- Toast Container -->
+		<div class="toast-container" id="toastContainer"></div>
+
+		<!-- Script -->
+		<script>
+			const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+			const script = document.createElement("script");
+			script.src = isLocalhost ? "./blockdag.js" : "https://arweave.net/YOUR_SCRIPT_ID";
+			document.body.appendChild(script);
+		</script>
+	</body>
+</html>
