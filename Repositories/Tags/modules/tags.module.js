@@ -114,6 +114,7 @@ const leaseTag = async (params, authUser) => {
 			zelfProof: tagObject.zelfProof,
 			zelfProofQRCode: tagObject.zelfProofQRCode,
 		},
+		walrus: tagObject.walrus,
 		pgp,
 	};
 };

@@ -12,14 +12,16 @@ console.log("🔍 DEBUG: WalrusClient imported successfully");
 // Walrus mainnet configuration
 const WALRUS_NETWORK = "mainnet"; // Make this configurable
 
-// Updated URLs based on correct domain patterns
+// Walrus URLs for blob access
+// Note: Actual blob retrieval uses the Walrus SDK (walrusClient.readBlob())
+// These URLs are for reference/display purposes and may not be directly accessible via HTTP
 const walrusUrls = {
-	// Primary aggregator URL (pattern based on SDK documentation)
-	primary: `https://aggregator.walrus.space`,
-	// Alternative URLs to try
-	alternatives: [`https://aggregator.mainnet.walrus.space`, `https://publisher.walrus.space`, `https://publisher.mainnet.walrus.space`],
-	// Fallback for direct node access (if available)
-	fallback: `https://walrus.space`,
+	// Primary direct blob access URL (based on official documentation)
+	primary: `https://walrus-mainnet.mystenlabs.com`,
+	// Alternative URLs (may not be active)
+	alternatives: [],
+	// Fallback URL (if needed)
+	fallback: `https://walrus-mainnet.mystenlabs.com`,
 };
 
 const explorerUrl = `https://walruscan.com/mainnet/blob`;
@@ -60,6 +62,158 @@ try {
 }
 
 /**
+ * Get and validate Walrus keypair from configuration
+ * This function handles all key derivation, validation, and keypair creation
+ * @returns {Promise<{success: boolean, keypair?: Ed25519Keypair, error?: string, reason?: string}>}
+ */
+const getWalrusKeypair = async () => {
+	try {
+		// Check if Walrus is available
+		if (!walrusAvailable) {
+			return {
+				success: false,
+				skipped: true,
+				reason: "Walrus client not available",
+				error: "Walrus SDK initialization failed",
+			};
+		}
+
+		// Check if private key is configured
+		if (!config.walrus.privateKey) {
+			return {
+				success: false,
+				skipped: true,
+				reason: "WALRUS_PRIVATE_KEY not configured",
+				error: "Please add WALRUS_PRIVATE_KEY to your .env file",
+			};
+		}
+
+		// Get private key from mnemonic
+		let privateKeyData;
+		try {
+			privateKeyData = await getWalrusKeyFromMnemonic(config.walrus.privateKey);
+		} catch (error) {
+			return {
+				success: false,
+				skipped: true,
+				reason: "Failed to derive private key from mnemonic",
+				error: error.message,
+			};
+		}
+
+		// Validate and convert private key
+		let privateKeyBuffer;
+		try {
+			const privateKeyHex = privateKeyData.privateKeyHex.replace(/^0x/, ""); // Remove 0x prefix if present
+
+			// Check if it's a valid hex string
+			if (!/^[0-9a-fA-F]+$/.test(privateKeyHex)) {
+				return {
+					success: false,
+					skipped: true,
+					reason: "Invalid private key format",
+					error: "Private key must be a valid hex string (64 characters)",
+				};
+			}
+
+			// Check length (should be 64 hex characters = 32 bytes)
+			if (privateKeyHex.length !== 64) {
+				return {
+					success: false,
+					skipped: true,
+					reason: "Invalid private key length",
+					error: `Private key must be 64 hex characters (got ${privateKeyHex.length})`,
+				};
+			}
+
+			privateKeyBuffer = Buffer.from(privateKeyHex, "hex");
+		} catch (error) {
+			return {
+				success: false,
+				skipped: true,
+				reason: "Private key conversion failed",
+				error: `Failed to convert private key: ${error.message}`,
+			};
+		}
+
+		// Create keypair from config
+		const keypair = Ed25519Keypair.fromSecretKey(privateKeyBuffer);
+
+		return {
+			success: true,
+			keypair,
+		};
+	} catch (error) {
+		return {
+			success: false,
+			skipped: true,
+			reason: "Keypair creation failed",
+			error: error.message,
+		};
+	}
+};
+
+/**
+ * Prepares a blob from base64 QR code for Walrus upload
+ * Handles base64 conversion, size validation, and blob creation
+ * @param {string} zelfProofQRCode - Base64 encoded QR code image (with or without data URL prefix)
+ * @param {string} zelfProof - The zelfProof string
+ * @param {object} publicData - Public data to include in metadata
+ * @param {string} fileName - Name for the file (e.g., "tagName.png")
+ * @param {object} additionalMetadata - Optional additional metadata fields (e.g., hasPassword)
+ * @returns {Promise<{success: boolean, blob?: Uint8Array, buffer?: Buffer, fileSize?: number, metadata?: object, skipped?: boolean, reason?: string}>}
+ */
+const prepareBlobForUpload = (zelfProofQRCode, zelfProof, publicData, fileName, additionalMetadata = {}) => {
+	try {
+		// Convert base64 string to a buffer
+		const base64Data = zelfProofQRCode.replace(/^data:image\/\w+;base64,/, "");
+		const buffer = Buffer.from(base64Data, "base64");
+		const fileSize = buffer.length;
+
+		// Prepare metadata for Sui object
+		const metadata = {
+			zelfProof,
+			contentType: "image/png",
+			fileName: fileName,
+			...additionalMetadata,
+			...publicData,
+		};
+
+		// Check file size limit (100KB similar to Arweave)
+		if (fileSize > 100 * 1024) {
+			console.log("Skipping upload because the file size is greater than 100KB", {
+				fileInKb: fileSize / 1024,
+				fileInMb: fileSize / 1024 / 1024,
+			});
+
+			return {
+				success: false,
+				skipped: true,
+				reason: "File size exceeds 100KB limit",
+			};
+		}
+
+		// Create blob from buffer (using buffer directly, no temp file needed)
+		const blob = new Uint8Array(buffer);
+
+		return {
+			success: true,
+			blob,
+			buffer,
+			fileSize,
+			metadata,
+		};
+	} catch (error) {
+		return {
+			success: false,
+			skipped: true,
+			reason: "Failed to prepare blob",
+			error: error.message,
+		};
+	}
+};
+
+/**
  * Registers a zelf name by uploading the QR code image to Walrus
  * @param {string} zelfProofQRCode - Base64 encoded QR code image
  * @param {object} zelfNameObject - Object containing zelf name details
@@ -79,115 +233,32 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 	const zelfName = publicData.zelfName;
 
 	try {
-		// Check if Walrus is available
-		if (!walrusAvailable) {
+		// Get Walrus keypair using the extracted function
+		const keypairResult = await getWalrusKeypair();
+
+		if (!keypairResult.success) return keypairResult;
+
+		const keypair = keypairResult.keypair;
+
+		// Prepare blob for upload using the generic function
+		const blobResult = prepareBlobForUpload(zelfProofQRCode, zelfProof, publicData, `${zelfName}.png`, { hasPassword: hasPassword || "false" });
+
+		if (!blobResult.success) {
 			return {
 				skipped: true,
-				reason: "Walrus client not available",
-				error: "Walrus SDK initialization failed",
+				reason: blobResult.reason,
+				error: blobResult.error,
 			};
 		}
 
-		// Check if private key is configured
-		if (!config.walrus.privateKey) {
-			return {
-				skipped: true,
-				reason: "WALRUS_PRIVATE_KEY not configured",
-				error: "Please add WALRUS_PRIVATE_KEY to your .env file",
-			};
-		}
+		const { blob, fileSize, metadata } = blobResult;
 
-		// Get private key from mnemonic
-		let privateKeyData;
-		try {
-			privateKeyData = await getWalrusKeyFromMnemonic(config.walrus.privateKey);
-
-			console.log({ privateKeyData });
-		} catch (error) {
-			return {
-				skipped: true,
-				reason: "Failed to derive private key from mnemonic",
-				error: error.message,
-			};
-		}
-
-		// Validate and convert private key
-		let privateKeyBuffer;
-		try {
-			const privateKeyHex = privateKeyData.privateKeyHex.replace(/^0x/, ""); // Remove 0x prefix if present
-
-			// Check if it's a valid hex string
-			if (!/^[0-9a-fA-F]+$/.test(privateKeyHex)) {
-				return {
-					skipped: true,
-					reason: "Invalid private key format",
-					error: "Private key must be a valid hex string (64 characters)",
-				};
-			}
-
-			// Check length (should be 64 hex characters = 32 bytes)
-			if (privateKeyHex.length !== 64) {
-				return {
-					skipped: true,
-					reason: "Invalid private key length",
-					error: `Private key must be 64 hex characters (got ${privateKeyHex.length})`,
-				};
-			}
-
-			privateKeyBuffer = Buffer.from(privateKeyHex, "hex");
-		} catch (error) {
-			return {
-				skipped: true,
-				reason: "Private key conversion failed",
-				error: `Failed to convert private key: ${error.message}`,
-			};
-		}
-
-		// Create keypair from config
-		const keypair = Ed25519Keypair.fromSecretKey(privateKeyBuffer);
-
-		// Convert base64 string to a buffer
-		const base64Data = zelfProofQRCode.replace(/^data:image\/\w+;base64,/, "");
-		const buffer = Buffer.from(base64Data, "base64");
-		const fileSize = buffer.length;
-
-		// Create temporary file
-		const tempFilePath = path.join(__dirname, `${zelfName}.png`);
-		fs.writeFileSync(tempFilePath, buffer);
-
-		// Prepare metadata for Sui object
-		const metadata = {
-			zelfProof,
-			hasPassword: hasPassword || "false",
-			contentType: "image/png",
-			fileName: `${zelfName}.png`,
-			...publicData,
-		};
-
-		// Check file size limit (100KB similar to Arweave)
-		if (fileSize > 100 * 1024) {
-			console.log("Skipping upload because the file size is greater than 100KB", {
-				fileInKb: fileSize / 1024,
-				fileInMb: fileSize / 1024 / 1024,
-			});
-
-			// Clean up temporary file
-			fs.unlinkSync(tempFilePath);
-
-			return {
-				skipped: true,
-				reason: "File size exceeds 100KB limit",
-			};
-		}
-
-		// Upload blob to Walrus
-		const blob = new Uint8Array(buffer);
 		console.log(`📤 Uploading ${zelfName}.png to Walrus (${fileSize} bytes)`);
 
 		const uploadResult = await walrusClient.writeBlob({
 			blob,
 			deletable: false,
-			epochs: 5, // Store for 5 epochs (10 days on testnet)
+			epochs: 5, // Store for 5 epochs
 			signer: keypair,
 		});
 
@@ -197,48 +268,22 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 			zelfName: zelfName,
 		});
 
-		// Clean up temporary file
-		fs.unlinkSync(tempFilePath);
-
-		// Attempt to store metadata on Sui blockchain
-		// const metadataResult = await storeBlobMetadataOnSui(
-		// 	uploadResult.blobId,
-		// 	{
-		// 		...metadata,
-		// 		uploadTimestamp: new Date().toISOString(),
-		// 		sizeBytes: fileSize,
-		// 		network: WALRUS_NETWORK,
-		// 	},
-		// 	keypair
-		// );
-
-		// Create metadata object on Sui blockchain
-		// This would require a custom smart contract deployment
-		// For now, we'll return the blob ID and construct URLs
-
 		return {
 			success: true,
 			blobId: uploadResult.blobId,
-			// Direct URL for fetching the blob
 			publicUrl: getPublicBlobUrl(uploadResult.blobId),
-			// Explorer URL for viewing blob details
 			explorerUrl: getExplorerBlobUrl(uploadResult.blobId),
-			// Metadata for reference
 			metadata: {
 				...metadata,
 				uploadTimestamp: new Date().toISOString(),
 				sizeBytes: fileSize,
 				network: WALRUS_NETWORK,
 			},
-			// Sui metadata storage result
-			// suiMetadata: metadataResult,
-			// Storage details
 			storage: {
 				epochs: 5,
 				network: WALRUS_NETWORK,
 				deletable: false,
 			},
-			// Full upload result for debugging
 			uploadResult,
 		};
 	} catch (error) {
@@ -257,114 +302,32 @@ const tagRegistration = async (zelfProofQRCode, tagObject, domainConfig) => {
 	const tagName = publicData[domainConfig.getTagKey()];
 
 	try {
-		// Check if Walrus is available
-		if (!walrusAvailable) {
+		// Get Walrus keypair using the extracted function
+		const keypairResult = await getWalrusKeypair();
+
+		if (!keypairResult.success) return keypairResult;
+
+		const keypair = keypairResult.keypair;
+
+		// Prepare blob for upload using the generic function
+		const blobResult = prepareBlobForUpload(zelfProofQRCode, zelfProof, publicData, `${tagName}.png`);
+
+		if (!blobResult.success) {
 			return {
 				skipped: true,
-				reason: "Walrus client not available",
-				error: "Walrus SDK initialization failed",
+				reason: blobResult.reason,
+				error: blobResult.error,
 			};
 		}
 
-		// Check if private key is configured
-		if (!config.walrus.privateKey) {
-			return {
-				skipped: true,
-				reason: "WALRUS_PRIVATE_KEY not configured",
-				error: "Please add WALRUS_PRIVATE_KEY to your .env file",
-			};
-		}
+		const { blob, fileSize, metadata } = blobResult;
 
-		// Get private key from mnemonic
-		let privateKeyData;
-		try {
-			privateKeyData = await getWalrusKeyFromMnemonic(config.walrus.privateKey);
-
-			console.log({ privateKeyData });
-		} catch (error) {
-			return {
-				skipped: true,
-				reason: "Failed to derive private key from mnemonic",
-				error: error.message,
-			};
-		}
-
-		// Validate and convert private key
-		let privateKeyBuffer;
-		try {
-			const privateKeyHex = privateKeyData.privateKeyHex.replace(/^0x/, ""); // Remove 0x prefix if present
-
-			// Check if it's a valid hex string
-			if (!/^[0-9a-fA-F]+$/.test(privateKeyHex)) {
-				return {
-					skipped: true,
-					reason: "Invalid private key format",
-					error: "Private key must be a valid hex string (64 characters)",
-				};
-			}
-
-			// Check length (should be 64 hex characters = 32 bytes)
-			if (privateKeyHex.length !== 64) {
-				return {
-					skipped: true,
-					reason: "Invalid private key length",
-					error: `Private key must be 64 hex characters (got ${privateKeyHex.length})`,
-				};
-			}
-
-			privateKeyBuffer = Buffer.from(privateKeyHex, "hex");
-		} catch (error) {
-			return {
-				skipped: true,
-				reason: "Private key conversion failed",
-				error: `Failed to convert private key: ${error.message}`,
-			};
-		}
-
-		// Create keypair from config
-		const keypair = Ed25519Keypair.fromSecretKey(privateKeyBuffer);
-
-		// Convert base64 string to a buffer
-		const base64Data = zelfProofQRCode.replace(/^data:image\/\w+;base64,/, "");
-		const buffer = Buffer.from(base64Data, "base64");
-		const fileSize = buffer.length;
-
-		// Create temporary file
-		const tempFilePath = path.join(__dirname, `${tagName}.png`);
-		fs.writeFileSync(tempFilePath, buffer);
-
-		// Prepare metadata for Sui object
-		const metadata = {
-			zelfProof,
-			contentType: "image/png",
-			fileName: `${tagName}.png`,
-			...publicData,
-		};
-
-		// Check file size limit (100KB similar to Arweave)
-		if (fileSize > 100 * 1024) {
-			console.log("Skipping upload because the file size is greater than 100KB", {
-				fileInKb: fileSize / 1024,
-				fileInMb: fileSize / 1024 / 1024,
-			});
-
-			// Clean up temporary file
-			fs.unlinkSync(tempFilePath);
-
-			return {
-				skipped: true,
-				reason: "File size exceeds 100KB limit",
-			};
-		}
-
-		// Upload blob to Walrus
-		const blob = new Uint8Array(buffer);
 		console.log(`📤 Uploading ${tagName}.png to Walrus (${fileSize} bytes)`);
 
 		const uploadResult = await walrusClient.writeBlob({
 			blob,
 			deletable: false,
-			epochs: 5, // Store for 5 epochs (10 days on testnet)
+			epochs: 5, // Store for 5 epochs
 			signer: keypair,
 		});
 
@@ -374,52 +337,103 @@ const tagRegistration = async (zelfProofQRCode, tagObject, domainConfig) => {
 			tagName: tagName,
 		});
 
-		// Clean up temporary file
-		fs.unlinkSync(tempFilePath);
-
-		// Attempt to store metadata on Sui blockchain
-		// const metadataResult = await storeBlobMetadataOnSui(
-		// 	uploadResult.blobId,
-		// 	{
-		// 		...metadata,
-		// 		uploadTimestamp: new Date().toISOString(),
-		// 		sizeBytes: fileSize,
-		// 		network: WALRUS_NETWORK,
-		// 	},
-		// 	keypair
-		// );
-
-		// Create metadata object on Sui blockchain
-		// This would require a custom smart contract deployment
-		// For now, we'll return the blob ID and construct URLs
-
 		return {
 			success: true,
 			blobId: uploadResult.blobId,
-			// Direct URL for fetching the blob
 			publicUrl: getPublicBlobUrl(uploadResult.blobId),
-			// Explorer URL for viewing blob details
 			explorerUrl: getExplorerBlobUrl(uploadResult.blobId),
-			// Metadata for reference
 			metadata: {
 				...metadata,
 				uploadTimestamp: new Date().toISOString(),
 				sizeBytes: fileSize,
 				network: WALRUS_NETWORK,
 			},
-			// Sui metadata storage result
-			// suiMetadata: metadataResult,
-			// Storage details
 			storage: {
 				epochs: 5,
 				network: WALRUS_NETWORK,
 				deletable: false,
 			},
-			// Full upload result for debugging
 			uploadResult,
 		};
 	} catch (error) {
 		console.error("Error uploading to Walrus:", error);
+		return {
+			skipped: true,
+			reason: "Upload failed",
+			error: error.message,
+		};
+	}
+};
+
+/**
+ * Registers a ZOTP by uploading the QR code image to Walrus
+ * @param {string} zelfProofQRCode - Base64 encoded QR code image
+ * @param {object} zotpObject - Object containing ZOTP details
+ * @returns {object} Result object with blobId, publicUrl, explorerUrl, and metadata
+ */
+const zotpRegistration = async (zelfProofQRCode, zotpObject) => {
+	const { zelfProof, publicData } = zotpObject;
+
+	// Generate a unique identifier for the ZOTP
+	const zotpIdentifier = publicData.username || `zotp_${Date.now()}`;
+	const fileName = `${zotpIdentifier}_zotp.png`;
+
+	try {
+		// Get Walrus keypair using the extracted function
+		const keypairResult = await getWalrusKeypair();
+
+		if (!keypairResult.success) return keypairResult;
+
+		const keypair = keypairResult.keypair;
+
+		// Prepare blob for upload using the generic function
+		const blobResult = prepareBlobForUpload(zelfProofQRCode, zelfProof, publicData, fileName, { type: "zotp" });
+
+		if (!blobResult.success) {
+			return {
+				skipped: true,
+				reason: blobResult.reason,
+				error: blobResult.error,
+			};
+		}
+
+		const { blob, fileSize, metadata } = blobResult;
+
+		console.log(`📤 Uploading ${fileName} to Walrus (${fileSize} bytes)`);
+
+		const uploadResult = await walrusClient.writeBlob({
+			blob,
+			deletable: false,
+			epochs: 5, // Store for 5 epochs
+			signer: keypair,
+		});
+
+		console.log(`✅ Successfully uploaded ZOTP to Walrus:`, {
+			blobId: uploadResult.blobId,
+			sizeBytes: fileSize,
+			zotpIdentifier: zotpIdentifier,
+		});
+
+		return {
+			success: true,
+			blobId: uploadResult.blobId,
+			publicUrl: getPublicBlobUrl(uploadResult.blobId),
+			explorerUrl: getExplorerBlobUrl(uploadResult.blobId),
+			metadata: {
+				...metadata,
+				uploadTimestamp: new Date().toISOString(),
+				sizeBytes: fileSize,
+				network: WALRUS_NETWORK,
+			},
+			storage: {
+				epochs: 5,
+				network: WALRUS_NETWORK,
+				deletable: false,
+			},
+			uploadResult,
+		};
+	} catch (error) {
+		console.error("Error uploading ZOTP to Walrus:", error);
 		return {
 			skipped: true,
 			reason: "Upload failed",
@@ -634,22 +648,24 @@ const isWalrusAvailable = () => {
 };
 
 // Helper function to get public URL for a blob
+// Note: This URL is for reference/display. Actual retrieval uses walrusClient.readBlob()
 const getPublicBlobUrl = (blobId) => {
 	if (!blobId) {
 		throw new Error("blobId is required");
 	}
-	// Return the primary URL as the public URL using correct Walrus API format
-	return `${walrusUrls.primary}/v1/blobs/${blobId}`;
+	// Return direct blob URL format (based on official Walrus documentation)
+	return `${walrusUrls.primary}/${blobId}`;
 };
 
 // Helper function to get all available URLs for a blob
+// Note: These URLs are for reference/display. Actual retrieval uses walrusClient.readBlob()
 const getAllBlobUrls = (blobId) => {
 	if (!blobId) throw new Error("blobId is required");
 
 	return {
-		primary: `${walrusUrls.primary}/v1/blobs/${blobId}`,
-		alternatives: walrusUrls.alternatives.map((url) => `${url}/v1/blobs/${blobId}`),
-		fallback: `${walrusUrls.fallback}/v1/blobs/${blobId}`,
+		primary: `${walrusUrls.primary}/${blobId}`,
+		alternatives: walrusUrls.alternatives.map((url) => `${url}/${blobId}`),
+		fallback: `${walrusUrls.fallback}/${blobId}`,
 	};
 };
 
@@ -777,6 +793,9 @@ const testConnection = async () => {
 module.exports = {
 	zelfNameRegistration,
 	tagRegistration,
+	zotpRegistration,
+	getWalrusKeypair,
+	prepareBlobForUpload,
 	walrusIDToBase64,
 	walrusIDToBase64WithWorkaround,
 	isWalrusAvailable,
