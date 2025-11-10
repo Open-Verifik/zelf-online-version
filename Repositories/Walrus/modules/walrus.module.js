@@ -371,7 +371,7 @@ const tagRegistration = async (zelfProofQRCode, tagObject, domainConfig) => {
  * @param {object} zotpObject - Object containing ZOTP details
  * @returns {object} Result object with blobId, publicUrl, explorerUrl, and metadata
  */
-const zotpRegistration = async (zelfProofQRCode, zotpObject) => {
+const zelfKeyStorage = async (zelfProofQRCode, zotpObject) => {
 	const { zelfProof, publicData } = zotpObject;
 
 	// Generate a unique identifier for the ZOTP
@@ -793,7 +793,7 @@ const testConnection = async () => {
 module.exports = {
 	zelfNameRegistration,
 	tagRegistration,
-	zotpRegistration,
+	zelfKeyStorage,
 	getWalrusKeypair,
 	prepareBlobForUpload,
 	walrusIDToBase64,

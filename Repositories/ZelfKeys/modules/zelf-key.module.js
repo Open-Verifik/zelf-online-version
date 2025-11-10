@@ -115,7 +115,7 @@ const validateOwnership = async (faceBase64, masterPassword, authToken, extraPar
 	});
 };
 
-const _store = async (publicData, metadata, faceBase64, identifier, authToken) => {
+const _store = async (publicData, metadata, faceBase64, identifier, authToken, type) => {
 	const zelfKey = {
 		zelfProof: null,
 		zelfProofQRCode: null,
@@ -132,15 +132,19 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken) =
 
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, zelfKey);
 
-	// store zelfKey now in Walrus
-	// await WalrusModule.storeZelfKey(zelfKey, authToken);
+	// Store ZOTP in Walrus if type is zotp
+
+	zelfKey.walrus = await WalrusModule.zelfKeyStorage(zelfKey.zelfProofQRCode, {
+		zelfProof: zelfKey.zelfProof,
+		publicData,
+	});
 
 	// now save it in IPFS
 	zelfKey.ipfs = await ZelfKeyIPFSModule.saveZelfKey(
 		{
 			zelfProofQRCode: zelfKey.zelfProofQRCode,
 			identifier,
-			publicData,
+			publicData: { ...publicData, walrus: zelfKey.walrus.blobId },
 		},
 		authToken
 	);
@@ -224,7 +228,7 @@ const storeData = async (data, authToken) => {
 
 		const identifier = `${fullTagName}_${shortTimestamp}`;
 
-		const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
+		const result = await _store(publicData, metadata, faceBase64, identifier, authToken, type);
 
 		return {
 			...result,
