@@ -9,29 +9,6 @@ const { errorHandler } = require("../../../Core/http-handler");
 const configuration = require("../../../Core/config");
 
 /**
- * Handle zelfPay logic for searchTag functions
- * @param {Object} data - Search result data
- * @param {Object} user - User object
- * @param {string} domain - Domain name
- * @returns {Object|null} - ZelfPay object or null
- */
-const handleZelfPayLogic = async (data, user, domain = "zelf") => {
-	if (!data || !data.available || !data.tagName?.includes("zelfpay")) {
-		return null;
-	}
-
-	const tagName = data.tagName.replace("zelfpay", domain);
-	const tagData = await Module.searchTag({ tagName, domain }, user);
-	const tagObject = tagData.ipfs?.length ? tagData.ipfs[0] : tagData.arweave[0];
-
-	if (tagObject) {
-		return await Module.createZelfPay(tagObject, user, domain);
-	}
-
-	return null;
-};
-
-/**
  * Handle old tag object updates
  * @param {Object} data - Search result data
  * @param {string} domain - Domain name
@@ -69,16 +46,6 @@ const searchTag = async (ctx) => {
 		};
 
 		let data = await Module.searchTag(requestData, ctx.state.user);
-
-		// Handle zelfPay logic
-		const zelfPayResult = await handleZelfPayLogic(data, ctx.state.user, extractedDomain);
-
-		// If zelfPay result is found, return it
-		if (zelfPayResult) {
-			ctx.body = { data: zelfPayResult };
-
-			return;
-		}
 
 		ctx.body = { data };
 	} catch (error) {
@@ -434,7 +401,6 @@ module.exports = {
 	referralRewards,
 	deleteTag,
 	// Utility functions
-	handleZelfPayLogic,
 	handleOldTagUpdate,
 
 	// domains

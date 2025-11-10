@@ -12,6 +12,7 @@ module.exports = (server) => {
 	const PATH = config.basePath(base);
 	// Specific data type endpoints
 	server.post(`${PATH}/store/password`, Middleware.storePasswordValidation, Controller.storePassword);
+	server.post(`${PATH}/store/zotp`, Middleware.storeZOTPValidation, Controller.storeZOTP);
 	server.post(`${PATH}/store/notes`, Middleware.storeNotesValidation, Controller.storeNotes);
 	server.post(`${PATH}/store/credit-card`, Middleware.storeCreditCardValidation, Controller.storeCreditCard);
 

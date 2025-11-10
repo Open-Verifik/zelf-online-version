@@ -25,7 +25,16 @@ const schemas = {
 		faceBase64: string().required(),
 		masterPassword: string().required(),
 	},
-
+	// ZOTP schema
+	zotp: {
+		username: string().required(),
+		setupKey: string().required(),
+		issuer: string().required(),
+		folder: string(),
+		insideFolder: boolean(),
+		faceBase64: string().required(),
+		masterPassword: string().required(),
+	},
 	// Notes schema (key-value pairs)
 	notes: {
 		title: string().min(1).max(100).required(),
@@ -71,6 +80,21 @@ const schemas = {
  */
 const storePasswordValidation = async (ctx, next) => {
 	const valid = validate(schemas.password, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
+/**
+ * Store ZOTP validation middleware
+ */
+const storeZOTPValidation = async (ctx, next) => {
+	const valid = validate(schemas.zotp, ctx.request.body);
 
 	if (valid.error) {
 		ctx.status = 409;
@@ -247,6 +271,7 @@ function isValidCreditCard(cardNumber) {
 module.exports = {
 	SUPPORTED_CATEGORIES,
 	storePasswordValidation,
+	storeZOTPValidation,
 	storeNotesValidation,
 	storeCreditCardValidation,
 	retrieveValidation,

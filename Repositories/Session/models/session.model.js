@@ -14,6 +14,7 @@ const SessionSchema = new Schema({
 		required: true,
 		unique: true,
 	},
+	tagName: defaultField(String, null),
 	domain: requiredField(String),
 	clientIP: requiredField(String),
 	isWebExtension: requiredField(Boolean, false),

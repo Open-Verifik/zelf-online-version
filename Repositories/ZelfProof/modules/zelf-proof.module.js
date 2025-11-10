@@ -107,6 +107,14 @@ const decrypt = async (data) => {
 	} catch (exception) {
 		const error = _formattingError(exception.response?.data);
 
+		// console.error({
+		// 	password: data.password,
+		// 	zelfProof: data.zelfProof,
+		// 	verifierKey: data.verifierKey,
+		// 	addServerPassword: data.addServerPassword,
+		// 	faceBase64: data.faceBase64,
+		// });
+
 		let _error = new Error(error.message);
 
 		_error.status = error.status;

@@ -428,62 +428,6 @@ const tagRegistration = async (zelfProofQRCode, tagObject, domainConfig) => {
 	}
 };
 
-const search = async (queryParams = {}) => {
-	// Check if Walrus is available
-	if (!walrusAvailable) {
-		return {
-			...queryParams,
-			available: false,
-			message: "Walrus client not available",
-		};
-	}
-
-	// Walrus doesn't have built-in search functionality like Arweave
-	// This would need to be implemented through Sui blockchain queries
-	// for metadata stored via storeBlobMetadataOnSui function
-
-	if (!queryParams.key || !queryParams.value) {
-		return {
-			...queryParams,
-			available: true,
-			message: "Search requires both key and value parameters",
-		};
-	}
-
-	// TODO: Implement search functionality through Sui blockchain
-	// This would require:
-	// 1. Deploy a Move smart contract to store blob metadata on Sui
-	// 2. Query the Sui blockchain for objects with matching metadata
-	// 3. Return blob IDs that match the search criteria
-
-	console.log(`🔍 Searching for blobs with ${queryParams.key}=${queryParams.value}`);
-
-	return {
-		...queryParams,
-		available: true,
-		message: "Search functionality requires Sui smart contract deployment",
-		note: "Unlike Arweave's native tags, Walrus requires custom Sui contracts for metadata queries",
-	};
-};
-
-/**
- * Example usage for frontend integration:
- *
- * // 1. After uploading, you get a result like this:
- * const uploadResult = await zelfNameRegistration(qrCodeBase64, zelfNameObj);
- * console.log('Blob ID:', uploadResult.blobId); // Store this in your database
- *
- * // 2. Later, to render the image in frontend:
- * const dataUrl = await walrusIDToBase64(uploadResult.blobId);
- * // dataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
- *
- * // 3. Use in HTML:
- * // <img src="{dataUrl}" alt="Zelf Name QR Code" />
- *
- * // 4. Or send to frontend via API:
- * // res.json({ imageData: dataUrl, blobId: uploadResult.blobId });
- */
-
 /**
  * Helper function to prepare image data for frontend rendering
  * @param {string} blobId - The Walrus blob ID
@@ -684,66 +628,6 @@ const walrusIDToBase64 = async (blobId) => {
 	}
 };
 
-/**
- * Alternative approaches for metadata storage with Walrus:
- *
- * 1. Database Storage (Recommended for now):
- *    - Store metadata in your regular database (MySQL, PostgreSQL, etc.)
- *    - Use blobId as the primary key
- *    - Query metadata from your database, not from Walrus
- *
- * 2. Sui Smart Contract (Future solution):
- *    - Deploy a Move smart contract to store blob metadata
- *    - Link metadata to blob IDs on Sui blockchain
- *    - Query metadata using Sui client
- *
- * 3. IPFS + Walrus Hybrid:
- *    - Store metadata on IPFS
- *    - Store blob data on Walrus
- *    - Use IPFS hash to retrieve metadata
- */
-
-// Helper function to store metadata on Sui blockchain (requires custom Move contract)
-const storeBlobMetadataOnSui = async (blobId, metadata, keypair) => {
-	// This would require a custom Move smart contract deployed on Sui
-	// Example structure:
-	/*
-	public fun store_blob_metadata(
-		blobId: String,
-		contentType: String,
-		zelfProof: String,
-		hasPassword: bool,
-		additionalData: vector<u8>,
-		ctx: &mut TxContext
-	) {
-		// Store metadata in Sui object linked to blob ID
-	}
-	*/
-
-	console.log("🔗 Storing metadata on Sui blockchain for blob:", blobId);
-
-	// For now, return a placeholder - you'd need to implement the Move contract
-	return {
-		success: false,
-		reason: "Sui smart contract not yet deployed",
-		note: "You need to deploy a Move contract to store blob metadata on Sui",
-		metadata,
-		blobId,
-	};
-};
-
-// Helper function to retrieve metadata from Sui blockchain
-const getBlobMetadataFromSui = async (blobId) => {
-	// This would query your custom Sui smart contract
-	console.log("🔍 Retrieving metadata from Sui blockchain for blob:", blobId);
-
-	return {
-		success: false,
-		reason: "Sui smart contract not yet deployed",
-		note: "You need to deploy a Move contract to retrieve blob metadata from Sui",
-	};
-};
-
 // Helper function to check if Walrus is available
 const isWalrusAvailable = () => {
 	return walrusAvailable;
@@ -760,9 +644,7 @@ const getPublicBlobUrl = (blobId) => {
 
 // Helper function to get all available URLs for a blob
 const getAllBlobUrls = (blobId) => {
-	if (!blobId) {
-		throw new Error("blobId is required");
-	}
+	if (!blobId) throw new Error("blobId is required");
 
 	return {
 		primary: `${walrusUrls.primary}/v1/blobs/${blobId}`,
@@ -773,25 +655,22 @@ const getAllBlobUrls = (blobId) => {
 
 // Helper function to get explorer URL for a blob
 const getExplorerBlobUrl = (blobId) => {
-	if (!blobId) {
-		throw new Error("blobId is required");
-	}
+	if (!blobId) throw new Error("blobId is required");
+
 	return `${explorerUrl}/${blobId}`;
 };
 
 // Helper function to get Sui explorer URL for Walrus coordination objects
 const getSuiExplorerUrl = (objectId) => {
-	if (!objectId) {
-		throw new Error("objectId is required");
-	}
+	if (!objectId) throw new Error("objectId is required");
+
 	return `https://suiscan.xyz/mainnet/object/${objectId}`;
 };
 
 // Helper function to get alternative Sui explorer URL
 const getAlternativeSuiExplorerUrl = (objectId) => {
-	if (!objectId) {
-		throw new Error("objectId is required");
-	}
+	if (!objectId) throw new Error("objectId is required");
+
 	return `https://suiexplorer.com/object/${objectId}`;
 };
 
@@ -898,7 +777,6 @@ const testConnection = async () => {
 module.exports = {
 	zelfNameRegistration,
 	tagRegistration,
-	search,
 	walrusIDToBase64,
 	walrusIDToBase64WithWorkaround,
 	isWalrusAvailable,
@@ -907,8 +785,6 @@ module.exports = {
 	getExplorerBlobUrl,
 	getSuiExplorerUrl,
 	getAlternativeSuiExplorerUrl,
-	storeBlobMetadataOnSui,
-	getBlobMetadataFromSui,
 	prepareImageForFrontend,
 	getImageSizeInfo,
 	saveBlobAsFile,

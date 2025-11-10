@@ -315,30 +315,6 @@ const leaseConfirmation = async (params, authUser) => {
 };
 
 /**
- * create ZelfPay
- * @param {Object} tagObject
- * @param {Object} authUser
- * @param {string} domain
- */
-const createZelfPay = async (tagObject, authUser, domain = "zelf") => {
-	const domainConfig = getDomainConfig(domain);
-
-	const zelfPayResult = await WalrusModule.createZelfPay({
-		zelfProof: tagObject.publicData.zelfProof,
-		verifierKey: config.zelfEncrypt.serverKey,
-		domain,
-		domainConfig,
-	});
-
-	return {
-		zelfPay: zelfPayResult,
-		tagObject,
-		domain,
-		domainConfig,
-	};
-};
-
-/**
  * Find duplicated tag
  * @param {string} tagName
  * @param {string} domain
@@ -500,7 +476,6 @@ module.exports = {
 	previewTag,
 	previewZelfProof,
 	leaseConfirmation,
-	createZelfPay,
 	deleteTag,
 	// Utility functions
 	getDomainConfig,

@@ -20,7 +20,31 @@ const storePassword = async (ctx) => {
 			ctx.state.user
 		);
 
-		ctx.body = { ...data };
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
+/**
+ * Store ZOTP
+ * @param {Object} ctx - Koa context
+ */
+const storeZOTP = async (ctx) => {
+	try {
+		const data = await Module.storeData(
+			{
+				...ctx.request.body,
+				type: "zotp",
+			},
+			ctx.state.user
+		);
+
+		ctx.body = { data };
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);
 
@@ -44,7 +68,7 @@ const storeNotes = async (ctx) => {
 			ctx.state.user
 		);
 
-		ctx.body = { ...data };
+		ctx.body = { data };
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);
 
@@ -67,7 +91,7 @@ const storeCreditCard = async (ctx) => {
 			},
 			ctx.state.user
 		);
-		ctx.body = { ...data };
+		ctx.body = { data };
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);
 
@@ -85,7 +109,7 @@ const retrieveData = async (ctx) => {
 	try {
 		const data = await Module.retrieveData(ctx.request.body, ctx.state.user);
 
-		ctx.body = { ...data };
+		ctx.body = { data };
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);
 
@@ -103,7 +127,7 @@ const previewData = async (ctx) => {
 	try {
 		const data = await Module.previewData(ctx.request.body, ctx.state.user);
 
-		ctx.body = { ...data };
+		ctx.body = { data };
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);
 
@@ -121,7 +145,7 @@ const listData = async (ctx) => {
 	try {
 		const data = await Module.listData(ctx.request.query, ctx.state.user);
 
-		ctx.body = { ...data };
+		ctx.body = { data };
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);
 
@@ -131,4 +155,12 @@ const listData = async (ctx) => {
 	}
 };
 
-module.exports = { storePassword, storeNotes, storeCreditCard, retrieveData, previewData, listData };
+module.exports = {
+	storePassword,
+	storeZOTP,
+	storeNotes,
+	storeCreditCard,
+	retrieveData,
+	previewData,
+	listData,
+};

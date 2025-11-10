@@ -7,83 +7,115 @@
 const TagsModule = require("../../Tags/modules/tags.module");
 const TagsPartsModule = require("../../Tags/modules/tags-parts.module");
 const ZelfKeyIPFSModule = require("./zelf-key-ipfs.module");
+const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
+const WalrusModule = require("../../Walrus/modules/walrus.module");
 
 const createMetadataAndPublicData = async (type, data, authToken) => {
+	const identifier = authToken.tagName || authToken.identifier;
+
+	const fullTagName = `${identifier}${authToken.domain ? "." + authToken.domain : ""}`;
+
+	const typePayload = {
+		metadata: {},
+		publicData: {},
+		fullTagName,
+	};
+
 	switch (type) {
+		case "zotp":
+			typePayload.metadata = {
+				username: `${data.username}`,
+				setupKey: `${data.setupKey}`,
+			};
+
+			typePayload.publicData = {
+				type,
+				username: `${data.username}`,
+				folder: data.folder && data.insideFolder ? data.folder : undefined,
+				issuer: `${data.issuer}`,
+				keyOwner: fullTagName,
+				category: `${fullTagName}_zotp`,
+			};
+			break;
 		case "password":
-			return {
-				metadata: {
-					username: `${data.username}`,
-					password: `${data.password}`,
-				},
-				publicData: {
-					type: "website_password",
-					website: `${data.website}`,
-					username: data.username,
-					folder: data.folder && data.insideFolder ? data.folder : undefined,
-					timestamp: `${new Date().toISOString()}`,
-					keyOwner: `${authToken.identifier}${authToken.domain ? "." + authToken.domain : ""}`,
-					category: `${authToken.identifier}_password`,
-				},
+			typePayload.metadata = {
+				username: `${data.username}`,
+				password: `${data.password}`,
 			};
+
+			typePayload.publicData = {
+				type,
+				website: `${data.website}`,
+				username: data.username,
+				folder: data.folder && data.insideFolder ? data.folder : undefined,
+				timestamp: `${new Date().toISOString()}`,
+				keyOwner: fullTagName,
+				category: `${fullTagName}_password`,
+			};
+			break;
 		case "notes":
-			return {
-				metadata: data.keyValuePairs,
-				publicData: {
-					type: "notes",
-					title: `${data.title}`,
-					timestamp: `${new Date().toISOString()}`,
-					folder: data.folder && data.insideFolder ? data.folder : undefined,
-					keyOwner: `${authToken.identifier}${authToken.domain ? "." + authToken.domain : ""}`,
-					category: `${authToken.identifier}_notes`,
-				},
+			typePayload.metadata = data.keyValuePairs;
+			typePayload.publicData = {
+				type,
+				title: `${data.title}`,
+				timestamp: `${new Date().toISOString()}`,
+				folder: data.folder && data.insideFolder ? data.folder : undefined,
+				keyOwner: fullTagName,
+				category: `${fullTagName}_notes`,
 			};
+			break;
 		case "credit_card":
-			return {
-				metadata: {
-					cardNumber: `${data.cardNumber}`,
-					expiryMonth: `${data.expiryMonth}`,
-					expiryYear: `${data.expiryYear}`,
-					cvv: `${data.cvv}`,
-				},
-				publicData: {
-					type: "credit_card",
-					card: JSON.stringify({
-						name: `${data.cardName}`,
-						number: `****-****-****-${data.cardNumber.slice(-4)}`,
-						expires: `${data.expiryMonth}/${data.expiryYear.slice(-2)}`,
-						bankName: `${data.bankName}`,
-					}),
-					folder: data.folder && data.insideFolder ? data.folder : undefined,
-					timestamp: `${new Date().toISOString()}`,
-					keyOwner: `${authToken.identifier}${authToken.domain ? "." + authToken.domain : ""}`,
-					category: `${authToken.identifier}_credit_card`,
-				},
+			typePayload.metadata = {
+				cardNumber: `${data.cardNumber}`,
+				expiryMonth: `${data.expiryMonth}`,
+				expiryYear: `${data.expiryYear}`,
+				cvv: `${data.cvv}`,
 			};
+
+			typePayload.publicData = {
+				type,
+				card: JSON.stringify({
+					name: `${data.cardName}`,
+					number: `****-****-****-${data.cardNumber.slice(-4)}`,
+					expires: `${data.expiryMonth}/${data.expiryYear.slice(-2)}`,
+					bankName: `${data.bankName}`,
+				}),
+				folder: data.folder && data.insideFolder ? data.folder : undefined,
+				timestamp: `${new Date().toISOString()}`,
+				keyOwner: fullTagName,
+				category: `${fullTagName}_credit_card`,
+			};
+			break;
 
 		default:
 			throw new Error(`Unsupported data type: ${type}`);
 	}
+
+	return typePayload;
 };
 
-const validateOwnership = async (identifier, domain, faceBase64, masterPassword, authToken, extraParams) => {
-	if (authToken.session) {
-		const sessionParams = {
-			tagName: identifier,
-			domain,
-			faceBase64,
-			password: masterPassword,
-		};
+const validateOwnership = async (faceBase64, masterPassword, authToken, extraParams) => {
+	const sessionParams = {
+		tagName: authToken.tagName || authToken.identifier,
+		domain: authToken.domain,
+		faceBase64,
+		password: masterPassword,
+	};
 
-		if (extraParams.removePGP) {
-			sessionParams.removePGP = true;
-		}
-		// this will throw an error if the tag is not found or the password is incorrect or the face is incorrect
-		await TagsModule.decryptTag(sessionParams, authToken);
+	if (extraParams.removePGP) {
+		sessionParams.removePGP = true;
 	}
+	// this will throw an error if the tag is not found or the password is incorrect or the face is incorrect
+	await TagsModule.decryptTag(sessionParams, authToken);
+
+	console.log("validated successfully", {
+		tagName: sessionParams.tagName,
+		domain: sessionParams.domain,
+		authToken,
+	});
 };
 
-const _store = async (publicData, metadata, faceBase64, masterPassword, identifier, authToken) => {
+const _store = async (publicData, metadata, faceBase64, identifier, authToken) => {
 	const zelfKey = {
 		zelfProof: null,
 		zelfProofQRCode: null,
@@ -93,13 +125,15 @@ const _store = async (publicData, metadata, faceBase64, masterPassword, identifi
 		publicData,
 		metadata,
 		faceBase64,
-		password: masterPassword,
 		_id: identifier,
 		tolerance: "REGULAR",
 		addServerPassword: false,
 	};
 
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, zelfKey);
+
+	// store zelfKey now in Walrus
+	// await WalrusModule.storeZelfKey(zelfKey, authToken);
 
 	// now save it in IPFS
 	zelfKey.ipfs = await ZelfKeyIPFSModule.saveZelfKey(
@@ -111,19 +145,7 @@ const _store = async (publicData, metadata, faceBase64, masterPassword, identifi
 		authToken
 	);
 
-	return {
-		zelfKey,
-		authToken,
-		success: true,
-		zelfQR: null, // Encrypted string
-		NFT: null,
-		ipfs: {
-			...zelfKey.ipfs,
-			publicData: zelfKey.ipfs.keyvalues,
-			keyvalues: undefined,
-		},
-		publicData,
-	};
+	return zelfKey;
 };
 
 /**
@@ -143,53 +165,6 @@ const getShortTimestamp = () => {
 	const hours = now.getHours();
 	const minutes = now.getMinutes();
 	return `H${hours}M${minutes}`;
-};
-
-const storePassword = async (data, authToken) => {
-	const { username, faceBase64, name, masterPassword } = data;
-
-	const { metadata, publicData } = await createMetadataAndPublicData("password", data, authToken);
-
-	const shortTimestamp = getShortTimestamp();
-	const identifier = name ? `${authToken.identifier}_${name}_${shortTimestamp}` : `${authToken.identifier}_${username}_${shortTimestamp}`;
-
-	const result = await _store(publicData, metadata, faceBase64, masterPassword, identifier, authToken);
-
-	return {
-		...result,
-		message: "Website password stored successfully as QR code and zelfProof string",
-	};
-};
-
-/**
- * Store notes as key-value pairs (metadata structure)
- * @param {Object} data
- * @param {string} data.title - Note title
- * @param {Object} data.keyValuePairs - Object with up to 10 key-value pairs
- * @param {string} data.faceBase64 - User's face for encryption
- * @param {string} data.password - User's master password
- * @returns {Promise<Object>}
- */
-const storeNotes = async (data, authToken) => {
-	const { title, faceBase64, masterPassword } = data;
-
-	try {
-		const shortTimestamp = getShortTimestamp();
-
-		const identifier = `${authToken.identifier}_notes_${title}_${shortTimestamp}`;
-
-		const { metadata, publicData } = await createMetadataAndPublicData("notes", data, authToken);
-
-		const result = await _store(publicData, metadata, faceBase64, masterPassword, identifier, authToken);
-
-		return {
-			...result,
-			message: "Notes stored successfully",
-		};
-	} catch (error) {
-		console.error("Error storing notes:", { error });
-		throw new Error("Failed to store notes");
-	}
 };
 
 /**
@@ -218,42 +193,6 @@ const _validateCreditCardData = (cardNumber, expiryMonth, expiryYear) => {
 };
 
 /**
- * Store credit card information
- * @param {Object} data
- * @param {string} data.cardName - Name on the card
- * @param {string} data.cardNumber - Credit card number
- * @param {string} data.expiryMonth - Expiry month (MM)
- * @param {string} data.expiryYear - Expiry year (YYYY)
- * @param {string} data.cvv - CVV code
- * @param {string} data.bankName - Bank name
- * @param {string} data.faceBase64 - User's face for encryption
- * @param {string} data.password - User's master password
- * @returns {Promise<Object>}
- */
-const storeCreditCard = async (data, authToken) => {
-	const { cardNumber, expiryMonth, expiryYear, bankName, faceBase64, masterPassword } = data;
-
-	try {
-		_validateCreditCardData(cardNumber, expiryMonth, expiryYear);
-
-		const shortTimestamp = getShortTimestamp();
-		const identifier = `${authToken.identifier}_${bankName}_${shortTimestamp}`;
-
-		const { metadata, publicData } = await createMetadataAndPublicData("credit_card", data, authToken);
-
-		const result = await _store(publicData, metadata, faceBase64, masterPassword, identifier, authToken);
-
-		return {
-			...result,
-			message: "Credit card stored successfully",
-		};
-	} catch (error) {
-		console.error("Error storing credit card:", error);
-		throw new Error("Failed to store credit card");
-	}
-};
-
-/**
  * Main function to handle different types of data storage
  * @param {Object} data
  * @param {string} data.type - Type of data to store (password, notes, credit_card)
@@ -264,43 +203,34 @@ const storeCreditCard = async (data, authToken) => {
  */
 const storeData = async (data, authToken) => {
 	try {
-		const { type, faceBase64, masterPassword } = data;
+		const { type } = data;
 
-		// Validate required fields
-		if (!type || !faceBase64) {
-			throw new Error("Missing required fields: type, payload, faceBase64, password");
-		}
+		// decrypt Password and FaceBase64
+		const decryptedParams = await TagsPartsModule.decryptParams(
+			{
+				password: data.masterPassword,
+				faceBase64: data.faceBase64,
+			},
+			authToken
+		);
 
-		await validateOwnership(authToken.identifier, authToken.domain, faceBase64, masterPassword, authToken, data);
+		const faceBase64 = decryptedParams.face;
 
-		// Route to appropriate storage function
-		let result;
-		switch (type) {
-			case "password":
-				// validate if includes password
-				if (!data.password) throw new Error("Missing required fields: password");
+		await validateOwnership(data.faceBase64, data.masterPassword, authToken, data);
 
-				result = await storePassword(data, authToken);
-				break;
+		const { metadata, publicData, fullTagName } = await createMetadataAndPublicData(type, { ...data, faceBase64 }, authToken);
 
-			case "notes":
-				result = await storeNotes(data, authToken);
-				break;
+		const shortTimestamp = getShortTimestamp();
 
-			case "credit_card":
-				result = await storeCreditCard(data, authToken);
-				break;
+		const identifier = `${fullTagName}_${shortTimestamp}`;
 
-			default:
-				throw new Error(`Unsupported data type: ${type}`);
-		}
+		const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
 
-		// Add IPFS information if available
-		if (result.ipfs) {
-			result.message += ` | IPFS: ${result.ipfs.hash}`;
-		}
-
-		return result;
+		return {
+			...result,
+			type,
+			message: "Data stored successfully",
+		};
 	} catch (error) {
 		console.error("Error in storeData:", error);
 		throw error;
@@ -319,14 +249,27 @@ const retrieveData = async (data, authToken) => {
 	try {
 		const { zelfProof, faceBase64, password } = data;
 
-		return {
-			success: true,
-			data: null,
-			message: "Data retrieved successfully",
-		};
+		const decryptedParams = await TagsPartsModule.decryptParams(
+			{
+				password,
+				faceBase64,
+			},
+			authToken
+		);
+
+		// Decrypt using ZelfProof module
+		const zelfKey = await ZelfProofModule.decrypt({
+			zelfProof,
+			faceBase64: decryptedParams.face,
+			password: decryptedParams.password,
+			os: "DESKTOP",
+		});
+
+		return zelfKey;
 	} catch (error) {
 		console.error("Error retrieving data:", error);
-		throw new Error("Failed to retrieve data");
+
+		throw new Error("409:failed_to_retrieve_data");
 	}
 };
 

@@ -39,11 +39,11 @@ const insert = async (params) => {
 		findOne: true,
 	};
 
-	// if (config.env === "development") {
-	// 	queryParams.where_identifier = params.identifier || params.clientIP;
-	// } else {
 	queryParams.where_clientIP = params.clientIP;
-	// }
+
+	if (params.tagName) {
+		queryParams.where_tagName = params.tagName;
+	}
 
 	const existingSession = await get(queryParams);
 
@@ -65,6 +65,7 @@ const insert = async (params) => {
 
 	const session = new Model({
 		identifier: params.identifier || params.clientIP,
+		tagName: params.tagName || null,
 		domain: params.domain || "zelf",
 		clientIP: params.clientIP,
 		type: params.type || "general",
@@ -80,6 +81,7 @@ const insert = async (params) => {
 			identifier: params.clientIP,
 			...session,
 		});
+
 		const error = new Error("session_duplication");
 
 		error.status = 409;
@@ -92,6 +94,7 @@ const insert = async (params) => {
 			{
 				session: session._id,
 				identifier: session.identifier,
+				tagName: session.tagName || null,
 				domain: session.domain || "zelf",
 				ip: session.clientIP,
 			},
