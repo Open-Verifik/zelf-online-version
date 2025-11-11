@@ -129,9 +129,15 @@ const createCheckoutSession = async (productId, priceId, customerEmail = null) =
 		success_url: config.stripe.checkoutUrls.success,
 		cancel_url: config.stripe.checkoutUrls.cancel,
 		metadata: {
-			productId: productId,
-			priceId: priceId,
 			customerEmail: customerEmail,
+			priceId: priceId,
+			productId: productId,
+			source: "dashboard",
+		},
+		subscription_data: {
+			metadata: {
+				source: "dashboard",
+			},
 		},
 	};
 

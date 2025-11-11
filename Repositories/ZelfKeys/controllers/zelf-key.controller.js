@@ -91,6 +91,7 @@ const storeCreditCard = async (ctx) => {
 			},
 			ctx.state.user
 		);
+
 		ctx.body = { data };
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);

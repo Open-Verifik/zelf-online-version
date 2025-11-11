@@ -1,13 +1,14 @@
 const Controller = require("../controllers/stripe.controller");
 const Middleware = require("../middlewares/stripe.middleware");
+const config = require("../../../Core/config");
 
-const PATH = "/api";
+const API_PATH = "/api";
+const base = "/stripe";
 
-/**
- * Stripe webhook routes
- * These routes are unprotected and handle Stripe webhook events
- */
 module.exports = (server) => {
-	// Stripe webhook endpoint
-	server.post(`${PATH}/webhook`, Middleware.webhookValidation, Controller.handleWebhook);
+	server.post(`${API_PATH}/webhook`, Middleware.webhookValidation, Controller.handleWebhook);
+
+	const PATH = config.basePath(base);
+
+	server.get(`${PATH}/stripe/result`, Controller.handleStripeResult);
 };

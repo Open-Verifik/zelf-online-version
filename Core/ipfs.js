@@ -3,9 +3,7 @@ const FormData = require("form-data");
 const axios = require("axios");
 
 const prefix = process.env.NODE_ENV === "development" ? "_" : "";
-
 const pinataGateway = process.env[`${prefix}PINATA_GATEWAY_URL`];
-
 const os = process.env.ENVOS;
 
 const pinataWeb3 = require("pinata");
@@ -73,42 +71,41 @@ const parseMetadataFromPinata = (keyvalues) => {
  * Helper function to normalize Pinata API response keys
  * Handles inconsistent casing in Pinata SDK responses (e.g., Keyvalues vs keyvalues, IpfsHash vs ipfsHash)
  * Normalizes all properties to camelCase format
+ * 			- Specifically when using `pinFileWindows`
  * @param {Object} response - Pinata API response object
  * @returns {Object} - Normalized response with consistent key casing
  */
 const normalizePinataResponse = (response) => {
-	if (!response || typeof response !== "object") {
-		return response;
-	}
+	if (!response || typeof response !== "object") return response;
 
-	// Mapping of Pinata API response keys to their camelCase equivalents
 	const keyMapping = {
-		IpfsHash: "ipfsHash",
-		PinSize: "pinSize",
-		Timestamp: "timestamp",
+		GroupId: "groupId",
 		ID: "id",
+		IpfsHash: "ipfsHash",
+		Keyvalues: "keyvalues",
+		MimeType: "mimeType",
 		Name: "name",
 		NumberOfFiles: "numberOfFiles",
-		MimeType: "mimeType",
-		GroupId: "groupId",
-		Keyvalues: "keyvalues",
+		PinSize: "pinSize",
+		Timestamp: "timestamp",
 	};
 
 	const normalized = { ...response };
 
-	// Normalize top-level properties
 	Object.keys(keyMapping).forEach((oldKey) => {
 		const newKey = keyMapping[oldKey];
+
 		if (oldKey in normalized && !(newKey in normalized)) {
 			normalized[newKey] = normalized[oldKey];
+
 			delete normalized[oldKey];
 		}
 	});
 
-	// Normalize metadata.keyvalues/Keyvalues if metadata exists
 	if (normalized.metadata && typeof normalized.metadata === "object") {
 		if ("Keyvalues" in normalized.metadata && !("keyvalues" in normalized.metadata)) {
 			normalized.metadata.keyvalues = normalized.metadata.Keyvalues;
+
 			delete normalized.metadata.Keyvalues;
 		}
 	}
@@ -185,22 +182,18 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 
 	try {
 		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
-
-		// Upload the file to Pinata using the new API
 		const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 
-		// Normalize response keys to handle inconsistent casing (Keyvalues vs keyvalues)
 		const normalizedResponse = normalizePinataResponse(uploadResponse);
 
-		console.log({ uploadResponse: normalizedResponse });
 		return {
-			url: `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`,
 			cid: normalizedResponse.cid,
 			ipfs_pin_hash: normalizedResponse.cid,
 			ipfsHash: normalizedResponse.cid,
-			pinned: true,
-			web3: true,
 			name: filename,
+			pinned: true,
+			url: `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`,
+			web3: true,
 			...normalizedResponse,
 		};
 	} catch (error) {
@@ -212,15 +205,14 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 
 const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
 	const PINATA_API_KEY = process.env[`${prefix}PINATA_API_KEY`];
-
 	const PINATA_SECRET_API_KEY = process.env[`${prefix}PINATA_API_SECRET`];
 
 	try {
-		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
-
 		const formData = new FormData();
 
+		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
 		const buffer = Buffer.from(base64Data, "base64");
+
 		formData.append("file", buffer, filename);
 
 		if (metadata) {

@@ -44,9 +44,7 @@ class QRZelfProofExtractor {
 
 		if (base64Image?.includes("https")) {
 			const response = await fetch(base64Image);
-
 			const buffer = await response.arrayBuffer();
-
 			const base64 = Buffer.from(buffer).toString("base64");
 
 			base64Image = `data:image/png;base64,${base64}`;

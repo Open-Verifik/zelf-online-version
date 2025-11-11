@@ -90,6 +90,7 @@ const getWalrusKeypair = async () => {
 
 		// Get private key from mnemonic
 		let privateKeyData;
+
 		try {
 			privateKeyData = await getWalrusKeyFromMnemonic(config.walrus.privateKey);
 		} catch (error) {
@@ -103,6 +104,7 @@ const getWalrusKeypair = async () => {
 
 		// Validate and convert private key
 		let privateKeyBuffer;
+
 		try {
 			const privateKeyHex = privateKeyData.privateKeyHex.replace(/^0x/, ""); // Remove 0x prefix if present
 
@@ -373,10 +375,11 @@ const tagRegistration = async (zelfProofQRCode, tagObject, domainConfig) => {
  */
 const zelfKeyStorage = async (zelfProofQRCode, zotpObject) => {
 	const { zelfProof, publicData } = zotpObject;
+	const { category = "zotp" } = publicData || {};
 
 	// Generate a unique identifier for the ZOTP
-	const zotpIdentifier = publicData.username || `zotp_${Date.now()}`;
-	const fileName = `${zotpIdentifier}_zotp.png`;
+	const zotpIdentifier = publicData.username || `${category}_${Date.now()}`;
+	const fileName = `${zotpIdentifier}_${category}.png`;
 
 	try {
 		// Get Walrus keypair using the extracted function

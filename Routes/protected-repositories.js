@@ -31,8 +31,6 @@ module.exports = (server) => {
 	require("../Repositories/License/routes/theme.route")(server);
 
 	require("../Repositories/Lifi/routes/lifi.route")(server);
-	// Subscription Plans
-	require("../Repositories/SubscriptionPlan/routes/subscription-plan.route")(server);
 	//M
 	//N
 	//O
@@ -48,6 +46,8 @@ module.exports = (server) => {
 	require("../Repositories/SocialCampaigns/routes/social-campaigns.routes")(server);
 	require("../Repositories/sui/routes/sui-scrapping.route")(server);
 	require("../Repositories/Solana/routes/solana-scrapping.route")(server);
+	require("../Repositories/Subscription/routes/subscription-protected.routes")(server);
+	require("../Repositories/SubscriptionPlan/routes/subscription-plan.route")(server);
 	//T
 	require("../Repositories/tron/routes/tron-scrapping.route")(server);
 	require("../Repositories/Tags/routes/tags.routes")(server);

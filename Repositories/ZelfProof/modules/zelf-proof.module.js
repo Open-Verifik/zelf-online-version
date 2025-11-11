@@ -76,7 +76,6 @@ const encryptQRCode = async (data) => {
 		if (!encryptedResponse?.data) return encryptedResponse;
 
 		const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
-
 		const zelfQR = `data:image/png;base64,${base64Image}`;
 
 		let zelfProof = null;

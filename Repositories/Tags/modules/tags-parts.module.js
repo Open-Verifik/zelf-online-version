@@ -137,7 +137,7 @@ const generateQRCode = async (params, authUser) => {
 /**
  * Convert URL to base64
  * @param {string} url - URL to convert
- * @returns {string} - Base64 encoded data
+ * @returns {Promise<string>} - Base64 encoded data
  */
 const urlToBase64 = async (url) => {
 	try {
@@ -422,6 +422,32 @@ const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
 	};
 };
 
+const decryptCreditCardParams = async (params, authUser) => {
+	let { cvv, cardNumber, masterPassword } = params;
+
+	cvv = await SessionModule.sessionDecrypt(params.cvv, authUser);
+	cardNumber = params.cardNumber ? await SessionModule.sessionDecrypt(params.cardNumber, authUser) : null;
+	masterPassword = params.masterPassword ? await SessionModule.sessionDecrypt(params.masterPassword, authUser) : null;
+
+	return { cvv, cardNumber, masterPassword };
+};
+
+const decryptPasswordParams = async (params, authUser) => {
+	let { password } = params;
+
+	password = await SessionModule.sessionDecrypt(params.password, authUser);
+
+	return { password };
+};
+
+const decryptNotesParams = async (params, authUser) => {
+	const { keyValuePairs } = params;
+
+	keyValuePairs.content = await SessionModule.sessionDecrypt(keyValuePairs.content, authUser);
+
+	return { keyValuePairs };
+};
+
 module.exports = {
 	decryptParams,
 	encryptParams,
@@ -438,4 +464,7 @@ module.exports = {
 	getFullTagName,
 	getTagNameFromPublicData,
 	generatePGPKeys,
+	decryptCreditCardParams,
+	decryptPasswordParams,
+	decryptNotesParams,
 };

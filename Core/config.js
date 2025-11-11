@@ -155,16 +155,53 @@ const configuration = {
 		rpcUrl: process.env.FANTOM_RPC_URL || "https://fragrant-wild-smoke.fantom.quiknode.pro/9f6de2bac71c11f7c08e97e7be74a9d770c62a86",
 	},
 	stripe: {
+		frontendUrl: process.env.FRONTEND_URL || "http://localhost:4200",
 		redirectUrl: process.env.STRIPE_REDIRECTURL || "https://verifik.app",
 		secretKey: process.env.STRIPE_SECRET_KEY || "",
 		taxes: 0.19,
-		frontendUrl: process.env.FRONTEND_URL || "http://localhost:4200",
 		checkoutUrls: {
 			success:
 				process.env.STRIPE_SUCCESS_URL ||
 				`${process.env.FRONTEND_URL || "http://localhost:4200"}/settings/plan-billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
 			cancel: process.env.STRIPE_CANCEL_URL || `${process.env.FRONTEND_URL || "http://localhost:4200"}/settings/plan-billing?canceled=true`,
 		},
+		plans: {
+			basic: {
+				currency: "usd",
+				description: "20 new encryptions per month.",
+				interval: "month",
+				name: "Basic Plan",
+				price: 5.99,
+				priceId: process.env.STRIPE_BASIC_PRICE_ID,
+			},
+			pro: {
+				currency: "usd",
+				description: "50 new encryptions per month",
+				interval: "month",
+				name: "Pro Plan",
+				price: 12.99,
+				priceId: process.env.STRIPE_PRO_PRICE_ID,
+			},
+			enterprise: {
+				currency: "usd",
+				description: "100 new encryptions per month.",
+				interval: "month",
+				name: "Enterprise Plan",
+				price: 49.99,
+				priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
+			},
+		},
+	},
+	avalanche: {
+		createNFT: process.env.AVALANCHE_CREATE_NFT === "true",
+		rpcUrl:
+			process.env.AVALANCHE_RPC_URL ||
+			"https://wild-bitter-meadow.avalanche-mainnet.quiknode.pro/e2565749ca44c2873fe2a0a747f5ac68ae7eb14f/ext/bc/C/rpc/",
+		chainId: 43114, // Avalanche C-Chain mainnet
+	},
+	cryptoPayments: {
+		demoMode: process.env.CRYPTO_PAYMENTS_DEMO_MODE === "true" || false,
+		demoMultiplier: 0.005, // 0.5% of original price for demo mode (max $0.049 for $9.99)
 	},
 };
 

@@ -1,0 +1,187 @@
+const { ethers } = require("ethers");
+const config = require("../../../Core/config");
+
+const CONSTANTS = {
+	contractAddress: "0x6C995090C530756d59E6eEa5a3bA209863e0E167",
+	network: "mainnet",
+	rpcUrl:
+		config.avalanche?.rpcUrl ||
+		"https://fragrant-wild-smoke.avalanche-mainnet.quiknode.pro/9f6de2bac71c11f7c08e97e7be74a9d770c62a86/ext/bc/C/rpc/",
+	chainId: config.avalanche?.chainId || 43114,
+	gasPrice: "25000000000", // 25 gwei
+	NFT_ABI: [
+		"function name() view returns (string)",
+		"function symbol() view returns (string)",
+		"function totalSupply() view returns (uint256)",
+		"function owner() view returns (address)",
+		"function mintNFT(address to, string memory tokenURI) returns (uint256)",
+	],
+};
+
+const getMasterWallet = async () => {
+	const provider = new ethers.JsonRpcProvider(CONSTANTS.rpcUrl);
+
+	const mnemonic = process.env.MNEMONICS;
+
+	if (!mnemonic) throw new Error("MNEMONICS not found in .env file");
+
+	const masterWallet = ethers.Wallet.fromPhrase(mnemonic, provider);
+	const balance = await provider.getBalance(masterWallet.address);
+	const contract = new ethers.Contract(CONSTANTS.contractAddress, CONSTANTS.NFT_ABI, masterWallet);
+
+	return {
+		masterWallet,
+		contract,
+		balance,
+	};
+};
+
+const createNFT = async (data, authToken) => {
+	const { identifier } = data;
+
+	const NFTData = await prepareNFTData(data, authToken);
+
+	const { contract } = await getMasterWallet();
+
+	const zelfKeyData = await insertMetadata(NFTData, data.publicData, identifier);
+
+	const tokenURI = zelfKeyData.ipfsUrl;
+
+	const gasEstimate = await contract.mintNFT.estimateGas(authToken.address, tokenURI);
+	const gasPrice = ethers.parseUnits(CONSTANTS.gasPrice, "wei");
+	const estimatedCost = gasEstimate * gasPrice;
+
+	const tx = await contract.mintNFT(authToken.address, tokenURI, {
+		gasLimit: gasEstimate,
+		gasPrice,
+	});
+
+	await tx.wait();
+
+	const totalSupply = await contract.totalSupply();
+	const newTokenId = totalSupply.toString();
+
+	const _estimatedCost = ethers.formatEther(estimatedCost);
+
+	return {
+		success: true,
+		tokenId: newTokenId,
+		transactionHash: tx.hash,
+		recipient: authToken.address,
+		cost: _estimatedCost,
+		metadata: NFTData,
+		metadataUrl: tokenURI,
+		imageUrl: NFTData.url,
+		explorerUrl: `https://snowtrace.io/tx/${tx.hash}`,
+		owner: authToken.address,
+		contractAddress: CONSTANTS.contractAddress,
+	};
+};
+
+const prepareNFTData = async (data, authToken) => {
+	const { name, identifier, url, publicData, zelfProof, website } = data;
+
+	const attributes = [
+		{
+			trait_type: "zelfProof",
+			value: zelfProof,
+		},
+		{
+			trait_type: "owner",
+			value: authToken.address,
+		},
+	];
+
+	for (const key in publicData) {
+		attributes.push({
+			trait_type: key,
+			value: publicData[key],
+		});
+	}
+	// remove special characters and all spaces from name and make it lowercase
+	const _name = `${name || identifier}`
+		.replace(/\s+/g, "_")
+		.toLowerCase()
+		.replace(/[^a-z0-9_]/g, "");
+
+	const metadata = {
+		name: _name,
+		description: `ZelfKey NFT for ${_name}`,
+		image: url, // Changed from "url" to "image" for proper NFT rendering
+		external_url: website || "https://zelf.world",
+		attributes: attributes,
+		properties: {
+			files: [
+				{
+					type: "image/png",
+					uri: url,
+				},
+			],
+			category: "image",
+		},
+	};
+
+	return metadata;
+};
+
+/**
+ *
+ * @param {Object} NFTData
+ * @param {Object} publicData
+ */
+const insertMetadata = async (NFTData, publicData, identifier) => {
+	const PINATA_CONFIG = {
+		apiKey: process.env.PINATA_API_KEY,
+		secretKey: process.env.PINATA_API_SECRET,
+		gateway: process.env.PINATA_GATEWAY_URL || "https://gateway.pinata.cloud",
+	};
+
+	const metadataBlob = new Blob([JSON.stringify(NFTData, null, 2)], {
+		type: "application/json",
+	});
+
+	const formData = new FormData();
+
+	formData.append("file", metadataBlob, `${identifier}.json`);
+	formData.append(
+		"pinataMetadata",
+		JSON.stringify({
+			name: identifier,
+			keyvalues: {
+				...publicData,
+				category: `nft_${publicData.category}`,
+			},
+		})
+	);
+
+	const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+		method: "POST",
+		headers: {
+			pinata_api_key: PINATA_CONFIG.apiKey,
+			pinata_secret_api_key: PINATA_CONFIG.secretKey,
+		},
+		body: formData,
+	});
+
+	if (!response.ok) {
+		throw new Error(`Pinata upload failed: ${response.status} ${response.statusText}`);
+	}
+
+	const result = await response.json();
+
+	const ipfsHash = result.IpfsHash;
+	const ipfsUrl = `https://${PINATA_CONFIG.gateway}/ipfs/${ipfsHash}`;
+
+	console.log("ipfsUrl", ipfsUrl);
+
+	return {
+		ipfsHash,
+		ipfsUrl,
+		record: result,
+	};
+};
+
+module.exports = {
+	createNFT,
+	insertMetadata,
+};

@@ -41,26 +41,31 @@ const insert = async (params) => {
 
 	queryParams.where_clientIP = params.clientIP;
 
-	if (params.tagName) {
-		queryParams.where_tagName = params.tagName;
-	}
+	if (params.tagName) queryParams["?where_tagName"] = params.tagName;
+	if (params.identifier) queryParams["?where_identifier"] = params.identifier;
 
-	const existingSession = await get(queryParams);
+	let existingSession = await get(queryParams);
 
 	if (existingSession) {
-		return {
-			token: jwt.sign(
-				{
-					session: existingSession._id,
-					identifier: existingSession.identifier,
-					domain: existingSession.domain,
-					ip: existingSession.clientIP,
-				},
-				config.JWT_SECRET
-			),
-			activatedAt: moment(existingSession.activatedAt).utc().unix(),
-			expiresAt: moment(existingSession.activatedAt).utc().add(10, "minutes").unix(),
-		};
+		if (params.killSession) {
+			await existingSession.deleteOne();
+
+			existingSession = null;
+		} else {
+			return {
+				token: jwt.sign(
+					{
+						session: existingSession._id,
+						identifier: existingSession.identifier,
+						domain: existingSession.domain,
+						ip: existingSession.clientIP,
+					},
+					config.JWT_SECRET
+				),
+				activatedAt: moment(existingSession.activatedAt).utc().unix(),
+				expiresAt: moment(existingSession.activatedAt).utc().add(10, "minutes").unix(),
+			};
+		}
 	}
 
 	const session = new Model({

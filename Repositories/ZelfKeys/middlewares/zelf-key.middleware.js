@@ -1,75 +1,61 @@
-const { string, validate, boolean, number, stringEnum, object } = require("../../../Core/JoiUtils");
+const { string, validate, boolean, stringEnum, object } = require("../../../Core/JoiUtils");
 
 /**
  * ZelfKey Middleware - Business logic validation for password manager operations
  * @author Miguel Trevino <miguel@zelf.world>
  */
 
-/**
- * Supported data categories for ZelfKey storage
- */
 const SUPPORTED_CATEGORIES = ["password", "notes", "credit_card", "contact", "zotp"];
 
-/**
- * Validation schemas for different data types
- */
 const schemas = {
-	// Website password schema
 	password: {
 		website: string().required(),
 		username: string().required(),
 		password: string().required(),
-		folder: string(),
-		insideFolder: boolean(),
-		notes: string(),
+		folder: string().optional().allow(""),
+		insideFolder: boolean().optional().allow(false),
+		notes: string().optional().allow(""),
 		faceBase64: string().required(),
 		masterPassword: string().required(),
 	},
-	// ZOTP schema
 	zotp: {
 		username: string().required(),
 		setupKey: string().required(),
 		issuer: string().required(),
-		folder: string(),
-		insideFolder: boolean(),
+		folder: string().optional().allow(""),
+		insideFolder: boolean().optional().allow(false),
 		faceBase64: string().required(),
 		masterPassword: string().required(),
 	},
-	// Notes schema (key-value pairs)
 	notes: {
 		title: string().min(1).max(100).required(),
 		keyValuePairs: object().required(),
 		faceBase64: string().required(),
-		folder: string(),
-		insideFolder: boolean(),
+		folder: string().optional().allow(""),
+		insideFolder: boolean().optional().allow(false),
 		masterPassword: string(),
 	},
-
-	// Credit card schema
 	creditCard: {
 		cardName: string().required(),
-		cardNumber: string().min(13).max(19).required(),
+		cardNumber: string().required(),
 		expiryMonth: stringEnum(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]).required(),
 		expiryYear: string().length(4).required(),
-		cvv: string().min(3).max(4).required(),
+		cvv: string().required(),
 		bankName: string().required(),
 		faceBase64: string().required(),
-		folder: string(),
-		insideFolder: boolean(),
+		folder: string().optional().allow(""),
+		insideFolder: boolean().optional().allow(false),
 		masterPassword: string(),
 	},
-	// Retrieve data schema
 	retrieve: {
 		zelfProof: string().required(),
 		faceBase64: string().required(),
 		password: string(),
 	},
-	// Preview data schema
 	preview: {
 		zelfProof: string().required(),
 		faceBase64: string().required(),
 	},
-	// List data schema
 	list: {
 		category: stringEnum(SUPPORTED_CATEGORIES).required(),
 	},
@@ -174,14 +160,7 @@ const storeCreditCardValidation = async (ctx, next) => {
 	}
 
 	// Additional business logic: validate credit card number format
-	const { cardNumber, expiryMonth, expiryYear } = ctx.request.body;
-
-	// Basic Luhn algorithm check for credit card
-	if (!isValidCreditCard(cardNumber)) {
-		ctx.status = 409;
-		ctx.body = { validationError: "Invalid credit card number" };
-		return;
-	}
+	const { expiryMonth, expiryYear } = ctx.request.body;
 
 	// Validate expiry date
 	const currentYear = new Date().getFullYear();
@@ -237,41 +216,6 @@ const previewValidation = async (ctx, next) => {
 
 	await next();
 };
-
-/**
- * Luhn algorithm for credit card validation
- * @param {string} cardNumber - Credit card number to validate
- * @returns {boolean} - True if valid, false otherwise
- */
-function isValidCreditCard(cardNumber) {
-	// Remove spaces and dashes
-	const cleanNumber = cardNumber.replace(/\s+/g, "").replace(/-/g, "");
-
-	// Check if it's all digits
-	if (!/^\d+$/.test(cleanNumber)) {
-		return false;
-	}
-
-	let sum = 0;
-	let isEven = false;
-
-	// Loop through values starting from the rightmost side
-	for (let i = cleanNumber.length - 1; i >= 0; i--) {
-		let digit = parseInt(cleanNumber.charAt(i));
-
-		if (isEven) {
-			digit *= 2;
-			if (digit > 9) {
-				digit -= 9;
-			}
-		}
-
-		sum += digit;
-		isEven = !isEven;
-	}
-
-	return sum % 10 === 0;
-}
 
 const deleteZelfKeyValidation = async (ctx, next) => {
 	const valid = validate(schemas.delete, {

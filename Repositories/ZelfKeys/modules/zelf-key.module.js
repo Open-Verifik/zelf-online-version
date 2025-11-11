@@ -11,6 +11,8 @@ const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const IPFS = require("../../../Core/ipfs");
 const QRZelfProofExtractor = require("../../Tags/modules/qr-zelfproof-extractor.module");
+const { createNFT } = require("../../Avalanche/modules/avax-nft.module");
+const config = require("../../../Core/config");
 
 const createMetadataAndPublicData = async (type, data, authToken) => {
 	const identifier = authToken.tagName || authToken.identifier;
@@ -26,69 +28,73 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
 	switch (type) {
 		case "zotp":
 			typePayload.metadata = {
-				username: `${data.username}`,
 				setupKey: `${data.setupKey}`,
+				username: `${data.username}`,
 			};
 
 			typePayload.publicData = {
-				type,
-				username: `${data.username}`,
+				category: `${fullTagName}_zotp`,
 				folder: data.folder && data.insideFolder ? data.folder : undefined,
 				issuer: `${data.issuer}`,
 				keyOwner: fullTagName,
-				category: `${fullTagName}_zotp`,
+				type,
+				username: `${data.username}`,
 			};
+
 			break;
 		case "password":
 			typePayload.metadata = {
-				username: `${data.username}`,
 				password: `${data.password}`,
+				username: `${data.username}`,
 			};
 
 			typePayload.publicData = {
-				type,
-				website: `${data.website}`,
-				username: data.username,
-				folder: data.folder && data.insideFolder ? data.folder : undefined,
-				timestamp: `${new Date().toISOString()}`,
-				keyOwner: fullTagName,
 				category: `${fullTagName}_password`,
+				folder: data.folder && data.insideFolder ? data.folder : undefined,
+				keyOwner: fullTagName,
+				timestamp: `${new Date().toISOString()}`,
+				type,
+				username: data.username,
+				website: `${data.website}`,
 			};
+
 			break;
 		case "notes":
 			typePayload.metadata = data.keyValuePairs;
+
 			typePayload.publicData = {
-				type,
-				title: `${data.title}`,
-				timestamp: `${new Date().toISOString()}`,
+				category: `${fullTagName}_notes`,
 				folder: data.folder && data.insideFolder ? data.folder : undefined,
 				keyOwner: fullTagName,
-				category: `${fullTagName}_notes`,
+				timestamp: `${new Date().toISOString()}`,
+				title: `${data.title}`,
+				type,
 			};
+
 			break;
 		case "credit_card":
 			typePayload.metadata = {
 				cardNumber: `${data.cardNumber}`,
+				cvv: `${data.cvv}`,
 				expiryMonth: `${data.expiryMonth}`,
 				expiryYear: `${data.expiryYear}`,
-				cvv: `${data.cvv}`,
 			};
 
 			typePayload.publicData = {
-				type,
 				card: JSON.stringify({
+					bankName: `${data.bankName}`,
+					expires: `${data.expiryMonth}/${data.expiryYear.slice(-2)}`,
 					name: `${data.cardName}`,
 					number: `****-****-****-${data.cardNumber.slice(-4)}`,
-					expires: `${data.expiryMonth}/${data.expiryYear.slice(-2)}`,
-					bankName: `${data.bankName}`,
 				}),
-				folder: data.folder && data.insideFolder ? data.folder : undefined,
-				timestamp: `${new Date().toISOString()}`,
-				keyOwner: fullTagName,
 				category: `${fullTagName}_credit_card`,
+				folder: data.folder && data.insideFolder ? data.folder : undefined,
+				keyOwner: fullTagName,
+				timestamp: `${new Date().toISOString()}`,
+				type,
 			};
-			break;
 
+			break;
 		default:
 			throw new Error(`Unsupported data type: ${type}`);
 	}
@@ -96,46 +102,24 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
 	return typePayload;
 };
 
-const validateOwnership = async (faceBase64, masterPassword, authToken, extraParams) => {
-	const sessionParams = {
-		tagName: authToken.tagName || authToken.identifier,
-		domain: authToken.domain,
-		faceBase64,
-		password: masterPassword,
-	};
-
-	if (extraParams.removePGP) {
-		sessionParams.removePGP = true;
-	}
-	// this will throw an error if the tag is not found or the password is incorrect or the face is incorrect
-	await TagsModule.decryptTag(sessionParams, authToken);
-
-	console.log("validated successfully", {
-		tagName: sessionParams.tagName,
-		domain: sessionParams.domain,
-		authToken,
-	});
-};
-
-const _store = async (publicData, metadata, faceBase64, identifier, authToken, type) => {
+const _store = async (publicData, metadata, faceBase64, identifier, authToken) => {
 	const zelfKey = {
 		zelfProof: null,
 		zelfProofQRCode: null,
 	};
 
 	const dataToEncrypt = {
-		publicData,
-		metadata,
-		faceBase64,
 		_id: identifier,
-		tolerance: "REGULAR",
 		addServerPassword: false,
+		faceBase64,
+		metadata,
+		publicData,
+		tolerance: "REGULAR",
 	};
 
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, zelfKey);
 
 	// Store ZOTP in Walrus if type is zotp
-
 	zelfKey.walrus = await WalrusModule.zelfKeyStorage(zelfKey.zelfProofQRCode, {
 		zelfProof: zelfKey.zelfProof,
 		publicData,
@@ -151,7 +135,64 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken, t
 		authToken
 	);
 
-	return zelfKey;
+	// Pin QR code separately for NFT (using the same image)
+	let qrCodeIPFS = null;
+
+	try {
+		qrCodeIPFS = await IPFS.pinFile(zelfKey.zelfProofQRCode, `${identifier}.png`, "image/png", {
+			...publicData,
+			identifier,
+			zelfProof: zelfKey.zelfProof,
+		});
+	} catch (ipfsError) {
+		console.warn("⚠️ Failed to pin QR code to IPFS, continuing without IPFS:", ipfsError.message);
+	}
+
+	// Create NFT if enabled and QR code was pinned successfully
+	const NFT =
+		config.avalanche.createNFT && qrCodeIPFS
+			? await createNFT(
+					{
+						name: identifier,
+						publicData,
+						url: qrCodeIPFS.url,
+						zelfProof: zelfKey.zelfProof,
+						zelfQR: zelfKey.zelfProofQRCode,
+					},
+					authToken
+			  )
+			: null;
+
+	if (NFT) {
+		try {
+			const NFTJSON = JSON.stringify(NFT, null, 2);
+
+			const base64Data = Buffer.from(NFTJSON).toString("base64");
+			const base64Json = `data:application/json;base64,${base64Data}`;
+
+			await IPFS.pinFile(base64Json, `${identifier}_nft_transaction.json`, "application/json", {
+				category: `${publicData.category}_nft_transaction`,
+				explorerUrl: NFT.explorerUrl,
+				identifier,
+				metadata: JSON.stringify(NFT.metadata),
+				transactionHash: NFT.transactionHash,
+				receipt: JSON.stringify({
+					contractAddress: NFT.contractAddress,
+					cost: NFT.cost,
+					metadataUrl: NFT.metadataUrl,
+					owner: NFT.owner,
+					tokenId: NFT.tokenId,
+				}),
+			});
+		} catch (ipfsError) {
+			console.warn("⚠️ Failed to pin NFT transaction to IPFS, continuing without IPFS:", ipfsError.message);
+		}
+	}
+
+	return {
+		...zelfKey,
+		NFT,
+	};
 };
 
 /**
@@ -170,32 +211,8 @@ const getShortTimestamp = () => {
 	const now = new Date();
 	const hours = now.getHours();
 	const minutes = now.getMinutes();
+
 	return `H${hours}M${minutes}`;
-};
-
-/**
- * Validate credit card data
- * @param {Object} data
- * @param {string} data.cardNumber - Credit card number
- * @param {string} data.expiryMonth - Expiry month (MM)
- * @param {string} data.expiryYear - Expiry year (YYYY)
- */
-const _validateCreditCardData = (cardNumber, expiryMonth, expiryYear) => {
-	if (!cardNumber || cardNumber.length < 13 || cardNumber.length > 19) {
-		throw new Error("Invalid credit card number");
-	}
-
-	const currentYear = new Date().getFullYear();
-
-	const currentMonth = new Date().getMonth() + 1;
-
-	if (parseInt(expiryYear) < currentYear || (parseInt(expiryYear) === currentYear && parseInt(expiryMonth) < currentMonth)) {
-		throw new Error("Credit card has expired");
-	}
-
-	if (parseInt(expiryMonth) < 1 || parseInt(expiryMonth) > 12) {
-		throw new Error("Invalid expiry month");
-	}
 };
 
 /**
@@ -211,7 +228,6 @@ const storeData = async (data, authToken) => {
 	try {
 		const { type } = data;
 
-		// decrypt Password and FaceBase64
 		const decryptedParams = await TagsPartsModule.decryptParams(
 			{
 				password: data.masterPassword,
@@ -220,17 +236,42 @@ const storeData = async (data, authToken) => {
 			authToken
 		);
 
+		let decryptedSensitiveData = {};
+
+		switch (type) {
+			case "credit_card":
+				decryptedSensitiveData = await TagsPartsModule.decryptCreditCardParams(data, authToken);
+
+				if (!_isValidCreditCard(decryptedSensitiveData.cardNumber)) {
+					throw new Error("409:invalid_credit_card_number");
+				}
+
+				break;
+			case "password":
+				decryptedSensitiveData = await TagsPartsModule.decryptPasswordParams(data, authToken);
+
+				break;
+			case "notes":
+				decryptedSensitiveData = await TagsPartsModule.decryptNotesParams(data, authToken);
+
+				break;
+			default:
+				break;
+		}
+
 		const faceBase64 = decryptedParams.face;
 
-		await validateOwnership(data.faceBase64, data.masterPassword, authToken, data);
+		await _validateOwnership(data.faceBase64, data.masterPassword, authToken, data);
 
-		const { metadata, publicData, fullTagName } = await createMetadataAndPublicData(type, { ...data, faceBase64 }, authToken);
+		const { metadata, publicData, fullTagName } = await createMetadataAndPublicData(
+			type,
+			{ ...data, faceBase64, ...decryptedSensitiveData },
+			authToken
+		);
 
 		const shortTimestamp = getShortTimestamp();
-
 		const identifier = `${fullTagName}_${shortTimestamp}`;
-
-		const result = await _store(publicData, metadata, faceBase64, identifier, authToken, type);
+		const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
 
 		return {
 			...result,
@@ -419,7 +460,6 @@ const listData = async (data, authToken) => {
 		const fullTagName = TagsPartsModule.getFullTagName(identifier, domain);
 
 		let searchCategory = category;
-
 		let results = [];
 
 		searchCategory = `${fullTagName}_${category}`;
@@ -442,7 +482,6 @@ const listData = async (data, authToken) => {
 
 					// Convert IPFS URL to base64 for zelfProofQRCode
 					let zelfProofQRCode = item.zelfProofQRCode;
-
 					let zelfProof = null;
 
 					if (!zelfProofQRCode && item.url) {
@@ -494,7 +533,7 @@ const deleteZelfKey = async (data, authToken) => {
 	try {
 		const { id, faceBase64, masterPassword } = data;
 
-		await validateOwnership(faceBase64, masterPassword, authToken, data);
+		await _validateOwnership(faceBase64, masterPassword, authToken, data);
 
 		const result = await IPFS.deleteFiles([id]);
 
@@ -518,6 +557,55 @@ const deleteZelfKey = async (data, authToken) => {
 
 		throw error;
 	}
+};
+
+const _validateOwnership = async (faceBase64, masterPassword, authToken, extraParams) => {
+	const sessionParams = {
+		domain: authToken.domain,
+		faceBase64,
+		password: masterPassword,
+		tagName: authToken.tagName || authToken.identifier,
+	};
+
+	if (extraParams.removePGP) sessionParams.removePGP = true;
+
+	// this will throw an error if the tag is not found or the password is incorrect or the face is incorrect
+	await TagsModule.decryptTag(sessionParams, authToken);
+};
+
+/**
+ * Luhn algorithm for credit card validation
+ * @param {string} cardNumber - Credit card number to validate
+ * @returns {boolean} - True if valid, false otherwise
+ */
+const _isValidCreditCard = (cardNumber) => {
+	// Remove spaces and dashes
+	const cleanNumber = cardNumber.replace(/\s+/g, "").replace(/-/g, "");
+
+	// Check if it's all digits
+	if (!/^\d+$/.test(cleanNumber)) {
+		return false;
+	}
+
+	let sum = 0;
+	let isEven = false;
+
+	// Loop through values starting from the rightmost side
+	for (let i = cleanNumber.length - 1; i >= 0; i--) {
+		let digit = parseInt(cleanNumber.charAt(i));
+
+		if (isEven) {
+			digit *= 2;
+			if (digit > 9) {
+				digit -= 9;
+			}
+		}
+
+		sum += digit;
+		isEven = !isEven;
+	}
+
+	return sum % 10 === 0;
 };
 
 module.exports = { storeData, retrieveData, previewData, createNFTReadyData, listData, deleteZelfKey };
