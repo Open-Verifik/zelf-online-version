@@ -9,6 +9,8 @@ const TagsPartsModule = require("../../Tags/modules/tags-parts.module");
 const ZelfKeyIPFSModule = require("./zelf-key-ipfs.module");
 const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
+const IPFS = require("../../../Core/ipfs");
+const QRZelfProofExtractor = require("../../Tags/modules/qr-zelfproof-extractor.module");
 
 const createMetadataAndPublicData = async (type, data, authToken) => {
 	const identifier = authToken.tagName || authToken.identifier;
@@ -412,15 +414,75 @@ const createNFTReadyData = async (data, authToken) => {
 const listData = async (data, authToken) => {
 	try {
 		const { category } = data;
+		const identifier = authToken.tagName || authToken.identifier;
+		const domain = authToken.domain || "zelf";
+		const fullTagName = TagsPartsModule.getFullTagName(identifier, domain);
+
+		let searchCategory = category;
+
+		let results = [];
+
+		searchCategory = `${fullTagName}_${category}`;
+
+		// Search IPFS for tags where category matches
+		const ipfsResults = await IPFS.filter("category", searchCategory);
+
+		// Format results to return publicData and relevant information
+		if (ipfsResults && Array.isArray(ipfsResults)) {
+			// Process results asynchronously to get zelfProofQRCode
+			const formattedResults = await Promise.all(
+				ipfsResults.map(async (item) => {
+					// Extract publicData from the item
+					const publicData = item.publicData || {};
+
+					// Only include items that match the category (filter in case of partial matches)
+					if (publicData.category !== searchCategory) {
+						return null;
+					}
+
+					// Convert IPFS URL to base64 for zelfProofQRCode
+					let zelfProofQRCode = item.zelfProofQRCode;
+
+					let zelfProof = null;
+
+					if (!zelfProofQRCode && item.url) {
+						try {
+							zelfProofQRCode = await TagsPartsModule.urlToBase64(item.url);
+							zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(zelfProofQRCode);
+						} catch (error) {
+							console.error("Error converting URL to base64:", error);
+							// Continue without zelfProofQRCode if conversion fails
+						}
+					}
+
+					const formattedItem = {
+						id: item.id || item.cid,
+						cid: item.cid,
+						url: item.url,
+						publicData,
+						zelfProofQRCode,
+						zelfProof,
+						createdAt: item.created_at || item.createdAt,
+						updatedAt: item.updated_at || item.updatedAt,
+					};
+
+					return formattedItem;
+				})
+			);
+
+			// Remove null entries
+			results = formattedResults.filter(Boolean);
+		}
 
 		return {
 			success: true,
-			message: `Found ${0} items in category: ${category}`,
-			category: category,
-			data: [],
+			message: `Found ${results.length} items in category: ${category}`,
+			category,
+			data: results,
 			timestamp: new Date().toISOString(),
-			zelfName: authToken.identifier,
-			totalCount: 0,
+			fullTagName,
+			searchCategory,
+			totalCount: results.length,
 		};
 	} catch (error) {
 		console.error("Error listing data:", error);
@@ -428,4 +490,31 @@ const listData = async (data, authToken) => {
 	}
 };
 
-module.exports = { storeData, retrieveData, previewData, createNFTReadyData, listData };
+const deleteZelfKey = async (data, authToken) => {
+	try {
+		const { id, faceBase64, masterPassword } = data;
+
+		const decryptedParams = await TagsPartsModule.decryptParams(
+			{
+				password: masterPassword,
+				faceBase64,
+			},
+			authToken
+		);
+
+		await validateOwnership(faceBase64, masterPassword, authToken, data);
+
+		const result = await IPFS.deleteFiles([id]);
+
+		return {
+			result,
+			success: true,
+			message: "ZelfKey deleted successfully",
+		};
+	} catch (error) {
+		console.error("Error deleting ZelfKey:", error);
+		throw new Error(`Failed to delete ZelfKey: ${error.message}`);
+	}
+};
+
+module.exports = { storeData, retrieveData, previewData, createNFTReadyData, listData, deleteZelfKey };

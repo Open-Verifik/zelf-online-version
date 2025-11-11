@@ -8,7 +8,7 @@ const { string, validate, boolean, number, stringEnum, object } = require("../..
 /**
  * Supported data categories for ZelfKey storage
  */
-const SUPPORTED_CATEGORIES = ["password", "notes", "credit_card", "contact"];
+const SUPPORTED_CATEGORIES = ["password", "notes", "credit_card", "contact", "zotp"];
 
 /**
  * Validation schemas for different data types
@@ -72,6 +72,11 @@ const schemas = {
 	// List data schema
 	list: {
 		category: stringEnum(SUPPORTED_CATEGORIES).required(),
+	},
+	delete: {
+		id: string().required(),
+		faceBase64: string().required(),
+		masterPassword: string().required(),
 	},
 };
 
@@ -268,6 +273,22 @@ function isValidCreditCard(cardNumber) {
 	return sum % 10 === 0;
 }
 
+const deleteZelfKeyValidation = async (ctx, next) => {
+	const valid = validate(schemas.delete, {
+		id: ctx.request.params.id,
+		faceBase64: ctx.request.body.faceBase64 || "",
+		masterPassword: ctx.request.body.masterPassword || "",
+	});
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	SUPPORTED_CATEGORIES,
 	storePasswordValidation,
@@ -277,4 +298,5 @@ module.exports = {
 	retrieveValidation,
 	previewValidation,
 	listValidation,
+	deleteZelfKeyValidation,
 };

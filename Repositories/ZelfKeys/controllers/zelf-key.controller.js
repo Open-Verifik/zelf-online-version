@@ -155,6 +155,31 @@ const listData = async (ctx) => {
 	}
 };
 
+/**
+ * Delete ZelfKey
+ * @param {Object} ctx - Koa context
+ */
+const deleteZelfKey = async (ctx) => {
+	try {
+		const data = await Module.deleteZelfKey(
+			{
+				id: ctx.request.params.id,
+				faceBase64: ctx.request.body.faceBase64,
+				masterPassword: ctx.request.body.masterPassword,
+			},
+			ctx.state.user
+		);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
 module.exports = {
 	storePassword,
 	storeZOTP,
@@ -163,4 +188,5 @@ module.exports = {
 	retrieveData,
 	previewData,
 	listData,
+	deleteZelfKey,
 };

@@ -20,4 +20,7 @@ module.exports = (server) => {
 	server.get(`${PATH}/list`, Middleware.listValidation, Controller.listData);
 	server.post(`${PATH}/retrieve`, Middleware.retrieveValidation, Controller.retrieveData);
 	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewData);
+
+	// delete endpoints
+	server.delete(`${PATH}/delete/:id`, Middleware.deleteZelfKeyValidation, Controller.deleteZelfKey);
 };
