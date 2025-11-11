@@ -494,14 +494,6 @@ const deleteZelfKey = async (data, authToken) => {
 	try {
 		const { id, faceBase64, masterPassword } = data;
 
-		const decryptedParams = await TagsPartsModule.decryptParams(
-			{
-				password: masterPassword,
-				faceBase64,
-			},
-			authToken
-		);
-
 		await validateOwnership(faceBase64, masterPassword, authToken, data);
 
 		const result = await IPFS.deleteFiles([id]);
@@ -512,8 +504,19 @@ const deleteZelfKey = async (data, authToken) => {
 			message: "ZelfKey deleted successfully",
 		};
 	} catch (error) {
-		console.error("Error deleting ZelfKey:", error);
-		throw new Error(`Failed to delete ZelfKey: ${error.message}`);
+		if (error?.message && typeof error.message === "string") {
+			const normalizedMessage = error.message.toLowerCase();
+
+			if (normalizedMessage.includes("password") && normalizedMessage.includes("invalid")) {
+				throw new Error("400:ERR_INVALID_PASSWORD");
+			}
+
+			if (normalizedMessage.includes("liveness") || normalizedMessage.includes("face")) {
+				throw new Error("400:ERR_LIVENESS_FAILED");
+			}
+		}
+
+		throw error;
 	}
 };
 

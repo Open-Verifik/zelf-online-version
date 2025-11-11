@@ -22,5 +22,5 @@ module.exports = (server) => {
 	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewData);
 
 	// delete endpoints
-	server.delete(`${PATH}/delete/:id`, Middleware.deleteZelfKeyValidation, Controller.deleteZelfKey);
+	server.put(`${PATH}/delete/:id`, Middleware.deleteZelfKeyValidation, Controller.deleteZelfKey);
 };
