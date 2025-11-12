@@ -30,7 +30,6 @@ const socialCampaignOTPSchema = new mongoose.Schema(
 		expiresAt: {
 			type: Date,
 			default: Date.now,
-			expires: 600, // 10 minutes in seconds
 		},
 		tagName: {
 			type: String,
@@ -92,6 +91,5 @@ socialCampaignOTPSchema.methods.compareOTP = function (candidateOTP) {
 // Indexes
 socialCampaignOTPSchema.index({ email: 1, verified: 1 });
 socialCampaignOTPSchema.index({ createdAt: -1 });
-socialCampaignOTPSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 600 });
 
-module.exports = mongoose.model("SocialCampaignOTP", socialCampaignOTPSchema);
+module.exports = mongoose.model("SocialCampaignRecord", socialCampaignOTPSchema);

@@ -1,4 +1,4 @@
-const Model = require("../models/social-campaign-otp.model");
+const Model = require("../models/social-campaign-record.model");
 const config = require("../../../Core/config");
 const axios = require("axios");
 const crypto = require("crypto");
@@ -89,45 +89,77 @@ const sendOTPEmail = async (email, otp, language = "en") => {
 /**
  * Step 1: Provide social email
  * Generates and sends OTP to the provided email
+ * Updates existing record instead of deleting to preserve X and LinkedIn validation flags
  * @param {string} email - User email address
+ * @param {string} tagName - Tag name
+ * @param {string} domain - Domain
  * @param {Object} authUser - Authenticated user from JWT
  * @returns {Promise<Object>} Response with success status
  */
 const provideEmail = async (email, tagName, domain, authUser) => {
-	// Check if there's an existing unverified OTP for this email
+	// Check if there's an existing record for this email, tagName, and domain
 	const existingSocialRecord = await Model.findOne({
 		email,
 		tagName,
 		domain,
 	});
 
+	// If record exists and is already verified, don't allow resend
 	if (existingSocialRecord && existingSocialRecord.verified) throw new Error("400:social_record_already_verified");
 
-	// If there's an existing OTP and it was created less than 1 minute ago, rate limit
+	// If there's an existing record, check rate limiting (1 minute cooldown)
 	if (existingSocialRecord) {
-		const timeSinceCreation = Date.now() - existingSocialRecord.createdAt.getTime();
-
+		const timeSinceLastUpdate = Date.now() - existingSocialRecord.updatedAt.getTime();
 		const oneMinute = 60 * 1000;
 
-		if (timeSinceCreation < oneMinute) throw new Error("429:please_wait_before_requesting_a_new_otp_code");
+		if (timeSinceLastUpdate < oneMinute) {
+			throw new Error("429:please_wait_before_requesting_a_new_otp_code");
+		}
 
-		// Delete old unverified OTP
-		await Model.deleteOne({ _id: existingSocialRecord._id });
+		// Update existing record instead of deleting
+		// Generate new OTP
+		const otp = generateOTP();
+
+		// Update the existing record with new OTP and reset attempts
+		// Preserve followedX and followedLinkedin flags
+		existingSocialRecord.otp = otp; // Will be hashed by pre-save hook
+		existingSocialRecord.attempts = 0; // Reset attempts for new OTP
+		existingSocialRecord.verified = false; // Ensure it's not verified
+		existingSocialRecord.expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+		// Keep followedX and followedLinkedin as they are
+
+		await existingSocialRecord.save();
+
+		// Detect language from authUser or default to English
+		const language = authUser?.language || authUser?.lang || "en";
+
+		// Send OTP via email
+		await sendOTPEmail(email, otp, language);
+
+		return {
+			success: true,
+			message: "OTP code has been sent to your email",
+			email: email,
+			tagName: tagName,
+			domain: domain,
+			followedX: existingSocialRecord.followedX,
+			followedLinkedin: existingSocialRecord.followedLinkedin,
+		};
 	}
 
-	// Generate new OTP
+	// No existing record, create a new one
 	const otp = generateOTP();
 
-	// Save OTP to database with TTL
 	const socialRecord = new Model({
 		email: email,
-		otp: otp,
+		otp: otp, // Will be hashed by pre-save hook
 		verified: false,
 		attempts: 0,
 		tagName,
 		domain,
 		followedX: false,
 		followedLinkedin: false,
+		expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes from now
 	});
 
 	await socialRecord.save();
@@ -152,13 +184,16 @@ const provideEmail = async (email, tagName, domain, authUser) => {
 /**
  * Step 2: Validate OTP
  * Validates the OTP code for the provided email
+ * Checks expiration manually since TTL index was removed
  * @param {string} email - User email address
  * @param {string} otp - OTP code to validate
+ * @param {string} tagName - Tag name
+ * @param {string} domain - Domain
  * @param {Object} authUser - Authenticated user from JWT
  * @returns {Promise<Object>} Response with validation result
  */
 const validateOTP = async (email, otp, tagName, domain, authUser) => {
-	// Find the OTP record for this email
+	// Find the OTP record for this email, tagName, and domain
 	const socialRecord = await Model.findOne({
 		email: email,
 		tagName,
@@ -169,10 +204,18 @@ const validateOTP = async (email, otp, tagName, domain, authUser) => {
 
 	if (socialRecord.verified) throw new Error("400:social_record_already_verified");
 
+	// Check if OTP has expired (manual check since no TTL index)
+	const now = new Date();
+	if (socialRecord.expiresAt && now > socialRecord.expiresAt) {
+		throw new Error("400:otp_code_expired");
+	}
+
 	// Check if maximum attempts exceeded
 	if (socialRecord.attempts >= socialRecord.maxAttempts) {
-		// Delete the OTP record to force a new request
-		await Model.deleteOne({ _id: socialRecord._id });
+		// Instead of deleting, extend expiration to allow resend after cooldown
+		// This preserves the record for X and LinkedIn validations
+		socialRecord.expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Extend by 10 minutes
+		await socialRecord.save();
 
 		throw new Error("429:maximum_validation_attempts_exceeded");
 	}
