@@ -13,6 +13,12 @@ module.exports = (server) => {
 
 	// Step 2: Validate social email with OTP
 	server.post(`${PATH}/validate-email`, Middleware.validateOTPValidation, Controller.validateOTP);
+
+	// Step 3: Validate X (Twitter) follow
+	server.post(`${PATH}/validate-x`, Middleware.validateXValidation, Controller.validateX);
+
+	// Step 4: Validate LinkedIn follow
+	server.post(`${PATH}/validate-linkedin`, Middleware.validateLinkedInValidation, Controller.validateLinkedIn);
 };
 
 /**

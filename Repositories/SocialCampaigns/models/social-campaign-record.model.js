@@ -43,9 +43,17 @@ const socialCampaignOTPSchema = new mongoose.Schema(
 			type: Boolean,
 			default: false,
 		},
+		xUsername: {
+			type: String,
+			default: null,
+		},
 		followedLinkedin: {
 			type: Boolean,
 			default: false,
+		},
+		linkedInUsername: {
+			type: String,
+			default: null,
 		},
 	},
 	{

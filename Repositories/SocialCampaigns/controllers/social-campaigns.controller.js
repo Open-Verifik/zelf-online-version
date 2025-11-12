@@ -44,7 +44,52 @@ const validateOTP = async (ctx) => {
 	}
 };
 
+/**
+ * Controller for validating X (Twitter) follow
+ * Step 3: User submits screenshot showing they followed X account
+ */
+const validateX = async (ctx) => {
+	try {
+		const { email, tagName, domain, screenshot, xUsername } = ctx.state;
+
+		const authUser = ctx.state.user;
+
+		const data = await Module.validateX(email, tagName, domain, screenshot, xUsername, authUser);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
+/**
+ * Controller for validating LinkedIn follow
+ * Step 4: User submits screenshot showing they followed LinkedIn account
+ */
+const validateLinkedIn = async (ctx) => {
+	try {
+		const { email, tagName, domain, screenshot, linkedInUsername } = ctx.state;
+		const authUser = ctx.state.user;
+
+		const data = await Module.validateLinkedIn(email, tagName, domain, screenshot, linkedInUsername, authUser);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
 module.exports = {
 	provideEmail,
 	validateOTP,
+	validateX,
+	validateLinkedIn,
 };
