@@ -87,9 +87,32 @@ const validateLinkedIn = async (ctx) => {
 	}
 };
 
+/**
+ * Controller for getting social campaign record
+ * Retrieves record by tagName and domain for authenticated user
+ */
+const getRecord = async (ctx) => {
+	try {
+		const { tagName, domain } = ctx.state;
+
+		const authUser = ctx.state.user;
+
+		const data = await Module.getRecord(tagName, domain, authUser);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
 module.exports = {
 	provideEmail,
 	validateOTP,
 	validateX,
 	validateLinkedIn,
+	getRecord,
 };

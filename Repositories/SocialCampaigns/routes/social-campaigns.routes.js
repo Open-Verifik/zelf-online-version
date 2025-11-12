@@ -19,6 +19,9 @@ module.exports = (server) => {
 
 	// Step 4: Validate LinkedIn follow
 	server.post(`${PATH}/validate-linkedin`, Middleware.validateLinkedInValidation, Controller.validateLinkedIn);
+
+	// Get record by tagName and domain
+	server.get(`${PATH}/record`, Middleware.getRecordValidation, Controller.getRecord);
 };
 
 /**

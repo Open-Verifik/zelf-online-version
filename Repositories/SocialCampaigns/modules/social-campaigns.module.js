@@ -417,11 +417,46 @@ const validateLinkedIn = async (email, tagName, domain, screenshot, linkedInUser
 	};
 };
 
+/**
+ * Get social campaign record by tagName and domain for authenticated user
+ * @param {string} tagName - Tag name
+ * @param {string} domain - Domain
+ * @param {Object} authUser - Authenticated user from JWT
+ * @returns {Promise<Object>} Social campaign record
+ */
+const getRecord = async (tagName, domain, authUser) => {
+	// Find the social record for the authenticated user
+	const socialRecord = await Model.findOne({
+		tagName,
+		domain,
+	});
+
+	if (!socialRecord) throw new Error("404:social_record_not_found");
+
+	// Return record data (excluding sensitive OTP hash)
+	return {
+		email: socialRecord.email,
+		tagName: socialRecord.tagName,
+		domain: socialRecord.domain,
+		verified: socialRecord.verified,
+		attempts: socialRecord.attempts,
+		maxAttempts: socialRecord.maxAttempts,
+		expiresAt: socialRecord.expiresAt,
+		followedX: socialRecord.followedX,
+		xUsername: socialRecord.xUsername,
+		followedLinkedin: socialRecord.followedLinkedin,
+		linkedInUsername: socialRecord.linkedInUsername,
+		createdAt: socialRecord.createdAt,
+		updatedAt: socialRecord.updatedAt,
+	};
+};
+
 module.exports = {
 	provideEmail,
 	validateOTP,
 	validateX,
 	validateLinkedIn,
+	getRecord,
 	generateOTP,
 	sendOTPEmail,
 };

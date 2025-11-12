@@ -26,6 +26,10 @@ const schemas = {
 		screenshot: string().required(), // Base64 encoded image
 		linkedInUsername: string().required(), // LinkedIn username or profile link
 	},
+	getRecord: {
+		tagName: string().required(),
+		domain: string().required(),
+	},
 };
 
 /**
@@ -182,9 +186,40 @@ const validateLinkedInValidation = async (ctx, next) => {
 	}
 };
 
+/**
+ * Middleware to validate get record request
+ * Gets record by tagName and domain for authenticated user
+ */
+const getRecordValidation = async (ctx, next) => {
+	try {
+		const { tagName, domain } = ctx.request.query;
+
+		const valid = validate(schemas.getRecord, {
+			tagName,
+			domain,
+		});
+
+		if (valid.error) {
+			ctx.status = 400;
+			ctx.body = { error: valid.error.message };
+			return;
+		}
+
+		// Normalize values
+		ctx.state.tagName = tagName.toLowerCase().trim();
+		ctx.state.domain = domain.toLowerCase().trim();
+
+		await next();
+	} catch (error) {
+		ctx.status = 400;
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	provideEmailValidation,
 	validateOTPValidation,
 	validateXValidation,
 	validateLinkedInValidation,
+	getRecordValidation,
 };

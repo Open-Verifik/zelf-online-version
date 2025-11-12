@@ -168,6 +168,11 @@ const errorHandler = (exception, ctx = null, optionalMessage) => {
 			message = optionalMessage || "Bad Request";
 			code = "BadRequest";
 			break;
+		case "401":
+			status = 401;
+			message = optionalMessage || "Authentication required";
+			code = "Unauthorized";
+			break;
 		case "403":
 			status = 403;
 			message = optionalMessage || "Access forbidden";
