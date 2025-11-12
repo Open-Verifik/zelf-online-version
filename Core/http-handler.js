@@ -183,6 +183,11 @@ const errorHandler = (exception, ctx = null, optionalMessage) => {
 			message = optionalMessage || "Record conflicts with existing records in place.";
 			code = "Conflict";
 			break;
+		case "429":
+			status = 429;
+			message = optionalMessage || "Too many requests. Please try again later.";
+			code = "TooManyRequests";
+			break;
 		case "412":
 			status = 412;
 			message = optionalMessage || "Pre condition to create this request, failed";

@@ -45,6 +45,7 @@ module.exports = (server) => {
 	//R
 	require("../Repositories/Rewards/routes/rewards.route")(server);
 	//S
+	require("../Repositories/SocialCampaigns/routes/social-campaigns.routes")(server);
 	require("../Repositories/sui/routes/sui-scrapping.route")(server);
 	require("../Repositories/Solana/routes/solana-scrapping.route")(server);
 	//T
