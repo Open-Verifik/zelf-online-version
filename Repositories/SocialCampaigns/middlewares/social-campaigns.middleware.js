@@ -17,14 +17,14 @@ const schemas = {
 		domain: string().required(),
 		email: string().email().required(),
 		screenshot: string().required(), // Base64 encoded image
-		xUsername: string().required(), // X (Twitter) username that user claims to follow
+		xUsername: string().optional(), // X (Twitter) username (optional - will validate against configured accounts)
 	},
 	validateLinkedIn: {
 		tagName: string().required(),
 		domain: string().required(),
 		email: string().email().required(),
 		screenshot: string().required(), // Base64 encoded image
-		linkedInUsername: string().required(), // LinkedIn username or profile link
+		linkedInUsername: string().required(), // LinkedIn username or profile link (user's LinkedIn username)
 	},
 	getRecord: {
 		tagName: string().required(),
@@ -132,7 +132,7 @@ const validateXValidation = async (ctx, next) => {
 		ctx.state.tagName = tagName.toLowerCase().trim();
 		ctx.state.domain = domain.toLowerCase().trim();
 		ctx.state.screenshot = screenshot;
-		ctx.state.xUsername = xUsername.trim();
+		ctx.state.xUsername = xUsername ? xUsername.trim() : null; // Optional - will validate against configured accounts
 
 		await next();
 	} catch (error) {
@@ -177,7 +177,7 @@ const validateLinkedInValidation = async (ctx, next) => {
 		ctx.state.tagName = tagName.toLowerCase().trim();
 		ctx.state.domain = domain.toLowerCase().trim();
 		ctx.state.screenshot = screenshot;
-		ctx.state.linkedInUsername = linkedInUsername.trim();
+		ctx.state.linkedInUsername = linkedInUsername.trim(); // Required - user's LinkedIn username
 
 		await next();
 	} catch (error) {

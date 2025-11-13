@@ -7,13 +7,9 @@ const fs = require("fs");
 const path = require("path");
 const { analyzeImageWithGemini } = require("./modules/gemini-ai.module");
 const socialAccountsConfig = require("./config/social-accounts.config");
-const config = require("../../Core/config");
 
-// Set API key for testing (can be overridden by environment variable)
-if (!process.env.GEMINI_API_KEY && !config.google?.geminiApiKey) {
-	process.env.GEMINI_API_KEY = "AIzaSyCN1ZRCjgfCw3K13o1HPcrSDGyKZHwO4eo";
-	console.log("🔑 Using test API key for authentication\n");
-}
+// Using service account authentication from gemini_key.json
+console.log("🔑 Using service account authentication (gemini_key.json)\n");
 
 /**
  * Convert image file to base64 data URL

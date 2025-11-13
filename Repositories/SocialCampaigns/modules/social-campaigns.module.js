@@ -284,34 +284,55 @@ const validateX = async (email, tagName, domain, screenshot, xUsername, authUser
 
 	if (!xAccounts || xAccounts.length === 0) throw new Error("500:x_accounts_not_configured");
 
-	// Verify that the provided username matches one of the configured accounts
-	const normalizedXUsername = xUsername.toLowerCase().replace(/^@/, "");
+	// Always validate against configured accounts from the screenshot
+	// xUsername is optional - if provided, we'll use it for reference, but Gemini AI will detect from screenshot
+	// The screenshot should show the user following @blockdag8990 (Liza's account)
+	let accountsToValidate = xAccounts;
 
-	const matchingAccount = true; // TODO: Enable Gemini AI validation when ready
+	// If xUsername is provided, verify it matches one of the configured accounts (optional validation)
+	if (xUsername) {
+		const normalizedXUsername = xUsername.toLowerCase().replace(/^@/, "");
+		const matchingAccount = xAccounts.find(
+			(acc) => acc.username?.toLowerCase().replace(/^@/, "") === normalizedXUsername || acc.displayName?.toLowerCase() === normalizedXUsername
+		);
 
-	// TODO: Enable Gemini AI validation when ready
-	// For now, bypass Gemini AI and return success for development/testing
-	// Set SKIP_GEMINI_VALIDATION=false in environment to enable real validation
-	const skipGemini = process.env.SKIP_GEMINI_VALIDATION !== "false"; // Defaults to true (skip) unless explicitly set to false
+		if (!matchingAccount) {
+			// If username doesn't match, still proceed - Gemini AI will validate from screenshot
+			// But log a warning that the provided username doesn't match configured accounts
+			console.warn(`Provided xUsername "${xUsername}" doesn't match configured accounts. Will validate from screenshot.`);
+		} else {
+			// If username matches, validate only that account
+			accountsToValidate = [matchingAccount];
+		}
+	}
+
+	// Use Gemini AI to validate the screenshot
+	// Set SKIP_GEMINI_VALIDATION=true in environment to bypass AI validation (for testing)
+	const skipGemini = process.env.SKIP_GEMINI_VALIDATION === "true";
 
 	let analysisResult;
+	let validatedAccount = accountsToValidate[0]; // Default to first account
+
 	if (skipGemini) {
-		// Mock successful response for development
+		// Mock successful response for testing/development
 		analysisResult = {
 			actionCompleted: true,
 			confidence: 0.95,
-			reason: "Mock validation - Gemini AI bypassed for development",
+			reason: "Mock validation - Gemini AI bypassed for testing",
 		};
 	} else {
-		// Analyze screenshot with Gemini AI
-		analysisResult = await GeminiAI.analyzeImageWithGemini(screenshot, "x", [matchingAccount]);
+		// Analyze screenshot with Gemini AI - check if user is following any of the configured accounts
+		analysisResult = await GeminiAI.analyzeImageWithGemini(screenshot, "x", accountsToValidate);
 
 		if (!analysisResult.actionCompleted) throw new Error("400:x_follow_not_verified");
+
+		// Try to determine which account was validated (use first one for now, or enhance Gemini response)
+		validatedAccount = accountsToValidate[0];
 	}
 
 	// Update record with X validation
 	socialRecord.followedX = true;
-	socialRecord.xUsername = matchingAccount.username || matchingAccount.displayName;
+	socialRecord.xUsername = validatedAccount.username || validatedAccount.displayName;
 	await socialRecord.save();
 
 	return {
@@ -364,43 +385,48 @@ const validateLinkedIn = async (email, tagName, domain, screenshot, linkedInUser
 		throw new Error("500:linkedin_accounts_not_configured");
 	}
 
-	// Extract username from LinkedIn URL if provided as link
-	let normalizedLinkedInUsername = linkedInUsername.toLowerCase().trim();
-	if (normalizedLinkedInUsername.includes("linkedin.com/in/")) {
-		normalizedLinkedInUsername = normalizedLinkedInUsername.split("linkedin.com/in/")[1].split("/")[0].split("?")[0];
-	} else if (normalizedLinkedInUsername.includes("linkedin.com/company/")) {
-		normalizedLinkedInUsername = normalizedLinkedInUsername.split("linkedin.com/company/")[1].split("/")[0].split("?")[0];
-	}
+	// Always validate against configured accounts from the screenshot
+	// linkedInUsername is required - it's the user's LinkedIn username, not the account they're following
+	// The screenshot should show the user following Liza Van den Berg's LinkedIn profile
+	const accountsToValidate = linkedInAccounts;
 
-	// Verify that the provided username matches one of the configured accounts
-	const matchingAccount = true;
-
-	// TODO: Enable Gemini AI validation when ready
-	// For now, bypass Gemini AI and return success for development/testing
-	// Set SKIP_GEMINI_VALIDATION=false in environment to enable real validation
-	const skipGemini = process.env.SKIP_GEMINI_VALIDATION !== "false"; // Defaults to true (skip) unless explicitly set to false
+	// Use Gemini AI to validate the screenshot
+	// Set SKIP_GEMINI_VALIDATION=true in environment to bypass AI validation (for testing)
+	const skipGemini = process.env.SKIP_GEMINI_VALIDATION === "true";
 
 	let analysisResult;
+	let validatedAccount = accountsToValidate[0]; // Default to first account
 
 	if (skipGemini) {
-		// Mock successful response for development
+		// Mock successful response for testing/development
 		analysisResult = {
 			actionCompleted: true,
 			confidence: 0.95,
-			reason: "Mock validation - Gemini AI bypassed for development",
+			reason: "Mock validation - Gemini AI bypassed for testing",
 		};
 	} else {
-		// Analyze screenshot with Gemini AI
-		analysisResult = await GeminiAI.analyzeImageWithGemini(screenshot, "linkedin", [matchingAccount]);
+		// Analyze screenshot with Gemini AI - check if user is following any of the configured accounts
+		analysisResult = await GeminiAI.analyzeImageWithGemini(screenshot, "linkedin", accountsToValidate);
 
 		if (!analysisResult.actionCompleted) {
 			throw new Error("400:linkedin_follow_not_verified");
 		}
+
+		// Try to determine which account was validated (use first one for now, or enhance Gemini response)
+		validatedAccount = accountsToValidate[0];
 	}
 
 	// Update record with LinkedIn validation
 	socialRecord.followedLinkedin = true;
-	socialRecord.linkedInUsername = matchingAccount.username || matchingAccount.displayName || matchingAccount.companyName;
+	// Save the user's LinkedIn username (required), not the account they're following
+	// Extract username from LinkedIn URL if provided as link
+	let userLinkedInUsername = linkedInUsername.trim();
+	if (userLinkedInUsername.includes("linkedin.com/in/")) {
+		userLinkedInUsername = userLinkedInUsername.split("linkedin.com/in/")[1].split("/")[0].split("?")[0];
+	} else if (userLinkedInUsername.includes("linkedin.com/company/")) {
+		userLinkedInUsername = userLinkedInUsername.split("linkedin.com/company/")[1].split("/")[0].split("?")[0];
+	}
+	socialRecord.linkedInUsername = userLinkedInUsername;
 	await socialRecord.save();
 
 	return {

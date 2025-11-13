@@ -2,29 +2,12 @@ const axios = require("axios");
 const path = require("path");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");
-const config = require("../../../Core/config");
 
 /**
  * Google Gemini AI integration for image analysis
  * Validates screenshots to verify social media follows
- * Supports two authentication methods:
- * 1. API Key (simpler, for testing)
- * 2. Service Account (more secure, for production)
+ * Uses service account authentication from gemini_key.json
  */
-
-// Authentication mode: 'api_key' or 'service_account'
-// Can be set via environment variable GEMINI_AUTH_MODE or config.google.geminiAuthMode
-// Defaults to 'api_key' if API key is provided, otherwise 'service_account'
-const getAuthMode = () => {
-	const envMode = process.env.GEMINI_AUTH_MODE || config.google?.geminiAuthMode;
-	if (envMode === "api_key" || envMode === "service_account") {
-		return envMode;
-	}
-
-	// Auto-detect: if API key is available, use it; otherwise use service account
-	const apiKey = config.google?.geminiApiKey || process.env.GEMINI_API_KEY;
-	return apiKey ? "api_key" : "service_account";
-};
 
 // Cache for access token (valid for 1 hour)
 let tokenCache = {
@@ -33,11 +16,46 @@ let tokenCache = {
 };
 
 /**
- * Get API key from config or environment
- * @returns {string|null} API key or null if not found
+ * List available Gemini models
+ * @returns {Promise<Array>} List of available models
  */
-const getApiKey = () => {
-	return config.google?.geminiApiKey || process.env.GEMINI_API_KEY || null;
+const listAvailableModels = async () => {
+	try {
+		const accessToken = await getServiceAccountToken();
+		if (!accessToken) {
+			throw new Error("Failed to obtain access token from service account");
+		}
+
+		// Try both API versions
+		const apiVersions = ["v1", "v1beta"];
+		const headers = {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${accessToken}`,
+		};
+
+		for (const apiVersion of apiVersions) {
+			try {
+				const listUrl = `https://generativelanguage.googleapis.com/${apiVersion}/models`;
+
+				const response = await axios.get(listUrl, {
+					headers,
+				});
+
+				return response.data?.models || [];
+			} catch (error) {
+				if (apiVersions.indexOf(apiVersion) < apiVersions.length - 1) {
+					console.log(`API version ${apiVersion} failed, trying next...`);
+					continue;
+				}
+				throw error;
+			}
+		}
+
+		return [];
+	} catch (error) {
+		console.error("Error listing models:", error);
+		throw new Error(`Failed to list models: ${error.message}`);
+	}
 };
 
 /**
@@ -53,8 +71,19 @@ const getServiceAccountToken = async () => {
 			return tokenCache.token;
 		}
 
-		// Load service account key file
-		const keyPath = path.resolve(__dirname, "../../../config/google_key.json");
+		// Load service account key file (prefer gemini_key.json, fallback to google_key.json)
+		const geminiKeyPath = path.resolve(__dirname, "../../../config/gemini_key.json");
+		const googleKeyPath = path.resolve(__dirname, "../../../config/google_key.json");
+
+		let keyPath = null;
+		if (fs.existsSync(geminiKeyPath)) {
+			keyPath = geminiKeyPath;
+		} else if (fs.existsSync(googleKeyPath)) {
+			keyPath = googleKeyPath;
+		} else {
+			throw new Error("Service account key file not found. Expected gemini_key.json or google_key.json in config directory");
+		}
+
 		const keyFile = JSON.parse(fs.readFileSync(keyPath, "utf8"));
 
 		// Create JWT for service account
@@ -65,7 +94,8 @@ const getServiceAccountToken = async () => {
 			aud: "https://oauth2.googleapis.com/token",
 			iat: nowSeconds,
 			exp: nowSeconds + 3600, // Token expires in 1 hour
-			scope: "https://www.googleapis.com/auth/cloud-platform",
+			// Use Gemini-specific scope for Generative Language API
+			scope: "https://www.googleapis.com/auth/generative-language",
 		};
 
 		// Sign JWT with private key
@@ -96,43 +126,54 @@ const getServiceAccountToken = async () => {
 };
 
 /**
- * Analyze image using Google Gemini AI
+ * Clean base64 image string by removing data URL prefix if present
  * @param {string} base64Image - Base64 encoded image (with or without data URL prefix)
+ * @returns {string} Clean base64 string
+ */
+const cleanBase64Image = (base64Image) => {
+	return base64Image.replace(/^data:image\/[a-z]+;base64,/, "");
+};
+
+/**
+ * Build validation prompt for Gemini AI based on platform and accounts
  * @param {string} platform - Platform name ('x' or 'linkedin')
  * @param {Array} accounts - Array of account objects to check for
- * @returns {Promise<Object>} Analysis result with actionCompleted boolean
+ * @returns {string} Formatted prompt string
  */
-const analyzeImageWithGemini = async (base64Image, platform, accounts) => {
-	try {
-		const authMode = getAuthMode();
+const buildValidationPrompt = (platform, accounts) => {
+	const platformName = platform === "x" ? "X (Twitter)" : "LinkedIn";
+	const accountNames = accounts.map((acc) => acc.displayName || acc.username || acc.companyName).join(", ");
+	const accountUsernames = accounts.map((acc) => acc.username || acc.displayName).join(", ");
 
-		let apiKey = null;
+	if (platform === "linkedin") {
+		return `Analyze this LinkedIn screenshot and determine if the user is following the required profile(s).
 
-		let accessToken = null;
+Required profiles to check: ${accountNames}
+Profile usernames/URLs: ${accountUsernames}
 
-		// Authenticate based on mode
-		if (authMode === "api_key") {
-			apiKey = getApiKey();
-			if (!apiKey) {
-				throw new Error("Gemini API key not configured. Set GEMINI_API_KEY or config.google.geminiApiKey");
-			}
-		} else {
-			accessToken = await getServiceAccountToken();
-			if (!accessToken) {
-				throw new Error("Failed to obtain access token from service account");
-			}
-		}
+Look for visual indicators that show the user is following these profiles, such as:
+- A "Following" button (with a checkmark) visible in the screenshot
+- The button should clearly show "Following" status (not "Follow" or "Connect")
+- Profile name "${accountNames}" visible in the screenshot
+- Profile picture matching the required account
 
-		// Clean base64 image (remove data URL prefix if present)
-		const cleanBase64 = base64Image.replace(/^data:image\/[a-z]+;base64,/, "");
+IMPORTANT: The screenshot must clearly show a "Following" button/status. If you see "Follow" or "Connect" buttons instead, the user is NOT following.
 
-		// Build prompt based on platform
-		const platformName = platform === "x" ? "X (Twitter)" : "LinkedIn";
-		const accountUsernames = accounts.map((acc) => acc.username || acc.displayName).join(", ");
+Return ONLY a valid JSON object with this exact structure:
+{
+  "actionCompleted": true or false,
+  "confidence": 0.0 to 1.0,
+  "reason": "brief explanation"
+}
 
-		const prompt = `Analyze this ${platformName} screenshot and determine if the user is following the required account(s).
+Be strict - only return actionCompleted: true if you can clearly see a "Following" button/status indicating the user is following at least one of the required profiles.`;
+	}
 
-Required accounts to check: ${accountUsernames}
+	// X (Twitter) validation prompt
+	return `Analyze this X (Twitter) screenshot and determine if the user is following the required account(s).
+
+Required accounts to check: ${accountNames}
+Account usernames: ${accountUsernames}
 
 Look for visual indicators that show the user is following these accounts, such as:
 - "Following" button or status
@@ -147,100 +188,198 @@ Return ONLY a valid JSON object with this exact structure:
 }
 
 Be strict - only return actionCompleted: true if you can clearly see evidence that the user is following at least one of the required accounts.`;
+};
 
-		// Gemini API endpoint
-		let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
-		const headers = {
-			"Content-Type": "application/json",
-		};
-		const params = {};
+/**
+ * Get list of Gemini models to try, ordered by preference (cheapest first)
+ * @returns {Array<string>} Array of model names
+ */
+const getModelNames = () => {
+	return [
+		"gemini-2.5-flash", // Latest Flash model (cheapest, best for image analysis)
+		"gemini-2.0-flash-001", // Stable Flash model
+		"gemini-2.0-flash-lite-001", // Even cheaper Flash-Lite
+		"gemini-1.5-flash", // Older Flash model (fallback)
+		"gemini-1.5-pro", // Pro model (more expensive, fallback)
+	];
+};
 
-		// Set authentication based on mode
-		if (authMode === "api_key") {
-			params.key = apiKey;
-		} else {
-			headers.Authorization = `Bearer ${accessToken}`;
-			params.alt = "json";
-		}
+/**
+ * Create request headers for Gemini API
+ * @param {string} accessToken - Service account access token
+ * @returns {Object} Headers object
+ */
+const createGeminiHeaders = (accessToken) => {
+	return {
+		"Content-Type": "application/json",
+		Authorization: `Bearer ${accessToken}`,
+	};
+};
 
-		// Prepare request payload
-		const payload = {
-			contents: [
-				{
-					parts: [
-						{
-							text: prompt,
+/**
+ * Create generation config for Gemini API request
+ * @returns {Object} Generation config object
+ */
+const createGenerationConfig = () => {
+	return {
+		temperature: 0.1,
+		topK: 32,
+		topP: 1,
+		maxOutputTokens: 1024,
+	};
+};
+
+/**
+ * Create payload for Gemini API request
+ * @param {string} prompt - Validation prompt
+ * @param {string} cleanBase64 - Clean base64 image data
+ * @returns {Object} Request payload object
+ */
+const createGeminiPayload = (prompt, cleanBase64) => {
+	return {
+		contents: [
+			{
+				parts: [
+					{
+						text: prompt,
+					},
+					{
+						inline_data: {
+							mime_type: "image/jpeg",
+							data: cleanBase64,
 						},
-						{
-							inline_data: {
-								mime_type: "image/jpeg",
-								data: cleanBase64,
-							},
-						},
-					],
-				},
-			],
-			generationConfig: {
-				temperature: 0.1,
-				topK: 32,
-				topP: 1,
-				maxOutputTokens: 1024,
-				responseMimeType: "application/json",
+					},
+				],
 			},
-		};
+		],
+		generationConfig: createGenerationConfig(),
+	};
+};
 
-		// Make API request
-		const response = await axios.post(geminiUrl, payload, {
-			headers,
-			params,
-		});
+/**
+ * Try multiple Gemini models until one succeeds
+ * @param {Array<string>} modelNames - Array of model names to try
+ * @param {string} apiVersion - API version ('v1' or 'v1beta')
+ * @param {Object} payload - Request payload
+ * @param {Object} headers - Request headers
+ * @returns {Promise<Object>} Axios response object
+ */
+const tryGeminiModels = async (modelNames, apiVersion, payload, headers) => {
+	let lastError;
 
-		// Extract response text
-		const responseText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-		if (!responseText) {
-			throw new Error("No response from Gemini API");
-		}
-
-		// Parse JSON response
-		let result;
+	for (const modelName of modelNames) {
 		try {
-			result = JSON.parse(responseText);
-		} catch (parseError) {
-			// Try to extract JSON from markdown code blocks if present
-			const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || responseText.match(/```\s*([\s\S]*?)\s*```/);
-			if (jsonMatch) {
-				result = JSON.parse(jsonMatch[1]);
-			} else {
-				throw parseError;
+			const geminiUrl = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent`;
+			const response = await axios.post(geminiUrl, payload, { headers });
+			return response;
+		} catch (error) {
+			lastError = error;
+			// If it's a 404 (model not found), try next model
+			const isLastModel = modelNames.indexOf(modelName) === modelNames.length - 1;
+			if (error.response?.status === 404 && !isLastModel) {
+				console.log(`Model ${modelName} not found, trying next model...`);
+				continue;
 			}
+			// For other errors or last model, throw the error
+			throw error;
+		}
+	}
+
+	throw lastError || new Error("500:failed_to_find_working_gemini_model");
+};
+
+/**
+ * Extract and parse response text from Gemini API response
+ * @param {Object} response - Axios response object
+ * @returns {Object} Parsed JSON result
+ */
+const parseGeminiResponse = (response) => {
+	const responseText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+	if (!responseText) throw new Error("500:no_response_from_gemini_api");
+
+	// Try to parse JSON directly
+	try {
+		return JSON.parse(responseText);
+	} catch (parseError) {
+		// Try to extract JSON from markdown code blocks if present
+		const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || responseText.match(/```\s*([\s\S]*?)\s*```/);
+		if (jsonMatch) {
+			return JSON.parse(jsonMatch[1]);
 		}
 
-		// Validate response structure
-		if (typeof result.actionCompleted !== "boolean") {
-			throw new Error("Invalid response format from Gemini API");
+		throw parseError;
+	}
+};
+
+/**
+ * Validate and format Gemini API response
+ * @param {Object} result - Parsed JSON result from Gemini
+ * @returns {Object} Formatted result with actionCompleted, confidence, and reason
+ */
+const validateAndFormatResult = (result) => {
+	if (typeof result.actionCompleted !== "boolean") throw new Error("500:invalid_response_format_from_gemini_api");
+
+	return {
+		actionCompleted: result.actionCompleted,
+		confidence: result.confidence || 0.5,
+		reason: result.reason || "Analysis completed",
+	};
+};
+
+/**
+ * Log error details for debugging
+ * @param {Error} error - Error object
+ */
+const logGeminiError = (error) => {
+	console.error("Error analyzing image with Gemini:", error);
+
+	if (error.response) {
+		console.error("Gemini API Error Response:", {
+			status: error.response.status,
+			data: error.response.data,
+		});
+	}
+};
+
+/**
+ * Analyze image using Google Gemini AI
+ * @param {string} base64Image - Base64 encoded image (with or without data URL prefix)
+ * @param {string} platform - Platform name ('x' or 'linkedin')
+ * @param {Array} accounts - Array of account objects to check for
+ * @returns {Promise<Object>} Analysis result with actionCompleted boolean
+ */
+const analyzeImageWithGemini = async (base64Image, platform, accounts) => {
+	try {
+		// Authenticate and get access token
+		const accessToken = await getServiceAccountToken();
+		if (!accessToken) {
+			throw new Error("Failed to obtain access token from service account");
 		}
 
-		return {
-			actionCompleted: result.actionCompleted,
-			confidence: result.confidence || 0.5,
-			reason: result.reason || "Analysis completed",
-		};
+		// Prepare image and prompt
+		const cleanBase64 = cleanBase64Image(base64Image);
+		const prompt = buildValidationPrompt(platform, accounts);
+
+		// Configure API request
+		const apiVersion = "v1";
+		const modelNames = getModelNames();
+		const headers = createGeminiHeaders(accessToken);
+		const payload = createGeminiPayload(prompt, cleanBase64);
+
+		// Make API request (try multiple models if needed)
+		const response = await tryGeminiModels(modelNames, apiVersion, payload, headers);
+
+		// Parse and validate response
+		const result = parseGeminiResponse(response);
+		return validateAndFormatResult(result);
 	} catch (error) {
-		console.error("Error analyzing image with Gemini:", error);
-
-		// If it's an axios error, log more details
-		if (error.response) {
-			console.error("Gemini API Error Response:", {
-				status: error.response.status,
-				data: error.response.data,
-			});
-		}
-
+		logGeminiError(error);
 		throw new Error(`Failed to analyze image: ${error.message}`);
 	}
 };
 
 module.exports = {
 	analyzeImageWithGemini,
+	listAvailableModels,
 };
