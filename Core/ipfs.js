@@ -243,13 +243,15 @@ const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "i
 
 		const uploadResponse = response.data;
 
+		const normalizedResponse = normalizePinataResponse(uploadResponse);
+
 		return {
-			url: `https://${pinataGateway}/ipfs/${uploadResponse.IpfsHash}`,
+			url: `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`,
 			pinned: true,
 			web3: true,
 			name: filename,
 			metadata,
-			...uploadResponse,
+			...normalizedResponse,
 		};
 	} catch (error) {
 		console.error(error);
