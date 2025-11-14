@@ -69,6 +69,53 @@ const parseMetadataFromPinata = (keyvalues) => {
 	return simpleMetadata;
 };
 
+/**
+ * Helper function to normalize Pinata API response keys
+ * Handles inconsistent casing in Pinata SDK responses (e.g., Keyvalues vs keyvalues, IpfsHash vs ipfsHash)
+ * Normalizes all properties to camelCase format
+ * @param {Object} response - Pinata API response object
+ * @returns {Object} - Normalized response with consistent key casing
+ */
+const normalizePinataResponse = (response) => {
+	if (!response || typeof response !== "object") {
+		return response;
+	}
+
+	// Mapping of Pinata API response keys to their camelCase equivalents
+	const keyMapping = {
+		IpfsHash: "ipfsHash",
+		PinSize: "pinSize",
+		Timestamp: "timestamp",
+		ID: "id",
+		Name: "name",
+		NumberOfFiles: "numberOfFiles",
+		MimeType: "mimeType",
+		GroupId: "groupId",
+		Keyvalues: "keyvalues",
+	};
+
+	const normalized = { ...response };
+
+	// Normalize top-level properties
+	Object.keys(keyMapping).forEach((oldKey) => {
+		const newKey = keyMapping[oldKey];
+		if (oldKey in normalized && !(newKey in normalized)) {
+			normalized[newKey] = normalized[oldKey];
+			delete normalized[oldKey];
+		}
+	});
+
+	// Normalize metadata.keyvalues/Keyvalues if metadata exists
+	if (normalized.metadata && typeof normalized.metadata === "object") {
+		if ("Keyvalues" in normalized.metadata && !("keyvalues" in normalized.metadata)) {
+			normalized.metadata.keyvalues = normalized.metadata.Keyvalues;
+			delete normalized.metadata.Keyvalues;
+		}
+	}
+
+	return normalized;
+};
+
 // Use JWT authentication for new SDK v2.5.0
 const web3Instance = new pinataWeb3.PinataSDK({
 	pinataJwt: process.env[`${prefix}PINATA_JWT`],
@@ -82,13 +129,16 @@ const upload = async (base64Image, filename = "image.png", mimeType = "image/png
 
 		const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 
+		// Normalize response keys to handle inconsistent casing (Keyvalues vs keyvalues)
+		const normalizedResponse = normalizePinataResponse(uploadResponse);
+
 		const expiresIn = 1800;
 
 		// Create URL using the gateway
-		const url = `https://${pinataGateway}/ipfs/${uploadResponse.cid}`;
+		const url = `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`;
 
 		return {
-			...uploadResponse,
+			...normalizedResponse,
 			url,
 			urlExpiresIn: expiresIn,
 			metadata,
@@ -139,15 +189,19 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 		// Upload the file to Pinata using the new API
 		const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 
+		// Normalize response keys to handle inconsistent casing (Keyvalues vs keyvalues)
+		const normalizedResponse = normalizePinataResponse(uploadResponse);
+
+		console.log({ uploadResponse: normalizedResponse });
 		return {
-			url: `https://${pinataGateway}/ipfs/${uploadResponse.cid}`,
-			cid: uploadResponse.cid,
-			ipfs_pin_hash: uploadResponse.cid,
-			ipfsHash: uploadResponse.cid,
+			url: `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`,
+			cid: normalizedResponse.cid,
+			ipfs_pin_hash: normalizedResponse.cid,
+			ipfsHash: normalizedResponse.cid,
 			pinned: true,
 			web3: true,
 			name: filename,
-			...uploadResponse,
+			...normalizedResponse,
 		};
 	} catch (error) {
 		console.error(error);
@@ -259,18 +313,24 @@ const filter = async (property = "name", value, options = {}) => {
 		for (let index = 0; index < files.length; index++) {
 			const file = files[index];
 
+			// Normalize response keys to handle inconsistent casing (Keyvalues vs keyvalues)
+			const normalizedFile = normalizePinataResponse(file);
+
 			// Use cid instead of ipfs_pin_hash for the new API
-			if (file.cid && file.cid !== "pending") {
-				file.url = `https://${pinataGateway}/ipfs/${file.cid}`;
+			if (normalizedFile.cid && normalizedFile.cid !== "pending") {
+				normalizedFile.url = `https://${pinataGateway}/ipfs/${normalizedFile.cid}`;
 			}
 
 			// Parse metadata keyvalues to simple format
-			if (file.metadata && file.metadata.keyvalues) {
-				file.publicData = parseMetadataFromPinata(file.metadata.keyvalues);
-			} else if (file.keyvalues) {
-				file.publicData = parseMetadataFromPinata(file.keyvalues);
-				delete file.keyvalues;
+			if (normalizedFile.metadata && normalizedFile.metadata.keyvalues) {
+				normalizedFile.publicData = parseMetadataFromPinata(normalizedFile.metadata.keyvalues);
+			} else if (normalizedFile.keyvalues) {
+				normalizedFile.publicData = parseMetadataFromPinata(normalizedFile.keyvalues);
+				delete normalizedFile.keyvalues;
 			}
+
+			// Update the original file object with normalized values
+			Object.assign(file, normalizedFile);
 		}
 
 		return files;
