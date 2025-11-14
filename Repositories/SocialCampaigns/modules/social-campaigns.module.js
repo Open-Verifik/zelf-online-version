@@ -494,7 +494,7 @@ const getReward = async (tagName, domain, authUser) => {
 
 	if (!socialRecord) throw new Error("404:social_record_not_found");
 
-	if (socialRecord.status !== "approved") throw new Error("400:social_record_not_approved");
+	if (socialRecord.status === "approved") throw new Error("400:social_record_approved");
 
 	if (socialRecord.status === "rejected") throw new Error("400:social_record_rejected");
 
