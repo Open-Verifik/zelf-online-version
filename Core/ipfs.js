@@ -4,9 +4,6 @@ const axios = require("axios");
 
 const prefix = process.env.NODE_ENV === "development" ? "_" : "";
 
-const pinataApiKey = process.env[`${prefix}PINATA_API_KEY`];
-const pinataApiSecret = process.env[`${prefix}PINATA_API_SECRET`];
-
 const pinataGateway = process.env[`${prefix}PINATA_GATEWAY_URL`];
 
 const os = process.env.ENVOS;
