@@ -364,21 +364,6 @@ const sendEmailReceipt = async (tagName, domain, network, email, token) => {
 		tokenDecoded.prices.BTC?.price ||
 		tokenDecoded.prices.AVAX?.price;
 
-	const emailBody = {
-		transactionDate: tagObject.publicData.registeredAt,
-		price: tagObject.publicData.price || tokenDecoded.publicData?.price || tokenDecoded.prices[network]?.amountToSend,
-		tagName: tokenDecoded.tagName,
-		domain,
-		network,
-		expires: tagObject.publicData.expiresAt,
-		price,
-		subtotal: price,
-		discount: tokenDecoded.discount || 0,
-		year: tokenDecoded.duration,
-		// tokenDecoded,
-		duration: tokenDecoded.duration,
-	};
-
 	return await sendEmail({
 		language: tokenDecoded.language || "es",
 		template: "Purchase_receipt",

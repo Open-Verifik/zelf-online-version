@@ -476,6 +476,7 @@ const getRecord = async (tagName, domain, authUser) => {
 		linkedInUsername: socialRecord.linkedInUsername,
 		createdAt: socialRecord.createdAt,
 		updatedAt: socialRecord.updatedAt,
+		status: socialRecord.status || "pending",
 	};
 };
 
