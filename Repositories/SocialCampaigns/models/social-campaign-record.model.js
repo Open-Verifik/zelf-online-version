@@ -55,6 +55,11 @@ const socialCampaignOTPSchema = new mongoose.Schema(
 			type: String,
 			default: null,
 		},
+		status: {
+			type: String,
+			enum: ["pending", "approved", "rejected"],
+			default: "pending",
+		},
 	},
 	{
 		timestamps: true,

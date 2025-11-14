@@ -8,7 +8,6 @@ const bitcoinModule = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const ETHModule = require("../../etherscan/modules/etherscan-scrapping.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 const AvalancheModule = require("../../Avalanche/modules/avalanche-scrapping.module");
-const TagsArweaveModule = require("./tags-arweave.module");
 const { sendEmail } = require("../../purchase-zelf/modules/purchase.module");
 const { buildMetadata, storeInIPFS, storeInWalrus, storeInArweave } = require("./tags-payment.module");
 

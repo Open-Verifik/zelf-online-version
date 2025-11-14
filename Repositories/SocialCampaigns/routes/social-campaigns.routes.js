@@ -22,6 +22,9 @@ module.exports = (server) => {
 
 	// Get record by tagName and domain
 	server.get(`${PATH}/record`, Middleware.getRecordValidation, Controller.getRecord);
+
+	// get reward by tagName and domain
+	server.post(`${PATH}/reward`, Middleware.getRewardValidation, Controller.getReward);
 };
 
 /**

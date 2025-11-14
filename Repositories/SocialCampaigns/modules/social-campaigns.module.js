@@ -3,8 +3,10 @@ const config = require("../../../Core/config");
 const axios = require("axios");
 const crypto = require("crypto");
 const { generateOTPEmailHTML } = require("../templates/otp-email.template");
-
+const TagsSearchModule = require("../../Tags/modules/tags-search.module");
 const domain = "mg.zelf.world";
+const MyTagsModule = require("../../Tags/modules/my-tags.module");
+const { getDomainConfig } = require("../../Tags/config/supported-domains");
 
 /**
  * Generate a 6-digit OTP code
@@ -477,6 +479,59 @@ const getRecord = async (tagName, domain, authUser) => {
 	};
 };
 
+/**
+ * Get reward by tagName and domain for authenticated user
+ * @param {string} tagName - Tag name
+ * @param {string} domain - Domain
+ * @param {Object} authUser - Authenticated user from JWT
+ * @returns {Promise<Object>} Reward
+ */
+const getReward = async (tagName, domain, authUser) => {
+	const socialRecord = await Model.findOne({
+		tagName,
+		domain,
+	});
+
+	if (!socialRecord) throw new Error("404:social_record_not_found");
+
+	if (socialRecord.status !== "approved") throw new Error("400:social_record_not_approved");
+
+	if (socialRecord.status === "rejected") throw new Error("400:social_record_rejected");
+
+	const tagResult = await TagsSearchModule.searchTag(
+		{
+			tagName,
+			domain,
+			environment: "all",
+			type: "both",
+		},
+		authUser
+	);
+
+	if (!tagResult.tagObject) throw new Error("404:tag_not_found");
+
+	const domainConfig = getDomainConfig(domain);
+
+	const updatedTagObject = await MyTagsModule.addDurationToTag(
+		{
+			tagName,
+			duration: 1,
+			domain,
+			domainConfig,
+		},
+		tagResult.tagObject
+	);
+
+	socialRecord.status = "approved";
+
+	await socialRecord.save();
+
+	return {
+		tagObject: updatedTagObject,
+		socialRecord,
+	};
+};
+
 module.exports = {
 	provideEmail,
 	validateOTP,
@@ -485,4 +540,5 @@ module.exports = {
 	getRecord,
 	generateOTP,
 	sendOTPEmail,
+	getReward,
 };

@@ -30,6 +30,10 @@ const schemas = {
 		tagName: string().required(),
 		domain: string().required(),
 	},
+	getReward: {
+		tagName: string().required(),
+		domain: string().required(),
+	},
 };
 
 /**
@@ -216,10 +220,43 @@ const getRecordValidation = async (ctx, next) => {
 	}
 };
 
+/**
+ * Middleware to validate get reward request
+ * Gets reward by tagName and domain for authenticated user
+ */
+const getRewardValidation = async (ctx, next) => {
+	try {
+		const { tagName, domain } = ctx.request.body;
+
+		const valid = validate(schemas.getReward, {
+			tagName,
+			domain,
+		});
+
+		if (valid.error) {
+			ctx.status = 400;
+
+			ctx.body = { error: valid.error.message };
+
+			return;
+		}
+
+		// Normalize values
+		ctx.state.tagName = tagName.toLowerCase().trim();
+		ctx.state.domain = domain.toLowerCase().trim();
+
+		await next();
+	} catch (error) {
+		ctx.status = 400;
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	provideEmailValidation,
 	validateOTPValidation,
 	validateXValidation,
 	validateLinkedInValidation,
 	getRecordValidation,
+	getRewardValidation,
 };
