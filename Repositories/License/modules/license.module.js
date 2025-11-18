@@ -187,7 +187,12 @@ const getMyLicense = async (jwt, withJSON = false, ownershipCredentials) => {
 		}
 	}
 
-	return { myLicense: myLicenses.length ? myLicenses[0] : null, zelfAccount: client, accountZelfProof, accountJSON };
+	return {
+		myLicense: myLicenses.length ? myLicenses[0] : null,
+		zelfAccount: client,
+		accountZelfProof,
+		accountJSON,
+	};
 };
 
 /**

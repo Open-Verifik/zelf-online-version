@@ -29,6 +29,7 @@ const getThemeSettings = async (ctx) => {
 const updateThemeSettings = async (ctx) => {
 	try {
 		const payload = Object.assign(ctx.request.query, ctx.request.body);
+
 		const { faceBase64, masterPassword, themeSettings } = payload;
 
 		const data = await Module.updateThemeSettings(

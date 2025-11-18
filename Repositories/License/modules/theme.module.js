@@ -25,6 +25,38 @@ const getThemeSettings = async (user) => {
 };
 
 /**
+ * Deep merge utility function
+ * @param {Object} target - Target object to merge into
+ * @param {Object} source - Source object to merge from
+ * @returns {Object} - Merged object
+ */
+const deepMerge = (target, source) => {
+	if (!source || typeof source !== "object") return target;
+	if (!target || typeof target !== "object") return source;
+
+	const result = { ...target };
+
+	for (const key in source) {
+		if (source.hasOwnProperty(key)) {
+			if (
+				source[key] &&
+				typeof source[key] === "object" &&
+				!Array.isArray(source[key]) &&
+				target[key] &&
+				typeof target[key] === "object" &&
+				!Array.isArray(target[key])
+			) {
+				result[key] = deepMerge(target[key], source[key]);
+			} else {
+				result[key] = source[key];
+			}
+		}
+	}
+
+	return result;
+};
+
+/**
  * Update user's theme settings
  * @param {Object} requestData - Request data with biometric verification
  * @param {Object} user - User object
@@ -36,15 +68,18 @@ const updateThemeSettings = async (requestData, user) => {
 
 		const { myLicense } = await LicenseModule.getMyLicense(user, true, { faceBase64, masterPassword });
 
-		if (!myLicense) throw new Error("404:license_not_found");
+		if (!myLicense || !myLicense.publicData || !myLicense.domainConfig) throw new Error("404:license_not_found");
 
-		// Get current license data
-		const licenseData = myLicense.publicData;
+		// Get existing theme settings or default
+		const existingThemeSettings = myLicense.domainConfig.themeSettings || getDefaultThemeSettings();
+
+		// Deep merge new theme settings with existing ones to preserve partial updates
+		const mergedThemeSettings = deepMerge(existingThemeSettings, themeSettings || {});
 
 		// Update theme settings in domain config
 		const updatedDomainConfig = {
 			...myLicense.domainConfig,
-			themeSettings: themeSettings,
+			themeSettings: mergedThemeSettings,
 			updatedAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 		};
 
@@ -58,8 +93,8 @@ const updateThemeSettings = async (requestData, user) => {
 				base64: base64Data,
 				metadata: {
 					type: "license",
-					licenseType: licenseData.type || "custom",
-					licenseSubscriptionId: licenseData.subscriptionId || "free",
+					licenseType: myLicense.publicData.type || "custom",
+					licenseSubscriptionId: myLicense.publicData.subscriptionId || "free",
 					licenseDomain: updatedDomainConfig.name,
 					licenseOwner: user.email,
 				},
@@ -74,10 +109,11 @@ const updateThemeSettings = async (requestData, user) => {
 
 		return {
 			ipfs: updatedLicense,
-			themeSettings: themeSettings,
+			themeSettings: mergedThemeSettings,
 		};
 	} catch (error) {
 		console.error("Update theme settings error:", error);
+
 		throw error;
 	}
 };
