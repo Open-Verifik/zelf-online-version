@@ -81,12 +81,6 @@ const insert = async (params) => {
 			identifier: params.clientIP,
 			...session,
 		});
-
-		const error = new Error("session_duplication");
-
-		error.status = 409;
-
-		throw error;
 	}
 
 	return {
