@@ -193,6 +193,7 @@ const configuration = {
 		},
 	},
 	avalanche: {
+		contractAddress: process.env.AVALANCHE_CONTRACT_ADDRESS || "0x6C995090C530756d59E6eEa5a3bA209863e0E167",
 		createNFT: process.env.AVALANCHE_CREATE_NFT === "true",
 		rpcUrl:
 			process.env.AVALANCHE_RPC_URL ||

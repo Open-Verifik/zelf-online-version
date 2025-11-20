@@ -1,0 +1,34 @@
+{
+	"name": "zelf-avalanche-nft",
+	"version": "1.0.0",
+	"description": "Avalanche NFT deployment and management for ZelfKey",
+	"type": "module",
+	"main": "modules/avalanche-nft.module.js",
+	"scripts": {
+		"compile": "hardhat compile",
+		"deploy:mainnet": "hardhat run deploy/deploy-contract.js --network avalanche",
+		"deploy:testnet": "hardhat run deploy/deploy-contract.js --network fuji",
+		"deploy:local": "hardhat run deploy/deploy-contract.js --network hardhat",
+		"verify:mainnet": "hardhat verify --network avalanche",
+		"verify:testnet": "hardhat verify --network fuji",
+		"verify:local": "hardhat verify --network hardhat",
+		"test": "node test-avalanche-nft.js"
+	},
+	"keywords": [
+		"avalanche",
+		"nft",
+		"zelfkey",
+		"blockchain"
+	],
+	"author": "Miguel Trevino",
+	"license": "ISC",
+	"dependencies": {
+		"dotenv": "^16.4.5",
+		"ethers": "6.13.5"
+	},
+	"devDependencies": {
+		"@nomicfoundation/hardhat-ethers": "^4.0.0",
+		"@openzeppelin/contracts": "^5.4.0",
+		"hardhat": "^3.0.1"
+	}
+}

@@ -48,3 +48,6 @@ config/0012589021.json
 cache/official-licenses-cache.json
 config/google_key.json
 config/gemini_key.json
+
+Avalanche/artifacts/
+Avalanche/cache/

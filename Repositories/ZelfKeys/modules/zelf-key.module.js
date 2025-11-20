@@ -3,7 +3,6 @@
  * Standalone version without external dependencies
  * @author Miguel Trevino <miguel@zelf.world>
  */
-
 const TagsModule = require("../../Tags/modules/tags.module");
 const TagsPartsModule = require("../../Tags/modules/tags-parts.module");
 const ZelfKeyIPFSModule = require("./zelf-key-ipfs.module");
@@ -11,7 +10,9 @@ const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const IPFS = require("../../../Core/ipfs");
 const QRZelfProofExtractor = require("../../Tags/modules/qr-zelfproof-extractor.module");
+
 const { createNFT } = require("../../Avalanche/modules/avax-nft.module");
+
 const config = require("../../../Core/config");
 
 const createMetadataAndPublicData = async (type, data, authToken) => {
@@ -119,7 +120,7 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken) =
 
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, zelfKey);
 
-	// Store ZOTP in Walrus if type is zotp
+	// Store ZOTP in Walrus
 	zelfKey.walrus = await WalrusModule.zelfKeyStorage(zelfKey.zelfProofQRCode, {
 		zelfProof: zelfKey.zelfProof,
 		publicData,
@@ -142,29 +143,29 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken) =
 		qrCodeIPFS = await IPFS.pinFile(zelfKey.zelfProofQRCode, `${identifier}.png`, "image/png", {
 			...publicData,
 			identifier,
-			zelfProof: zelfKey.zelfProof,
 		});
 	} catch (ipfsError) {
 		console.warn("⚠️ Failed to pin QR code to IPFS, continuing without IPFS:", ipfsError.message);
 	}
 
-	// Create NFT if enabled and QR code was pinned successfully
-	const NFT =
-		config.avalanche.createNFT && qrCodeIPFS
-			? await createNFT(
-					{
-						name: identifier,
-						publicData,
-						url: qrCodeIPFS.url,
-						zelfProof: zelfKey.zelfProof,
-						zelfQR: zelfKey.zelfProofQRCode,
-					},
-					authToken
-			  )
-			: null;
+	let NFT = null;
 
-	if (NFT) {
-		try {
+	try {
+		NFT =
+			config.avalanche.createNFT && qrCodeIPFS
+				? await createNFT(
+						{
+							name: identifier,
+							publicData,
+							url: qrCodeIPFS.url,
+							zelfProof: zelfKey.zelfProof,
+							zelfQR: zelfKey.zelfProofQRCode,
+						},
+						authToken
+				  )
+				: null;
+
+		if (NFT) {
 			const NFTJSON = JSON.stringify(NFT, null, 2);
 
 			const base64Data = Buffer.from(NFTJSON).toString("base64");
@@ -184,9 +185,9 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken) =
 					tokenId: NFT.tokenId,
 				}),
 			});
-		} catch (ipfsError) {
-			console.warn("⚠️ Failed to pin NFT transaction to IPFS, continuing without IPFS:", ipfsError.message);
 		}
+	} catch (ipfsError) {
+		console.warn("⚠️ Failed to pin NFT transaction to IPFS, continuing without IPFS:", ipfsError.message);
 	}
 
 	return {
@@ -271,6 +272,7 @@ const storeData = async (data, authToken) => {
 
 		const shortTimestamp = getShortTimestamp();
 		const identifier = `${fullTagName}_${shortTimestamp}`;
+
 		const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
 
 		return {

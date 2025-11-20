@@ -1,4 +1,3 @@
-const fs = require("fs");
 let armoredPublicKey = null;
 let secretKey = "your-secret-key";
 let passphrase = "something-seom";
@@ -55,10 +54,12 @@ const insert = async (params) => {
 			return {
 				token: jwt.sign(
 					{
-						session: existingSession._id,
-						identifier: existingSession.identifier,
 						domain: existingSession.domain,
+						ethAddress: existingSession.ethAddress,
+						identifier: existingSession.identifier,
 						ip: existingSession.clientIP,
+						session: existingSession._id,
+						tagName: existingSession.tagName,
 					},
 					config.JWT_SECRET
 				),
@@ -69,13 +70,14 @@ const insert = async (params) => {
 	}
 
 	const session = new Model({
-		identifier: params.identifier || params.clientIP,
-		tagName: params.tagName || null,
-		domain: params.domain || "zelf",
 		clientIP: params.clientIP,
-		type: params.type || "general",
-		status: "active",
+		domain: params.domain || "zelf",
+		ethAddress: params.ethAddress || null,
+		identifier: params.identifier || params.clientIP,
 		isWebExtension: params.isWebExtension || false,
+		status: "active",
+		tagName: params.tagName || null,
+		type: params.type || "general",
 	});
 
 	try {
@@ -91,11 +93,12 @@ const insert = async (params) => {
 	return {
 		token: jwt.sign(
 			{
-				session: session._id,
-				identifier: session.identifier,
-				tagName: session.tagName || null,
 				domain: session.domain || "zelf",
+				ethAddress: params.ethAddress || null,
+				identifier: session.identifier,
 				ip: session.clientIP,
+				session: session._id,
+				tagName: session.tagName || null,
 			},
 			config.JWT_SECRET
 		),
