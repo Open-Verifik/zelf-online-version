@@ -155,7 +155,7 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken) =
 			config.avalanche.createNFT && qrCodeIPFS
 				? await createNFT(
 						{
-							name: identifier,
+							identifier,
 							publicData,
 							url: qrCodeIPFS.url,
 							zelfProof: zelfKey.zelfProof,
