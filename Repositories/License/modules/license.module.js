@@ -132,7 +132,7 @@ const searchLicense = async (query, user) => {
  * Get user's own licenses
  * @param {Object} query - Query parameters
  * @param {Object} jwt - JWT object
- * @returns {Array} - Array of user's licenses
+ * @returns {Promise<Array>} - Array of user's licenses
  */
 const getMyLicense = async (jwt, withJSON = false, ownershipCredentials) => {
 	// Get client data to get the zelfProof

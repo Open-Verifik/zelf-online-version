@@ -5,9 +5,8 @@ const base = "/license/theme";
 
 module.exports = (server) => {
 	const PATH = config.basePath(base);
-	// Route definitions
-	server.get(`${PATH}`, Middleware.getThemeValidation, Controller.getThemeSettings);
 
+	server.get(`${PATH}`, Middleware.getThemeValidation, Controller.getThemeSettings);
 	server.post(`${PATH}`, Middleware.updateThemeValidation, Controller.updateThemeSettings);
 };
 
