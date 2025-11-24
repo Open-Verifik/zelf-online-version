@@ -99,15 +99,15 @@ const validateJWT = async (ctx, next) => {
 		[]
 	);
 
-	if (!session || session.globalCount > config.sessions.globalLimit) {
+	if (session?.globalCount > config.sessions?.globalLimit) {
 		ctx.status = 401;
 		ctx.body = { error: "Invalid session" };
 		return;
 	}
 
-	session.globalCount += 1;
+	session?.globalCount += 1;
 
-	await session.save();
+	await session?.save();
 
 	await next();
 };
