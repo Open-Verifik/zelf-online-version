@@ -105,9 +105,11 @@ const validateJWT = async (ctx, next) => {
 		return;
 	}
 
-	session?.globalCount += 1;
+	if (session) {
+		session.globalCount += 1;
 
-	await session?.save();
+		await session.save();
+	}
 
 	await next();
 };
