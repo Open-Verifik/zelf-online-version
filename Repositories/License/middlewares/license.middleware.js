@@ -33,9 +33,27 @@ const schemas = {
 					methods: array()
 						.items(stringEnum(["coinbase", "crypto", "stripe"]))
 						.required(),
+					networks: object()
+						.pattern(
+							string(),
+							object({
+								enabled: boolean().required(),
+								nativeCurrency: object({
+									enabled: boolean().required(),
+									code: string().required(),
+								}).required(),
+								altCoins: object({
+									enabled: boolean().required(),
+									standard: string().allow("", null).optional(),
+									showAll: boolean().default(true),
+									specificTokens: array().items(string()).default([]),
+								}).optional(),
+							})
+						)
+						.default({}),
 					currencies: array()
 						.items(stringEnum(["BTC", "ETH", "SOL", "USDC", "USDT", "BDAG", "AVAX", "ZNS"]))
-						.required(),
+						.optional(),
 					discounts: object({
 						yearly: number().min(0).max(1).default(0.1),
 						lifetime: number().min(0).max(1).default(0.2),

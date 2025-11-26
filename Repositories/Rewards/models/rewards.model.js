@@ -69,7 +69,6 @@ const rewardsSchema = new mongoose.Schema(
 );
 
 // Indexes
-rewardsSchema.index({ rewardPrimaryKey: 1 }, { unique: true });
 rewardsSchema.index({ name: 1, type: 1 });
 rewardsSchema.index({ name: 1, status: 1 });
 rewardsSchema.index({ createdAt: -1 });
