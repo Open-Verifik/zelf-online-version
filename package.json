@@ -36,14 +36,14 @@
 		"@mysten/sui": "^1.36.0",
 		"@mysten/sui.js": "^0.54.1",
 		"@mysten/walrus": "^0.2.3",
-		"@solana/spl-token": "^0.4.13",
+		"@solana/spl-token": "^0.1.8",
 		"@solana/web3.js": "^1.93.0",
 		"@toruslabs/tss-lib": "^2.3.0",
 		"axios": "1.12.1",
 		"bcrypt-nodejs": "^0.0.3",
-		"bip32": "^5.0.0-rc.0",
+		"bip32": "^4.0.0",
 		"bip39": "^3.1.0",
-		"bitcoinjs-lib": "^7.0.0-rc.0",
+		"bitcoinjs-lib": "^6.1.7",
 		"canvas": "^3.2.0",
 		"cheerio": "^1.0.0-rc.10",
 		"dotenv": "^16.4.5",
@@ -74,7 +74,6 @@
 		"qrcode": "^1.5.4",
 		"qrcode-reader": "^1.0.4",
 		"readable-stream": "^4.5.2",
-		"request": "^2.88.2",
 		"stripe": "^16.6.0",
 		"swagger-jsdoc": "^6.2.8",
 		"tiny-secp256k1": "^2.2.3",
@@ -83,7 +82,11 @@
 	"dresolutions": {
 		"axios": "1.8.2",
 		"elliptic": "^6.6.1",
-		"ws": "^8.0.0"
+		"ws": "^8.0.0",
+		"valibot": "^1.2.0"
+	},
+	"overrides": {
+		"valibot": "^1.2.0"
 	},
 	"keywords": [
 		"zelf",
