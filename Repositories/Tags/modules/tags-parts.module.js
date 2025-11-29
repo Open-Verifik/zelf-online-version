@@ -448,6 +448,30 @@ const decryptNotesParams = async (params, authUser) => {
 	return { keyValuePairs };
 };
 
+const encryptCreditCardParams = async (params, authUser) => {
+	const { cvv, cardNumber, masterPassword } = params;
+
+	const pgp = await SessionModule.walletEncrypt({ cvv, cardNumber }, authUser.ethAddress, masterPassword);
+
+	return pgp;
+};
+
+const encryptPasswordParams = async (params, authUser) => {
+	const { password, masterPassword } = params;
+
+	const pgp = await SessionModule.walletEncrypt({ password }, authUser.ethAddress, masterPassword);
+
+	return pgp;
+};
+
+const encryptNotesParams = async (params, authUser) => {
+	const { content, masterPassword } = params;
+
+	const pgp = await SessionModule.walletEncrypt({ content }, authUser.ethAddress, masterPassword);
+
+	return pgp;
+};
+
 module.exports = {
 	decryptParams,
 	encryptParams,
@@ -467,4 +491,7 @@ module.exports = {
 	decryptCreditCardParams,
 	decryptPasswordParams,
 	decryptNotesParams,
+	encryptCreditCardParams,
+	encryptPasswordParams,
+	encryptNotesParams,
 };

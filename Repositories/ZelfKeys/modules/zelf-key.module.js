@@ -295,10 +295,14 @@ const storeData = async (data, authToken) => {
  * @returns {Promise<Object>}
  */
 const retrieveData = async (data, authToken) => {
-	try {
-		const { zelfProof, faceBase64, password } = data;
+	const { zelfProof, faceBase64, password, type } = data;
 
-		const decryptedParams = await TagsPartsModule.decryptParams(
+	let decryptedParams = null;
+	let pgp = null;
+	let zelfKey = null;
+
+	try {
+		decryptedParams = await TagsPartsModule.decryptParams(
 			{
 				password,
 				faceBase64,
@@ -306,20 +310,50 @@ const retrieveData = async (data, authToken) => {
 			authToken
 		);
 
-		// Decrypt using ZelfProof module
-		const zelfKey = await ZelfProofModule.decrypt({
-			zelfProof,
+		zelfKey = await ZelfProofModule.decrypt({
 			faceBase64: decryptedParams.face,
-			password: decryptedParams.password,
 			os: "DESKTOP",
+			password: decryptedParams.password,
+			zelfProof,
 		});
-
-		return zelfKey;
 	} catch (error) {
-		console.error("Error retrieving data:", error);
-
-		throw new Error("409:failed_to_retrieve_data");
+		throw new Error("409:failed_to_decrypt");
 	}
+
+	if (!zelfKey) throw new Error("409:zelf_key_record_not_found");
+
+	try {
+		const encryptionParams = {
+			...zelfKey?.metadata,
+		};
+
+		switch (type) {
+			case "payment-card":
+			case "credit_card":
+				pgp = await TagsPartsModule.encryptCreditCardParams(encryptionParams, authToken);
+
+				break;
+			case "password":
+				pgp = await TagsPartsModule.encryptPasswordParams(encryptionParams, authToken);
+
+				break;
+			case "notes":
+				pgp = await TagsPartsModule.encryptNotesParams(encryptionParams, authToken);
+
+				break;
+			default:
+				break;
+		}
+	} catch (error) {
+		throw new Error("409:failed_to_encrypt_metadata_for_transport");
+	}
+
+	zelfKey.metadata = {};
+
+	return {
+		...zelfKey,
+		pgp,
+	};
 };
 
 /**
