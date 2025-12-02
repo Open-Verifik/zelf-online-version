@@ -271,6 +271,7 @@ const storeData = async (data, authToken) => {
 		);
 
 		const shortTimestamp = getShortTimestamp();
+
 		const identifier = `${fullTagName}_${shortTimestamp}`;
 
 		const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
