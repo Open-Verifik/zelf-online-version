@@ -203,6 +203,7 @@ const sessionDecrypt = async (content, authUser) => {
 
 		return decryptedContent;
 	} catch (exception) {
+		console.error("Error during decryption:", { exception, authUser });
 		return null;
 	}
 };
