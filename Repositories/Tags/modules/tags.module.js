@@ -58,6 +58,10 @@ const leaseTag = async (params, authUser) => {
 
 	const { face, password } = decryptedParams;
 
+	if (!face) throw new Error("409:face_not_found");
+
+	if (!password) throw new Error("409:password_not_found");
+
 	const { eth, btc, solana, sui, zkProof, mnemonic } = await _createWalletsFromPhrase({
 		...params,
 		mnemonic: decryptedParams.mnemonic,
