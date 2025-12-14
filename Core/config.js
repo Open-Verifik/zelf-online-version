@@ -173,7 +173,7 @@ const configuration = {
 				description: "20 new encryptions per month.",
 				interval: "month",
 				name: "Basic Plan",
-				price: 5.99,
+				price: 4.99,
 				priceId: process.env.STRIPE_BASIC_PRICE_ID,
 			},
 			pro: {
@@ -181,7 +181,7 @@ const configuration = {
 				description: "50 new encryptions per month",
 				interval: "month",
 				name: "Pro Plan",
-				price: 12.99,
+				price: 9.99,
 				priceId: process.env.STRIPE_PRO_PRICE_ID,
 			},
 			enterprise: {
@@ -189,7 +189,7 @@ const configuration = {
 				description: "100 new encryptions per month.",
 				interval: "month",
 				name: "Enterprise Plan",
-				price: 49.99,
+				price: 19.99,
 				priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
 			},
 		},
