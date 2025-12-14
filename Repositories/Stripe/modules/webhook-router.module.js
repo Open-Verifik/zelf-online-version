@@ -73,8 +73,6 @@ const getWebhookSource = async (event) => {
 const routeWebhook = async (event) => {
 	const source = await getWebhookSource(event);
 
-	console.log({ source });
-
 	// Extension/app sources route to Subscription module
 	if (source === "extension" || source === "ios" || source === "android") {
 		return await SubscriptionModule.webhookHandler(event);

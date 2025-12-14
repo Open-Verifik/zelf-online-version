@@ -382,6 +382,17 @@ async function searchSubscriptionInIPFS(zelfKeysTag) {
 			const isActiveOrCancelledActive = !keyValues.status || keyValues.status === "active" || keyValues.status === "cancelled_active";
 
 			if (isActiveOrCancelledActive) {
+				// For cancelled_active, ensure we haven't passed the end date
+				if (keyValues.status === "cancelled_active" && keyValues.endDate) {
+					const endDate = parseDateTime(keyValues.endDate);
+					// Add a small buffer (e.g. 24 hours) to be generous/account for timezone issues, or strict?
+					// Let's be strict but rely on the stored date.
+					if (endDate && endDate < new Date()) {
+						// Subscription has expired
+						continue;
+					}
+				}
+
 				activeSubscription = {
 					id: element.id,
 					url: element.url,
@@ -569,7 +580,10 @@ async function handleSubscriptionUpdated(subscription) {
 			subscriptionData
 		);
 
-		await pinata.unPinFiles([existingSubscription.ipfs_pin_hash]);
+		// Only delete the old one if we successfully created the new one
+		if (newRecord && newRecord.id && existingSubscription.id) {
+			await pinata.deleteFiles([existingSubscription.id]);
+		}
 
 		return newRecord;
 	} catch (error) {
@@ -589,13 +603,102 @@ async function handleSubscriptionDeleted(subscription) {
 		if (!tagName) return;
 
 		const zelfKeysTag = convertToZelfKeysFormat(tagName);
+
 		const existingSubscription = await searchSubscriptionInIPFS(zelfKeysTag);
 
 		if (!existingSubscription) return;
 
+		// Check if we are still within the paid period
+		const periodEnd = new Date(subscription.current_period_end * 1000);
+
+		const now = new Date();
+
+		// If the period ends in the future (more than a small buffer of 5 minutes),
+		// we treat it as cancelled_active, effectively letting them keep access until then.
+		// However, 'customer.subscription.deleted' usually means it IS removed from Stripe effective immediately
+		// OR effective at period end (but the event fires when the deletion actually happens).
+		// If Stripe fires this event, the subscription GONE from Stripe active list.
+		// BUT if the user passed 'cancel_at_period_end' in update, we get 'updated' event, not 'deleted'.
+		// 'deleted' event means it is actually cancelled/revoked.
+		// BUT, if we want to support "cancel it BUT we don't remove their subscrption yet since it will cancel at the end of their billing cycle",
+		// we usually handle that in 'customer.subscription.updated' (where cancel_at_period_end becomes true).
+		// Let's re-read the user request carefully: "we need to cover the case where they cancel it BUT we don't remove their subscrption yet since it will cancel at the end of their billing cycle"
+		// This usually happens in `cancelSubscription` function (user action) or `handleSubscriptionUpdated` (webhook).
+		// `handleSubscriptionDeleted` is fired when it finally expires.
+
+		// Wait, if the user cancels via Dashboard (our app), `cancelSubscription` sets `cancel_at_period_end: true`.
+		// Stripe will then fire `customer.subscription.updated` with `cancel_at_period_end: true`.
+		// THEN, at the end of the month, Stripe fires `customer.subscription.deleted`.
+
+		// So, `handleSubscriptionUpdated` is where we mark it as "cancelled_active" (which I already implemented!).
+		// And `handleSubscriptionDeleted` is where we finally remove it.
+
+		// However, if the user is asking this, maybe they mean ensuring `handleSubscriptionUpdated` is doing it right?
+		// OR they mean if we receive a DELETE event but for some reason the time hasn't passed? (Unlikely).
+		// OR maybe they mean `handleSubscriptionDeleted` SHOULD check dates just in case?
+
+		// Actually, looking at `handleSubscriptionUpdated` above (lines 534-579):
+		// It sets `status = "cancelled_active"` if `subscription.cancel_at_period_end` is true.
+		// This seems correct for the "pending cancellation" state.
+
+		// The user pointed to `handleSubscriptionDeleted` specifically.
+		// Perhaps they want to ensure that even if we get a delete event, if the end date is in the future, we don't strict delete?
+		// But `deleted` event means Stripe has stopped the subscription.
+
+		// Let's assume the user wants to be EXTRA safe in `updated` or `deleted`.
+		// Wait, the user highlighted `handleSubscriptionDeleted`.
+		// "now we need to cover the case where they cancel cancel it BUT we don't remove their subscrption yet".
+		// If they cancel in Stripe Portal immediately, it might fire deleted? No, usually allows period end.
+
+		// Let's look at `cancelSubscription` (lines 162-184).
+		// It calls `stripe.subscriptions.update(..., { cancel_at_period_end: true })`.
+		// This triggers `customer.subscription.updated`.
+
+		// So `handleSubscriptionDeleted` SHOULD be the final cleanup.
+		// Maybe the user thinks `handleSubscriptionDeleted` is triggered immediately upon cancellation request?
+		// If so, I should check `subscription.status`.
+		// If `subscription.status` is `canceled`, it's done.
+
+		// Let's implement logic that checks if `current_period_end` is > now.
+		// If so, update to `cancelled_active` instead of deleting.
+
+		if (periodEnd > now) {
+			// Still has time remaining
+			const stripeData =
+				typeof existingSubscription.stripeData === "string"
+					? JSON.parse(existingSubscription.stripeData)
+					: existingSubscription.stripeData || {};
+
+			stripeData.status = "cancelled_active";
+			stripeData.cancelledAt = formatDateTime(new Date());
+			stripeData.cancelAtPeriodEnd = true; // effectively
+
+			const subscriptionData = {
+				stripeData: JSON.stringify(stripeData),
+				tagName: zelfKeysTag,
+				startDate: existingSubscription.startDate,
+				endDate: formatDateTime(periodEnd),
+				paymentMethod: "stripe",
+				type: "subscription",
+			};
+
+			// Should we update or unpin/pin? Update is safer
+			const newRecord = await updateSubscriptionInIPFS(zelfKeysTag, subscriptionData);
+
+			// Delete the old "active" record since we now have a "cancelled_active" one
+			if (newRecord && newRecord.id && existingSubscription.id) {
+				await pinata.deleteFiles([existingSubscription.id]);
+			}
+
+			return;
+		}
+
 		try {
-			await pinata.unPinFiles([existingSubscription.ipfs_pin_hash]);
+			if (existingSubscription.id) {
+				await pinata.deleteFiles([existingSubscription.id]);
+			}
 		} catch (unpinError) {
+			// ... existing error flow
 			const deletedSubscriptionData = {
 				stripeData: JSON.stringify({
 					...(existingSubscription.stripeData || {}),
