@@ -28,7 +28,7 @@ module.exports = (server) => {
 	require("../Repositories/Session/routes/session.route")(server);
 	require("../Repositories/Stripe/routes/stripe.routes")(server);
 	require("../Repositories/Subscribers/routes/subscriber.route")(server);
-	require("../Repositories/Subscription/routes/subscription.routes")(server);
+	require("../Repositories/ZelfKeysSubscription/routes/zelf-keys-subscription.routes")(server);
 	//T
 	//U
 	//V

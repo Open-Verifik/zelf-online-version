@@ -127,6 +127,7 @@ const getAvailablePlans = async () => {
  */
 const createCheckoutSession = async (body, user) => {
 	const { tagName } = user;
+
 	const { planId } = body;
 
 	if (!planId || !configuration.stripe.plans[planId]) {
@@ -140,14 +141,14 @@ const createCheckoutSession = async (body, user) => {
 	const planConfig = configuration.stripe.plans[planId];
 
 	const session = await stripe.checkout.sessions.create({
-		cancel_url: configuration.stripe.checkoutUrls.cancel,
+		cancel_url: configuration.stripe.zelfKeys.cancel,
 		customer_email: `${tagName}@zelf.world`,
 		line_items: [{ price: planConfig.priceId, quantity: 1 }],
 		metadata: { tagName: tagName, plan: planId, source: "extension" },
 		mode: "subscription",
 		payment_method_types: ["card"],
 		subscription_data: { metadata: { tagName: tagName, plan: planId, source: "extension" } },
-		success_url: `${configuration.stripe.checkoutUrls.success}&session_id={CHECKOUT_SESSION_ID}`,
+		success_url: configuration.stripe.zelfKeys.success,
 	});
 
 	return { success: true, checkoutUrl: session.url, sessionId: session.id };
@@ -347,7 +348,7 @@ const webhookHandler = async (event) => {
 
 				break;
 			case "invoice.payment_succeeded":
-				result.invoiceResult = await handleInvoicePaymentSucceeded(event.data.object);
+				result.invoiceResult = await handleInvoicePaymentSucceeded(event.data.object, event.id);
 				result.invoicePaymentProcessed = true;
 
 				break;
@@ -451,15 +452,23 @@ async function handleSubscriptionCreated(subscription) {
  * @param {Object} invoice
  * @returns {Object} invoice payment succeeded result
  */
-async function handleInvoicePaymentSucceeded(invoice) {
+async function handleInvoicePaymentSucceeded(invoice, eventId = null) {
 	try {
+		if (eventId) {
+			const key = `invoice_processing_${eventId}`;
+			if (processedWebhooks.has(key)) return { success: true, message: "already_processed" };
+			processedWebhooks.set(key, Date.now());
+		}
+
 		if (!invoice.subscription) return { success: false, message: "not_a_subscription_invoice_skipping" };
 
 		let subscription;
+
 		let tagName;
 
 		try {
 			subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+
 			tagName = subscription.metadata.tagName;
 		} catch (error) {
 			tagName = invoice.metadata?.tagName;
@@ -480,6 +489,7 @@ async function handleInvoicePaymentSucceeded(invoice) {
 		}
 
 		const zelfKeysTag = convertToZelfKeysFormat(tagName);
+
 		const existingSubscription = await searchSubscriptionInIPFS(zelfKeysTag);
 
 		if (existingSubscription) {
@@ -528,6 +538,7 @@ async function handleSubscriptionUpdated(subscription) {
 		if (!tagName) return;
 
 		const zelfKeysTag = convertToZelfKeysFormat(tagName);
+
 		const existingSubscription = await searchSubscriptionInIPFS(zelfKeysTag);
 
 		if (!existingSubscription) return;
@@ -800,6 +811,71 @@ const checkAvalancheTransactions = async (address, requiredAmount) => {
 	}
 };
 
+/**
+ *
+ * @param {string} sessionId
+ * @returns {Object} session check result
+ */
+async function checkSession(sessionId) {
+	if (processedWebhooks.has(`session_check_${sessionId}`)) {
+		return { success: true, message: "session_already_processed" };
+	}
+
+	const session = await stripe.checkout.sessions.retrieve(sessionId, {
+		expand: ["payment_intent", "subscription", "invoice"],
+	});
+
+	if (session.payment_status === "paid") {
+		processedWebhooks.set(`session_check_${sessionId}`, Date.now());
+
+		// Trigger the logic we were using for invoices
+		// We know that session.invoice is expanded to an object if present, or we can fetch it
+		let invoice = session.invoice;
+
+		if (typeof invoice === "string") {
+			invoice = await stripe.invoices.retrieve(invoice);
+		}
+
+		// If it's a subscription checkout, it usually has an invoice.
+		// If it doesn't (weird case for subscriptions), fall back to subscription retrieval
+		if (invoice) {
+			return await handleInvoicePaymentSucceeded(invoice);
+		} else {
+			// Fallback if no invoice is present but subscription is
+			if (session.subscription) {
+				const subscription =
+					typeof session.subscription === "string" ? await stripe.subscriptions.retrieve(session.subscription) : session.subscription;
+
+				// Construct a fake invoice-like object to reuse the logic
+				// or just abstract the logic out. For now, reusing handleInvoicePaymentSucceeded is easiest
+				// if we mock the invoice object structure it expects.
+				// Actually, handleInvoicePaymentSucceeded expects an invoice object.
+				// let's create a minimal one.
+
+				const minimalInvoice = {
+					subscription: subscription.id,
+					customer: subscription.customer,
+					metadata: session.metadata, // Pass session metadata as invoice metadata fallbacks
+					lines: {
+						data: [
+							{
+								period: {
+									start: subscription.current_period_start,
+									end: subscription.current_period_end,
+								},
+							},
+						],
+					},
+				};
+
+				return await handleInvoicePaymentSucceeded(minimalInvoice);
+			}
+		}
+	}
+
+	return { success: false, message: "session_not_paid_yet", status: session.payment_status };
+}
+
 module.exports = {
 	getActiveSubscription,
 	getAvailablePlans,
@@ -809,4 +885,5 @@ module.exports = {
 	createCryptoPayment,
 	confirmCryptoPayment,
 	webhookHandler,
+	checkSession,
 };

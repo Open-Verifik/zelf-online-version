@@ -1,5 +1,5 @@
-const Controller = require("../controllers/subscription.controller.js");
-const Middleware = require("../middlewares/subscription.middleware.js");
+const Controller = require("../controllers/zelf-keys-subscription.controller.js");
+const Middleware = require("../middlewares/zelf-keys-subscription.middleware.js");
 const config = require("../../../Core/config");
 
 const base = "/subscription";

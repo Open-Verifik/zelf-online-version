@@ -46,7 +46,7 @@ module.exports = (server) => {
 	require("../Repositories/SocialCampaigns/routes/social-campaigns.routes")(server);
 	require("../Repositories/sui/routes/sui-scrapping.route")(server);
 	require("../Repositories/Solana/routes/solana-scrapping.route")(server);
-	require("../Repositories/Subscription/routes/subscription-protected.routes")(server);
+	require("../Repositories/ZelfKeysSubscription/routes/zelf-keys-subscription-protected.routes")(server);
 	require("../Repositories/SubscriptionPlan/routes/subscription-plan.route")(server);
 	//T
 	require("../Repositories/tron/routes/tron-scrapping.route")(server);

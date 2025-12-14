@@ -159,11 +159,13 @@ const configuration = {
 		redirectUrl: process.env.STRIPE_REDIRECTURL || "https://verifik.app",
 		secretKey: process.env.STRIPE_SECRET_KEY || "",
 		taxes: 0.19,
-		checkoutUrls: {
-			success:
-				process.env.STRIPE_SUCCESS_URL ||
-				`${process.env.FRONTEND_URL || "http://localhost:4200"}/settings/plan-billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
-			cancel: process.env.STRIPE_CANCEL_URL || `${process.env.FRONTEND_URL || "http://localhost:4200"}/settings/plan-billing?canceled=true`,
+		zelfKeys: {
+			success: `${process.env.FRONTEND_URL}/zelfkeys/success?session_id={CHECKOUT_SESSION_ID}`,
+			cancel: `${process.env.FRONTEND_URL}/zelfkeys/cancel?canceled=true`,
+		},
+		dashboard: {
+			success: `${process.env.FRONTEND_URL}/settings/plan-billing?session_id={CHECKOUT_SESSION_ID}`,
+			cancel: `${process.env.FRONTEND_URL}/settings/plan-billing?canceled=true`,
 		},
 		plans: {
 			basic: {

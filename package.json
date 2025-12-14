@@ -1,6 +1,6 @@
 {
 	"scripts": {
-		"start": "node server.js",
+		"start": "nodemon server.js --delay=3s",
 		"preinstall": "npx npm-force-resolutions",
 		"test": "jest",
 		"test:watch": "jest --watch",

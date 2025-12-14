@@ -126,8 +126,8 @@ const createCheckoutSession = async (productId, priceId, customerEmail = null) =
 			},
 		],
 		mode: "subscription",
-		success_url: config.stripe.checkoutUrls.success,
-		cancel_url: config.stripe.checkoutUrls.cancel,
+		success_url: config.stripe.dashboard.success,
+		cancel_url: config.stripe.dashboard.cancel,
 		metadata: {
 			customerEmail: customerEmail,
 			priceId: priceId,
@@ -154,9 +154,7 @@ const createCheckoutSession = async (productId, priceId, customerEmail = null) =
 const getMySubscription = async (authToken) => {
 	const { myLicense, zelfAccount } = await getMyLicense(authToken, true);
 
-	if (!myLicense?.domainConfig?.stripe?.subscriptionId) {
-		throw new Error("404:subscription_not_found");
-	}
+	if (!myLicense?.domainConfig?.stripe?.subscriptionId) throw new Error("404:subscription_not_found");
 
 	const stripe = getStripeClient();
 

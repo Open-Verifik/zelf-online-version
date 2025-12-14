@@ -1,8 +1,7 @@
 const Stripe = require("stripe");
 
 const config = require("../../../Core/config");
-
-const SubscriptionModule = require("../../Subscription/modules/subscription.module");
+const SubscriptionModule = require("../../ZelfKeysSubscription/modules/zelf-keys-subscription.module");
 const StripeModule = require("./stripe.module");
 
 /**
@@ -73,6 +72,8 @@ const getWebhookSource = async (event) => {
  */
 const routeWebhook = async (event) => {
 	const source = await getWebhookSource(event);
+
+	console.log({ source });
 
 	// Extension/app sources route to Subscription module
 	if (source === "extension" || source === "ios" || source === "android") {

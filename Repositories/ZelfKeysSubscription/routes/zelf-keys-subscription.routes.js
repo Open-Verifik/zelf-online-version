@@ -1,4 +1,4 @@
-const Controller = require("../controllers/subscription.controller.js");
+const Controller = require("../controllers/zelf-keys-subscription.controller.js");
 
 const config = require("../../../Core/config");
 
@@ -8,4 +8,6 @@ module.exports = (server) => {
 	const PATH = config.basePath(base);
 
 	server.get(`${PATH}/plans`, Controller.getAvailablePlans);
+
+	server.post(`${PATH}/check-session`, Controller.checkSession);
 };

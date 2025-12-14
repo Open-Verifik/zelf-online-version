@@ -1,4 +1,4 @@
-const Module = require("../modules/subscription.module.js");
+const Module = require("../modules/zelf-keys-subscription.module.js");
 
 const getActiveSubscription = async (ctx) => {
 	try {
@@ -40,6 +40,7 @@ const createCheckoutSession = async (ctx) => {
 		const data = await Module.createCheckoutSession(ctx.request.body, ctx.state.user);
 
 		ctx.status = 200;
+
 		ctx.body = {
 			success: true,
 			checkoutUrl: data.checkoutUrl,
@@ -126,6 +127,27 @@ const confirmCryptoPayment = async (ctx) => {
 	}
 };
 
+const checkSession = async (ctx) => {
+	try {
+		const { sessionId } = ctx.request.body;
+		const data = await Module.checkSession(sessionId);
+
+		ctx.status = 200;
+		ctx.body = {
+			success: true,
+			data,
+		};
+	} catch (error) {
+		console.error("Error checking session:", error);
+
+		ctx.status = error.status || 500;
+		ctx.body = {
+			error: error.message,
+			success: false,
+		};
+	}
+};
+
 const webhookHandler = async (ctx) => {
 	try {
 		const data = await Module.webhookHandler(ctx.request.body, ctx.headers);
@@ -156,4 +178,5 @@ module.exports = {
 	createCryptoPayment,
 	confirmCryptoPayment,
 	webhookHandler,
+	checkSession,
 };
