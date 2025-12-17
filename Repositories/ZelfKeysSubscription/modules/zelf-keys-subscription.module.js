@@ -146,6 +146,7 @@ const createCheckoutSession = async (body, user) => {
 		line_items: [{ price: planConfig.priceId, quantity: 1 }],
 		metadata: { tagName: tagName, plan: planId, source: "extension" },
 		mode: "subscription",
+		discounts: [{ coupon: "ZELFKEYSGRATIS2025CARLOS" }],
 		payment_method_types: ["card"],
 		subscription_data: { metadata: { tagName: tagName, plan: planId, source: "extension" } },
 		success_url: configuration.stripe.zelfKeys.success,
