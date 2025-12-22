@@ -7,6 +7,7 @@ const { errorHandler } = require("../../../Core/http-handler");
 const createFromInvitation = async (ctx) => {
 	try {
 		const data = await StaffModule.createFromInvitation(ctx.request.body);
+
 		ctx.body = { data };
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);

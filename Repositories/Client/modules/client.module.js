@@ -7,6 +7,7 @@ const zelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const axios = require("axios");
+const sharp = require("sharp");
 
 /**
  *
@@ -201,7 +202,7 @@ const create = async (data) => {
 };
 
 const update = async (data, authUser) => {
-	const { name, email, countryCode, phone, company, faceBase64, masterPassword } = data;
+	const { name, email, countryCode, phone, company, faceBase64, masterPassword, accountPhoto } = data;
 
 	const cleanCountryCode = countryCode ? countryCode.replace(/^[^\d+]*/, "").trim() : null;
 
@@ -235,6 +236,51 @@ const update = async (data, authUser) => {
 
 	if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
 
+	// Handle accountPhoto upload if provided
+	if (accountPhoto) {
+		try {
+			// accountPhoto should be base64 string
+			const photoBuffer = Buffer.from(accountPhoto.replace(/^data:image\/\w+;base64,/, ""), "base64");
+
+			// Compress and optimize image using sharp
+			const compressedPhotoBuffer = await sharp(photoBuffer)
+				.resize(800, 800, {
+					fit: "inside",
+					withoutEnlargement: true,
+				})
+				.jpeg({
+					quality: 85,
+					progressive: true,
+				})
+				.toBuffer();
+
+			// Convert buffer to base64 for IPFS upload
+			const compressedPhotoBase64 = compressedPhotoBuffer.toString("base64");
+
+			// Upload compressed photo to IPFS
+			const photoIpfsHash = await IPFSModule.insert(
+				{
+					base64: compressedPhotoBase64,
+					name: `client-photo-${email || metadata.accountEmail}-${Date.now()}.jpg`,
+					metadata: {
+						type: "client_profile_photo",
+						photoEmail: email || metadata.accountEmail,
+						uploadedAt: new Date().toISOString(),
+					},
+					pinIt: true,
+				},
+				{ pro: true }
+			);
+
+			// update metadata
+			metadata.accountPhoto = photoIpfsHash.id;
+			metadata.accountPhotoUrl = photoIpfsHash.url;
+		} catch (error) {
+			console.error("Error uploading photo to IPFS:", error);
+			throw new Error("Failed to upload photo to IPFS");
+		}
+	}
+
 	// Unpin the previous IPFS record
 	if (zelfAccount.id) {
 		await IPFSModule.unPinFiles([zelfAccount.id]);
@@ -252,6 +298,8 @@ const update = async (data, authUser) => {
 		version: "1.0.0",
 		name: name || metadata.accountName,
 		hasPassword: metadata.hasPassword || "false",
+		accountPhoto: metadata.accountPhoto,
+		accountPhotoUrl: metadata.accountPhotoUrl,
 	};
 
 	// Convert to JSON string and then to base64
@@ -271,6 +319,7 @@ const update = async (data, authUser) => {
 				accountType: "client_account",
 				accountSubscriptionId: "free",
 				accountName: updatedClientData.name,
+				accountPhotoUrl: updatedClientData.accountPhotoUrl,
 			},
 			name: `${updatedClientData.email}.account`,
 			pinIt: true,

@@ -267,9 +267,7 @@ const createFromInvitation = async (data) => {
 		throw new Error("401:invalid_or_expired_invitation");
 	}
 
-	if (invitation.type !== "staff_invitation") {
-		throw new Error("401:invalid_invitation_type");
-	}
+	if (invitation.type !== "staff_invitation") throw new Error("401:invalid_invitation_type");
 
 	// Check if staff already exists (ACTIVE account)
 	const existingStaff = await IPFSModule.get({
@@ -279,9 +277,7 @@ const createFromInvitation = async (data) => {
 
 	const activeStaff = existingStaff.find((r) => r.accountType === "staff" || r.accountType === "staff_account");
 
-	if (activeStaff) {
-		throw new Error("403:staff_already_exists");
-	}
+	if (activeStaff) throw new Error("403:staff_already_exists");
 
 	// Create zelfProof for staff member using the zkProof from owner
 	let zelfProof;
@@ -307,6 +303,7 @@ const createFromInvitation = async (data) => {
 			tolerance: "REGULAR",
 			verifierKey: config.zelfEncrypt.serverKey,
 		});
+
 		zelfProof = encryptionResult.zelfProof;
 	} catch (error) {
 		if (error.message?.includes("LIVENESS")) {
@@ -431,19 +428,10 @@ const auth = async (data) => {
 		faceBase64,
 		verifierKey: config.zelfEncrypt.serverKey,
 		password: masterPassword,
+		identifier: email,
 	});
 
 	if (!decryptedAccount) throw new Error("409:error_decrypting_zelf_account");
-
-	console.log({
-		token: {
-			email,
-			role: decryptedAccount.metadata.staffRole,
-			ownerEmail: decryptedAccount.metadata.ownerEmail,
-			accountType: "staff",
-			exp: moment().add(30, "day").unix(),
-		},
-	});
 
 	return {
 		zelfProof: accountJSON.data.zelfProof,
@@ -600,16 +588,12 @@ const _processExistingInvitation = (ipfsRecords, existingJSON, currentData, isRe
 
 	let recoveredData = { ...currentData };
 
-	console.log({ recoveredData, existingJSON });
-
 	// ONLY recover data from existing JSON if missing in current request
 	// Do NOT overwrite values that the frontend explicitly sent
 	if (!recoveredData.staffPhone && existingJSON.staffPhone) {
 		recoveredData.staffPhone = existingJSON.staffPhone;
 	}
 	if (!recoveredData.staffName && (existingJSON.staffName || existingJSON.name)) {
-		console.log("Recovering staff name:", existingJSON.staffName, existingJSON.name, existingJSON);
-
 		recoveredData.staffName = existingJSON.staffName || existingJSON.name;
 	}
 
