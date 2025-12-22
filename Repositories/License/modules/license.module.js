@@ -534,7 +534,19 @@ const syncLicenseWithStripe = async (license, paymentData) => {
 				},
 		  };
 
-	const plan = DefaultLicenseValues.findPlanByPrice(paymentData.amountPaid);
+	// Use the original price from the subscription to identify the plan,
+	// as the paid amount might be different due to coupons, discounts, or prorations.
+	const subscriptionPrice = paymentData.subscription?.items?.data[0]?.price?.unit_amount;
+
+	const priceToMatch = subscriptionPrice !== undefined ? subscriptionPrice : paymentData.amountPaid;
+
+	const plan = DefaultLicenseValues.findPlanByPrice(priceToMatch);
+
+	if (!plan) {
+		console.error(`Plan not found for price: ${priceToMatch} (Paid: ${paymentData.amountPaid})`);
+
+		throw new Error(`Plan not found for price: ${priceToMatch}`);
+	}
 
 	const licenseObject = new Domain(licenseData);
 
@@ -550,7 +562,7 @@ const syncLicenseWithStripe = async (license, paymentData) => {
 		subscriptionId: paymentData.subscriptionId,
 		customerId: paymentData.customerId,
 		productId: paymentData.subscription.items?.data[0]?.plan?.product,
-		priceId: paymentData.priceId,
+		priceId: paymentData.priceId || paymentData.subscription?.items?.data[0]?.price?.id,
 		latestInvoiceId: paymentData.invoiceId,
 		amountPaid: paymentData.amountPaid,
 		paidAt: paymentData.paidAt,

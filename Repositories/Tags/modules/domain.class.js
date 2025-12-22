@@ -316,6 +316,7 @@ class Domain {
 			zelfkeys: this.zelfkeys,
 			storage: this.tags.storage,
 			stripe: this.stripe,
+			limits: this.limits,
 			metadata: this.metadata,
 			themeSettings: this.themeSettings, // Include complete themeSettings in JSON output
 		};

@@ -28,7 +28,7 @@ const plans = {
 			pricePerActiveUser: _setActiveUserPrice(10),
 			tags: parseInt(99 / _setTagPrice(6)),
 			zelfkeys: parseInt(99 / _setActiveUserPrice(10)),
-			zelfproofs: parseInt(99 / _setTagPrice(6)),
+			zelfProofs: parseInt(99 / _setTagPrice(6)),
 		},
 	},
 	zelfStartUp: {
@@ -39,7 +39,7 @@ const plans = {
 			pricePerActiveUser: _setActiveUserPrice(8),
 			tags: parseInt(499 / _setTagPrice(5)),
 			zelfkeys: parseInt(499 / _setActiveUserPrice(8)),
-			zelfproofs: parseInt(499 / _setTagPrice(5)),
+			zelfProofs: parseInt(499 / _setTagPrice(5)),
 		},
 	},
 	zelfBusiness: {
@@ -50,7 +50,7 @@ const plans = {
 			pricePerActiveUser: _setActiveUserPrice(7),
 			tags: parseInt(999 / _setTagPrice(4)),
 			zelfkeys: parseInt(999 / _setActiveUserPrice(7)),
-			zelfproofs: parseInt(999 / _setTagPrice(4)),
+			zelfProofs: parseInt(999 / _setTagPrice(4)),
 		},
 	},
 	zelfGold: {
@@ -61,7 +61,7 @@ const plans = {
 			pricePerActiveUser: _setActiveUserPrice(5),
 			tags: parseInt(2499 / _setTagPrice(3)),
 			zelfkeys: parseInt(2499 / _setActiveUserPrice(5)),
-			zelfproofs: parseInt(2499 / _setTagPrice(3)),
+			zelfProofs: parseInt(2499 / _setTagPrice(3)),
 		},
 	},
 	zelfEnterprise: {
@@ -72,7 +72,7 @@ const plans = {
 			pricePerActiveUser: _setActiveUserPrice(3),
 			tags: parseInt(4999 / _setTagPrice(2)),
 			zelfkeys: parseInt(4999 / _setActiveUserPrice(3)),
-			zelfproofs: parseInt(4999 / _setTagPrice(2)),
+			zelfProofs: parseInt(4999 / _setTagPrice(2)),
 		},
 	},
 };
