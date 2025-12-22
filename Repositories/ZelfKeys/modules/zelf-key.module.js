@@ -134,6 +134,8 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken) =
 
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, zelfKey);
 
+	console.log({ authToken });
+
 	// Store ZOTP in Walrus
 	if (isWalrusStorageSupported(authToken.domain, "zelfkeys")) {
 		zelfKey.walrus = await WalrusModule.zelfKeyStorage(zelfKey.zelfProofQRCode, {
