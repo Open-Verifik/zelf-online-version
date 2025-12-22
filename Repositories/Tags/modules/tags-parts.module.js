@@ -425,6 +425,14 @@ const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
 const decryptCreditCardParams = async (params, authUser) => {
 	let { cvv, cardNumber, masterPassword } = params;
 
+	if (params.removePGP) {
+		return {
+			cvv,
+			cardNumber,
+			masterPassword,
+		};
+	}
+
 	cvv = await SessionModule.sessionDecrypt(params.cvv, authUser);
 	cardNumber = params.cardNumber ? await SessionModule.sessionDecrypt(params.cardNumber, authUser) : null;
 	masterPassword = params.masterPassword ? await SessionModule.sessionDecrypt(params.masterPassword, authUser) : null;
@@ -435,6 +443,12 @@ const decryptCreditCardParams = async (params, authUser) => {
 const decryptPasswordParams = async (params, authUser) => {
 	let { password } = params;
 
+	if (params.removePGP) {
+		return {
+			password,
+		};
+	}
+
 	password = await SessionModule.sessionDecrypt(params.password, authUser);
 
 	return { password };
@@ -442,6 +456,12 @@ const decryptPasswordParams = async (params, authUser) => {
 
 const decryptNotesParams = async (params, authUser) => {
 	const { keyValuePairs } = params;
+
+	if (params.removePGP) {
+		return {
+			keyValuePairs,
+		};
+	}
 
 	keyValuePairs.content = await SessionModule.sessionDecrypt(keyValuePairs.content, authUser);
 

@@ -233,6 +233,7 @@ const storeData = async (data, authToken) => {
 			{
 				password: data.masterPassword,
 				faceBase64: data.faceBase64,
+				removePGP: data.removePGP,
 			},
 			authToken
 		);

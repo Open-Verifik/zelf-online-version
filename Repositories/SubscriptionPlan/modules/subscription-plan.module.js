@@ -125,6 +125,7 @@ const createCheckoutSession = async (productId, priceId, customerEmail = null) =
 				quantity: 1,
 			},
 		],
+		allow_promotion_codes: true,
 		mode: "subscription",
 		success_url: config.stripe.dashboard.success,
 		cancel_url: config.stripe.dashboard.cancel,
