@@ -123,6 +123,15 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken) =
 		tolerance: "REGULAR",
 	};
 
+	console.log({
+		_id: identifier,
+		addServerPassword: false,
+		// faceBase64,
+		metadata,
+		publicData,
+		tolerance: "REGULAR",
+	});
+
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, zelfKey);
 
 	// Store ZOTP in Walrus
@@ -246,8 +255,6 @@ const storeData = async (data, authToken) => {
 			},
 			authToken
 		);
-
-		const domainConfig = getDomainConfig(domain || authToken.domain);
 
 		let decryptedSensitiveData = {};
 
