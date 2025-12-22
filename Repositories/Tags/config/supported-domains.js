@@ -395,6 +395,30 @@ const getSupportedDomains = (licenses = null) => {
 	return SUPPORTED_DOMAINS;
 };
 
+const isWalrusStorageSupported = (domain, app) => {
+	const config = getDomainConfig(domain);
+
+	if (!config) return false;
+
+	return Boolean(config[app]?.storage?.walrusEnabled);
+};
+
+const isIPFSStorageSupported = (domain, app) => {
+	const config = getDomainConfig(domain);
+
+	if (!config) return false;
+
+	return Boolean(config[app]?.storage?.ipfsEnabled);
+};
+
+const isArweaveStorageSupported = (domain, app) => {
+	const config = getDomainConfig(domain);
+
+	if (!config) return false;
+
+	return Boolean(config[app]?.storage?.arweaveEnabled);
+};
+
 module.exports = {
 	getSupportedDomains,
 	getDomainConfig,
@@ -412,4 +436,7 @@ module.exports = {
 	getDomainLimits,
 	validateDomainName,
 	loadDynamicDomains,
+	isWalrusStorageSupported,
+	isIPFSStorageSupported,
+	isArweaveStorageSupported,
 };

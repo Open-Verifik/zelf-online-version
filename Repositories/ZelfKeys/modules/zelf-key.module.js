@@ -10,7 +10,12 @@ const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const IPFS = require("../../../Core/ipfs");
 const QRZelfProofExtractor = require("../../Tags/modules/qr-zelfproof-extractor.module");
-
+const {
+	getDomainConfig,
+	isWalrusStorageSupported,
+	isIPFSStorageSupported,
+	isArweaveStorageSupported,
+} = require("../../Tags/config/supported-domains");
 const { createNFT } = require("../../Avalanche/modules/avax-nft.module");
 
 const config = require("../../../Core/config");
@@ -121,20 +126,24 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken) =
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, zelfKey);
 
 	// Store ZOTP in Walrus
-	zelfKey.walrus = await WalrusModule.zelfKeyStorage(zelfKey.zelfProofQRCode, {
-		zelfProof: zelfKey.zelfProof,
-		publicData,
-	});
+	if (isWalrusStorageSupported(authToken.domain, "zelfkeys")) {
+		zelfKey.walrus = await WalrusModule.zelfKeyStorage(zelfKey.zelfProofQRCode, {
+			zelfProof: zelfKey.zelfProof,
+			publicData,
+		});
+	}
 
 	// now save it in IPFS
-	zelfKey.ipfs = await ZelfKeyIPFSModule.saveZelfKey(
-		{
-			zelfProofQRCode: zelfKey.zelfProofQRCode,
-			identifier,
-			publicData: { ...publicData, walrus: zelfKey.walrus.blobId },
-		},
-		authToken
-	);
+	if (isIPFSStorageSupported(authToken.domain, "zelfkeys")) {
+		zelfKey.ipfs = await ZelfKeyIPFSModule.saveZelfKey(
+			{
+				zelfProofQRCode: zelfKey.zelfProofQRCode,
+				identifier,
+				publicData: { ...publicData, walrus: zelfKey.walrus?.blobId },
+			},
+			authToken
+		);
+	}
 
 	// Pin QR code separately for NFT (using the same image)
 	let qrCodeIPFS = null;
@@ -227,7 +236,7 @@ const getShortTimestamp = () => {
  */
 const storeData = async (data, authToken) => {
 	try {
-		const { type } = data;
+		const { type, domain } = data;
 
 		const decryptedParams = await TagsPartsModule.decryptParams(
 			{
@@ -237,6 +246,8 @@ const storeData = async (data, authToken) => {
 			},
 			authToken
 		);
+
+		const domainConfig = getDomainConfig(domain || authToken.domain);
 
 		let decryptedSensitiveData = {};
 

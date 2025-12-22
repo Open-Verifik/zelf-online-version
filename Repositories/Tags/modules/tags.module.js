@@ -11,7 +11,7 @@ const OfflineProofModule = require("../../Mina/offline-proof");
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
 const { initTagUpdates, updateTags } = require("./sync-tag-records.module");
-const WalrusModule = require("../../Walrus/modules/walrus.module");
+
 const { generateHoldDomain } = require("./domain-registry.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const TagsRegistrationModule = require("./tags-registration.module");
