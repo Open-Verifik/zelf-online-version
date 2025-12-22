@@ -164,8 +164,8 @@ const configuration = {
 			cancel: `${process.env.FRONTEND_URL}/zelfkeys/cancel?canceled=true`,
 		},
 		dashboard: {
-			success: `${process.env.FRONTEND_URL}/settings/plan-billing?session_id={CHECKOUT_SESSION_ID}`,
-			cancel: `${process.env.FRONTEND_URL}/settings/plan-billing?canceled=true`,
+			success: `${process.env.DASHBOARD_URL}/settings/plan-billing?session_id={CHECKOUT_SESSION_ID}`,
+			cancel: `${process.env.DASHBOARD_URL}/settings/plan-billing?canceled=true`,
 		},
 		plans: {
 			basic: {

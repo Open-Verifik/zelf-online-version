@@ -20,4 +20,7 @@ module.exports = (server) => {
 
 	// create portal session for subscription management
 	server.post(`${PATH}/create-portal-session`, Middleware.createPortalSessionValidation, Controller.createPortalSession);
+
+	// verify session after redirect
+	server.post(`${PATH}/verify-session`, Middleware.verifySessionValidation, Controller.verifySession);
 };

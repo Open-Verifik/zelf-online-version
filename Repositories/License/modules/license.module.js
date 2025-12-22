@@ -7,11 +7,11 @@ const moment = require("moment");
 const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
 const DefaultLicenseValues = require("./default-license.values");
 const { Domain } = require("../../Tags/modules/domain.class");
-
 const { initCacheInstance } = require("../../../cache/manager");
 
 // Initialize cache with 1 hour TTL and check period of 10 minutes
 const licenseCache = initCacheInstance();
+
 /**
  * Load licenses from cache
  * @returns {Array|null} - Cached licenses or null if not found/expired
@@ -462,76 +462,19 @@ const _loadLicenseJSON = async (ipfsUrl) => {
 	return jsonData.data;
 };
 
+// Deprecated: use saveSubscriptionRecord instead to keep license and subscription separate
 const syncLicenseWithStripe = async (license, paymentData) => {
-	// first we need to
+	return saveSubscriptionRecord(license, paymentData);
+};
+
+// New function to save subscription as a separate IPFS record
+const saveSubscriptionRecord = async (license, paymentData) => {
 	const licenseData = license
 		? await _loadLicenseJSON(license.url)
 		: {
 				owner: paymentData.customerEmail,
+				name: "zelf", // Default name if license not found
 				type: "license",
-				status: "active",
-				description: `License for ${paymentData.customerEmail}`,
-				features: [
-					{
-						name: "Zelf Name Service",
-						code: "zns",
-						description: "Encryptions, Decryptions, previews of ZelfProofs",
-						enabled: true,
-					},
-					{
-						name: "Zelf Keys",
-						code: "zelfkeys",
-						description: "Zelf Keys: Passwords, Notes, Credit Cards, etc.",
-						enabled: true,
-					},
-				],
-				tags: {
-					minLength: 3,
-					maxLength: 50,
-					allowedChars: /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
-					reserved: ["www", "api", "admin", "support", "help"],
-					customRules: [],
-					payment: {
-						methods: ["coinbase", "crypto", "stripe"],
-						currencies: ["BDAG", "BTC", "ETH", "SOL", "USDT"],
-						discounts: {
-							yearly: 0.1,
-							lifetime: 0.2,
-						},
-						rewardPrice: 10,
-						whitelist: {},
-						pricingTable: {},
-					},
-					storage: {
-						// Moved storage inside tags
-						keyPrefix: "tagName",
-						ipfsEnabled: true,
-						arweaveEnabled: true,
-						walrusEnabled: true,
-						backupEnabled: false,
-					},
-				},
-				zelfkeys: {
-					plans: [],
-					payment: {
-						whitelist: {},
-						pricingTable: {},
-					},
-					storage: {
-						// Moved storage inside zelfkeys
-						keyPrefix: "tagName",
-						ipfsEnabled: true,
-						arweaveEnabled: true,
-						walrusEnabled: true,
-						backupEnabled: false,
-					},
-				},
-				metadata: {
-					launchDate: moment().format("YYYY-MM-DD"),
-					version: "1.0.0",
-					documentation: "https://docs.zelf.world",
-					support: "standard",
-				},
 		  };
 
 	// Use the original price from the subscription to identify the plan,
@@ -548,52 +491,69 @@ const syncLicenseWithStripe = async (license, paymentData) => {
 		throw new Error(`Plan not found for price: ${priceToMatch}`);
 	}
 
-	const licenseObject = new Domain(licenseData);
+	const domainName = licenseData.name || "zelf";
 
-	licenseObject.limits = plan.limits;
-	licenseObject.subscriptionId = paymentData.subscriptionId;
-	licenseObject.startDate = moment(new Date(paymentData.subscription.current_period_start * 1000)).format("YYYY-MM-DD HH:mm:ss");
-	licenseObject.endDate = moment(new Date(paymentData.subscription.current_period_end * 1000)).format("YYYY-MM-DD HH:mm:ss");
-	licenseObject.expiresAt = moment(new Date(paymentData.subscription.current_period_end * 1000))
-		.add(15, "days")
-		.format("YYYY-MM-DD HH:mm:ss");
-
-	licenseObject.stripe = {
+	// Create subscription object
+	const subscriptionObject = {
+		domain: domainName,
+		limits: plan.limits,
+		planCode: plan.code,
 		subscriptionId: paymentData.subscriptionId,
-		customerId: paymentData.customerId,
-		productId: paymentData.subscription.items?.data[0]?.plan?.product,
-		priceId: paymentData.priceId || paymentData.subscription?.items?.data[0]?.price?.id,
-		latestInvoiceId: paymentData.invoiceId,
-		amountPaid: paymentData.amountPaid,
-		paidAt: paymentData.paidAt,
-		status: paymentData.status,
+		startDate: moment(new Date(paymentData.subscription.current_period_start * 1000)).format("YYYY-MM-DD HH:mm:ss"),
+		endDate: moment(new Date(paymentData.subscription.current_period_end * 1000)).format("YYYY-MM-DD HH:mm:ss"),
+		expiresAt: moment(new Date(paymentData.subscription.current_period_end * 1000))
+			.add(15, "days")
+			.format("YYYY-MM-DD HH:mm:ss"),
+		stripe: {
+			subscriptionId: paymentData.subscriptionId,
+			customerId: paymentData.customerId,
+			productId: paymentData.subscription.items?.data[0]?.plan?.product,
+			priceId: paymentData.priceId || paymentData.subscription?.items?.data[0]?.price?.id,
+			latestInvoiceId: paymentData.invoiceId,
+			amountPaid: paymentData.amountPaid,
+			paidAt: paymentData.paidAt,
+			status: paymentData.status,
+		},
+		updatedAt: new Date().toISOString(),
 	};
 
-	// now we will create it with the new details
+	// We'll unpin any previous subscription file for this domain/subscription to avoid clutter?
+	// Actually, maybe we should keep history? IPFS is immutable, so old files exist but pinning ensures availability.
+	// If we want to "update", we should probably unpin the old one if we can find it.
+	// For now, let's just insert the new one.
 
-	await TagsIPFSModule.unPinFiles([license.id]);
+	// Attempt to find existing subscription for this domain to unpin it (cleanup)
+	const existingSubscriptions = await IPFS.get({ key: "subscriptionDomain", value: domainName });
 
-	const jsonData = JSON.stringify(licenseObject.toJSON(), null, 2);
+	if (existingSubscriptions && existingSubscriptions.length > 0) {
+		// Unpin old subscriptions for this domain??
+		// Maybe we just unpin the one that matches the same subscriptionId if we want to update?
+		// Or if we want to have only one active subscription record per domain?
+		// Let's assume one active subscription per domain.
+		await TagsIPFSModule.unPinFiles(existingSubscriptions.map((s) => s.id));
+	}
+
+	const jsonData = JSON.stringify(subscriptionObject, null, 2);
 
 	const base64Data = Buffer.from(jsonData).toString("base64");
 
-	const licenseUpdated = await IPFS.insert(
+	const subscriptionRecord = await IPFS.insert(
 		{
 			base64: base64Data,
 			metadata: {
-				type: "license",
-				licenseType: plan.code,
-				licenseSubscriptionId: paymentData.subscriptionId,
-				licenseDomain: licenseObject.name,
-				licenseOwner: licenseData.owner,
+				type: "subscription",
+				subscriptionId: paymentData.subscriptionId,
+				subscriptionDomain: domainName,
+				subscriptionOwner: licenseData.owner || paymentData.customerEmail,
+				plan: plan.code,
 			},
-			name: `${licenseObject.name}.license`,
+			name: `${domainName}.subscription`,
 			pinIt: true,
 		},
 		{ pro: true }
 	);
 
-	return licenseUpdated;
+	return subscriptionRecord;
 };
 
 module.exports = {
@@ -604,6 +564,7 @@ module.exports = {
 	deleteLicense,
 	loadOfficialLicenses,
 	syncLicenseWithStripe,
+	saveSubscriptionRecord,
 	// Cache management functions
 	clearCache,
 	getCacheStats,

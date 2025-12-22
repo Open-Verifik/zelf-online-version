@@ -1,7 +1,7 @@
 const Stripe = require("stripe");
 const config = require("../../../Core/config");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
-const { syncLicenseWithStripe } = require("../../License/modules/license.module");
+const { syncLicenseWithStripe, saveSubscriptionRecord } = require("../../License/modules/license.module");
 
 /**
  * Get Stripe client instance
@@ -93,7 +93,7 @@ const handleInvoicePaymentSucceeded = async (invoice, stripe) => {
 		// retrieve the license from IPFS with the same accountEmail
 		const licensesWithSameEmail = await IPFSModule.get({ key: "licenseOwner", value: customer.email });
 
-		await syncLicenseWithStripe(licensesWithSameEmail[0], paymentData);
+		await saveSubscriptionRecord(licensesWithSameEmail[0], paymentData);
 
 		return { status: "success", action: "invoice_payment_succeeded", data: paymentData };
 	} catch (error) {

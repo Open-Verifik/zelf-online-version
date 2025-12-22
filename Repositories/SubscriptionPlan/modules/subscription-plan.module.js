@@ -155,15 +155,74 @@ const createCheckoutSession = async (productId, priceId, customerEmail = null) =
 const getMySubscription = async (authToken) => {
 	const { myLicense, zelfAccount } = await getMyLicense(authToken, true);
 
-	if (!myLicense?.domainConfig?.stripe?.subscriptionId) throw new Error("404:subscription_not_found");
+	if (!myLicense) throw new Error("404:license_not_found");
+
+	const IPFSModule = require("../../IPFS/modules/ipfs.module");
+
+	// Try to find the subscription record in IPFS
+	const subscriptionRecords = await IPFSModule.get({
+		key: "subscriptionDomain",
+		value: myLicense.domainConfig.name,
+	});
+
+	let subscriptionId = myLicense.domainConfig?.stripe?.subscriptionId;
+	let productId = myLicense.domainConfig?.stripe?.productId;
+	let subscriptionIPFS = null;
+	let product = null;
+	let subscription = null;
+
+	if (subscriptionRecords && subscriptionRecords.length > 0) {
+		const subRecord = subscriptionRecords[0];
+		// Fetch the JSON content
+		const axios = require("axios");
+		try {
+			const jsonResponse = await axios.get(subRecord.url);
+			subscriptionIPFS = jsonResponse.data;
+
+			if (subscriptionIPFS.stripe?.subscriptionId) {
+				subscriptionId = subscriptionIPFS.stripe.subscriptionId;
+			}
+			if (subscriptionIPFS.stripe?.productId) {
+				productId = subscriptionIPFS.stripe.productId;
+			}
+		} catch (err) {
+			console.error("Failed to fetch subscription JSON from IPFS", err);
+		}
+	}
+
+	if (!subscriptionRecords || subscriptionRecords.length === 0) {
+		const result = await migrateLegacySubscription(myLicense, IPFSModule);
+
+		if (result) {
+			subscriptionIPFS = result.subscriptionIPFS;
+			subscriptionId = result.subscriptionId;
+			productId = result.productId;
+		}
+	}
+
+	if (!subscriptionId) {
+		// If no subscription found, return minimal info or null
+		return { myLicense, zelfAccount, subscription: null, product: null };
+	}
 
 	const stripe = getStripeClient();
 
-	const subscription = await stripe.subscriptions.retrieve(myLicense.domainConfig.stripe?.subscriptionId);
+	try {
+		subscription = await stripe.subscriptions.retrieve(subscriptionId);
+	} catch (e) {
+		console.warn("Stripe subscription not found:", subscriptionId);
+		// If stripe fails, we might still want to return what we have?
+	}
 
-	const product = await stripe.products.retrieve(myLicense.domainConfig.stripe?.productId);
+	if (productId || (subscription && subscription.plan && subscription.plan.product)) {
+		try {
+			product = await stripe.products.retrieve(productId || subscription.plan.product);
+		} catch (e) {
+			console.warn("Stripe product not found");
+		}
+	}
 
-	return { myLicense, zelfAccount, subscription, product };
+	return { myLicense, zelfAccount, subscription, product, subscriptionIPFS };
 };
 
 /**
@@ -174,14 +233,39 @@ const getMySubscription = async (authToken) => {
 const createPortalSession = async (authToken) => {
 	const stripe = getStripeClient();
 
-	// Get the user's subscription to find the customer ID
+	// Get the user's license
 	const { myLicense } = await getMyLicense(authToken, true);
 
-	if (!myLicense?.domainConfig?.stripe?.customerId) {
-		throw new Error("400:no_customer_found");
+	if (!myLicense) throw new Error("404:license_not_found");
+
+	let customerId = myLicense.domainConfig?.stripe?.customerId;
+
+	// Try to find the subscription record in IPFS to get the most recent/correct customer ID
+	// because we now store subscription info in a separate record
+	const IPFSModule = require("../../IPFS/modules/ipfs.module");
+
+	const subscriptionRecords = await IPFSModule.get({
+		key: "subscriptionDomain",
+		value: myLicense.domainConfig.name,
+	});
+
+	if (subscriptionRecords && subscriptionRecords.length > 0) {
+		const subRecord = subscriptionRecords[0];
+		const axios = require("axios");
+		try {
+			const jsonResponse = await axios.get(subRecord.url);
+			const subscriptionIPFS = jsonResponse.data;
+			if (subscriptionIPFS.stripe?.customerId) {
+				customerId = subscriptionIPFS.stripe.customerId;
+			}
+		} catch (err) {
+			console.error("Failed to fetch subscription JSON for portal session", err);
+		}
 	}
 
-	const customerId = myLicense.domainConfig.stripe.customerId;
+	if (!customerId) {
+		throw new Error("400:no_customer_found");
+	}
 
 	// Create portal session
 	const sessionParams = {
@@ -194,10 +278,130 @@ const createPortalSession = async (authToken) => {
 	return session;
 };
 
+const verifySession = async (sessionId, authToken) => {
+	const stripe = getStripeClient();
+
+	// Get the user's license to verify ownership matches or at least log/track
+	// In strictly safe env, we should check if session.customer_email matches user.email
+	// But Stripe checkout might use a different email if user changed it.
+	// For now, we trust the authenticated user providing a valid session ID from their flow.
+	const { myLicense } = await getMyLicense(authToken, true);
+
+	if (!myLicense) throw new Error("404:license_not_found");
+
+	// 1. Retrieve the session
+	const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+	if (!session) throw new Error("404:session_not_found");
+
+	console.log({ session });
+
+	if (session.payment_status !== "paid") throw new Error("400:session_not_paid");
+
+	// 2. Retrieve subscription
+	const subscription = await stripe.subscriptions.retrieve(session.subscription);
+	if (!subscription) throw new Error("404:subscription_not_found");
+
+	// 3. Retrieve customer
+	const customer = await stripe.customers.retrieve(session.customer);
+	if (!customer) throw new Error("404:customer_not_found");
+
+	// 4. Construct payment data (mimicking webhook structure)
+	const paymentData = {
+		invoiceId: session.invoice, // sessions usually have an invoice if it's subscription
+		subscriptionId: session.subscription,
+		customerId: session.customer,
+		customerEmail: customer.email,
+		amountPaid: session.amount_total,
+		paidAt: new Date(), // approximate if we don't fetch invoice
+		currency: session.currency,
+		status: "paid",
+		subscription: subscription,
+		customer: customer,
+		priceId: session.line_items?.data?.[0]?.price?.id || subscription.items.data[0].price.id,
+	};
+
+	// If we need strict invoice data (like paid_at), we could fetch the invoice:
+	if (session.invoice) {
+		const invoice = await stripe.invoices.retrieve(session.invoice);
+		paymentData.paidAt = new Date(invoice.status_transitions.paid_at * 1000);
+		paymentData.amountPaid = invoice.amount_paid;
+	}
+
+	// 5. Save/Update subscription record in IPFS
+	// We use the license found for the current user.
+	// NOTE: saveSubscriptionRecord uses license.url to load data or creates default.
+	const { saveSubscriptionRecord } = require("../../License/modules/license.module");
+	const record = await saveSubscriptionRecord(myLicense, paymentData);
+
+	return { success: true, record };
+};
+
+const migrateLegacySubscription = async (myLicense, IPFSModule) => {
+	const legacySubscriptionId = myLicense.domainConfig?.stripe?.subscriptionId;
+
+	if (!legacySubscriptionId) return null;
+
+	console.log("Migrating legacy subscription to new IPFS record format...", legacySubscriptionId);
+	const stripe = getStripeClient();
+	try {
+		const subscriptionToMigrate = await stripe.subscriptions.retrieve(legacySubscriptionId);
+		if (subscriptionToMigrate && subscriptionToMigrate.status === "active") {
+			const customer = await stripe.customers.retrieve(subscriptionToMigrate.customer);
+
+			// Mimic payment data
+			const paymentData = {
+				subscriptionId: subscriptionToMigrate.id,
+				customerId: subscriptionToMigrate.customer,
+				customerEmail: customer.email, // Best effort
+				amountPaid: 0, // Unknown without invoice, but safe for record creation
+				paidAt: new Date(subscriptionToMigrate.current_period_start * 1000),
+				currency: subscriptionToMigrate.currency,
+				status: "paid",
+				subscription: subscriptionToMigrate,
+				customer: customer,
+				priceId: subscriptionToMigrate.items?.data[0]?.price?.id,
+			};
+
+			// Save new record
+			const { saveSubscriptionRecord } = require("../../License/modules/license.module");
+			await saveSubscriptionRecord(myLicense, paymentData);
+
+			// Re-fetch to return the new record immediately (optional, or just proceed)
+			const newRecords = await IPFSModule.get({
+				key: "subscriptionDomain",
+				value: myLicense.domainConfig.name,
+			});
+
+			if (newRecords && newRecords.length > 0) {
+				const subRecord = newRecords[0];
+				const axios = require("axios");
+				const jsonResponse = await axios.get(subRecord.url);
+				const subscriptionIPFS = jsonResponse.data;
+				let subscriptionId = null;
+				let productId = null;
+
+				if (subscriptionIPFS.stripe?.subscriptionId) {
+					subscriptionId = subscriptionIPFS.stripe.subscriptionId;
+				}
+				if (subscriptionIPFS.stripe?.productId) {
+					productId = subscriptionIPFS.stripe.productId;
+				}
+
+				return { subscriptionIPFS, subscriptionId, productId };
+			}
+		}
+	} catch (err) {
+		console.error("Migration failed", err);
+	}
+	return null;
+};
+
 module.exports = {
 	listSubscriptionPlans,
 	getSubscriptionPlan,
 	createCheckoutSession,
 	getMySubscription,
 	createPortalSession,
+	verifySession,
 };

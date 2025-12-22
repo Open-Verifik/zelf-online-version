@@ -8,6 +8,9 @@ const schemas = {
 		productId: string().required(),
 		priceId: string().required(),
 	},
+	verifySession: {
+		sessionId: string().required(),
+	},
 };
 
 const getByIdValidation = async (ctx, next) => {
@@ -48,9 +51,24 @@ const createPortalSessionValidation = async (ctx, next) => {
 	await next();
 };
 
+const verifySessionValidation = async (ctx, next) => {
+	const { sessionId } = ctx.request.body;
+
+	const valid = validate(schemas.verifySession, { sessionId });
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	getByIdValidation,
 	subscribeValidation,
 	mySubscriptionValidation,
 	createPortalSessionValidation,
+	verifySessionValidation,
 };

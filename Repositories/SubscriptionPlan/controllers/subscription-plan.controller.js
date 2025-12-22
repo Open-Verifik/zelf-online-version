@@ -80,10 +80,29 @@ const createPortalSession = async (ctx) => {
 	}
 };
 
+const verifySession = async (ctx) => {
+	try {
+		const { sessionId } = ctx.request.body;
+
+		if (!sessionId) throw new Error("400:session_id_required");
+
+		const result = await Module.verifySession(sessionId, ctx.state.user);
+
+		ctx.body = result;
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
 module.exports = {
 	list,
 	getById,
 	subscribe,
 	mySubscription,
 	createPortalSession,
+	verifySession,
 };
