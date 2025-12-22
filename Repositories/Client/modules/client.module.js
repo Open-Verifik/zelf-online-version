@@ -18,13 +18,21 @@ const get = async (params = {}, authUser = {}) => {
 	if (params.email) {
 		const emailRecord = await IPFSModule.get({ key: "accountEmail", value: params.email });
 
-		return emailRecord.length ? emailRecord[0] : null;
+		if (emailRecord.length) return emailRecord[0];
+
+		const staffRecord = await IPFSModule.get({ key: "staffEmail", value: params.email });
+
+		return staffRecord.length ? staffRecord[0] : null;
 	}
 
 	if (params.phone) {
 		const phoneRecord = await IPFSModule.get({ key: "accountPhone", value: params.phone });
 
-		return phoneRecord.length ? phoneRecord[0] : null;
+		if (phoneRecord.length) return phoneRecord[0];
+
+		const staffRecord = await IPFSModule.get({ key: "staffPhone", value: params.phone });
+
+		return staffRecord.length ? staffRecord[0] : null;
 	}
 
 	// If no specific email/phone, return all client accounts with pagination
@@ -94,6 +102,12 @@ const show = async (params = {}, authUser = {}) => {
 	};
 };
 
+/**
+ * client account creation
+ * @param {Object} data
+ * @returns
+ * @author Miguel Trevino
+ */
 const create = async (data) => {
 	// Clean country code to remove any flag emojis (e.g., "🇵🇦 +507" -> "+507")
 	const cleanCountryCode = data.countryCode ? data.countryCode.replace(/^[^\d+]*/, "").trim() : data.countryCode;
@@ -142,7 +156,6 @@ const create = async (data) => {
 		version: "1.0.0",
 		name: data.name,
 		hasPassword: data.masterPassword ? "true" : "false",
-		zelfProof,
 	};
 
 	// Convert to JSON string and then to base64
@@ -332,7 +345,21 @@ const auth = async (data, authUser) => {
 
 	if (!decryptedZelfAccount) throw new Error("409:error_decrypting_zelf_account");
 
-	zelfAccount.publicData.name = accountJSON.data.name;
+	zelfAccount.publicData.name = accountJSON.data.name || accountJSON.data.staffName;
+
+	// Determine account type based on metadata
+	const isStaffAccount = accountJSON.data.accountType === "staff";
+
+	const accountType = isStaffAccount ? "staff_account" : "client_account";
+
+	// Prepare JWT payload
+	const jwtPayload = {
+		email: accountJSON.data.email || accountJSON.data.staffEmail || accountJSON.data.clientEmail || data.email,
+		accountType,
+		phone: accountJSON.data.phone || accountJSON.data.staffPhone || accountJSON.data.clientPhone || data.phone,
+		countryCode: accountJSON.data.countryCode || accountJSON.data.staffCountryCode || accountJSON.data.clientCountryCode || data.countryCode,
+		exp: moment().add(30, "day").unix(),
+	};
 
 	return {
 		zelfProof: accountJSON.data.zelfProof,
@@ -340,13 +367,7 @@ const auth = async (data, authUser) => {
 		ipfsHash: zelfAccount.cid,
 		zkProof: decryptedZelfAccount.metadata.zkProof,
 		apiKey: decryptedZelfAccount.metadata.apiKey,
-		token: jwt.sign(
-			{
-				email: data.email,
-				exp: moment().add(30, "day").unix(),
-			},
-			config.JWT_SECRET
-		),
+		token: jwt.sign(jwtPayload, config.JWT_SECRET),
 	};
 };
 
@@ -409,7 +430,7 @@ const updatePassword = async (data, authUser) => {
 		password: newPassword,
 	});
 
-	zelfAccount.publicData.name = accountJSON.data.name;
+	zelfAccount.publicData.name = accountJSON.data.name || accountJSON.data.staffName;
 
 	// get the data from the JSON inside the zelfAccount.url
 	const _jsonData = await axios.get(zelfAccount.url);

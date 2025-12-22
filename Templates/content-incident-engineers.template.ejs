@@ -1,0 +1,306 @@
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-spacing: 0 !important; border-collapse: collapse">
+	<tbody>
+		<tr>
+			<td
+				style="
+					border-collapse: collapse;
+					font-family: Arial, sans-serif;
+					font-size: 15px;
+					color: #23496d;
+					word-break: break-word;
+					padding: 20px 40px 7px;
+				"
+			>
+				<div style="color: inherit; font-size: inherit; line-height: inherit">
+					<div style="color: inherit; font-size: inherit; line-height: inherit">
+						<p style="font-size: 16px; line-height: 175%; text-align: left" align="left">
+							<span style="color: #000000"><%- greeting %></span>
+						</p>
+
+						<p style="line-height: 175%; text-align: left" align="left">
+							<span style="color: #000000"><%- message %></span>
+						</p>
+
+						<br />
+
+						<!-- Incident Details Section -->
+						<div style="background-color: #f5f7fa; border-left: 4px solid #dc3545; padding: 16px 20px; margin: 16px 0">
+							<h2 style="color: #000000; margin-top: 0; margin-bottom: 12px; font-size: 18px; font-weight: bold">
+								🚨 Incident Details
+							</h2>
+
+							<table
+								role="presentation"
+								cellpadding="0"
+								cellspacing="0"
+								width="100%"
+								style="border-spacing: 0 !important; border-collapse: collapse"
+							>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d; width: 40%">Status:</td>
+									<td style="padding: 8px 0; color: #000000">
+										<span style="background-color: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 13px">
+											<%= incidentStatus.toUpperCase() %>
+										</span>
+									</td>
+								</tr>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Feature Code:</td>
+									<td style="padding: 8px 0; color: #000000">
+										<code style="background-color: #e9ecef; padding: 2px 6px; border-radius: 3px"><%= featureCode %></code>
+									</td>
+								</tr>
+								<% if (featureName) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Feature Name:</td>
+									<td style="padding: 8px 0; color: #000000"><%= featureName %></td>
+								</tr>
+								<% } %> <% if (featureUrl) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Feature URL:</td>
+									<td style="padding: 8px 0; color: #000000">
+										<a href="<%= featureUrl %>" style="color: #007bff; text-decoration: none"><%= featureUrl %></a>
+									</td>
+								</tr>
+								<% } %> <% if (incidentAlias) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Alias:</td>
+									<td style="padding: 8px 0; color: #000000"><%= incidentAlias %></td>
+								</tr>
+								<% } %> <% if (startDate) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Start Date:</td>
+									<td style="padding: 8px 0; color: #000000"><%= startDate %></td>
+								</tr>
+								<% } %>
+							</table>
+						</div>
+
+						<!-- Feature Pricing Section -->
+						<% if (featurePrice || featureSmartCheckPrice) { %>
+						<div style="background-color: #f5f7fa; border-left: 4px solid #007bff; padding: 16px 20px; margin: 16px 0">
+							<h2 style="color: #000000; margin-top: 0; margin-bottom: 12px; font-size: 18px; font-weight: bold">
+								💰 Pricing Information
+							</h2>
+
+							<table
+								role="presentation"
+								cellpadding="0"
+								cellspacing="0"
+								width="100%"
+								style="border-spacing: 0 !important; border-collapse: collapse"
+							>
+								<% if (featurePrice) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d; width: 40%">Price:</td>
+									<td style="padding: 8px 0; color: #000000">$<%= featurePrice.toFixed(2) %> credits</td>
+								</tr>
+								<% } %> <% if (featureSmartCheckPrice) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Smart Check Price:</td>
+									<td style="padding: 8px 0; color: #000000">$<%= featureSmartCheckPrice.toFixed(2) %> credits</td>
+								</tr>
+								<% } %> <% if (featureFeeType) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Fee Type:</td>
+									<td style="padding: 8px 0; color: #000000"><%= featureFeeType.toUpperCase() %></td>
+								</tr>
+								<% } %> <% if (featureCountry) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Country:</td>
+									<td style="padding: 8px 0; color: #000000"><%= featureCountry %></td>
+								</tr>
+								<% } %>
+							</table>
+						</div>
+						<% } %>
+
+						<!-- Failure Statistics Section -->
+						<div style="background-color: #f5f7fa; border-left: 4px solid #ffc107; padding: 16px 20px; margin: 16px 0">
+							<h2 style="color: #000000; margin-top: 0; margin-bottom: 12px; font-size: 18px; font-weight: bold">
+								📊 Failure Statistics
+							</h2>
+
+							<table
+								role="presentation"
+								cellpadding="0"
+								cellspacing="0"
+								width="100%"
+								style="border-spacing: 0 !important; border-collapse: collapse"
+							>
+								<% if (initialFailurePercentage !== null && initialFailurePercentage !== undefined) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d; width: 40%">Initial Failure %:</td>
+									<td style="padding: 8px 0; color: #000000"><%= initialFailurePercentage.toFixed(2) %>%</td>
+								</tr>
+								<% } %> <% if (currentFailurePercentage !== null && currentFailurePercentage !== undefined) { %> <% const failureColor
+								= currentFailurePercentage >= 20 ? '#dc3545' : '#28a745'; %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Current Failure %:</td>
+									<td style="padding: 8px 0; color: #000000">
+										<span style="color: <%- failureColor %>; font-weight: bold">
+											<%= currentFailurePercentage.toFixed(2) %>%
+										</span>
+									</td>
+								</tr>
+								<% } %> <% if (failuresCount !== null && failuresCount !== undefined) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Failures Count:</td>
+									<td style="padding: 8px 0; color: #000000"><%= failuresCount %></td>
+								</tr>
+								<% } %> <% if (successCount !== null && successCount !== undefined) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Success Count:</td>
+									<td style="padding: 8px 0; color: #000000"><%= successCount %></td>
+								</tr>
+								<% } %>
+							</table>
+						</div>
+
+						<!-- Exception Details Section -->
+						<% if (exceptionMessage || exceptionCode || exceptionStatus) { %>
+						<div style="background-color: #f5f7fa; border-left: 4px solid #6c757d; padding: 16px 20px; margin: 16px 0">
+							<h2 style="color: #000000; margin-top: 0; margin-bottom: 12px; font-size: 18px; font-weight: bold">
+								⚠️ Exception Details
+							</h2>
+
+							<table
+								role="presentation"
+								cellpadding="0"
+								cellspacing="0"
+								width="100%"
+								style="border-spacing: 0 !important; border-collapse: collapse"
+							>
+								<% if (exceptionMessage) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d; width: 40%; vertical-align: top">Message:</td>
+									<td style="padding: 8px 0; color: #000000; word-break: break-word"><%= exceptionMessage %></td>
+								</tr>
+								<% } %> <% if (exceptionCode) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Code:</td>
+									<td style="padding: 8px 0; color: #000000">
+										<code style="background-color: #e9ecef; padding: 2px 6px; border-radius: 3px"><%= exceptionCode %></code>
+									</td>
+								</tr>
+								<% } %> <% if (exceptionStatus) { %>
+								<tr>
+									<td style="padding: 8px 0; font-weight: bold; color: #23496d">Status Code:</td>
+									<td style="padding: 8px 0; color: #000000"><%= exceptionStatus %></td>
+								</tr>
+								<% } %>
+							</table>
+						</div>
+						<% } %>
+
+						<!-- Affected Clients Section -->
+						<% if (affectedClients && affectedClients.length > 0) { %>
+						<div style="background-color: #f5f7fa; border-left: 4px solid #17a2b8; padding: 16px 20px; margin: 16px 0">
+							<h2 style="color: #000000; margin-top: 0; margin-bottom: 12px; font-size: 18px; font-weight: bold">
+								👥 Affected Clients (<%= affectedClients.length %>)
+							</h2>
+
+							<table
+								role="presentation"
+								cellpadding="0"
+								cellspacing="0"
+								width="100%"
+								style="border-spacing: 0 !important; border-collapse: collapse"
+							>
+								<% affectedClients.forEach(function(client, index) { %>
+								<tr>
+									<td style="padding: 8px 0; color: #000000">
+										<strong><%= client.name || 'Unknown' %></strong>
+										<% if (client.email) { %>
+										<br />
+										<span style="font-size: 13px; color: #6c757d">📧 <%= client.email %></span>
+										<% } %> <% if (client._id) { %>
+										<br />
+										<span style="font-size: 12px; color: #999">ID: <%= client._id.toString() %></span>
+										<% } %>
+									</td>
+								</tr>
+								<% }); %>
+							</table>
+						</div>
+						<% } %>
+
+						<!-- Incident Log Section -->
+						<% if (incidentLogs && incidentLogs.length > 0) { %>
+						<div style="background-color: #f5f7fa; border-left: 4px solid #28a745; padding: 16px 20px; margin: 16px 0">
+							<h2 style="color: #000000; margin-top: 0; margin-bottom: 12px; font-size: 18px; font-weight: bold">📝 Incident Logs</h2>
+
+							<% incidentLogs.forEach(function(log, index) { %>
+							<div style="margin-bottom: 16px; padding: 12px; background-color: white; border-radius: 4px">
+								<% if (log.category) { %>
+								<p style="margin: 0 0 8px 0; font-weight: bold; color: #23496d">
+									Category: <span style="color: #000000"><%= log.category %></span>
+								</p>
+								<% } %> <% if (log.privateLog) { %>
+								<p style="margin: 8px 0; color: #000000; font-style: italic"><strong>Private Note:</strong> <%= log.privateLog %></p>
+								<% } %> <% if (log.publicLog) { %>
+								<p style="margin: 8px 0; color: #000000"><strong>Public Log:</strong> <%= log.publicLog %></p>
+								<% } %> <% if (log.createdAt) { %>
+								<p style="margin: 8px 0 0 0; font-size: 12px; color: #999">Created: <%= log.createdAt %></p>
+								<% } %>
+							</div>
+							<% }); %>
+						</div>
+						<% } %>
+
+						<br />
+
+						<p style="line-height: 175%; text-align: left" align="left">
+							<span style="color: #000000"><%= sincerely %></span>
+						</p>
+
+						<h3 style="line-height: 175%; font-weight: bold; text-align: left" align="left">
+							<span style="color: #000000"><%= projectName %></span>
+						</h3>
+
+						<% if (isVerifikSigned) { %>
+						<table
+							role="presentation"
+							width="100%"
+							cellpadding="0"
+							cellspacing="0"
+							style="border-spacing: 0 !important; border-collapse: collapse"
+						>
+							<tbody>
+								<tr>
+									<td
+										align="center"
+										valign="top"
+										style="
+											border-collapse: collapse;
+											font-family: Arial, sans-serif;
+											color: #23496d;
+											word-break: break-word;
+											text-align: center;
+											padding: 10px 20px;
+											font-size: 0px;
+										"
+									>
+										<img
+											src="https://22733348.fs1.hubspotusercontent-na1.net/hub/22733348/hubfs/PiedePagina.png?width=1120&amp;upscale=true&amp;name=PiedePagina.png"
+											style="
+												outline: none;
+												text-decoration: none;
+												-ms-interpolation-mode: bicubic;
+												max-width: 100%;
+												font-size: 16px;
+											"
+											width="600"
+											align="middle"
+										/>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<% } %>
+					</div>
+				</div>
+			</td>
+		</tr>
+	</tbody>
+</table>

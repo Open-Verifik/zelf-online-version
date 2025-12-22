@@ -93,6 +93,8 @@ const encryptQRCode = async (data) => {
 };
 
 const decrypt = async (data) => {
+	if (!data.zelfProof) throw new Error("400:missing_zelf_proof");
+
 	try {
 		const encryptedResponse = await axios.post("/zelf/decrypt", {
 			face_base_64: data.faceBase64,
@@ -122,6 +124,11 @@ const decrypt = async (data) => {
 	}
 };
 
+/**
+ * Preview ZelfProof
+ * @param {Object} data
+ * @returns {Object}
+ */
 const preview = async (data) => {
 	try {
 		const encryptedResponse = await axios.post("/zelf/preview", {

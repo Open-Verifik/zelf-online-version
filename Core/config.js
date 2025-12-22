@@ -19,7 +19,7 @@ const configuration = {
 	},
 	email_providers: {
 		mailgun: {
-			proxyEmail: process.env.MAILGUN_PROXY_EMAIL,
+			proxyEmail: process.env.MAILGUN_PROXY_EMAIL || "miguel@zelf.world",
 			apiKey: process.env.MAILGUN_API_KEY,
 		},
 	},

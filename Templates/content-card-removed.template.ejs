@@ -1,0 +1,107 @@
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-spacing: 0 !important; border-collapse: collapse">
+	<tbody>
+		<tr>
+			<td
+				class="hs_padded"
+				style="
+					border-collapse: collapse;
+					font-family: Arial, sans-serif;
+					font-size: 15px;
+					color: #23496d;
+					word-break: break-word;
+					padding: 20px 40px 7px;
+				"
+			>
+				<div
+					id="hs_cos_wrapper_module-1-0-0"
+					class="hs_cos_wrapper hs_cos_wrapper_widget hs_cos_wrapper_type_module"
+					style="color: inherit; font-size: inherit; line-height: inherit"
+				>
+					<div
+						id="hs_cos_wrapper_module-1-0-0_"
+						class="hs_cos_wrapper hs_cos_wrapper_widget hs_cos_wrapper_type_rich_text"
+						style="color: inherit; font-size: inherit; line-height: inherit"
+					>
+						<p style="font-size: 16px; line-height: 175%; font-weight: bold; text-align: left" align="left"><%- greeting %></p>
+
+						<p style="line-height: 175%; text-align: left" align="left">
+							<span style="color: #000000"><%- message %></span>
+						</p>
+
+						<br />
+
+						<% if (authLink && authLink.includes('http')) { %>
+						<p style="text-align: center; line-height: 125%" align="left">
+							<a
+								href="<%= authLink %>"
+								style="
+									background-color: <%= buttonColor || '#007bff' %>;
+									color: <%= buttonTxtColor || '#ffffff' %>;
+									padding: 15px 30px;
+									text-decoration: none;
+									font-size: 16px;
+									font-weight: bold;
+									border-radius: 5px;
+									display: inline-block;
+								"
+							>
+								<%= buttonText || 'Click Here' %>
+							</a>
+						</p>
+
+						<br />
+						<% } %>
+
+						<p style="line-height: 175%; text-align: left" align="left">
+							<span style="color: #000000"><%= sincerely %></span>
+						</p>
+
+						<h3 style="line-height: 175%; font-weight: bold; text-align: left" align="left">
+							<span style="color: #000000">Verifik</span>
+						</h3>
+
+						<table
+							role="presentation"
+							width="100%"
+							cellpadding="0"
+							cellspacing="0"
+							style="border-spacing: 0 !important; border-collapse: collapse"
+						>
+							<tbody>
+								<tr>
+									<td
+										align="center"
+										valign="top"
+										style="
+											border-collapse: collapse;
+
+											font-family: Arial, sans-serif;
+											color: #23496d;
+											word-break: break-word;
+											text-align: center;
+											padding: 10px 20px;
+											font-size: 0px;
+										"
+									>
+										<img
+											src="https://22733348.fs1.hubspotusercontent-na1.net/hub/22733348/hubfs/PiedePagina.png?width=1120&amp;upscale=true&amp;name=PiedePagina.png"
+											style="
+												outline: none;
+												text-decoration: none;
+												-ms-interpolation-mode: bicubic;
+												max-width: 100%;
+												font-size: 16px;
+											"
+											width="600"
+											align="middle"
+										/>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</td>
+		</tr>
+	</tbody>
+</table>

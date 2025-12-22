@@ -1,0 +1,48 @@
+<div style="padding: 20px 40px 40px 40px; text-align: center">
+	<h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #111827; letter-spacing: -0.025em">Join <%= companyName %> on Zelf</h1>
+
+	<p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #374151">Hello <%= staffName %>,</p>
+
+	<p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #374151">
+		You have been invited by <strong style="color: #111827"><%= ownerName %></strong> to join the team.
+	</p>
+
+	<p style="margin: 0 0 32px; font-size: 16px; line-height: 1.6; color: #374151">
+		As a <strong style="color: #111827"><%= role %></strong>, you'll have access to manage and collaborate on the dashboard.
+	</p>
+
+	<div style="text-align: center; margin-bottom: 32px">
+		<a
+			href="<%= inviteLink %>"
+			style="
+				display: inline-block;
+				padding: 12px 32px;
+				background-color: #000000;
+				color: #ffffff;
+				text-decoration: none;
+				border-radius: 8px;
+				font-weight: 600;
+				font-size: 15px;
+				transition: background-color 0.2s;
+			"
+		>
+			Accept Invitation
+		</a>
+	</div>
+
+	<p style="margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: #6b7280">
+		This invitation will expire in 1 hour. If you didn't expect this, you can safely ignore this email.
+	</p>
+
+	<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #6b7280">
+		Button not working? Copy and paste this link:<br />
+		<a href="<%= inviteLink %>" style="color: #000000; word-break: break-all; text-decoration: underline"><%= inviteLink %></a>
+	</p>
+
+	<div style="border-top: 1px solid #e5e7eb; margin-top: 32px; padding-top: 32px">
+		<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #9ca3af">
+			<%= sincerely %><br />
+			The <%= projectName %> Team
+		</p>
+	</div>
+</div>

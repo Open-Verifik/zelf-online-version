@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<%- include('partials/mail-head.template.ejs') %>
+	</head>
+
+	<body
+		bgcolor="#F9FAFB"
+		style="
+			margin: 0 !important;
+			padding: 0 !important;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+				'Segoe UI Symbol';
+			font-size: 15px;
+			color: #374151;
+			word-break: break-word;
+		"
+	>
+		<div style="background-color: #f9fafb" bgcolor="#F9FAFB">
+			<table
+				role="presentation"
+				cellpadding="0"
+				cellspacing="0"
+				style="
+					border-spacing: 0 !important;
+					border-collapse: collapse;
+					margin: 0;
+					padding: 0;
+					width: 100% !important;
+					min-width: 320px !important;
+					height: 100% !important;
+				"
+				width="100%"
+				height="100%"
+			>
+				<tbody>
+					<tr>
+						<td
+							valign="top"
+							style="
+								border-collapse: collapse;
+								font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+								font-size: 15px;
+								color: #374151;
+								word-break: break-word;
+							"
+						>
+							<div style="color: inherit; font-size: inherit; line-height: inherit">
+								<div style="padding-left: 10px; padding-right: 10px; padding-top: 40px; padding-bottom: 40px">
+									<div
+										class="hse-column-container"
+										style="
+											min-width: 280px;
+											max-width: 600px;
+											width: 100%;
+											margin-left: auto;
+											margin-right: auto;
+											border-collapse: collapse;
+											border-spacing: 0;
+											background-color: #ffffff;
+											border-radius: 12px;
+											overflow: hidden;
+											box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+											border: 1px solid #e5e7eb;
+										"
+										bgcolor="#FFFFFF"
+									>
+										<div id="column-1-0" class="hse-column hse-size-12">
+											<%- include('partials/mail-header.template.ejs') %>
+											<br />
+											<%- include( contentTemplate ) %>
+										</div>
+									</div>
+								</div>
+
+								<%- include('partials/mail-footer.template.ejs') %>
+							</div>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</body>
+</html>

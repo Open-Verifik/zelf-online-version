@@ -29,6 +29,7 @@ module.exports = (server) => {
 	require("../Repositories/Stripe/routes/stripe.routes")(server);
 	require("../Repositories/Subscribers/routes/subscriber.route")(server);
 	require("../Repositories/ZelfKeysSubscription/routes/zelf-keys-subscription.routes")(server);
+	require("../Repositories/Staff/routes/unprotected-staff.route")(server);
 	//T
 	//U
 	//V
