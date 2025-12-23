@@ -102,7 +102,7 @@ class QRZelfProofExtractor {
 			}
 
 			if (!qrResult) {
-				console.warn("1. No QR code result");
+				console.warn("1. No QR code result", { qrResult });
 				return null;
 			}
 
