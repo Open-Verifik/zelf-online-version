@@ -353,14 +353,21 @@ const retrieveData = async (data, authToken) => {
 			case "payment-card":
 			case "credit_card":
 				pgp = await TagsPartsModule.encryptCreditCardParams(encryptionParams, authToken);
+				zelfKey.metadata = {};
 
 				break;
 			case "password":
 				pgp = await TagsPartsModule.encryptPasswordParams(encryptionParams, authToken);
+				zelfKey.metadata = {};
 
 				break;
 			case "notes":
 				pgp = await TagsPartsModule.encryptNotesParams(encryptionParams, authToken);
+				zelfKey.metadata = {};
+
+				break;
+			case "zotp":
+				// pgp = await TagsPartsModule.encryptZOTPParams(encryptionParams, authToken);
 
 				break;
 			default:
@@ -369,8 +376,6 @@ const retrieveData = async (data, authToken) => {
 	} catch (error) {
 		throw new Error("409:failed_to_encrypt_metadata_for_transport");
 	}
-
-	zelfKey.metadata = {};
 
 	return {
 		...zelfKey,
