@@ -11,11 +11,6 @@ const webhookHandler = async (payload) => {
 	switch (event.type) {
 		case "NON_RENEWING_PURCHASE":
 			return await _handleWebhook(event);
-		case "RENEWAL":
-		case "INITIAL_PURCHASE":
-			return await _handleZelfKeysSubscriptionWebhook(event);
-		default:
-			break;
 	}
 
 	const error = new Error("webhook_failed");
@@ -136,10 +131,6 @@ const _handleWebhook = async (event) => {
 // 		publicData: payload.metadata,
 // 	});
 // };
-
-const _handleZelfKeysSubscriptionWebhook = async (event) => {
-	console.log("enters into zelf keys subscription webhook");
-};
 
 module.exports = {
 	webhookHandler,

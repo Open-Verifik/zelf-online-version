@@ -8,16 +8,16 @@ const webhookHandler = async (payload) => {
 	// we going to check for the event and confirm the information
 	const event = payload.event;
 
+	console.log("event", event);
+
 	switch (event.type) {
 		case "NON_RENEWING_PURCHASE":
 			// if (event.environment === "SANDBOX" && config.env === "development") {
 			return await _handleWebhook(event);
-			// }
 
-			// if (event.environment === "PRODUCTION" && config.env === "production") {
-			// return await _handleWebhook(event);
-			// }
-			break;
+		case "RENEWAL":
+		case "INITIAL_PURCHASE":
+			return await _handleZelfKeysSubscriptionWebhook(event);
 
 		default:
 			break;
@@ -26,6 +26,10 @@ const webhookHandler = async (payload) => {
 	const error = new Error("webhook_failed");
 	error.status = 500;
 	throw error;
+};
+
+const _handleZelfKeysSubscriptionWebhook = async (event) => {
+	console.log("enters into zelf keys subscription webhook");
 };
 
 const _handleWebhook = async (event) => {
