@@ -402,6 +402,7 @@ async function searchSubscriptionInIPFS(zelfKeysTag) {
 					...keyValues,
 					stripeData: keyValues.stripeData ? JSON.parse(keyValues.stripeData) : null,
 					cryptoData: keyValues.cryptoData ? JSON.parse(keyValues.cryptoData) : null,
+					revenueCatData: keyValues.revenueCatData ? JSON.parse(keyValues.revenueCatData) : null,
 				};
 
 				break;
