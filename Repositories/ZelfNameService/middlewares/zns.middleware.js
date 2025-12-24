@@ -571,7 +571,7 @@ const revenueCatWebhookValidation = async (ctx, next) => {
 
 	const { clientId, email } = ctx.state.user;
 
-	if (!clientId || email !== config.revenueCat.allowedEmail) {
+	if (config.env === "production" && (!clientId || email !== config.revenueCat.allowedEmail)) {
 		ctx.status = 403;
 		ctx.body = { validationError: "Access forbidden" };
 		return;
@@ -579,7 +579,9 @@ const revenueCatWebhookValidation = async (ctx, next) => {
 
 	if (!event) {
 		ctx.status = 409;
+
 		ctx.body = { validationError: "Missing event payload" };
+
 		return;
 	}
 
