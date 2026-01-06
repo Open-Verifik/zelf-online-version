@@ -8,6 +8,10 @@ const { generateMnemonic } = require("../../Wallet/modules/helpers");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const axios = require("axios");
 const sharp = require("sharp");
+const { createEthWallet } = require("../../Wallet/modules/eth");
+const { createSolanaWallet } = require("../../Wallet/modules/solana");
+const { createBTCWallet } = require("../../Wallet/modules/btc");
+const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
 
 /**
  *
@@ -125,6 +129,8 @@ const create = async (data) => {
 
 	const zkProof = await OfflineProofModule.createProof(apiKey);
 
+	const mnemonic = generateMnemonic(12);
+
 	const { zelfProof } = await zelfProofModule.encrypt({
 		publicData: {
 			email: data.email,
@@ -136,7 +142,7 @@ const create = async (data) => {
 		metadata: {
 			apiKey,
 			zkProof,
-			mnemonic: generateMnemonic(12),
+			mnemonic,
 		},
 		password: data.masterPassword || undefined,
 		identifier: data.email,
@@ -183,13 +189,26 @@ const create = async (data) => {
 	);
 
 	zelfAccount.publicData = zelfAccount.keyvalues;
+
 	delete zelfAccount.keyvalues;
+
 	zelfAccount.publicData.name = data.name;
+
+	const eth = createEthWallet(mnemonic);
+	const btc = createBTCWallet(mnemonic);
+	const solana = await createSolanaWallet(mnemonic);
+	const sui = await generateSuiWalletFromMnemonic(mnemonic);
 
 	return {
 		zelfProof,
 		zelfAccount,
 		ipfsHash: zelfAccount.cid,
+		wallet: {
+			ethAddress: eth.address,
+			btcAddress: btc.address,
+			solanaAddress: solana.address,
+			suiAddress: sui.address,
+		},
 		token: jwt.sign(
 			{
 				email: data.email,
@@ -401,16 +420,27 @@ const auth = async (data, authUser) => {
 
 	const accountType = isStaffAccount ? "staff_account" : "client_account";
 
-	// Prepare JWT payload
+	const eth = createEthWallet(decryptedZelfAccount.metadata.mnemonic);
+	const btc = createBTCWallet(decryptedZelfAccount.metadata.mnemonic);
+	const solana = await createSolanaWallet(decryptedZelfAccount.metadata.mnemonic);
+	const sui = await generateSuiWalletFromMnemonic(decryptedZelfAccount.metadata.mnemonic);
+
 	const jwtPayload = {
 		email: accountJSON.data.email || accountJSON.data.staffEmail || accountJSON.data.clientEmail || data.email,
 		accountType,
+		solanaAddress: solana.address,
 		phone: accountJSON.data.phone || accountJSON.data.staffPhone || accountJSON.data.clientPhone || data.phone,
 		countryCode: accountJSON.data.countryCode || accountJSON.data.staffCountryCode || accountJSON.data.clientCountryCode || data.countryCode,
 		exp: moment().add(30, "day").unix(),
 	};
 
 	return {
+		wallet: {
+			ethAddress: eth.address,
+			btcAddress: btc.address,
+			solanaAddress: solana.address,
+			suiAddress: sui.address,
+		},
 		zelfProof: accountJSON.data.zelfProof,
 		zelfAccount,
 		ipfsHash: zelfAccount.cid,
