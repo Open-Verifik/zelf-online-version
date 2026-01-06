@@ -101,10 +101,7 @@ class QRZelfProofExtractor {
 				return null;
 			}
 
-			if (!qrResult) {
-				console.warn("1. No QR code result", { qrResult });
-				return null;
-			}
+			if (!qrResult) return null;
 
 			// Handle jsQR result (preferred)
 			if (jsQR && qrResult.binaryData) {

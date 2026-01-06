@@ -62,17 +62,18 @@ const isSupported = (domain) => {
 const getAllSupportedDomains = (licenses = null, paid = false) => {
 	const domains = getSupportedDomains(licenses);
 
-	if (paid) {
-		const paidDomains = {};
+	// TODO Miguel > I need to implement this better
+	// if (paid) {
+	// 	const paidDomains = {};
 
-		for (const domain in domains) {
-			if (domains[domain].stripe?.amountPaid > 0) {
-				paidDomains[domain] = domains[domain];
-			}
-		}
+	// 	for (const domain in domains) {
+	// 		if (domains[domain].stripe?.amountPaid > 0) {
+	// 			paidDomains[domain] = domains[domain];
+	// 		}
+	// 	}
 
-		return paidDomains;
-	}
+	// 	return paidDomains;
+	// }
 
 	return domains;
 };

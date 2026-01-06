@@ -117,6 +117,7 @@ const searchLicense = async (query, user) => {
 		for (const license of allLicenses) {
 			try {
 				const jsonResponse = await axios.get(license.url);
+
 				license.domainConfig = jsonResponse.data;
 			} catch (error) {
 				console.error(`Error getting license JSON for ${license.id}:`, error);
@@ -428,6 +429,7 @@ const loadOfficialLicenses = async (force = false) => {
 		for (const license of officialLicenses) {
 			try {
 				const licenseData = await _loadLicenseJSON(license.url);
+
 				licenses.push(licenseData);
 			} catch (error) {
 				console.error(`Error loading license ${license.id}:`, error.message);
