@@ -628,9 +628,14 @@ const _validateOwnership = async (faceBase64, masterPassword, authToken, extraPa
 		faceBase64,
 		password: masterPassword,
 		tagName: authToken.tagName || authToken.identifier,
+		removePGP: extraParams.removePGP || false,
 	};
 
-	if (extraParams.removePGP) sessionParams.removePGP = true;
+	console.log({
+		masterPassword,
+		domain: authToken.domain,
+		tagName: authToken.tagName || authToken.identifier,
+	});
 
 	// this will throw an error if the tag is not found or the password is incorrect or the face is incorrect
 	await TagsModule.decryptTag(sessionParams, authToken);

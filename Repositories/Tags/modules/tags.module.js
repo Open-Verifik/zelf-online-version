@@ -183,6 +183,8 @@ const decryptTag = async (params, authUser) => {
 
 	const { face, password } = await _decryptParams(params, authUser);
 
+	console.log({ debug: true, addServerPassword: Boolean(params.addServerPassword), password, zelfProof });
+
 	const decryptedZelfProof = await decrypt({
 		addServerPassword: Boolean(params.addServerPassword),
 		faceBase64: face,
