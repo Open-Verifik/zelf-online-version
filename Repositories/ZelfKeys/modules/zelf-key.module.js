@@ -632,7 +632,6 @@ const _validateOwnership = async (faceBase64, masterPassword, authToken, extraPa
 	};
 
 	console.log({
-		masterPassword,
 		domain: authToken.domain,
 		tagName: authToken.tagName || authToken.identifier,
 	});
