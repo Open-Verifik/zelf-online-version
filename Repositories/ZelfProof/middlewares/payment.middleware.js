@@ -1,7 +1,7 @@
-const config = require("../../../Core/config");
 const SolanaPaymentService = require("../../Solana/modules/payment-verification.module");
 const AvalanchePaymentService = require("../../Avalanche/modules/payment-verification.module");
 const BasePaymentService = require("../../base/modules/payment-verification.module");
+const IPFSModule = require("../../IPFS/modules/ipfs.module");
 
 /**
  * HTTP 402 Payment Required Middleware
@@ -132,7 +132,7 @@ const paymentRequired = async (ctx, next) => {
 		}
 
 		// Check if payment has already been used (prevent replay attacks)
-		if (await isPaymentUsed(paymentTxHash, paymentChain)) {
+		if (await isPaymentUsed(paymentTxHash)) {
 			ctx.status = 409;
 			ctx.body = {
 				error: "Payment Already Used",
@@ -198,17 +198,11 @@ const hasValidSubscription = async (ctx) => {
 /**
  * Check if a payment has already been used
  */
-const isPaymentUsed = async (txHash, chain) => {
+const isPaymentUsed = async (txHash) => {
 	try {
-		// Check Redis cache first for fast lookup
-		const cacheKey = `payment:used:${chain}:${txHash}`;
-		const cached = await config.redis?.get(cacheKey);
-
-		if (cached) return true;
-
-		// Check database for historical payments
-		// This would query your payments table
-		const payment = await findPaymentByTxHash(txHash, chain);
+		// Check IPFS for historical payments
+		// This queries the IPFS index
+		const payment = await findPaymentByTxHash(txHash);
 
 		return payment !== null;
 	} catch (error) {
@@ -223,11 +217,7 @@ const isPaymentUsed = async (txHash, chain) => {
  */
 const markPaymentAsUsed = async (paymentData) => {
 	try {
-		// Store in Redis with 30-day expiration
-		const cacheKey = `payment:used:${paymentData.chain}:${paymentData.txHash}`;
-		await config.redis?.setex(cacheKey, 30 * 24 * 60 * 60, JSON.stringify(paymentData));
-
-		// Store in database for permanent record
+		// Store in IPFS for permanent record and replay protection
 		await savePaymentRecord(paymentData);
 
 		console.log(`Payment marked as used: ${paymentData.txHash}`);
@@ -249,25 +239,67 @@ const getSubscriptionStatus = async (userId) => {
 };
 
 /**
- * Helper: Find payment by transaction hash (placeholder - integrate with your database)
+ * Helper: Find payment by transaction hash using IPFS Filter
  */
-const findPaymentByTxHash = async (txHash, chain) => {
-	// TODO: Integrate with your database
-	// Example:
-	// const Payment = require("../../models/Payment");
-	// return await Payment.findOne({ txHash, chain });
-	return null;
+const findPaymentByTxHash = async (txHash) => {
+	try {
+		console.log(`PaymentMiddleware: Searching IPFS for txHash ${txHash}`);
+
+		// Query IPFS for metadata key "paymentTx" matching the hash
+		// This relies on IPFS provider supporting metadata filtering
+		const results = await IPFSModule.get({ key: "paymentTx", value: txHash });
+
+		console.log(`PaymentMiddleware: Found ${results ? results.length : 0} records for ${txHash}`);
+
+		if (results && results.length > 0) {
+			return results[0];
+		}
+		return null;
+	} catch (error) {
+		console.error("Error finding payment in IPFS:", error);
+		return null;
+	}
 };
 
 /**
- * Helper: Save payment record (placeholder - integrate with your database)
+ * Helper: Save payment record to IPFS
  */
 const savePaymentRecord = async (paymentData) => {
-	// TODO: Integrate with your database
-	// Example:
-	// const Payment = require("../../models/Payment");
-	// return await Payment.create(paymentData);
-	return null;
+	try {
+		const receipt = {
+			...paymentData,
+			type: "ZELF_PAYMENT_RECEIPT",
+			version: "1.0",
+			timestamp: new Date().toISOString(),
+		};
+
+		const base64 = Buffer.from(JSON.stringify(receipt)).toString("base64");
+
+		// Insert into IPFS with metadata for indexing
+		const result = await IPFSModule.insert(
+			{
+				base64,
+				name: `PaymentReceipt_${paymentData.txHash}`,
+				pinIt: true,
+				metadata: {
+					paymentTx: `${paymentData.txHash}`,
+					chain: `${paymentData.chain}`,
+					amount: `${paymentData.amount}`,
+					type: "ZELF_PAYMENT",
+				},
+			},
+			{ pro: true }
+		);
+
+		if (!result) {
+			throw new Error("Failed to save payment record to IPFS (Insert returned null)");
+		}
+
+		return result;
+	} catch (error) {
+		console.error("Error saving payment record to IPFS:", error);
+		throw error;
+	}
 };
 
 /**
