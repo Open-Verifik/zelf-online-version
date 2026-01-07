@@ -11,22 +11,16 @@ module.exports = (server) => {
 	const PATH = config.basePath(base);
 
 	// Routes with payment middleware (HTTP 402)
-	server.post(`${PATH}/encrypt`, Middleware.jwtValidation, PaymentMiddleware.paymentRequired, Middleware.encryptValidation, Controller.encrypt);
+	server.post(`${PATH}/encrypt`, PaymentMiddleware.paymentRequired, Middleware.encryptValidation, Controller.encrypt);
 
-	server.post(
-		`${PATH}/encrypt-qr-code`,
-		Middleware.jwtValidation,
-		PaymentMiddleware.paymentRequired,
-		Middleware.encryptValidation,
-		Controller.encryptQRCode
-	);
+	server.post(`${PATH}/encrypt-qr-code`, PaymentMiddleware.paymentRequired, Middleware.encryptValidation, Controller.encryptQRCode);
 
-	server.post(`${PATH}/decrypt`, Middleware.jwtValidation, PaymentMiddleware.paymentRequired, Middleware.decryptValidation, Controller.decrypt);
+	server.post(`${PATH}/decrypt`, PaymentMiddleware.paymentRequired, Middleware.decryptValidation, Controller.decrypt);
 
-	server.post(`${PATH}/preview`, Middleware.jwtValidation, PaymentMiddleware.paymentRequired, Middleware.previewValidation, Controller.preview);
+	server.post(`${PATH}/preview`, PaymentMiddleware.paymentRequired, Middleware.previewValidation, Controller.preview);
 
 	// Payment statistics endpoint (no payment required)
-	server.get(`${PATH}/payment-stats`, Middleware.jwtValidation, PaymentMiddleware.getPaymentStats);
+	server.get(`${PATH}/payment-stats`, PaymentMiddleware.getPaymentStats);
 };
 
 /**

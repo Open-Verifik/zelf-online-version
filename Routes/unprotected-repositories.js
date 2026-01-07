@@ -38,4 +38,5 @@ module.exports = (server) => {
 	//X
 	//Y
 	//Z
+	require("../Repositories/ZelfProof/routes/zelf-proof.route")(server);
 };

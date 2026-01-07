@@ -21,7 +21,7 @@ module.exports = (server) => {
 	require("../Repositories/fantom/routes/fantom-scrapping.route")(server);
 	//G
 	//H
-	require("../Repositories/ZelfProof/routes/zelf-proof.route")(server);
+	//H
 	//I
 	require("../Repositories/IPFS/routes/ipfs.routes")(server);
 	//J
