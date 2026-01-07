@@ -3,16 +3,30 @@ const config = require("../../../Core/config");
 const Controller = require("../controllers/zelf-proof.controller");
 
 const Middleware = require("../middlewares/zelf-proof.middleware");
+const PaymentMiddleware = require("../middlewares/payment.middleware");
 
 const base = "/zelf-proof";
 
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.post(`${PATH}/encrypt`, Middleware.jwtValidation, Middleware.encryptValidation, Controller.encrypt);
-	server.post(`${PATH}/encrypt-qr-code`, Middleware.jwtValidation, Middleware.encryptValidation, Controller.encryptQRCode);
-	server.post(`${PATH}/decrypt`, Middleware.jwtValidation, Middleware.decryptValidation, Controller.decrypt);
-	server.post(`${PATH}/preview`, Middleware.jwtValidation, Middleware.previewValidation, Controller.preview);
+	// Routes with payment middleware (HTTP 402)
+	server.post(`${PATH}/encrypt`, Middleware.jwtValidation, PaymentMiddleware.paymentRequired, Middleware.encryptValidation, Controller.encrypt);
+
+	server.post(
+		`${PATH}/encrypt-qr-code`,
+		Middleware.jwtValidation,
+		PaymentMiddleware.paymentRequired,
+		Middleware.encryptValidation,
+		Controller.encryptQRCode
+	);
+
+	server.post(`${PATH}/decrypt`, Middleware.jwtValidation, PaymentMiddleware.paymentRequired, Middleware.decryptValidation, Controller.decrypt);
+
+	server.post(`${PATH}/preview`, Middleware.jwtValidation, PaymentMiddleware.paymentRequired, Middleware.previewValidation, Controller.preview);
+
+	// Payment statistics endpoint (no payment required)
+	server.get(`${PATH}/payment-stats`, Middleware.jwtValidation, PaymentMiddleware.getPaymentStats);
 };
 
 /**

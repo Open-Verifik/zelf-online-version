@@ -15,7 +15,7 @@ const schemas = {
 		livenessDetectionPriorCreation: boolean(),
 		publicData: stringKeyValueObject(),
 		faceBase64: string().required(),
-		livenessLevel: string().required(),
+		livenessLevel: stringEnum(["REGULAR", "SOFT", "HARDENED"]).required(),
 		metadata: stringKeyValueObject().required(),
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
 		password: string(),

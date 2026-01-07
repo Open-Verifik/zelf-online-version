@@ -151,6 +151,50 @@ const _formattingError = (error = {}) => {
 		error.message = error.message.replaceAll(config.terms.zk, config.terms._zk).toUpperCase();
 	}
 
+	// Determine appropriate HTTP status code based on error type
+	if (!error.status) {
+		const message = error.message || "";
+		const code = error.code || "";
+
+		// Face validation errors - 422 Unprocessable Entity
+		if (
+			message.includes("FACE IS NOT CENTRAL") ||
+			message.includes("NOT CENTRAL") ||
+			message.includes("MULTIPLE FACE") ||
+			message.includes("NO FACE DETECTED") ||
+			message.includes("FACE NOT RECOGNIZED") ||
+			message.includes("LIVENESS") ||
+			message.includes("FACE QUALITY") ||
+			message.includes("FACE TOO SMALL") ||
+			message.includes("FACE TOO LARGE") ||
+			code.includes("FACE_")
+		) {
+			error.status = 422;
+		}
+		// Authentication/verification errors - 401 Unauthorized
+		else if (
+			message.includes("INVALID PASSWORD") ||
+			message.includes("AUTHENTICATION FAILED") ||
+			message.includes("UNAUTHORIZED") ||
+			code.includes("AUTH_")
+		) {
+			error.status = 401;
+		}
+		// Invalid image or data format - 400 Bad Request
+		else if (
+			message.includes("INVALID IMAGE") ||
+			message.includes("INVALID FORMAT") ||
+			message.includes("INVALID DATA") ||
+			code === "ERR_INVALID_IMAGE"
+		) {
+			error.status = 400;
+		}
+		// Default to 500 for unknown errors
+		else {
+			error.status = 500;
+		}
+	}
+
 	return error;
 };
 
