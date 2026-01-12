@@ -108,7 +108,9 @@ const insert = async (params) => {
 };
 
 const extractPublicKey = async (params) => {
-	const identifier = config.env === "development" ? params.identifier : params.clientIP;
+	// Use unique identifier (wallet + device hash) for better user experience
+	// Fallback to clientIP for legacy support or if identifier not provided
+	const identifier = params.identifier || params.clientIP;
 
 	const storedKey = await PGPKeyModule.findKey(identifier); // uuid
 
@@ -204,7 +206,10 @@ const sessionDecrypt = async (content, authUser) => {
 		return decryptedContent;
 	} catch (exception) {
 		console.error("Error during decryption:", { exception, authUser });
-		return null;
+		// Use the format "statusCode:message" that errorHandler expects
+		const error = new Error("412:encryption_key_didnt_match");
+
+		throw error;
 	}
 };
 

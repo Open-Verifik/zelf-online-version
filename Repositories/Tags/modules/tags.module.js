@@ -41,7 +41,7 @@ const generateDomainHoldDomain = (domain, name) => {
  * @param {Object} authUser
  */
 const leaseTag = async (params, authUser) => {
-	const { tagName, domain, referralTagName } = params;
+	const { tagName, domain, referralTagName, securityType } = params;
 
 	const domainConfig = getDomainConfig(domain);
 
@@ -60,7 +60,7 @@ const leaseTag = async (params, authUser) => {
 
 	if (!face) throw new Error("409:face_not_found");
 
-	if (!password) throw new Error("409:password_not_found");
+	if (!password && securityType !== "withoutPassword") throw new Error("409:password_not_found");
 
 	const { eth, btc, solana, sui, zkProof, mnemonic } = await _createWalletsFromPhrase({
 		...params,
@@ -79,24 +79,34 @@ const leaseTag = async (params, authUser) => {
 			mnemonic,
 		},
 		faceBase64: face,
-		password,
 		_id: tagName,
 		tolerance: params.tolerance,
 		addServerPassword: Boolean(params.addServerPassword),
 	};
 
+	// we won't assign the password if the security type is withoutPassword
+	if (securityType !== "withoutPassword") {
+		dataToEncrypt.password = password;
+	}
+
 	const tagObject = {
 		...dataToEncrypt.publicData,
 	};
 
-	TagsPartsModule.assignProperties(tagObject, dataToEncrypt, { eth, btc, solana, sui }, { ...params, password, referralTagObject }, domainConfig);
+	TagsPartsModule.assignProperties(
+		tagObject,
+		dataToEncrypt,
+		{ eth, btc, solana, sui },
+		{ ...params, password: dataToEncrypt.password, referralTagObject },
+		domainConfig
+	);
 
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
 
 	if (tagObject.price === 0) {
-		await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
+		await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, securityType, authUser);
 	} else {
-		await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
+		await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, securityType, authUser);
 	}
 
 	if (!tagObject.zelfProof) {
@@ -183,13 +193,12 @@ const decryptTag = async (params, authUser) => {
 
 	const { face, password } = await _decryptParams(params, authUser);
 
-	console.log({ debug: true, addServerPassword: Boolean(params.addServerPassword) });
-
 	const decryptedZelfProof = await decrypt({
 		addServerPassword: Boolean(params.addServerPassword),
 		faceBase64: face,
 		password,
 		zelfProof: tagObject?.zelfProof,
+		hasPassword: tagObject.publicData.hasPassword,
 	});
 
 	if (decryptedZelfProof.error) {
@@ -203,6 +212,8 @@ const decryptTag = async (params, authUser) => {
 	const { mnemonic, zkProof, solanaSecretKey } = decryptedZelfProof.metadata;
 
 	const tagKey = domainConfig.getTagKey();
+
+	console.log({ password });
 
 	const { encryptedMessage, privateKey, tagsToAdd } = await initTagUpdates(tagObject, {
 		mnemonic,

@@ -40,8 +40,6 @@ const ERC20_ABI = [
  */
 const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 	try {
-		console.log(`🔍 Verifying Avalanche payment: ${txHash}`);
-
 		// Validate inputs
 		if (!txHash) {
 			return {
@@ -168,7 +166,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 		const block = await provider.getBlock(receipt.blockNumber);
 
 		// All checks passed!
-		console.log(`✅ Avalanche payment verified: ${actualAmount} ZNS from ${from}`);
 
 		return {
 			valid: true,

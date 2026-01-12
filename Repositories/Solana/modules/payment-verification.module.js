@@ -30,8 +30,6 @@ const connection = new Connection(SOLANA_CONFIG.rpcEndpoint, "confirmed");
  */
 const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 	try {
-		console.log(`🔍 Verifying Solana payment: ${txHash}`, { expectedAmount, proof, userWallet });
-
 		// Validate inputs
 		if (!txHash) {
 			return {
@@ -52,8 +50,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 			maxSupportedTransactionVersion: 0,
 		});
 
-		console.log({ transaction });
-
 		if (!transaction) {
 			return {
 				valid: false,
@@ -67,7 +63,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 
 		// Check transaction status
 		if (transaction.meta?.err) {
-			console.log("❌ Transaction failed on blockchain");
 			return {
 				valid: false,
 				reason: "Transaction failed on blockchain",
@@ -83,7 +78,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 		const confirmations = currentSlot - slot;
 
 		if (confirmations < SOLANA_CONFIG.confirmations) {
-			console.log(`❌ Insufficient confirmations: ${confirmations}`);
 			return {
 				valid: false,
 				reason: `Insufficient confirmations (${confirmations}/${SOLANA_CONFIG.confirmations})`,
@@ -98,7 +92,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 		const tokenTransfer = await parseTokenTransfer(transaction);
 
 		if (!tokenTransfer) {
-			console.log("❌ No token transfer found");
 			return {
 				valid: false,
 				reason: "No token transfer found in transaction",
@@ -107,7 +100,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 
 		// Verify it's a ZNS token transfer
 		if (tokenTransfer.mint !== SOLANA_CONFIG.znsTokenMint) {
-			console.log(`❌ Wrong token mint: ${tokenTransfer.mint} vs ${SOLANA_CONFIG.znsTokenMint}`);
 			return {
 				valid: false,
 				reason: "Transaction is not a ZNS token transfer",
@@ -120,7 +112,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 
 		// Verify recipient is the service wallet
 		if (tokenTransfer.destination !== SOLANA_CONFIG.serviceWallet) {
-			console.log(`❌ Wrong recipient: ${tokenTransfer.destination} vs ${SOLANA_CONFIG.serviceWallet}`);
 			return {
 				valid: false,
 				reason: "Payment was not sent to the service wallet",
@@ -133,7 +124,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 
 		// Verify sender matches user wallet (if provided)
 		if (userWallet && tokenTransfer.source !== userWallet) {
-			console.log(`❌ Wrong sender: ${tokenTransfer.source} vs ${userWallet}`);
 			return {
 				valid: false,
 				reason: "Payment source does not match user wallet",
@@ -148,7 +138,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 		const actualAmount = tokenTransfer.amount / Math.pow(10, tokenTransfer.decimals);
 
 		if (actualAmount < expectedAmount) {
-			console.log(`❌ Insufficient amount: ${actualAmount} vs ${expectedAmount}`);
 			return {
 				valid: false,
 				reason: "Insufficient payment amount",
@@ -159,9 +148,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 				},
 			};
 		}
-
-		// All checks passed!
-		console.log(`✅ Solana payment verified: ${actualAmount} ZNS from ${tokenTransfer.source}`);
 
 		return {
 			valid: true,

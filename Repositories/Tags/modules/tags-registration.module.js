@@ -79,9 +79,11 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
  * Save hold tag in IPFS (for recovery)
  * @param {Object} tagObject - Tag object
  * @param {Object} referralTagObject - Referral tag object
+ * @param {Object} domainConfig - Domain config
+ * @param {string} securityType - Security type
  * @param {Object} authUser - Authenticated user
  */
-const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, authUser) => {
+const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, securityType, authUser) => {
 	const domain = tagObject.domain || "zelf";
 
 	const _domainConfig = domainConfig || getDomainConfig(domain);
@@ -107,6 +109,10 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, aut
 		},
 		suiAddress: tagObject.suiAddress,
 	};
+
+	if (securityType && tagObject.hasPassword == "true") {
+		metadata.extraParams.st = securityType;
+	}
 
 	if (referralTagObject) {
 		metadata.referral = {

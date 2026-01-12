@@ -95,6 +95,8 @@ const encryptQRCode = async (data) => {
 const decrypt = async (data) => {
 	if (!data.zelfProof) throw new Error("400:missing_zelf_proof");
 
+	if (data.hasPassword == "false") data.password = undefined;
+
 	try {
 		const encryptedResponse = await axios.post("/zelf/decrypt", {
 			face_base_64: data.faceBase64,

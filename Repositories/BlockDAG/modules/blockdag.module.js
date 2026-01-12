@@ -52,6 +52,8 @@ const apiForAddressBalance = "https://api.awakening.bdagscan.com/v1/api/transact
 const apiForAddressTransactions = "https://api.awakening.bdagscan.com/v1/api/transaction/getTransactionByAddress";
 //?address=0x787389C8ec43D94362648310316F4348A4dE8C83&limit=10&page=1&export=false <-- those are the query parameters
 
+const apiForTransactionDetails = "https://api.awakening.bdagscan.com/v1/api/transaction/getTransactionDetails?txnHash=";
+
 // sample response for the apiForAddressTransactions
 /**
  * {
@@ -124,7 +126,7 @@ const apiForAddressTransactions = "https://api.awakening.bdagscan.com/v1/api/tra
 }
  */
 
-// Helper function to get address balance from API
+// Helper function to get address balance and details from API
 const getAddressBalanceFromAPI = async (address) => {
 	try {
 		const response = await instance.get(`${apiForAddressBalance}${address}`, {
@@ -132,8 +134,12 @@ const getAddressBalanceFromAPI = async (address) => {
 		});
 
 		if (response.data && response.data.status === 200 && response.data.data) {
-			const balance = response.data.data.balance;
-			return balance !== undefined && balance !== null ? balance.toString() : "0";
+			const { balance, firstTransaction, lastTransaction } = response.data.data;
+			return {
+				balance: balance !== undefined && balance !== null ? balance.toString() : "0",
+				firstTransaction,
+				lastTransaction,
+			};
 		}
 		throw new Error("Invalid API response");
 	} catch (error) {
@@ -162,6 +168,23 @@ const getAddressTransactionsFromAPI = async (address, page = 1, limit = 20) => {
 	} catch (error) {
 		console.error("BlockDAG API transactions fetch failed:", error.message);
 		throw error;
+	}
+};
+
+// Helper function to get transaction details from API
+const getTransactionFromAPI = async (txnHash) => {
+	try {
+		const response = await instance.get(`${apiForTransactionDetails}${txnHash}`, {
+			headers: { "Content-Type": "application/json" },
+		});
+
+		if (response.data && response.data.status === 200 && response.data.data) {
+			return response.data.data;
+		}
+		return null;
+	} catch (error) {
+		console.error("BlockDAG API transaction detail fetch failed:", error.message);
+		return null;
 	}
 };
 
@@ -334,11 +357,13 @@ const getLatestBlock = async () => {
 /**
  * Fetch BDAG balance with API fallback to RPC
  * @param {string} address - Address to fetch balance for
- * @returns {Promise<string>} Balance as string
+ * @returns {Promise<Object>} Object containing balance and transaction stats
  */
 const fetchBdagBalance = async (address) => {
 	try {
-		return await getAddressBalanceFromAPI(address);
+		const response = await getAddressBalanceFromAPI(address);
+		console.log({ response });
+		return response;
 	} catch (apiError) {
 		console.log("BlockDAG API balance fetch failed, trying RPC:", apiError.message);
 		try {
@@ -354,10 +379,19 @@ const fetchBdagBalance = async (address) => {
 					headers: { "Content-Type": "application/json" },
 				}
 			);
-			return balanceResponse.data.result ? (parseInt(balanceResponse.data.result, 16) / Math.pow(10, 18)).toString() : "0";
+			const balance = balanceResponse.data.result ? (parseInt(balanceResponse.data.result, 16) / Math.pow(10, 18)).toString() : "0";
+			return {
+				balance,
+				firstTransaction: null,
+				lastTransaction: null,
+			};
 		} catch (error) {
 			console.error("BlockDAG RPC balance fetch failed:", error.message);
-			return "0";
+			return {
+				balance: "0",
+				firstTransaction: null,
+				lastTransaction: null,
+			};
 		}
 	}
 };
@@ -372,7 +406,7 @@ const fetchBdagPrice = async () => {
 		return priceData.price || "0";
 	} catch (error) {
 		console.log("BlockDAG price fetch failed, using default:", error.message);
-		return "0.001"; // Placeholder price
+		return "0.005"; // Placeholder price
 	}
 };
 
@@ -481,7 +515,17 @@ const fetchAddressTransactions = async (address) => {
  * @param {number} totalFiatBalance - Total fiat balance from tokens
  * @returns {Object} Complete address response object
  */
-const buildAddressResponse = (address, balance, price, fiatBalance, tokens, transactions, totalFiatBalance) => {
+const buildAddressResponse = (
+	address,
+	balance,
+	price,
+	fiatBalance,
+	tokens,
+	transactions,
+	totalFiatBalance,
+	firstTransaction = null,
+	lastTransaction = null
+) => {
 	const totalPortfolioValue = fiatBalance + totalFiatBalance;
 
 	return {
@@ -491,6 +535,8 @@ const buildAddressResponse = (address, balance, price, fiatBalance, tokens, tran
 		totalPortfolioValue,
 		price,
 		type: "system_account",
+		firstTransaction,
+		lastTransaction,
 		account: {
 			asset: "BDAG",
 			fiatBalance: fiatBalance.toString(),
@@ -516,16 +562,17 @@ const getAddress = async (query) => {
 
 		// Add overall timeout to prevent hanging
 		const timeoutPromise = new Promise((_, reject) => {
-			setTimeout(() => reject(new Error("BlockDAG API timeout after 8 seconds")), 8000);
+			setTimeout(() => reject(new Error("BlockDAG API timeout after 30 seconds")), 30000);
 		});
 
 		const dataPromise = (async () => {
-			// Fetch all data in parallel where possible
-			const [bdagBalance, bdagPrice, tokensData] = await Promise.all([
-				fetchBdagBalance(address),
-				fetchBdagPrice(),
-				fetchAddressTokens(address),
-			]);
+			// Fetch balance first (API call)
+			const bdagData = await fetchBdagBalance(address);
+
+			// Fetch price and tokens in parallel
+			const [bdagPrice, tokensData] = await Promise.all([fetchBdagPrice(), fetchAddressTokens(address)]);
+
+			const bdagBalance = bdagData.balance;
 
 			// Calculate fiat balance
 			const fiatBalance = parseFloat(bdagBalance) * parseFloat(bdagPrice);
@@ -539,7 +586,17 @@ const getAddress = async (query) => {
 			const transactions = await fetchAddressTransactions(address);
 
 			// Build and return response
-			return buildAddressResponse(address, bdagBalance, bdagPrice, fiatBalance, tokens, transactions, tokensData.totalFiatBalance);
+			return buildAddressResponse(
+				address,
+				bdagBalance,
+				bdagPrice,
+				fiatBalance,
+				tokens,
+				transactions,
+				tokensData.totalFiatBalance,
+				bdagData.firstTransaction,
+				bdagData.lastTransaction
+			);
 		})();
 
 		return await Promise.race([dataPromise, timeoutPromise]);
@@ -721,6 +778,30 @@ const getTransactionStatus = async (params) => {
 	try {
 		const { id } = params;
 
+		// Try API first
+		const apiTx = await getTransactionFromAPI(id);
+
+		if (apiTx) {
+			return {
+				blockNumber: apiTx.block?.blockNumber ? parseInt(apiTx.block?.blockNumber) : "N/A",
+				confirmations: apiTx.status === "success" ? "1" : "0",
+				from: apiTx.from,
+				to: apiTx.to,
+				value: apiTx.value ? parseFloat(apiTx.value).toFixed(6) : "0",
+				gas: "21000", // Default or parsed if available
+				gasPrice: apiTx.txnGasPrice ? Math.floor(parseFloat(apiTx.txnGasPrice) * 1e18) : "0",
+				gasUsed: apiTx.gasUsed ? parseInt(apiTx.gasUsed) : "0",
+				nonce: "0", // Not usually provided in this API response
+				input: "0x", // Not usually provided in this API response
+				hash: apiTx.txnHash,
+				status: apiTx.status === "success" ? "success" : apiTx.status === "failed" ? "failed" : "pending",
+				transactionIndex: "0",
+			};
+		}
+
+		// Fallback to RPC
+		console.log("Transaction not found in API, falling back to RPC...");
+
 		// Get transaction details via RPC
 		const response = await instance.post(
 			BLOCKDAG_RPC,
@@ -820,7 +901,7 @@ const getPortfolioSummary = async (params) => {
 
 		// Get BDAG balance and price
 		let bdagBalance = "0";
-		let bdagPrice = "0.001"; // Default placeholder
+		let bdagPrice = "0.005"; // Default placeholder
 		try {
 			const balanceResponse = await instance.post(
 				BLOCKDAG_RPC,
@@ -838,7 +919,8 @@ const getPortfolioSummary = async (params) => {
 
 			try {
 				const priceData = await getTickerPrice({ symbol: "BDAG" });
-				bdagPrice = priceData.price || "0.001";
+
+				bdagPrice = priceData.price || "0.005";
 			} catch (priceError) {
 				console.log("Price fetch failed, using default");
 			}

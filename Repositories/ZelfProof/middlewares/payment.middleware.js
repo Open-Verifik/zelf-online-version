@@ -151,9 +151,6 @@ const paymentRequired = async (ctx, next) => {
 			timestamp: new Date(),
 		});
 
-		// Log successful payment
-		console.log(`Payment verified: ${paymentConfig.cost} ZNS on ${paymentChain} - TX: ${paymentTxHash}`);
-
 		// Attach payment info to context for analytics
 		ctx.state.paymentInfo = {
 			chain: paymentChain,
@@ -219,8 +216,6 @@ const markPaymentAsUsed = async (paymentData) => {
 	try {
 		// Store in IPFS for permanent record and replay protection
 		await savePaymentRecord(paymentData);
-
-		console.log(`Payment marked as used: ${paymentData.txHash}`);
 	} catch (error) {
 		console.error("Error marking payment as used:", error);
 		throw error;
@@ -243,13 +238,9 @@ const getSubscriptionStatus = async (userId) => {
  */
 const findPaymentByTxHash = async (txHash) => {
 	try {
-		console.log(`PaymentMiddleware: Searching IPFS for txHash ${txHash}`);
-
 		// Query IPFS for metadata key "paymentTx" matching the hash
 		// This relies on IPFS provider supporting metadata filtering
 		const results = await IPFSModule.get({ key: "paymentTx", value: txHash });
-
-		console.log(`PaymentMiddleware: Found ${results ? results.length : 0} records for ${txHash}`);
 
 		if (results && results.length > 0) {
 			return results[0];
