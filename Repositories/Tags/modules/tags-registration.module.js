@@ -107,6 +107,9 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
 			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 			expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
 		},
+		addresses: JSON.stringify({
+			arweaveAddress: tagObject.arweaveAddress,
+		}),
 		suiAddress: tagObject.suiAddress,
 	};
 

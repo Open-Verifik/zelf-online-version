@@ -74,6 +74,14 @@ const _formatRecord = (item) => {
 		delete formattedResult.publicData.extraParams;
 	}
 
+	if (formattedResult?.publicData?.addresses) {
+		const addresses = JSON.parse(formattedResult.publicData.addresses);
+
+		Object.assign(formattedResult.publicData, addresses);
+
+		delete formattedResult.publicData.addresses;
+	}
+
 	if (formattedResult?.publicData?.referral) {
 		const referral = JSON.parse(formattedResult.publicData.referral);
 

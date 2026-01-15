@@ -11,7 +11,8 @@ const { getDomainConfig } = require("../config/supported-domains");
  * Placeholder module for tag record synchronization
  */
 const initTagUpdates = async (tagObject, secretKeys) => {
-	const { mnemonic, zkProof, solanaSecretKey, password } = secretKeys;
+	const { mnemonic, zkProof, solanaSecretKey, arweavePrivateKey, password } = secretKeys;
+
 	let sui = {};
 	let btc = {};
 
@@ -34,7 +35,7 @@ const initTagUpdates = async (tagObject, secretKeys) => {
 	}
 
 	const { encryptedMessage, privateKey } = await SessionModule.walletEncrypt(
-		{ mnemonic, zkProof, solanaSecretKey, suiSecretKey: sui.secretKey },
+		{ mnemonic, zkProof, solanaSecretKey, suiSecretKey: sui.secretKey, arweavePrivateKey },
 		tagObject.publicData.ethAddress,
 		password
 	);

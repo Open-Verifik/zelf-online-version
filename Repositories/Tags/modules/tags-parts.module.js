@@ -348,7 +348,7 @@ const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainCo
 		referralTagName ? `${referralTagName}.${domainConfig.name}` : ""
 	);
 
-	const { eth, btc, solana, sui } = addresses;
+	const { eth, btc, solana, sui, arweave } = addresses;
 
 	tagObject.price = price;
 	tagObject.reward = reward;
@@ -358,6 +358,7 @@ const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainCo
 	tagObject.btcAddress = btc.address;
 	tagObject.solanaAddress = solana.address;
 	tagObject.suiAddress = sui.address;
+	tagObject.arweaveAddress = arweave.address;
 	tagObject.hasPassword = `${Boolean(payload.password)}`;
 };
 
@@ -393,7 +394,7 @@ const getTagNameFromPublicData = (tagObject, type = "full", domainConfig) => {
 };
 
 const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
-	const { eth, solana, sui } = addresses;
+	const { eth, solana, sui, arweave } = addresses;
 
 	const { mnemonic, zkProof } = dataToEncrypt.metadata;
 
@@ -407,6 +408,7 @@ const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
 			zkProof,
 			solanaPrivateKey: solana.secretKey,
 			suiSecretKey: sui.secretKey,
+			arweavePrivateKey: arweave.privateKey,
 		},
 		eth.address,
 		password

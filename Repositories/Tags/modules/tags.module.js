@@ -18,6 +18,7 @@ const TagsRegistrationModule = require("./tags-registration.module");
 const { extractZelfProofFromQR } = require("./qr-zelfproof-extractor.module");
 const SessionModule = require("../../Session/modules/session.module");
 const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
+const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const { unPinFiles } = require("./tags-ipfs.module");
 const jwt = require("jsonwebtoken");
 
@@ -62,7 +63,7 @@ const leaseTag = async (params, authUser) => {
 
 	if (!password && securityType !== "withoutPassword") throw new Error("409:password_not_found");
 
-	const { eth, btc, solana, sui, zkProof, mnemonic } = await _createWalletsFromPhrase({
+	const { eth, btc, solana, sui, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
 		...params,
 		mnemonic: decryptedParams.mnemonic,
 	});
@@ -96,7 +97,7 @@ const leaseTag = async (params, authUser) => {
 	TagsPartsModule.assignProperties(
 		tagObject,
 		dataToEncrypt,
-		{ eth, btc, solana, sui },
+		{ eth, btc, solana, sui, arweave },
 		{ ...params, password: dataToEncrypt.password, referralTagObject },
 		domainConfig
 	);
@@ -114,7 +115,7 @@ const leaseTag = async (params, authUser) => {
 		tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
 	}
 
-	const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui }, password);
+	const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, arweave }, password);
 
 	return {
 		ipfs: [tagObject.ipfs],
@@ -130,6 +131,14 @@ const leaseTag = async (params, authUser) => {
 		},
 		walrus: tagObject.walrus,
 		pgp,
+		metadata:
+			config.env === "production"
+				? undefined
+				: {
+						// for development porposes so we can visualize the arweave private key and the mnemonic for testing.
+						mnemonic,
+						arweavePrivateKey: arweave.privateKey,
+				  },
 	};
 };
 
@@ -215,10 +224,14 @@ const decryptTag = async (params, authUser) => {
 
 	console.log({ password });
 
+	// Generate Arweave wallet from mnemonic for consistency
+	const arweave = await ArweaveModule.generateWalletFromMnemonic(mnemonic);
+
 	const { encryptedMessage, privateKey, tagsToAdd } = await initTagUpdates(tagObject, {
 		mnemonic,
 		zkProof,
 		solanaSecretKey,
+		arweavePrivateKey: arweave.privateKey,
 		password,
 	});
 
@@ -245,7 +258,7 @@ const decryptTag = async (params, authUser) => {
 			},
 			config.JWT_SECRET
 		),
-		metadata: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey } : undefined,
+		metadata: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey, arweavePrivateKey: arweave.privateKey } : undefined,
 	};
 };
 
@@ -405,6 +418,9 @@ const _validateReferral = async (referralTagName, authUser, domainConfig) => {
 
 /**
  * Create wallets from phrase
+ * TODO: Add Arweave wallet generation
+ * - Add Arweave public address
+ * - Generate private key from mnemonic (12 words)
  * @param {Object} params
  */
 const _createWalletsFromPhrase = async (params) => {
@@ -420,6 +436,7 @@ const _createWalletsFromPhrase = async (params) => {
 	const sui = await generateSuiWalletFromMnemonic(_mnemonic);
 
 	const zkProof = await OfflineProofModule.createProof(_mnemonic);
+	const arweave = await ArweaveModule.generateWalletFromMnemonic(_mnemonic);
 
 	return {
 		eth,
@@ -428,6 +445,7 @@ const _createWalletsFromPhrase = async (params) => {
 		sui,
 		zkProof,
 		mnemonic: _mnemonic,
+		arweave,
 	};
 };
 
