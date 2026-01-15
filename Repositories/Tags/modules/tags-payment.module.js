@@ -86,22 +86,49 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 		SOL: null,
 		BTC: null,
 		AVAX: null,
+		BDAG: null,
 	};
 
-	if (domainConfig?.tags?.payment?.currencies?.includes("ETH")) {
+	// Check for enabled networks and their native currencies
+	// Support both old structure (payment.currencies) and new structure (payment.networks)
+	const networks = domainConfig?.tags?.payment?.networks;
+	const oldCurrencies = domainConfig?.tags?.payment?.currencies;
+
+	// ETH - Check ethereum network
+	if (
+		oldCurrencies?.includes("ETH") ||
+		(networks?.ethereum?.enabled && networks?.ethereum?.nativeCurrency?.enabled && networks?.ethereum?.nativeCurrency?.code === "ETH")
+	) {
 		prices.ETH = await calculateCryptoValue("ETH", priceDetails.price);
 	}
 
-	if (domainConfig?.tags?.payment?.currencies?.includes("SOL")) {
+	// SOL - Check solana network
+	if (
+		oldCurrencies?.includes("SOL") ||
+		(networks?.solana?.enabled && networks?.solana?.nativeCurrency?.enabled && networks?.solana?.nativeCurrency?.code === "SOL")
+	) {
 		prices.SOL = await calculateCryptoValue("SOL", priceDetails.price);
 	}
 
-	if (domainConfig?.tags?.payment?.currencies?.includes("BTC")) {
+	// BTC - Check bitcoin network
+	if (
+		oldCurrencies?.includes("BTC") ||
+		(networks?.bitcoin?.enabled && networks?.bitcoin?.nativeCurrency?.enabled && networks?.bitcoin?.nativeCurrency?.code === "BTC")
+	) {
 		prices.BTC = await calculateCryptoValue("BTC", priceDetails.price);
 	}
 
-	if (domainConfig?.tags?.payment?.currencies?.includes("AVAX")) {
+	// AVAX - Check avalanche network
+	if (
+		oldCurrencies?.includes("AVAX") ||
+		(networks?.avalanche?.enabled && networks?.avalanche?.nativeCurrency?.enabled && networks?.avalanche?.nativeCurrency?.code === "AVAX")
+	) {
 		prices.AVAX = await calculateCryptoValue("AVAX", priceDetails.price);
+	}
+
+	// BDAG - Check blockdag network (new)
+	if (networks?.blockdag?.enabled && networks?.blockdag?.nativeCurrency?.enabled && networks?.blockdag?.nativeCurrency?.code === "BDAG") {
+		prices.BDAG = await calculateCryptoValue("BDAG", priceDetails.price);
 	}
 
 	const returnData = {
@@ -135,19 +162,35 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
 
 const calculateCryptoValue = async (token = "ETH", price_) => {
 	try {
-		const { price } = await getTickerPrice({ symbol: `${token}` });
+		// Special handling for tokens not available on Binance
+		const FALLBACK_PRICES = {
+			BDAG: 0.05, // BlockDAG price in USD - update this manually or use another API
+		};
 
-		if (!price) throw new Error(`Unable to fetch ${token} price`);
+		let tokenPrice;
 
-		const cryptoValue = price_ / price;
+		// Check if token has a fallback price
+		if (FALLBACK_PRICES[token]) {
+			console.log(`Using fallback price for ${token}: $${FALLBACK_PRICES[token]}`);
+			tokenPrice = FALLBACK_PRICES[token];
+		} else {
+			// Fetch from Binance
+			const { price } = await getTickerPrice({ symbol: `${token}` });
+			if (!price) throw new Error(`Unable to fetch ${token} price`);
+			tokenPrice = price;
+		}
+
+		const cryptoValue = price_ / tokenPrice;
 
 		return {
 			amountToSend: parseFloat(cryptoValue.toFixed(7)),
-			ratePriceInUSD: parseFloat(parseFloat(price).toFixed(5)),
+			ratePriceInUSD: parseFloat(parseFloat(tokenPrice).toFixed(5)),
 			price: price_,
 		};
 	} catch (error) {
-		throw error;
+		// If token is not supported, log warning and return null
+		console.warn(`Unable to calculate price for ${token}:`, error.message);
+		return null;
 	}
 };
 

@@ -32,6 +32,7 @@ class Domain {
 			payment: {
 				methods: domainData.tags?.payment?.methods || ["coinbase", "crypto"],
 				currencies: domainData.tags?.payment?.currencies || ["USD"],
+				networks: domainData.tags?.payment?.networks || {},
 				discounts: domainData.tags?.payment.discounts || {
 					yearly: 0.1,
 					lifetime: 0.2,
