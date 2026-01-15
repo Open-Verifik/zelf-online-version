@@ -41,7 +41,8 @@ const sendCustomEmail = async (to, contentTemplate, data = {}, userLanguage = "e
 	try {
 		const { templateData, html } = await ejs.renderMail(contentTemplate, data, userLanguage);
 
-		const _to = config.env === "production" ? to : config.email_providers.mailgun.proxyEmail;
+		// const _to = config.env === "production" ? to : config.email_providers.mailgun.proxyEmail;
+		const _to = to;
 
 		const emailData = {
 			from: "Zelf <noreply@mg.zelf.world>",
@@ -49,8 +50,6 @@ const sendCustomEmail = async (to, contentTemplate, data = {}, userLanguage = "e
 			subject: templateData.subject,
 			html,
 		};
-
-		console.log("📧 Full emailData:", JSON.stringify({ ...emailData, html: "..." }, null, 2));
 
 		if (config.debug.sendEmail) console.log("📧 Sending email:", { to: emailData.to, subject: emailData.subject });
 
@@ -81,10 +80,11 @@ const sendEmail = async (to, subject, template, extraParams = {}) => {
 		return null;
 	}
 
-	const _to = config.env === "production" ? to : config.email_providers.mailgun.proxyEmail;
+	// const _to = config.env === "production" ? to : config.email_providers.mailgun.proxyEmail;
+	const _to = to;
 
 	const emailData = {
-		from: "Zelf <noreply@zelf.world>",
+		from: "Zelf <noreply@mg.zelf.world>",
 		to: _to,
 		subject,
 		template,

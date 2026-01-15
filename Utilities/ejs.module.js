@@ -8,6 +8,7 @@ const EMAIL_CONTENT_TEMPLATES = {
 	staff_welcome: "content-staff-welcome.template.ejs",
 	otp: "content-otp.template.ejs",
 	plain: "content-plain.template.ejs",
+	purchase_receipt: "content-purchase-receipt.template.ejs",
 };
 
 /**

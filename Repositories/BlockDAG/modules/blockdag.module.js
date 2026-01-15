@@ -362,7 +362,7 @@ const getLatestBlock = async () => {
 const fetchBdagBalance = async (address) => {
 	try {
 		const response = await getAddressBalanceFromAPI(address);
-		console.log({ response });
+
 		return response;
 	} catch (apiError) {
 		console.log("BlockDAG API balance fetch failed, trying RPC:", apiError.message);

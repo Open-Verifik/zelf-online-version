@@ -8,7 +8,8 @@ const bitcoinModule = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const ETHModule = require("../../etherscan/modules/etherscan-scrapping.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 const AvalancheModule = require("../../Avalanche/modules/avalanche-scrapping.module");
-const { sendEmail } = require("../../purchase-zelf/modules/purchase.module");
+// const { sendEmail } = require("../../purchase-zelf/modules/purchase.module");
+const { sendCustomEmail } = require("../../../Core/mailgun");
 const { buildMetadata, storeInIPFS, storeInWalrus, storeInArweave } = require("./tags-payment.module");
 
 /**
@@ -364,18 +365,27 @@ const sendEmailReceipt = async (tagName, domain, network, email, token) => {
 		tokenDecoded.prices.BTC?.price ||
 		tokenDecoded.prices.AVAX?.price;
 
-	return await sendEmail({
-		language: tokenDecoded.language || "es",
-		template: "Purchase_receipt",
-		tagName: tokenDecoded.tagName,
-		transactionDate: tagObject.publicData.registeredAt,
-		price,
-		subtotal: price,
-		discount: tokenDecoded.discount || 0,
-		expires: tagObject.publicData.expiresAt,
-		year: tokenDecoded.duration,
+	// Format dates for better readability
+	const transactionDate = moment(tagObject.publicData.registeredAt).format("YYYY-MM-DD HH:mm:ss");
+	const expiresDate = moment(tagObject.publicData.expiresAt).format("YYYY-MM-DD HH:mm:ss");
+	const yearLabel = tokenDecoded.duration === 1 ? "1 YEAR" : `${tokenDecoded.duration} YEARS`;
+
+	return await sendCustomEmail(
 		email,
-	});
+		"purchase_receipt",
+		{
+			subject: `Your Zelf Domain Receipt - ${tokenDecoded.tagName}`,
+			tagName: tokenDecoded.tagName,
+			transactionDate,
+			expires: expiresDate,
+			subtotal: price,
+			discount: tokenDecoded.discount || 0,
+			total: price - (tokenDecoded.discount || 0),
+			year: tokenDecoded.duration,
+			yearLabel,
+		},
+		tokenDecoded.language || "en"
+	);
 };
 
 module.exports = {
