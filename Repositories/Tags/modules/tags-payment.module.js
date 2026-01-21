@@ -288,8 +288,8 @@ const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, { e
 			solanaAddress: solanaAddress,
 			count: `${currentCount}`,
 		},
-		redirect_url: "https://payment.zelf.world/checkout",
-		cancel_url: "https://payment.zelf.world/checkout",
+		redirect_url: "https://zelf.world/tags/payment/checkout/coinbase",
+		cancel_url: "https://zelf.world/tags/payment",
 	};
 
 	const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);

@@ -48,13 +48,16 @@ class Domain {
 				walrusEnabled: domainData.tags?.storage?.walrusEnabled || false,
 				backupEnabled: domainData.tags?.storage?.backupEnabled || false,
 			},
+			wallet: {
+				networks: domainData.tags?.wallet?.networks || domainData.wallet?.networks || {},
+			},
 		};
 
 		this.zelfkeys = {
 			plans: domainData.zelfkeys?.plans || [],
 			payment: {
-				whitelist: domainData.zelfkeys?.whitelist || {},
-				pricingTable: domainData.zelfkeys?.pricingTable || {},
+				whitelist: domainData.zelfkeys?.payment?.whitelist || domainData.zelfkeys?.whitelist || {},
+				pricingTable: domainData.zelfkeys?.payment?.pricingTable || domainData.zelfkeys?.pricingTable || {},
 			},
 			storage: {
 				keyPrefix: domainData.zelfkeys?.storage?.keyPrefix || "tagName",

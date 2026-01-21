@@ -48,7 +48,7 @@ const schemas = {
 									showAll: boolean().default(true),
 									specificTokens: array().items(string()).default([]),
 								}).optional(),
-							})
+							}),
 						)
 						.default({}),
 					currencies: array()
@@ -70,7 +70,7 @@ const schemas = {
 								4: number().min(0),
 								5: number().min(0),
 								lifetime: number().min(0),
-							})
+							}),
 						)
 						.required(),
 				}).required(),
@@ -81,6 +81,16 @@ const schemas = {
 					walrusEnabled: boolean().default(false),
 					backupEnabled: boolean().default(false),
 					// Note: backupEnabled is not allowed in frontend payload
+				}).required(),
+				wallet: object({
+					networks: object()
+						.pattern(
+							string(),
+							object({
+								enabled: boolean().required(),
+							}),
+						)
+						.required(),
 				}).required(),
 			}).required(),
 			zelfkeys: object({

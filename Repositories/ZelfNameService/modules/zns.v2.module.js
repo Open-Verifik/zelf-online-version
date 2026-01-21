@@ -673,8 +673,8 @@ const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 			solanaAddress: params.solanaAddress,
 			count: `${currentCount}`,
 		},
-		redirect_url: "https://payment.zelf.world/checkout",
-		cancel_url: "https://payment.zelf.world/checkout",
+		redirect_url: "https://zelf.world/tags/payment/checkout/coinbase",
+		cancel_url: "https://zelf.world/tags/payment/checkout/coinbase",
 	};
 
 	const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
@@ -763,8 +763,8 @@ const updateZelfPay = async (zelfPayObject, updates = {}) => {
 				solanaAddress: zelfPayObject.publicData.solanaAddress,
 				count: `${newCount}`,
 			},
-			redirect_url: "https://payment.zelf.world/checkout",
-			cancel_url: "https://payment.zelf.world/checkout",
+			redirect_url: "https://zelf.world/tags/payment/checkout/coinbase",
+			cancel_url: "https://zelf.world/tags/payment/checkout/coinbase",
 		};
 
 		const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
