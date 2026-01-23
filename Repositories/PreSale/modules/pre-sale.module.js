@@ -125,8 +125,8 @@ const createStripeSession = async ({ amount, email, zelfName, solanaAddress }) =
                 },
             ],
             mode: "payment",
-            success_url: `${frontendUrl}/presale/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${frontendUrl}/presale/checkout?canceled=true`,
+            success_url: `${frontendUrl}/presale/success?session_id={CHECKOUT_SESSION_ID}&method=stripe`,
+            cancel_url: `${frontendUrl}/presale/checkout?canceled=true&method=stripe`,
             customer_email: email,
             metadata: {
                 type: "zns_presale",
@@ -409,7 +409,7 @@ const _saveReceiptToIPFS = async (existingRecord, data) => {
             try {
                 const details = JSON.parse(keyvalues.paymentDetails);
                 alreadyReleased = details.tokensReleased === true;
-            } catch (e) { }
+            } catch (e) {}
         } else {
             alreadyReleased = keyvalues.tokensReleased === "true";
         }
