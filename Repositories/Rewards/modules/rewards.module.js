@@ -119,23 +119,81 @@ const _getZelfNamePublicData = async (zelfName) => {
 	}
 };
 
-// Helper function to generate wheel reward based on type
-const _generateWheelReward = (type) => {
-	let min, max;
-
+// Helper function to get wheel segments based on type
+const _getWheelSegments = (type) => {
 	if (type === "hold") {
-		min = 0.1;
-		max = 1.0;
+		// .hold domains: 1 to 12 ZNS (12 slots)
+		return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 	} else if (type === "mainnet") {
-		min = 0.2;
-		max = 2.0;
+		// Purchased domains (mainnet): 2, 4, 6, ... 24 ZNS (12 slots, even numbers)
+		return [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24];
 	} else {
 		throw new Error("Invalid ZelfName type");
 	}
+};
 
-	// Generate random reward amount within range (2 decimal places)
-	const reward = Math.random() * (max - min) + min;
-	return Math.round(reward * 100) / 100;
+// Helper function to generate wheel reward based on type
+const _generateWheelReward = (type) => {
+	const segments = _getWheelSegments(type);
+
+	// Select a random segment index
+	const winningIndex = Math.floor(Math.random() * segments.length);
+	const rewardAmount = segments[winningIndex];
+
+	return {
+		amount: rewardAmount,
+		winningIndex,
+		segments,
+	};
+};
+
+// Get roulette wheel configuration
+const getRouletteWheel = async (data, authUser) => {
+	try {
+		const { tagName, domain } = data;
+
+		const { tagObject, _tagName, domainConfig } = await _getTagObject(tagName, domain, authUser);
+
+		// Check if user already claimed today
+		const todayReward = await _getTodayReward(_tagName);
+
+		const type = tagObject.publicData.type || "hold";
+		const segments = _getWheelSegments(type);
+
+		// Calculate next claim time (tomorrow at midnight UTC)
+		const nextClaimAvailable = moment().add(1, "day").startOf("day").toISOString();
+
+		// If user already claimed, extract the reward details
+		let todayRewardData = null;
+
+		if (todayReward) {
+			// Handle both MongoDB and IPFS data structures
+			const amount = todayReward.amount || todayReward.publicData?.amount || 0;
+			const claimedAt = todayReward.claimedAt || todayReward.redeemedAt || todayReward.publicData?.redeemedAt || null;
+
+			todayRewardData = {
+				amount: parseFloat(amount) || 0,
+				currency: "ZNS",
+				claimedAt,
+				source: todayReward.source || "unknown",
+			};
+		}
+
+		return {
+			success: true,
+			tagName: _tagName,
+			type,
+			segments,
+			segmentCount: segments.length,
+			canSpin: !todayReward,
+			alreadyClaimedToday: !!todayReward,
+			nextClaimAvailable,
+			todayReward: todayRewardData,
+		};
+	} catch (error) {
+		console.error("Error in getRouletteWheel:", error);
+		throw new Error(error.message || "Failed to get roulette wheel configuration");
+	}
 };
 
 // Helper function to filter IPFS files by multiple metadata keys
@@ -213,7 +271,8 @@ const dailyRewards = async (data, authUser) => {
 		}
 
 		// Generate wheel reward based on type
-		const rewardAmount = _generateWheelReward(tagObject.publicData.type);
+		const wheelResult = _generateWheelReward(tagObject.publicData.type);
+		const rewardAmount = wheelResult.amount;
 
 		const todayKey = moment().format("YYYY-MM-DD");
 		const rewardPrimaryKey = `${_tagName}${todayKey}`;
@@ -222,6 +281,8 @@ const dailyRewards = async (data, authUser) => {
 			rewardsTagName: _tagName,
 			rewardPrimaryKey,
 			amount: rewardAmount,
+			winningIndex: wheelResult.winningIndex,
+			segments: wheelResult.segments,
 			type: "daily",
 			status: "claimed",
 			description: `Daily wheel reward for ${tagObject.publicData.type} ZelfName`,
@@ -229,7 +290,7 @@ const dailyRewards = async (data, authUser) => {
 			redeemedAt: moment().format("YYYY-MM-DD HH:mm:ss"),
 			zelfNameType: tagObject.publicData.type,
 			wheelSpin: true,
-			rewardRange: tagObject.publicData.type === "hold" ? "0.1-1.0" : "0.2-2.0",
+			rewardRange: tagObject.publicData.type === "hold" ? "1-12" : "2-24",
 		};
 
 		// Metadata for IPFS querying (key-value pairs)
@@ -319,6 +380,8 @@ const dailyRewards = async (data, authUser) => {
 			reward: {
 				rewardPrimaryKey,
 				amount: rewardAmount,
+				winningIndex: wheelResult.winningIndex,
+				segments: wheelResult.segments,
 				currency: "ZNS",
 				type: "daily",
 				zelfNameType: tagObject.publicData.type,
@@ -708,6 +771,7 @@ module.exports = {
 	update,
 	destroy,
 	dailyRewards,
+	getRouletteWheel,
 	rewardFirstTransaction,
 	checkAndSendReminders,
 	getUserRewardHistory,

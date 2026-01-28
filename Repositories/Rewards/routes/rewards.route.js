@@ -8,13 +8,17 @@ const base = "/rewards";
 module.exports = (server) => {
 	const PATH = config.basePath(base);
 
-	server.post(`${PATH}/daily`, Middleware.dailyRewardsValidation, Controller.dailyRewards);
-	server.post(`${PATH}/first-transaction`, Middleware.firstTransactionRewardValidation, Controller.firstTransactionReward);
-	server.get(`${PATH}/history/:tagName`, Middleware.rewardHistoryValidation, Controller.rewardHistory);
-	server.get(`${PATH}/stats/:tagName`, Middleware.rewardStatsValidation, Controller.rewardStats);
+	// Roulette wheel configuration
+	server.get(`${PATH}/roulette-wheel`, Middleware.rouletteWheelValidation, Controller.getRouletteWheel);
 
-	// release rewards
-	// server.post(`${PATH}/release`, Middleware.releaseRewardsValidation, Controller.releaseRewards);
+	// Daily rewards
+	server.post(`${PATH}/daily`, Middleware.dailyRewardsValidation, Controller.dailyRewards);
+
+	server.post(`${PATH}/first-transaction`, Middleware.firstTransactionRewardValidation, Controller.firstTransactionReward);
+
+	server.get(`${PATH}/history/:tagName`, Middleware.rewardHistoryValidation, Controller.rewardHistory);
+
+	server.get(`${PATH}/stats/:tagName`, Middleware.rewardStatsValidation, Controller.rewardStats);
 };
 
 /**
@@ -187,6 +191,110 @@ module.exports = (server) => {
  *           type: string
  *           description: Success or error message
  *           example: "Daily reward claimed successfully"
+ */
+
+/**
+ * @swagger
+ * /api/rewards/roulette-wheel:
+ *   get:
+ *     summary: Get roulette wheel configuration
+ *     description: |
+ *       Get the roulette wheel configuration for a user based on their tag type.
+ *       - .hold domains get 12 segments with values 1-12 ZNS
+ *       - Purchased (mainnet) domains get 12 segments with values 2, 4, 6, ... 24 ZNS
+ *       Also returns whether the user can spin today or has already claimed.
+ *     tags: [Rewards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: tagName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tag name (supports multiple domains)
+ *         example: "username.zelf"
+ *       - in: query
+ *         name: domain
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Domain for the tag
+ *         example: "zelf"
+ *     responses:
+ *       200:
+ *         description: Roulette wheel configuration retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 tagName:
+ *                   type: string
+ *                   example: "username.zelf"
+ *                 type:
+ *                   type: string
+ *                   enum: [hold, mainnet]
+ *                   example: "hold"
+ *                 segments:
+ *                   type: array
+ *                   items:
+ *                     type: number
+ *                   example: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+ *                 segmentCount:
+ *                   type: number
+ *                   example: 12
+ *                 canSpin:
+ *                   type: boolean
+ *                   example: true
+ *                 alreadyClaimedToday:
+ *                   type: boolean
+ *                   example: false
+ *                 todayReward:
+ *                   type: object
+ *                   nullable: true
+ *                   properties:
+ *                     amount:
+ *                       type: number
+ *                       example: 5
+ *                     claimedAt:
+ *                       type: string
+ *                       example: "2024-01-15 10:30:00"
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "tagName is required"
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Tag not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "tag_not_found"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 
 /**

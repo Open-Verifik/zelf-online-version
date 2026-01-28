@@ -58,9 +58,25 @@ const firstTransactionReward = async (ctx) => {
 	}
 };
 
+const getRouletteWheel = async (ctx) => {
+	try {
+		const { tagName, domain } = ctx.request.query;
+
+		const data = await Module.getRouletteWheel({ tagName, domain }, ctx.state.user);
+
+		ctx.body = data;
+	} catch (error) {
+		console.error(error);
+		ctx.status = error.status || 500;
+
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	dailyRewards,
 	rewardHistory,
 	rewardStats,
 	firstTransactionReward,
+	getRouletteWheel,
 };

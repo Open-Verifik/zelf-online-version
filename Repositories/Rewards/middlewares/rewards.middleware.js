@@ -189,11 +189,48 @@ const releaseRewardsValidation = async (ctx, next) => {
 	await next();
 };
 
+const rouletteWheelValidation = async (ctx, next) => {
+	try {
+		const { tagName, domain } = ctx.request.query;
+
+		const valid = validate(schemas.reward, {
+			tagName,
+			domain,
+		});
+
+		if (valid.error) {
+			ctx.status = 400;
+			ctx.body = { error: valid.error.message };
+			return;
+		}
+
+		// Extract domain and name from tagName
+		const { domain: extractedDomain, name } = extractTagInfo(tagName, domain);
+		const domainValidation = await validateDomainAndName(extractedDomain, name);
+
+		if (!domainValidation.valid) {
+			ctx.status = 400;
+			ctx.body = { error: domainValidation.error };
+			return;
+		}
+
+		// Add extracted domain and name to context for use in controllers
+		ctx.state.extractedDomain = extractedDomain;
+		ctx.state.extractedName = name;
+
+		await next();
+	} catch (error) {
+		ctx.status = 400;
+		ctx.body = { error: error.message };
+	}
+};
+
 module.exports = {
 	dailyRewardsValidation,
 	rewardHistoryValidation,
 	rewardStatsValidation,
 	firstTransactionRewardValidation,
+	rouletteWheelValidation,
 	normalizeZelfName, // Export the utility function for use in other modules
 	extractTagInfo, // Export the new utility function for tag extraction
 	releaseRewardsValidation,
