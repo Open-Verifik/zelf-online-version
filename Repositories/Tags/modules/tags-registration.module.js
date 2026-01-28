@@ -60,9 +60,10 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 			{ hasPassword: metadata.hasPassword, zelfProof: metadata.zelfProof, publicData: metadata },
 			domainConfig
 		);
+
+		metadata.walrus = tagObject.walrus.blobId;
 	}
 
-	metadata.walrus = tagObject.walrus.blobId;
 
 	tagObject.ipfs = await TagsIPFSModule.insert(
 		{
