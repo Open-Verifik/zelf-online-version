@@ -33,7 +33,10 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 			type: "mainnet",
 			hasPassword: tagObject.hasPassword,
 		},
-		suiAddress: tagObject.suiAddress,
+		addresses: JSON.stringify({
+			arweaveAddress: tagObject.arweaveAddress,
+			suiAddress: tagObject.suiAddress,
+		}),
 	};
 
 	if (referralTagObject) {
@@ -42,18 +45,24 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 			solanaAddress: referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress,
 		};
 
+		metadata.referralTagName = metadata.referral.tagName;
+
 		metadata.referral = JSON.stringify(metadata.referral);
 	}
 
-	tagObject.walrus = await WalrusModule.tagRegistration(
-		tagObject.zelfProofQRCode,
-		{ hasPassword: metadata.hasPassword, zelfProof: metadata.zelfProof, publicData: metadata },
-		domainConfig
-	);
+	metadata.extraParams = JSON.stringify(metadata.extraParams);
+
+	// only add it if the domain supports it
+	console.log({ isWalrusEnabled: domainConfig.isWalrusEnabled() });
+	if (domainConfig.isWalrusEnabled()) {
+		tagObject.walrus = await WalrusModule.tagRegistration(
+			tagObject.zelfProofQRCode,
+			{ hasPassword: metadata.hasPassword, zelfProof: metadata.zelfProof, publicData: metadata },
+			domainConfig
+		);
+	}
 
 	metadata.walrus = tagObject.walrus.blobId;
-
-	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
 	tagObject.ipfs = await TagsIPFSModule.insert(
 		{
@@ -67,12 +76,16 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 
 	tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
 
-	tagObject.arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
-		hasPassword: metadata.hasPassword,
-		zelfProof: metadata.zelfProof,
-		publicData: metadata,
-		fileName: tagName,
-	});
+	console.log({ isArweaveEnabled: domainConfig.isArweaveEnabled() });
+
+	if (domainConfig.isArweaveEnabled()) {
+		tagObject.arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
+			hasPassword: metadata.hasPassword,
+			zelfProof: metadata.zelfProof,
+			publicData: metadata,
+			fileName: tagName,
+		});
+	}
 };
 
 /**
@@ -98,8 +111,8 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
 		[tagKey]: holdName,
 		domain,
 		ethAddress: tagObject.ethAddress,
-		btcAddress: tagObject.btcAddress,
 		solanaAddress: tagObject.solanaAddress,
+		btcAddress: tagObject.btcAddress,
 		extraParams: {
 			hasPassword: tagObject.hasPassword,
 			type: "hold",
@@ -109,8 +122,8 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
 		},
 		addresses: JSON.stringify({
 			arweaveAddress: tagObject.arweaveAddress,
+			suiAddress: tagObject.suiAddress,
 		}),
-		suiAddress: tagObject.suiAddress,
 	};
 
 	if (securityType && tagObject.hasPassword == "true") {
@@ -122,6 +135,8 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
 			tagName: referralTagObject.publicData?.[tagKey] || referralTagObject.metadata?.[tagKey],
 			solanaAddress: referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress,
 		};
+
+		metadata.referralTagName = metadata.referral.tagName;
 
 		metadata.referral = JSON.stringify(metadata.referral);
 	}

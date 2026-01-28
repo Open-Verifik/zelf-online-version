@@ -276,6 +276,10 @@ class Domain {
 		return this.tags.storage.arweaveEnabled;
 	}
 
+	isWalrusEnabled() {
+		return this.tags.storage.walrusEnabled;
+	}
+
 	/**
 	 * Check if backup is enabled
 	 * @returns {boolean} - True if backup is enabled

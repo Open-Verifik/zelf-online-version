@@ -68,7 +68,9 @@ const searchTag = async (params, authUser) => {
 				if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
 					combinedResults.tagObject.zelfProof = extractedZelfProof;
 				}
-			} catch (error) {}
+			} catch (error) {
+				console.error({ searchTag_error: error });
+			}
 		}
 
 		return combinedResults;

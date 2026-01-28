@@ -135,10 +135,10 @@ const leaseTag = async (params, authUser) => {
 			config.env === "production"
 				? undefined
 				: {
-						// for development porposes so we can visualize the arweave private key and the mnemonic for testing.
-						mnemonic,
-						arweavePrivateKey: arweave.privateKey,
-				  },
+					// for development porposes so we can visualize the arweave private key and the mnemonic for testing.
+					mnemonic,
+					arweavePrivateKey: arweave.privateKey,
+				},
 	};
 };
 
