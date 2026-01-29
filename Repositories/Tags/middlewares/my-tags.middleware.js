@@ -6,30 +6,40 @@ const jwt = require("jsonwebtoken");
 const config = require("../../../Core/config");
 
 const schemas = {
-	transfer: {
-		tagName: string().required(),
-		domain: string(),
-		faceBase64: string().required(),
-		password: string().required(),
-	},
-	paymentConfirmation: {
-		tagName: string().required(),
-		domain: string(),
-		network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX"]).required(),
-		token: string().required(),
-	},
-	paymentOptions: {
-		tagName: string().required(),
-		domain: string(),
-		duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
-	},
-	receiptEmail: {
-		tagName: string().required(),
-		domain: string(),
-		network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX"]).required(),
-		email: string().email().required(),
-		token: string().required(),
-	},
+    transfer: {
+        tagName: string().required(),
+        domain: string(),
+        faceBase64: string().required(),
+        password: string().required(),
+    },
+    paymentConfirmation: {
+        tagName: string().required(),
+        domain: string(),
+        network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX"]).required(),
+        token: string().required(),
+    },
+    paymentOptions: {
+        tagName: string().required(),
+        domain: string(),
+        duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
+    },
+    receiptEmail: {
+        tagName: string().required(),
+        domain: string(),
+        network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX"]).required(),
+        email: string().email().required(),
+        token: string().required(),
+    },
+    referrals: {
+        tagName: string().required(),
+        domain: string().required(),
+    },
+    claimReferral: {
+        tagName: string().required(),
+        domain: string().required(),
+        friendTagName: string().required(),
+        friendDomain: string().required(),
+    },
 };
 
 /**
@@ -38,32 +48,32 @@ const schemas = {
  * @param {*} next - Next middleware
  */
 const transferValidation = async (ctx, next) => {
-	const valid = validate(schemas.transfer, ctx.request.body);
+    const valid = validate(schemas.transfer, ctx.request.body);
 
-	if (valid.error) {
-		ctx.status = 409;
-		ctx.body = { validationError: valid.error.message };
-		return;
-	}
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
 
-	const { tagName, domain } = ctx.request.body;
+    const { tagName, domain } = ctx.request.body;
 
-	// Validate domain and tag name
-	const { domain: extractedDomain, name } = extractDomainAndName(tagName, domain);
+    // Validate domain and tag name
+    const { domain: extractedDomain, name } = extractDomainAndName(tagName, domain);
 
-	const domainValidation = await validateDomainAndName(extractedDomain, name);
+    const domainValidation = await validateDomainAndName(extractedDomain, name);
 
-	if (!domainValidation.valid) {
-		ctx.status = 409;
-		ctx.body = { validationError: domainValidation.error };
-		return;
-	}
+    if (!domainValidation.valid) {
+        ctx.status = 409;
+        ctx.body = { validationError: domainValidation.error };
+        return;
+    }
 
-	// Add extracted domain and name to context
-	ctx.state.extractedDomain = extractedDomain;
-	ctx.state.extractedName = name;
+    // Add extracted domain and name to context
+    ctx.state.extractedDomain = extractedDomain;
+    ctx.state.extractedName = name;
 
-	await next();
+    await next();
 };
 
 /**
@@ -72,27 +82,27 @@ const transferValidation = async (ctx, next) => {
  * @param {*} next - Next middleware
  */
 const paymentOptionsValidation = async (ctx, next) => {
-	const valid = validate(schemas.paymentOptions, ctx.request.query);
+    const valid = validate(schemas.paymentOptions, ctx.request.query);
 
-	if (valid.error) {
-		ctx.status = 409;
+    if (valid.error) {
+        ctx.status = 409;
 
-		ctx.body = { validationError: valid.error.message };
+        ctx.body = { validationError: valid.error.message };
 
-		return;
-	}
+        return;
+    }
 
-	const { tagName, domain } = ctx.request.query;
+    const { tagName, domain } = ctx.request.query;
 
-	const domainValidation = await validateDomainAndName(domain, tagName);
+    const domainValidation = await validateDomainAndName(domain, tagName);
 
-	if (!domainValidation.valid) {
-		ctx.status = 409;
-		ctx.body = { validationError: domainValidation.error };
-		return;
-	}
+    if (!domainValidation.valid) {
+        ctx.status = 409;
+        ctx.body = { validationError: domainValidation.error };
+        return;
+    }
 
-	await next();
+    await next();
 };
 
 /**
@@ -101,87 +111,113 @@ const paymentOptionsValidation = async (ctx, next) => {
  * @param {*} next - Next middleware
  */
 const paymentConfirmationValidation = async (ctx, next) => {
-	const valid = validate(schemas.paymentConfirmation, ctx.request.body);
+    const valid = validate(schemas.paymentConfirmation, ctx.request.body);
 
-	if (valid.error) {
-		ctx.status = 409;
-		ctx.body = { validationError: valid.error.message };
-		return;
-	}
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
 
-	const { tagName, domain, token, network } = ctx.request.body;
+    const { tagName, domain, token, network } = ctx.request.body;
 
-	const domainValidation = await validateDomainAndName(domain, tagName);
+    const domainValidation = await validateDomainAndName(domain, tagName);
 
-	if (!domainValidation.valid) {
-		ctx.status = 409;
-		ctx.body = { validationError: domainValidation.error };
-		return;
-	}
+    if (!domainValidation.valid) {
+        ctx.status = 409;
+        ctx.body = { validationError: domainValidation.error };
+        return;
+    }
 
-	// now also validate the token is valid that we encrypted with jwt
-	const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+    // now also validate the token is valid that we encrypted with jwt
+    const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
 
-	if (!tokenDecoded) {
-		ctx.status = 409;
-		ctx.body = { validationError: "invalid_token" };
-		return;
-	}
+    if (!tokenDecoded) {
+        ctx.status = 409;
+        ctx.body = { validationError: "invalid_token" };
+        return;
+    }
 
-	// now validate tokenDecoded.ttl is still valid
-	// TEMPORARY: Simulate 2 hours in the future for testing
-	//.add(2, "hours")
-	const now = moment().unix();
+    // now validate tokenDecoded.ttl is still valid
+    // TEMPORARY: Simulate 2 hours in the future for testing
+    //.add(2, "hours")
+    const now = moment().unix();
 
-	if (tokenDecoded.ttl < now) {
-		ctx.status = 409;
-		ctx.body = { validationError: "token_expired" };
-		return;
-	}
+    if (tokenDecoded.ttl < now) {
+        ctx.status = 409;
+        ctx.body = { validationError: "token_expired" };
+        return;
+    }
 
-	// now validate the network and coin
-	if (!tokenDecoded.prices[network] && network !== "coinbase" && network !== "CB") {
-		ctx.status = 409;
-		ctx.body = { validationError: "invalid_network" };
-		return;
-	}
+    // now validate the network and coin
+    if (!tokenDecoded.prices[network] && network !== "coinbase" && network !== "CB") {
+        ctx.status = 409;
+        ctx.body = { validationError: "invalid_network" };
+        return;
+    }
 
-	await next();
+    await next();
 };
 
 const receiptEmailValidation = async (ctx, next) => {
-	const { network, token } = ctx.request.body;
+    const { network, token } = ctx.request.body;
 
-	const valid = validate(schemas.receiptEmail, ctx.request.body);
+    const valid = validate(schemas.receiptEmail, ctx.request.body);
 
-	if (valid.error) {
-		ctx.status = 409;
-		ctx.body = { validationError: valid.error.message };
-		return;
-	}
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
 
-	// now also validate the token is valid that we encrypted with jwt
-	const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+    // now also validate the token is valid that we encrypted with jwt
+    const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
 
-	if (!tokenDecoded) {
-		ctx.status = 409;
-		ctx.body = { validationError: "invalid_token" };
-		return;
-	}
+    if (!tokenDecoded) {
+        ctx.status = 409;
+        ctx.body = { validationError: "invalid_token" };
+        return;
+    }
 
-	// now validate the network and coin
-	if (!tokenDecoded.prices[network] && network !== "coinbase" && network !== "CB") {
-		ctx.status = 409;
-		ctx.body = { validationError: "invalid_network" };
-		return;
-	}
+    // now validate the network and coin
+    if (!tokenDecoded.prices[network] && network !== "coinbase" && network !== "CB") {
+        ctx.status = 409;
+        ctx.body = { validationError: "invalid_network" };
+        return;
+    }
 
-	await next();
+    await next();
+};
+
+const referralsValidation = async (ctx, next) => {
+    const valid = validate(schemas.referrals, ctx.request.query);
+
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
+
+    await next();
+};
+
+const claimReferralValidation = async (ctx, next) => {
+    const valid = validate(schemas.claimReferral, ctx.request.body);
+
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
+
+    await next();
 };
 
 module.exports = {
-	transferValidation,
-	paymentOptionsValidation,
-	paymentConfirmationValidation,
-	receiptEmailValidation,
+    transferValidation,
+    paymentOptionsValidation,
+    paymentConfirmationValidation,
+    receiptEmailValidation,
+    referralsValidation,
+    claimReferralValidation,
 };

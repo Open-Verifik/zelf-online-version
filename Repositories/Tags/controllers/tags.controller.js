@@ -15,16 +15,16 @@ const configuration = require("../../../Core/config");
  * @returns {Object} - Updated data
  */
 const handleOldTagUpdate = async (data, domain = "zelf") => {
-	if (data && data.ipfs?.length) {
-		const tagObject = data.ipfs[0];
+    if (data && data.ipfs?.length) {
+        const tagObject = data.ipfs[0];
 
-		if (!tagObject.publicData.registeredAt) {
-			const updatedTagObject = await updateOldTagObject(tagObject, domain);
-			data.ipfs[0] = updatedTagObject;
-		}
-	}
+        if (!tagObject.publicData.registeredAt) {
+            const updatedTagObject = await updateOldTagObject(tagObject, domain);
+            data.ipfs[0] = updatedTagObject;
+        }
+    }
 
-	return data;
+    return data;
 };
 
 /**
@@ -33,28 +33,28 @@ const handleOldTagUpdate = async (data, domain = "zelf") => {
  * @returns {Object} - Search results
  */
 const searchTag = async (ctx) => {
-	try {
-		const { extractedDomain, extractedName } = ctx.state;
+    try {
+        const { extractedDomain, extractedName } = ctx.state;
 
-		// Add domain context to request
-		const requestData = {
-			...ctx.request.query,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.query.tagName,
-			domain: extractedDomain || ctx.request.query.domain,
-			environment: ctx.request.query.environment,
-			type: ctx.request.query.type || "both",
-		};
+        // Add domain context to request
+        const requestData = {
+            ...ctx.request.query,
+            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.query.tagName,
+            domain: extractedDomain || ctx.request.query.domain,
+            environment: ctx.request.query.environment,
+            type: ctx.request.query.type || "both",
+        };
 
-		let data = await Module.searchTag(requestData, ctx.state.user);
+        let data = await Module.searchTag(requestData, ctx.state.user);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -63,23 +63,23 @@ const searchTag = async (ctx) => {
  * @returns {Object} - Search results
  */
 const searchTagsByDomain = async (ctx) => {
-	try {
-		const { domain, storage, limit, pageOffset } = ctx.request.query;
+    try {
+        const { domain, storage, limit, pageOffset } = ctx.request.query;
 
-		let data = await TagsSearchModule.searchByDomain({ domain, storage, limit, pageOffset }, ctx.state.user);
+        let data = await TagsSearchModule.searchByDomain({ domain, storage, limit, pageOffset }, ctx.state.user);
 
-		ctx.body = {
-			data,
-			limit,
-			total: data.length,
-		};
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = {
+            data,
+            limit,
+            total: data.length,
+        };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -88,25 +88,25 @@ const searchTagsByDomain = async (ctx) => {
  * @returns {Object} - Lease results
  */
 const leaseTag = async (ctx) => {
-	try {
-		const { extractedDomain, extractedName } = ctx.state;
+    try {
+        const { extractedDomain, extractedName } = ctx.state;
 
-		const requestData = {
-			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
-			domain: extractedDomain,
-		};
+        const requestData = {
+            ...ctx.request.body,
+            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            domain: extractedDomain,
+        };
 
-		const data = await Module.leaseTag(requestData, ctx.state.user);
+        const data = await Module.leaseTag(requestData, ctx.state.user);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -115,25 +115,25 @@ const leaseTag = async (ctx) => {
  * @returns {Object} - Recovery results
  */
 const leaseRecovery = async (ctx) => {
-	try {
-		const { extractedDomain, extractedName } = ctx.state;
+    try {
+        const { extractedDomain, extractedName } = ctx.state;
 
-		const requestData = {
-			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
-			domain: extractedDomain,
-		};
+        const requestData = {
+            ...ctx.request.body,
+            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            domain: extractedDomain,
+        };
 
-		const data = await TagsRecoveryModule.leaseRecovery(requestData, ctx.state.user);
+        const data = await TagsRecoveryModule.leaseRecovery(requestData, ctx.state.user);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -142,25 +142,25 @@ const leaseRecovery = async (ctx) => {
  * @returns {Object} - Offline lease results
  */
 const leaseOfflineTag = async (ctx) => {
-	try {
-		const { extractedDomain, extractedName } = ctx.state;
+    try {
+        const { extractedDomain, extractedName } = ctx.state;
 
-		const requestData = {
-			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
-			domain: extractedDomain,
-		};
+        const requestData = {
+            ...ctx.request.body,
+            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            domain: extractedDomain,
+        };
 
-		const data = await TagsOfflineModule.leaseOfflineTag(requestData, ctx.state.user);
+        const data = await TagsOfflineModule.leaseOfflineTag(requestData, ctx.state.user);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -169,25 +169,25 @@ const leaseOfflineTag = async (ctx) => {
  * @returns {Object} - Confirmation results
  */
 const leaseConfirmation = async (ctx) => {
-	try {
-		const { extractedDomain, extractedName } = ctx.state;
+    try {
+        const { extractedDomain, extractedName } = ctx.state;
 
-		const requestData = {
-			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
-			domain: extractedDomain,
-		};
+        const requestData = {
+            ...ctx.request.body,
+            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            domain: extractedDomain,
+        };
 
-		const data = await Module.leaseConfirmation(requestData, ctx.state.user);
+        const data = await Module.leaseConfirmation(requestData, ctx.state.user);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -196,25 +196,25 @@ const leaseConfirmation = async (ctx) => {
  * @returns {Object} - Preview results
  */
 const previewTag = async (ctx) => {
-	try {
-		const { extractedDomain, extractedName } = ctx.state;
+    try {
+        const { extractedDomain, extractedName } = ctx.state;
 
-		const requestData = {
-			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
-			domain: extractedDomain,
-		};
+        const requestData = {
+            ...ctx.request.body,
+            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            domain: extractedDomain,
+        };
 
-		const data = await Module.previewTag(requestData, ctx.state.user);
+        const data = await Module.previewTag(requestData, ctx.state.user);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -223,17 +223,17 @@ const previewTag = async (ctx) => {
  * @returns {Object} - Preview results
  */
 const previewZelfProof = async (ctx) => {
-	try {
-		const data = await Module.previewZelfProof(ctx.request.body, ctx.state.user);
+    try {
+        const data = await Module.previewZelfProof(ctx.request.body, ctx.state.user);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -242,25 +242,25 @@ const previewZelfProof = async (ctx) => {
  * @returns {Object} - Decrypt results
  */
 const decryptTag = async (ctx) => {
-	try {
-		const { extractedDomain, extractedName } = ctx.state;
+    try {
+        const { extractedDomain, extractedName } = ctx.state;
 
-		const requestData = {
-			...ctx.request.body,
-			tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
-			domain: extractedDomain,
-		};
+        const requestData = {
+            ...ctx.request.body,
+            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            domain: extractedDomain,
+        };
 
-		const data = await Module.decryptTag(requestData, ctx.state.user);
+        const data = await Module.decryptTag(requestData, ctx.state.user);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -269,17 +269,17 @@ const decryptTag = async (ctx) => {
  * @returns {Object} - Webhook results
  */
 const revenueCatWebhook = async (ctx) => {
-	try {
-		const data = await RevenueCatModule.revenueCatWebhook(ctx.request.body);
+    try {
+        const data = await RevenueCatModule.revenueCatWebhook(ctx.request.body);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -288,17 +288,17 @@ const revenueCatWebhook = async (ctx) => {
  * @returns {Object} - Rewards results
  */
 const purchaseRewards = async (ctx) => {
-	try {
-		const data = await RevenueCatModule.purchaseRewards(ctx.request.body);
+    try {
+        const data = await RevenueCatModule.purchaseRewards(ctx.request.body);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -307,17 +307,17 @@ const purchaseRewards = async (ctx) => {
  * @returns {Object} - Rewards results
  */
 const referralRewards = async (ctx) => {
-	try {
-		const data = await RevenueCatModule.referralRewards(ctx.request.body);
+    try {
+        const data = await RevenueCatModule.referralRewards(ctx.request.body);
 
-		ctx.body = { data };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 /**
@@ -326,84 +326,84 @@ const referralRewards = async (ctx) => {
  * @returns {Object} - Delete result
  */
 const deleteTag = async (ctx) => {
-	try {
-		const { cid, faceBase64, password, tagName, domain } = ctx.request.body;
+    try {
+        const { cid, faceBase64, password, tagName, domain } = ctx.request.body;
 
-		const result = await Module.deleteTag({ cid, faceBase64, password, tagName, domain }, ctx.state.user);
+        const result = await Module.deleteTag({ cid, faceBase64, password, tagName, domain }, ctx.state.user);
 
-		ctx.body = { data: result };
-	} catch (error) {
-		const _exception = errorHandler(error, ctx);
+        ctx.body = { data: result };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
 
-		ctx.status = _exception.status;
+        ctx.status = _exception.status;
 
-		ctx.body = { message: _exception.message, code: _exception.code };
-	}
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
 };
 
 const getDomains = async (ctx, next) => {
-	try {
-		// Load licenses first to ensure we have the latest data
-		const { loadOfficialLicenses } = require("../../License/modules/license.module");
+    try {
+        // Load licenses first to ensure we have the latest data
+        const { loadOfficialLicenses } = require("../../License/modules/license.module");
 
-		const licenses = await loadOfficialLicenses();
+        const licenses = await loadOfficialLicenses();
 
-		const { includeNonPaid } = ctx.request.query;
+        const { includeNonPaid } = ctx.request.query;
 
-		// Get domains with the loaded licenses
-		const domains = getAllSupportedDomains(
-			licenses,
-			includeNonPaid !== undefined ? !Boolean(includeNonPaid === "true") : configuration.env === "development" ? false : true
-		);
+        // Get domains with the loaded licenses
+        const domains = getAllSupportedDomains(
+            licenses,
+            includeNonPaid !== undefined ? !Boolean(includeNonPaid === "true") : configuration.env === "development" ? false : true,
+        );
 
-		ctx.body = { data: domains };
-	} catch (error) {
-		console.error("Error loading domains:", error);
-		// Fallback to domains without licenses
-		const domains = getAllSupportedDomains();
-		ctx.body = { data: domains };
-	}
+        ctx.body = { data: domains };
+    } catch (error) {
+        console.error("Error loading domains:", error);
+        // Fallback to domains without licenses
+        const domains = getAllSupportedDomains();
+        ctx.body = { data: domains };
+    }
 
-	await next();
+    await next();
 };
 
 const getDomain = async (ctx, next) => {
-	const { domain } = ctx.request.params;
+    const { domain } = ctx.request.params;
 
-	const domainConfig = await Module.getDomainConfig(domain);
+    const domainConfig = await Module.getDomainConfig(domain);
 
-	if (!domainConfig) {
-		ctx.status = 404;
-		ctx.body = {
-			code: "NotFound",
-			message: "domain_not_found",
-		};
-		return;
-	}
+    if (!domainConfig) {
+        ctx.status = 404;
+        ctx.body = {
+            code: "NotFound",
+            message: "domain_not_found",
+        };
+        return;
+    }
 
-	ctx.body = { data: domainConfig };
+    ctx.body = { data: domainConfig };
 
-	await next();
+    await next();
 };
 
 module.exports = {
-	searchTag,
-	searchTagsByDomain,
-	leaseTag,
-	leaseRecovery,
-	leaseOfflineTag,
-	leaseConfirmation,
-	previewTag,
-	previewZelfProof,
-	decryptTag,
-	revenueCatWebhook,
-	purchaseRewards,
-	referralRewards,
-	deleteTag,
-	// Utility functions
-	handleOldTagUpdate,
+    searchTag,
+    searchTagsByDomain,
+    leaseTag,
+    leaseRecovery,
+    leaseOfflineTag,
+    leaseConfirmation,
+    previewTag,
+    previewZelfProof,
+    decryptTag,
+    revenueCatWebhook,
+    purchaseRewards,
+    referralRewards,
+    deleteTag,
+    // Utility functions
+    handleOldTagUpdate,
 
-	// domains
-	getDomains,
-	getDomain,
+    // domains
+    getDomains,
+    getDomain,
 };

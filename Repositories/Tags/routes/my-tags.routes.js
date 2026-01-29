@@ -7,19 +7,24 @@ const Middleware = require("../middlewares/my-tags.middleware");
 const base = "/my-tags";
 
 module.exports = (server) => {
-	const PATH = config.basePath(base);
+    const PATH = config.basePath(base);
 
-	// transfer tag
-	server.post(`${PATH}/transfer`, Middleware.transferValidation, Controller.transferTag);
+    // transfer tag
+    server.post(`${PATH}/transfer`, Middleware.transferValidation, Controller.transferTag);
 
-	// payment options
-	server.get(`${PATH}/payment-options`, Middleware.paymentOptionsValidation, Controller.paymentOptions);
+    // payment options
+    server.get(`${PATH}/payment-options`, Middleware.paymentOptionsValidation, Controller.paymentOptions);
 
-	// payment confirmation
-	server.post(`${PATH}/payment-confirmation`, Middleware.paymentConfirmationValidation, Controller.paymentConfirmation);
+    // payment confirmation
+    server.post(`${PATH}/payment-confirmation`, Middleware.paymentConfirmationValidation, Controller.paymentConfirmation);
 
-	// receipt email
-	server.post(`${PATH}/email-receipt`, Middleware.receiptEmailValidation, Controller.receiptEmail);
+    // receipt email
+    server.post(`${PATH}/email-receipt`, Middleware.receiptEmailValidation, Controller.receiptEmail);
+
+    // my referrals
+    server.get(`${PATH}/referrals`, Middleware.referralsValidation, Controller.referrals);
+
+    server.post(`${PATH}/referrals/claim`, Middleware.claimReferralValidation, Controller.claimReferralReward);
 };
 
 /**
