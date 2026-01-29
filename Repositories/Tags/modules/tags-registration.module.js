@@ -53,7 +53,6 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
 	// only add it if the domain supports it
-	console.log({ isWalrusEnabled: domainConfig.isWalrusEnabled() });
 	if (domainConfig.isWalrusEnabled()) {
 		tagObject.walrus = await WalrusModule.tagRegistration(
 			tagObject.zelfProofQRCode,
@@ -76,8 +75,6 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
 	);
 
 	tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
-
-	console.log({ isArweaveEnabled: domainConfig.isArweaveEnabled() });
 
 	if (domainConfig.isArweaveEnabled()) {
 		tagObject.arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
