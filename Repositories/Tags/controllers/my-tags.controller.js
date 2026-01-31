@@ -110,9 +110,9 @@ const referrals = async (ctx) => {
 
 const claimReferralReward = async (ctx) => {
     try {
-        const { tagName, domain, friendTagName, friendDomain } = ctx.request.body;
+        const { tagName, domain, friendTagName, friendDomain, rewardType } = ctx.request.body;
 
-        const data = await Module.claimReferralReward(tagName, domain, friendTagName, friendDomain, ctx.state.user);
+        const data = await Module.claimReferralReward(tagName, domain, friendTagName, friendDomain, ctx.state.user, rewardType);
 
         ctx.body = { data };
     } catch (error) {

@@ -140,10 +140,9 @@ const searchArweave = async (params, authUser) => {
 
 		if (!_domainConfig?.tags?.storage?.arweaveEnabled) return [];
 
-		const _tagName = TagsPartsModule.getFullTagName(tagName, _domainConfig.name);
-
-		// Search by different criteria
+		// Search by different criteria (only resolve full tagName when searching by tagName)
 		if (tagName) {
+			const _tagName = TagsPartsModule.getFullTagName(tagName, _domainConfig.name);
 			return TagsArweaveModule.searchByStorageKey({ tagName: _tagName, domainConfig: _domainConfig, domain });
 		}
 

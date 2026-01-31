@@ -39,7 +39,7 @@ const searchTag = async (ctx) => {
         // Add domain context to request
         const requestData = {
             ...ctx.request.query,
-            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.query.tagName,
+            tagName: extractedName ? `${extractedName}.${extractedDomain}`.toLowerCase() : ctx.request.query.tagName?.toLowerCase(),
             domain: extractedDomain || ctx.request.query.domain,
             environment: ctx.request.query.environment,
             type: ctx.request.query.type || "both",

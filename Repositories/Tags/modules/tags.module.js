@@ -29,11 +29,11 @@ const jwt = require("jsonwebtoken");
  * @returns {string} - Hold domain
  */
 const generateDomainHoldDomain = (domain, name) => {
-	try {
-		return generateHoldDomain(domain, name);
-	} catch (error) {
-		return generateHoldDomain("zelf", name); // Fallback to zelf
-	}
+    try {
+        return generateHoldDomain(domain, name);
+    } catch (error) {
+        return generateHoldDomain("zelf", name); // Fallback to zelf
+    }
 };
 
 /**
@@ -42,104 +42,104 @@ const generateDomainHoldDomain = (domain, name) => {
  * @param {Object} authUser
  */
 const leaseTag = async (params, authUser) => {
-	const { tagName, domain, referralTagName, securityType } = params;
+    const { tagName, domain, referralTagName, securityType } = params;
 
-	const domainConfig = getDomainConfig(domain);
+    const domainConfig = getDomainConfig(domain);
 
-	if (!domainConfig) throw new Error(`Unsupported domain: ${domain}`);
+    if (!domainConfig) throw new Error(`Unsupported domain: ${domain}`);
 
-	// Get tag key using the method
-	const tagKey = domainConfig.getTagKey();
+    // Get tag key using the method
+    const tagKey = domainConfig.getTagKey();
 
-	await _findDuplicatedTag(tagName, domain, domainConfig);
+    await _findDuplicatedTag(tagName, domain, domainConfig);
 
-	const referralTagObject = await _validateReferral(referralTagName, authUser, domainConfig);
+    const referralTagObject = await _validateReferral(referralTagName, authUser, domainConfig);
 
-	const decryptedParams = await TagsPartsModule.decryptParams(params, authUser);
+    const decryptedParams = await TagsPartsModule.decryptParams(params, authUser);
 
-	const { face, password } = decryptedParams;
+    const { face, password } = decryptedParams;
 
-	if (!face) throw new Error("409:face_not_found");
+    if (!face) throw new Error("409:face_not_found");
 
-	if (!password && securityType !== "withoutPassword") throw new Error("409:password_not_found");
+    if (!password && securityType !== "withoutPassword") throw new Error("409:password_not_found");
 
-	const { eth, btc, solana, sui, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
-		...params,
-		mnemonic: decryptedParams.mnemonic,
-	});
+    const { eth, btc, solana, sui, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
+        ...params,
+        mnemonic: decryptedParams.mnemonic,
+    });
 
-	const dataToEncrypt = {
-		publicData: {
-			ethAddress: eth.address,
-			solanaAddress: solana.address,
-			btcAddress: btc.address,
-			[tagKey]: tagName,
-			domain,
-		},
-		metadata: {
-			mnemonic,
-		},
-		faceBase64: face,
-		_id: tagName,
-		tolerance: params.tolerance,
-		addServerPassword: Boolean(params.addServerPassword),
-	};
+    const dataToEncrypt = {
+        publicData: {
+            ethAddress: eth.address,
+            solanaAddress: solana.address,
+            btcAddress: btc.address,
+            [tagKey]: tagName,
+            domain,
+        },
+        metadata: {
+            mnemonic,
+        },
+        faceBase64: face,
+        _id: tagName,
+        tolerance: params.tolerance,
+        addServerPassword: Boolean(params.addServerPassword),
+    };
 
-	// we won't assign the password if the security type is withoutPassword
-	if (securityType !== "withoutPassword") {
-		dataToEncrypt.password = password;
-	}
+    // we won't assign the password if the security type is withoutPassword
+    if (securityType !== "withoutPassword") {
+        dataToEncrypt.password = password;
+    }
 
-	const tagObject = {
-		...dataToEncrypt.publicData,
-	};
+    const tagObject = {
+        ...dataToEncrypt.publicData,
+    };
 
-	TagsPartsModule.assignProperties(
-		tagObject,
-		dataToEncrypt,
-		{ eth, btc, solana, sui, arweave },
-		{ ...params, password: dataToEncrypt.password, referralTagObject },
-		domainConfig
-	);
+    TagsPartsModule.assignProperties(
+        tagObject,
+        dataToEncrypt,
+        { eth, btc, solana, sui, arweave },
+        { ...params, password: dataToEncrypt.password, referralTagObject },
+        domainConfig,
+    );
 
-	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
+    await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
 
-	if (tagObject.price === 0) {
-		await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, securityType, authUser);
-	} else {
-		await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, securityType, authUser);
-	}
+    if (tagObject.price === 0) {
+        await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, securityType, authUser);
+    } else {
+        await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, securityType, authUser);
+    }
 
-	if (!tagObject.zelfProof) {
-		// from ipfs
-		tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
-	}
+    if (!tagObject.zelfProof) {
+        // from ipfs
+        tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
+    }
 
-	const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, arweave }, password);
+    const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, arweave }, password);
 
-	return {
-		ipfs: [tagObject.ipfs],
-		available: false,
-		name: tagName,
-		tagName: `${tagName}.${domain}`,
-		domain,
-		arweave: tagObject.arweave ? [tagObject.arweave] : [],
-		tagObject: {
-			...tagObject.ipfs,
-			zelfProof: tagObject.zelfProof,
-			zelfProofQRCode: tagObject.zelfProofQRCode,
-		},
-		walrus: tagObject.walrus,
-		pgp,
-		metadata:
-			config.env === "production"
-				? undefined
-				: {
-					// for development porposes so we can visualize the arweave private key and the mnemonic for testing.
-					mnemonic,
-					arweavePrivateKey: arweave.privateKey,
-				},
-	};
+    return {
+        ipfs: [tagObject.ipfs],
+        available: false,
+        name: tagName,
+        tagName: `${tagName}.${domain}`,
+        domain,
+        arweave: tagObject.arweave ? [tagObject.arweave] : [],
+        tagObject: {
+            ...tagObject.ipfs,
+            zelfProof: tagObject.zelfProof,
+            zelfProofQRCode: tagObject.zelfProofQRCode,
+        },
+        walrus: tagObject.walrus,
+        pgp,
+        metadata:
+            config.env === "production"
+                ? undefined
+                : {
+                      // for development porposes so we can visualize the arweave private key and the mnemonic for testing.
+                      mnemonic,
+                      arweavePrivateKey: arweave.privateKey,
+                  },
+    };
 };
 
 /**
@@ -148,38 +148,38 @@ const leaseTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value, environment, type, domainConfig, duration } = params;
+    const { tagName, domain, key, value, environment, type, domainConfig, duration } = params;
 
-	try {
-		const _domainConfig = domainConfig || getDomainConfig(domain);
+    try {
+        const _domainConfig = domainConfig || getDomainConfig(domain);
 
-		const result = await TagsSearchModule.searchTag(
-			{
-				tagName,
-				domain,
-				key,
-				value,
-				environment: environment || "all",
-				type: type || "both",
-				domainConfig: _domainConfig,
-				duration: duration || "1",
-			},
-			authUser
-		);
+        const result = await TagsSearchModule.searchTag(
+            {
+                tagName,
+                domain,
+                key,
+                value,
+                environment: environment || "all",
+                type: type || "both",
+                domainConfig: _domainConfig,
+                duration: duration || "1",
+            },
+            authUser,
+        );
 
-		if (result.ipfs?.length) {
-			for (let index = 0; index < result.ipfs.length; index++) {
-				const element = result.ipfs[index];
-				delete element.zelfProof;
-				delete element.zelfProofQRCode;
-			}
-		}
+        if (result.ipfs?.length) {
+            for (let index = 0; index < result.ipfs.length; index++) {
+                const element = result.ipfs[index];
+                delete element.zelfProof;
+                delete element.zelfProofQRCode;
+            }
+        }
 
-		return result;
-	} catch (error) {
-		console.error({ error });
-		throw error;
-	}
+        return result;
+    } catch (error) {
+        console.error({ error });
+        throw error;
+    }
 };
 
 /**
@@ -188,78 +188,76 @@ const searchTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const decryptTag = async (params, authUser) => {
-	const { tagName, domain } = params;
+    const { tagName, domain } = params;
 
-	const domainConfig = getDomainConfig(domain);
+    const domainConfig = getDomainConfig(domain);
 
-	const searchResult = await searchTag({ tagName, domain, domainConfig, environment: "all" }, authUser);
+    const searchResult = await searchTag({ tagName, domain, domainConfig, environment: "all" }, authUser);
 
-	if (searchResult.available) return searchResult;
+    if (searchResult.available) return searchResult;
 
-	const tagObject = searchResult.tagObject;
+    const tagObject = searchResult.tagObject;
 
-	if (!tagObject?.zelfProof) throw new Error("404:tag_not_found");
+    if (!tagObject?.zelfProof) throw new Error("404:tag_not_found");
 
-	const { face, password } = await _decryptParams(params, authUser);
+    const { face, password } = await _decryptParams(params, authUser);
 
-	const decryptedZelfProof = await decrypt({
-		addServerPassword: Boolean(params.addServerPassword),
-		faceBase64: face,
-		password,
-		zelfProof: tagObject?.zelfProof,
-		hasPassword: tagObject.publicData.hasPassword,
-	});
+    const decryptedZelfProof = await decrypt({
+        addServerPassword: Boolean(params.addServerPassword),
+        faceBase64: face,
+        password,
+        zelfProof: tagObject?.zelfProof,
+        hasPassword: tagObject.publicData.hasPassword,
+    });
 
-	if (decryptedZelfProof.error) {
-		const error = new Error(decryptedZelfProof.error.code);
+    if (decryptedZelfProof.error) {
+        const error = new Error(decryptedZelfProof.error.code);
 
-		error.status = 409;
+        error.status = 409;
 
-		throw error;
-	}
+        throw error;
+    }
 
-	const { mnemonic, zkProof, solanaSecretKey } = decryptedZelfProof.metadata;
+    const { mnemonic, zkProof, solanaSecretKey } = decryptedZelfProof.metadata;
 
-	const tagKey = domainConfig.getTagKey();
+    const tagKey = domainConfig.getTagKey();
 
-	console.log({ password });
+    // Generate Arweave wallet from mnemonic for consistency
+    const arweave = await ArweaveModule.generateWalletFromMnemonic(mnemonic);
 
-	// Generate Arweave wallet from mnemonic for consistency
-	const arweave = await ArweaveModule.generateWalletFromMnemonic(mnemonic);
+    const { encryptedMessage, privateKey, tagsToAdd } = await initTagUpdates(tagObject, {
+        mnemonic,
+        zkProof,
+        solanaSecretKey,
+        arweavePrivateKey: arweave.privateKey,
+        password,
+    });
 
-	const { encryptedMessage, privateKey, tagsToAdd } = await initTagUpdates(tagObject, {
-		mnemonic,
-		zkProof,
-		solanaSecretKey,
-		arweavePrivateKey: arweave.privateKey,
-		password,
-	});
+    if (tagsToAdd.length) {
+        const { ipfs, arweave } = await updateTags(tagObject, tagsToAdd);
 
-	if (tagsToAdd.length) {
-		const { ipfs, arweave } = await updateTags(tagObject, tagsToAdd);
+        tagObject.updatedIpfs = ipfs;
+        tagObject.updatedArweave = arweave;
 
-		tagObject.updatedIpfs = ipfs;
-		tagObject.updatedArweave = arweave;
+        for (let index = 0; index < tagsToAdd.length; index++) {
+            const tag = tagsToAdd[index];
+            tagObject.publicData[tag.name] = tag.value;
+        }
+    }
 
-		for (let index = 0; index < tagsToAdd.length; index++) {
-			const tag = tagsToAdd[index];
-			tagObject.publicData[tag.name] = tag.value;
-		}
-	}
-
-	return {
-		...tagObject,
-		domain,
-		pgp: { encryptedMessage, privateKey },
-		durationToken: jwt.sign(
-			{
-				tagName: tagObject.publicData[tagKey],
-				exp: moment().add(1, "month").unix(),
-			},
-			config.JWT_SECRET
-		),
-		metadata: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey, arweavePrivateKey: arweave.privateKey } : undefined,
-	};
+    return {
+        ...tagObject,
+        domain,
+        pgp: { encryptedMessage, privateKey },
+        durationToken: jwt.sign(
+            {
+                tagName: tagObject.publicData[tagKey],
+                exp: moment().add(1, "month").unix(),
+            },
+            config.JWT_SECRET,
+        ),
+        metadata: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey, arweavePrivateKey: arweave.privateKey } : undefined,
+    };
 };
 
 /**
@@ -268,24 +266,24 @@ const decryptTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const previewTag = async (params, authUser) => {
-	const domainConfig = getDomainConfig(params.domain);
+    const domainConfig = getDomainConfig(params.domain);
 
-	const searchResult = await searchTag({ ...params, domainConfig, environment: "all" }, authUser);
+    const searchResult = await searchTag({ ...params, domainConfig, environment: "all" }, authUser);
 
-	if (searchResult.available) {
-		return searchResult;
-	}
+    if (searchResult.available) {
+        return searchResult;
+    }
 
-	const tagObject = searchResult.tagObject;
+    const tagObject = searchResult.tagObject;
 
-	const zelfProof = await extractZelfProofFromQR(tagObject.zelfProofQRCode);
+    const zelfProof = await extractZelfProofFromQR(tagObject.zelfProofQRCode);
 
-	const previewResult = await preview({
-		zelfProof,
-		addServerPassword: Boolean(params.addServerPassword),
-	});
+    const previewResult = await preview({
+        zelfProof,
+        addServerPassword: Boolean(params.addServerPassword),
+    });
 
-	return { preview: previewResult, tagObject: searchResult.tagObject };
+    return { preview: previewResult, tagObject: searchResult.tagObject };
 };
 
 /**
@@ -294,30 +292,30 @@ const previewTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const previewZelfProof = async (params, authUser) => {
-	const { zelfProof } = params;
+    const { zelfProof } = params;
 
-	const previewResult = await preview({
-		zelfProof,
-		addServerPassword: Boolean(params.addServerPassword),
-	});
+    const previewResult = await preview({
+        zelfProof,
+        addServerPassword: Boolean(params.addServerPassword),
+    });
 
-	// get any key that has "Name" in the public data
-	const tagKey = Object.keys(previewResult.publicData).find((key) => key.includes("Name"));
+    // get any key that has "Name" in the public data
+    const tagKey = Object.keys(previewResult.publicData).find((key) => key.includes("Name"));
 
-	const tagName = previewResult.publicData[tagKey];
+    const tagName = previewResult.publicData[tagKey];
 
-	const name = tagName.split(".")[0];
+    const name = tagName.split(".")[0];
 
-	const domain = tagName.split(".")[1];
+    const domain = tagName.split(".")[1];
 
-	return {
-		preview: previewResult,
-		name,
-		tagKey,
-		tagName,
-		domain,
-		zelfProof,
-	};
+    return {
+        preview: previewResult,
+        name,
+        tagKey,
+        tagName,
+        domain,
+        zelfProof,
+    };
 };
 
 /**
@@ -326,23 +324,23 @@ const previewZelfProof = async (params, authUser) => {
  * @param {Object} authUser
  */
 const leaseConfirmation = async (params, authUser) => {
-	const { tagName, domain, coin, network } = params;
-	const domainConfig = getDomainConfig(domain);
+    const { tagName, domain, coin, network } = params;
+    const domainConfig = getDomainConfig(domain);
 
-	const confirmation = await confirmPayUniqueAddress({
-		tagName: `${tagName}.${domain}`,
-		domain,
-		domainConfig,
-		coin,
-		network,
-	});
+    const confirmation = await confirmPayUniqueAddress({
+        tagName: `${tagName}.${domain}`,
+        domain,
+        domainConfig,
+        coin,
+        network,
+    });
 
-	return {
-		tagName: `${tagName}.${domain}`,
-		domain,
-		domainConfig,
-		confirmation,
-	};
+    return {
+        tagName: `${tagName}.${domain}`,
+        domain,
+        domainConfig,
+        confirmation,
+    };
 };
 
 /**
@@ -353,22 +351,22 @@ const leaseConfirmation = async (params, authUser) => {
  * @param {Object} domainConfig
  */
 const _findDuplicatedTag = async (tagName, domain, domainConfig) => {
-	const searchParams = {
-		tagName,
-		domain,
-		domainConfig,
-		environment: "all",
-	};
+    const searchParams = {
+        tagName,
+        domain,
+        domainConfig,
+        environment: "all",
+    };
 
-	const result = await TagsSearchModule.searchTag(searchParams);
+    const result = await TagsSearchModule.searchTag(searchParams);
 
-	if (result.available === false) {
-		const error = new Error("409:tag_already_exists");
-		error.status = 409;
-		throw error;
-	}
+    if (result.available === false) {
+        const error = new Error("409:tag_already_exists");
+        error.status = 409;
+        throw error;
+    }
 
-	return result;
+    return result;
 };
 
 /**
@@ -378,16 +376,16 @@ const _findDuplicatedTag = async (tagName, domain, domainConfig) => {
  * @param {Object} authUser
  */
 const _findTag = async (params, storage, authUser) => {
-	const { tagName, domain } = params;
-	const domainConfig = getDomainConfig(domain);
+    const { tagName, domain } = params;
+    const domainConfig = getDomainConfig(domain);
 
-	const searchParams = {
-		tagName,
-		domain,
-		domainConfig,
-	};
+    const searchParams = {
+        tagName,
+        domain,
+        domainConfig,
+    };
 
-	return await TagsSearchModule.searchTag(searchParams, authUser);
+    return await TagsSearchModule.searchTag(searchParams, authUser);
 };
 
 /**
@@ -397,23 +395,23 @@ const _findTag = async (params, storage, authUser) => {
  * @param {Domain} domainConfig
  */
 const _validateReferral = async (referralTagName, authUser, domainConfig) => {
-	if (!referralTagName) return null;
+    if (!referralTagName) return null;
 
-	const domain = domainConfig.name;
+    const domain = domainConfig.name;
 
-	const searchParams = {
-		tagName: referralTagName.includes(".") ? referralTagName : `${referralTagName}.${domain}`,
-		domain,
-		domainConfig,
+    const searchParams = {
+        tagName: referralTagName.includes(".") ? referralTagName : `${referralTagName}.${domain}`,
+        domain,
+        domainConfig,
 
-		environment: "all",
-	};
+        environment: "all",
+    };
 
-	const result = await TagsSearchModule.searchTag(searchParams, authUser);
+    const result = await TagsSearchModule.searchTag(searchParams, authUser);
 
-	if (result.available === false) return result.tagObject;
+    if (result.available === false) return result.tagObject;
 
-	return null;
+    return null;
 };
 
 /**
@@ -424,29 +422,29 @@ const _validateReferral = async (referralTagName, authUser, domainConfig) => {
  * @param {Object} params
  */
 const _createWalletsFromPhrase = async (params) => {
-	const _mnemonic = params.type === "import" ? params.mnemonic : generateMnemonic(params.wordsCount);
+    const _mnemonic = params.type === "import" ? params.mnemonic : generateMnemonic(params.wordsCount);
 
-	const wordsArray = _mnemonic.split(" ");
+    const wordsArray = _mnemonic.split(" ");
 
-	if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
+    if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
 
-	const eth = await createEthWallet(_mnemonic);
-	const btc = await createBTCWallet(_mnemonic);
-	const solana = await createSolanaWallet(_mnemonic);
-	const sui = await generateSuiWalletFromMnemonic(_mnemonic);
+    const eth = await createEthWallet(_mnemonic);
+    const btc = await createBTCWallet(_mnemonic);
+    const solana = await createSolanaWallet(_mnemonic);
+    const sui = await generateSuiWalletFromMnemonic(_mnemonic);
 
-	const zkProof = await OfflineProofModule.createProof(_mnemonic);
-	const arweave = await ArweaveModule.generateWalletFromMnemonic(_mnemonic);
+    const zkProof = await OfflineProofModule.createProof(_mnemonic);
+    const arweave = await ArweaveModule.generateWalletFromMnemonic(_mnemonic);
 
-	return {
-		eth,
-		btc,
-		solana,
-		sui,
-		zkProof,
-		mnemonic: _mnemonic,
-		arweave,
-	};
+    return {
+        eth,
+        btc,
+        solana,
+        sui,
+        zkProof,
+        mnemonic: _mnemonic,
+        arweave,
+    };
 };
 
 /**
@@ -455,69 +453,69 @@ const _createWalletsFromPhrase = async (params) => {
  * @param {Object} authUser
  */
 const _decryptParams = async (params, authUser) => {
-	if (params.removePGP) {
-		return {
-			password: params.password,
-			mnemonic: params.mnemonic,
-			face: params.faceBase64,
-		};
-	}
+    if (params.removePGP) {
+        return {
+            password: params.password,
+            mnemonic: params.mnemonic,
+            face: params.faceBase64,
+        };
+    }
 
-	// Use session decryption for all parameters consistently
-	const password = params.password ? await SessionModule.sessionDecrypt(params.password, authUser) : null;
-	const mnemonic = params.mnemonic ? await SessionModule.sessionDecrypt(params.mnemonic, authUser) : null;
-	const face = params.faceBase64 ? await SessionModule.sessionDecrypt(params.faceBase64, authUser) : null;
+    // Use session decryption for all parameters consistently
+    const password = params.password ? await SessionModule.sessionDecrypt(params.password, authUser) : null;
+    const mnemonic = params.mnemonic ? await SessionModule.sessionDecrypt(params.mnemonic, authUser) : null;
+    const face = params.faceBase64 ? await SessionModule.sessionDecrypt(params.faceBase64, authUser) : null;
 
-	return {
-		password,
-		mnemonic,
-		face,
-	};
+    return {
+        password,
+        mnemonic,
+        face,
+    };
 };
 
 const deleteTag = async (params, authUser) => {
-	const { tagName, domain, faceBase64, password } = params;
+    const { tagName, domain, faceBase64, password } = params;
 
-	const searchResult = await searchTag({ tagName, domain }, authUser);
+    const searchResult = await searchTag({ tagName, domain }, authUser);
 
-	const zelfProof = searchResult.tagObject.zelfProof;
+    const zelfProof = searchResult.tagObject.zelfProof;
 
-	const ipfsID = searchResult.tagObject.id;
+    const ipfsID = searchResult.tagObject.id;
 
-	const decryptedZelfProof = await decrypt({
-		faceBase64,
-		password,
-		zelfProof,
-	});
+    const decryptedZelfProof = await decrypt({
+        faceBase64,
+        password,
+        zelfProof,
+    });
 
-	if (decryptedZelfProof.error) {
-		const error = new Error(decryptedZelfProof.error.code);
-		error.status = 409;
-		throw error;
-	}
+    if (decryptedZelfProof.error) {
+        const error = new Error(decryptedZelfProof.error.code);
+        error.status = 409;
+        throw error;
+    }
 
-	const deletedFiles = [];
+    const deletedFiles = [];
 
-	if (ipfsID) {
-		deletedFiles.push(await unPinFiles([ipfsID]));
-	}
+    if (ipfsID) {
+        deletedFiles.push(await unPinFiles([ipfsID]));
+    }
 
-	return { tagObject: searchResult.tagObject, deletedFiles };
+    return { tagObject: searchResult.tagObject, deletedFiles };
 };
 
 module.exports = {
-	leaseTag,
-	searchTag,
-	decryptTag,
-	previewTag,
-	previewZelfProof,
-	leaseConfirmation,
-	deleteTag,
-	// Utility functions
-	getDomainConfig,
-	generateDomainHoldDomain,
-	_findDuplicatedTag,
-	_validateReferral,
-	_createWalletsFromPhrase,
-	_decryptParams,
+    leaseTag,
+    searchTag,
+    decryptTag,
+    previewTag,
+    previewZelfProof,
+    leaseConfirmation,
+    deleteTag,
+    // Utility functions
+    getDomainConfig,
+    generateDomainHoldDomain,
+    _findDuplicatedTag,
+    _validateReferral,
+    _createWalletsFromPhrase,
+    _decryptParams,
 };

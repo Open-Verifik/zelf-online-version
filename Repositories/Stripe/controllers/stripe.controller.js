@@ -5,28 +5,28 @@ const Stripe = require("stripe");
 const configuration = require("../../../Core/config");
 
 const stripe = new Stripe(configuration.stripe.secretKey, {
-	apiVersion: "2023-10-16",
+    apiVersion: "2023-10-16",
 });
 
 /**
  * Handle Stripe webhook events
  */
 const handleWebhook = async (ctx) => {
-	try {
-		// Use the verified event from middleware instead of raw request body
-		const event = ctx.webhookEvent;
+    try {
+        // Use the verified event from middleware instead of raw request body
+        const event = ctx.webhookEvent;
 
-		// Route webhook to appropriate handler based on source
-		const result = await WebhookRouter.routeWebhook(event);
+        // Route webhook to appropriate handler based on source
+        const result = await WebhookRouter.routeWebhook(event);
 
-		ctx.status = 200;
-		ctx.body = { received: true, processed: result };
-	} catch (error) {
-		console.error("Error processing webhook:", error);
+        ctx.status = 200;
+        ctx.body = { received: true, processed: result };
+    } catch (error) {
+        console.error("Error processing webhook:", error);
 
-		ctx.status = 400;
-		ctx.body = { error: "Webhook processing failed" };
-	}
+        ctx.status = 400;
+        ctx.body = { error: "Webhook processing failed" };
+    }
 };
 
 /**
@@ -34,56 +34,56 @@ const handleWebhook = async (ctx) => {
  * @param {Object} ctx - Koa context
  */
 const handleStripeResult = async (ctx) => {
-	try {
-		const { success, canceled, session_id } = ctx.query;
+    try {
+        const { success, canceled, session_id } = ctx.query;
 
-		let sessionData = null;
-		let subscriptionData = null;
-		let customerData = null;
-		let errorMessage = null;
+        let sessionData = null;
+        let subscriptionData = null;
+        let customerData = null;
+        let errorMessage = null;
 
-		// If we have a session ID, retrieve the session details
-		if (session_id) {
-			try {
-				sessionData = await stripe.checkout.sessions.retrieve(session_id, {
-					expand: ["subscription", "customer", "subscription.latest_invoice"],
-				});
+        // If we have a session ID, retrieve the session details
+        if (session_id) {
+            try {
+                sessionData = await stripe.checkout.sessions.retrieve(session_id, {
+                    expand: ["subscription", "customer", "subscription.latest_invoice"],
+                });
 
-				if (sessionData.subscription) {
-					subscriptionData = sessionData.subscription;
-				}
+                if (sessionData.subscription) {
+                    subscriptionData = sessionData.subscription;
+                }
 
-				if (sessionData.customer) {
-					customerData = sessionData.customer;
-				}
-			} catch (stripeError) {
-				console.error("Error retrieving Stripe session:", stripeError);
-				errorMessage = "Unable to retrieve session details";
-			}
-		}
+                if (sessionData.customer) {
+                    customerData = sessionData.customer;
+                }
+            } catch (stripeError) {
+                console.error("Error retrieving Stripe session:", stripeError);
+                errorMessage = "Unable to retrieve session details";
+            }
+        }
 
-		// Generate the HTML response
-		const html = generateResultHTML({
-			success: success === "true",
-			canceled: canceled === "true",
-			sessionId: session_id,
-			sessionData,
-			subscriptionData,
-			customerData,
-			errorMessage,
-		});
+        // Generate the HTML response
+        const html = generateResultHTML({
+            success: success === "true",
+            canceled: canceled === "true",
+            sessionId: session_id,
+            sessionData,
+            subscriptionData,
+            customerData,
+            errorMessage,
+        });
 
-		ctx.type = "html";
-		ctx.body = html;
-	} catch (error) {
-		console.error("Error handling Stripe result:", error);
+        ctx.type = "html";
+        ctx.body = html;
+    } catch (error) {
+        console.error("Error handling Stripe result:", error);
 
-		const errorHtml = generateErrorHTML(error.message);
+        const errorHtml = generateErrorHTML(error.message);
 
-		ctx.type = "html";
-		ctx.body = errorHtml;
-		ctx.status = 500;
-	}
+        ctx.type = "html";
+        ctx.body = errorHtml;
+        ctx.status = 500;
+    }
 };
 
 /**
@@ -92,14 +92,14 @@ const handleStripeResult = async (ctx) => {
  * @returns {string} HTML string
  */
 const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscriptionData, customerData, errorMessage }) => {
-	const baseUrl = configuration.base_url;
+    const baseUrl = configuration.base_url;
 
-	if (errorMessage) {
-		return generateErrorHTML(errorMessage);
-	}
+    if (errorMessage) {
+        return generateErrorHTML(errorMessage);
+    }
 
-	if (canceled) {
-		return `
+    if (canceled) {
+        return `
 		<!DOCTYPE html>
 		<html lang="en">
 		<head>
@@ -123,28 +123,28 @@ const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscri
 		</body>
 		</html>
 		`;
-	}
+    }
 
-	if (success && subscriptionData) {
-		const planName = subscriptionData.metadata?.plan || "Premium";
-		const amount = subscriptionData.plan?.amount ? (subscriptionData.plan.amount / 100).toFixed(2) : "N/A";
-		const currency = subscriptionData.plan?.currency?.toUpperCase() || "USD";
-		const interval = subscriptionData.plan?.interval || "month";
-		const customerEmail = customerData?.email || "N/A";
-		const nextBilling = subscriptionData.current_period_end ? new Date(subscriptionData.current_period_end * 1000).toLocaleDateString() : "N/A";
-		const source = subscriptionData.metadata?.source || (sessionData && sessionData.metadata?.source);
+    if (success && subscriptionData) {
+        const planName = subscriptionData.metadata?.plan || "Premium";
+        const amount = subscriptionData.plan?.amount ? (subscriptionData.plan.amount / 100).toFixed(2) : "N/A";
+        const currency = subscriptionData.plan?.currency?.toUpperCase() || "USD";
+        const interval = subscriptionData.plan?.interval || "month";
+        const customerEmail = customerData?.email || "N/A";
+        const nextBilling = subscriptionData.current_period_end ? new Date(subscriptionData.current_period_end * 1000).toLocaleDateString() : "N/A";
+        const source = subscriptionData.metadata?.source || (sessionData && sessionData.metadata?.source);
 
-		// Get invoice details
-		const latestInvoice = subscriptionData.latest_invoice;
-		const invoiceNumber = latestInvoice?.number || "N/A";
-		const invoiceDate = latestInvoice?.created ? new Date(latestInvoice.created * 1000).toLocaleDateString() : "N/A";
-		const invoicePdfUrl = latestInvoice?.invoice_pdf;
-		const invoiceAmount = latestInvoice?.amount_paid ? (latestInvoice.amount_paid / 100).toFixed(2) : amount;
+        // Get invoice details
+        const latestInvoice = subscriptionData.latest_invoice;
+        const invoiceNumber = latestInvoice?.number || "N/A";
+        const invoiceDate = latestInvoice?.created ? new Date(latestInvoice.created * 1000).toLocaleDateString() : "N/A";
+        const invoicePdfUrl = latestInvoice?.invoice_pdf;
+        const invoiceAmount = latestInvoice?.amount_paid ? (latestInvoice.amount_paid / 100).toFixed(2) : amount;
 
-		// Extension redirect JavaScript for extension/app sources
-		const extensionRedirectScript =
-			source === "extension" || source === "ios" || source === "android"
-				? `
+        // Extension redirect JavaScript for extension/app sources
+        const extensionRedirectScript =
+            source === "extension" || source === "ios" || source === "android"
+                ? `
 		<script>
 			(function() {
 				// Try to communicate with extension
@@ -161,7 +161,7 @@ const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscri
 						// Post message to extension context
 						window.postMessage({ type: 'PAYMENT_SUCCESS', source: '${source}' }, '*');
 					} catch (e) {
-						console.log('Extension communication not available');
+						console.error('Extension communication not available');
 					}
 				}
 
@@ -174,16 +174,16 @@ const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscri
 				}, 2000);
 			})();
 		</script>`
-				: "";
+                : "";
 
-		const extensionCloseButton =
-			source === "extension" || source === "ios" || source === "android"
-				? `<button id="close-window-btn" onclick="window.close()" class="button secondary" style="display: none; margin-top: 16px;">
+        const extensionCloseButton =
+            source === "extension" || source === "ios" || source === "android"
+                ? `<button id="close-window-btn" onclick="window.close()" class="button secondary" style="display: none; margin-top: 16px;">
 				Close Window & Return to Extension
 			</button>`
-				: "";
+                : "";
 
-		return `
+        return `
 		<!DOCTYPE html>
 		<html lang="en">
 		<head>
@@ -241,8 +241,8 @@ const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscri
 					
 					<div class="actions">
 						${
-							invoicePdfUrl
-								? `<a href="${invoicePdfUrl}" target="_blank" class="button primary invoice-button">
+                            invoicePdfUrl
+                                ? `<a href="${invoicePdfUrl}" target="_blank" class="button primary invoice-button">
 							<svg class="button-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 								<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 								<polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -252,8 +252,8 @@ const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscri
 							</svg>
 							See Invoice PDF
 						</a>`
-								: `<span class="button disabled">Invoice PDF not available</span>`
-						}
+                                : `<span class="button disabled">Invoice PDF not available</span>`
+                        }
 						${extensionCloseButton}
 					</div>
 					
@@ -267,14 +267,14 @@ const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscri
 		</body>
 		</html>
 		`;
-	}
+    }
 
-	// Fallback for success without subscription data
-	if (success) {
-		const source = sessionData?.metadata?.source;
-		const extensionRedirectScript =
-			source === "extension" || source === "ios" || source === "android"
-				? `
+    // Fallback for success without subscription data
+    if (success) {
+        const source = sessionData?.metadata?.source;
+        const extensionRedirectScript =
+            source === "extension" || source === "ios" || source === "android"
+                ? `
 		<script>
 			(function() {
 				if (typeof chrome !== 'undefined' && chrome.runtime) {
@@ -286,7 +286,7 @@ const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscri
 						});
 						window.postMessage({ type: 'PAYMENT_SUCCESS', source: '${source}' }, '*');
 					} catch (e) {
-						console.log('Extension communication not available');
+						console.error('Extension communication not available');
 					}
 				}
 				setTimeout(function() {
@@ -297,15 +297,15 @@ const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscri
 				}, 2000);
 			})();
 		</script>`
-				: "";
-		const extensionCloseButton =
-			source === "extension" || source === "ios" || source === "android"
-				? `<button id="close-window-btn" onclick="window.close()" class="button secondary" style="display: none; margin-top: 16px;">
+                : "";
+        const extensionCloseButton =
+            source === "extension" || source === "ios" || source === "android"
+                ? `<button id="close-window-btn" onclick="window.close()" class="button secondary" style="display: none; margin-top: 16px;">
 				Close Window & Return to Extension
 			</button>`
-				: "";
+                : "";
 
-		return `
+        return `
 		<!DOCTYPE html>
 		<html lang="en">
 		<head>
@@ -331,19 +331,19 @@ const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscri
 						${extensionCloseButton}
 					</div>
 					${
-						source === "extension" || source === "ios" || source === "android"
-							? '<div class="footer-note"><p>You can close this window and return to the extension.</p></div>'
-							: ""
-					}
+                        source === "extension" || source === "ios" || source === "android"
+                            ? '<div class="footer-note"><p>You can close this window and return to the extension.</p></div>'
+                            : ""
+                    }
 				</div>
 			</div>
 		</body>
 		</html>
 		`;
-	}
+    }
 
-	// Default fallback
-	return generateErrorHTML("Invalid request parameters");
+    // Default fallback
+    return generateErrorHTML("Invalid request parameters");
 };
 
 /**
@@ -352,9 +352,9 @@ const generateResultHTML = ({ success, canceled, sessionId, sessionData, subscri
  * @returns {string} HTML string
  */
 const generateErrorHTML = (message) => {
-	const baseUrl = configuration.base_url;
+    const baseUrl = configuration.base_url;
 
-	return `
+    return `
 	<!DOCTYPE html>
 	<html lang="en">
 	<head>
@@ -385,7 +385,7 @@ const generateErrorHTML = (message) => {
  * @returns {string} CSS string
  */
 const getCommonStyles = () => {
-	return `
+    return `
 		* {
 			margin: 0;
 			padding: 0;
@@ -623,6 +623,6 @@ const getCommonStyles = () => {
 };
 
 module.exports = {
-	handleWebhook,
-	handleStripeResult,
+    handleWebhook,
+    handleStripeResult,
 };

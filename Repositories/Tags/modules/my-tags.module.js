@@ -12,6 +12,11 @@ const AvalancheModule = require("../../Avalanche/modules/avalanche-scrapping.mod
 const { sendCustomEmail } = require("../../../Core/mailgun");
 const { buildMetadata, storeInIPFS, storeInWalrus, storeInArweave } = require("./tags-payment.module");
 
+const ReferralRewardModel = require("../models/referral-rewards.model");
+const TagsTokenModule = require("./tags-token.module");
+const IPFS = require("../../../Core/ipfs");
+const TagsArweaveModule = require("./tags-arweave.module");
+
 /**
  * Confirm payment with Coinbase
  * @param {string} coinbase_hosted_url
@@ -65,27 +70,15 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
 
     const domainConfig = getDomainConfig(domain);
 
-    if (!tokenDecoded || !tokenDecoded.tagName || !tokenDecoded.tagPayName) {
-        const error = new Error("tag_not_authenticated");
-        error.status = 401;
-        throw error;
-    }
+    if (!tokenDecoded || !tokenDecoded.tagName || !tokenDecoded.tagPayName) throw new Error("401:tag_not_authenticated");
 
     // Verify the tag belongs to the user
-    if (tokenDecoded.tagName !== `${tagName}.${domain}`) {
-        const error = new Error("tag_not_owned");
-        error.status = 403;
-        throw error;
-    }
+    if (tokenDecoded.tagName !== `${tagName}.${domain}`) throw new Error("403:tag_not_owned");
 
     // Get current tag data
     const tagData = await searchTag({ tagName, domain }, {});
 
-    if (tagData.available) {
-        const error = new Error("tag_not_found");
-        error.status = 404;
-        throw error;
-    }
+    if (tagData.available) throw new Error("404:tag_not_found");
 
     const tagObject = tagData.tagObject;
 
@@ -210,6 +203,12 @@ const isSolanaPaymentConfirmed = async (address, amountToPay) => {
     return false;
 };
 
+/**
+ * Check if Avalanche payment is confirmed
+ * @param {string} address
+ * @param {number} amountToPay
+ * @returns {Promise<Object>}
+ */
 const isAvalanchePaymentConfirmed = async (address, amountToPay) => {
     try {
         const response = await AvalancheModule.getAddress({ id: address });
@@ -325,15 +324,15 @@ const addDurationToTag = async (params, tagObject) => {
 
     const { metadata } = buildMetadata(params, tagObject, domainConfig);
 
-    if (domainConfig.tags.storage.walrusEnabled) {
-        // await storeInWalrus(tagObject, domainConfig, metadata);
+    if (domainConfig.isWalrusEnabled()) {
+        await storeInWalrus(tagObject, domainConfig, metadata);
     }
 
-    if (domainConfig.tags.storage.ipfsEnabled) {
+    if (domainConfig.isIPFSEnabled()) {
         await storeInIPFS(tagObject, domainConfig, metadata);
     }
 
-    if (domainConfig.tags.storage.arweaveEnabled) {
+    if (domainConfig.isArweaveEnabled()) {
         await storeInArweave(tagObject, domainConfig, metadata);
     }
 
@@ -389,66 +388,6 @@ const sendEmailReceipt = async (tagName, domain, network, email, token) => {
 };
 
 /**
- * Get my referrals for a specific tag (referrer) in a single domain.
- * @param {string} tagName - Referrer tag name without domain (e.g. "miguel")
- * @param {string} domain - Domain (e.g. "zelf") -> full referrer tag = "miguel.zelf"
- * @param {Object} authUser
- */
-const getMyReferrals = async (tagName, domain, authUser) => {
-    const referralTagName = tagName.includes(".") ? tagName : `${tagName}.${domain}`;
-    const domainConfig = getDomainConfig(domain);
-
-    const ipfsRecords = await TagsSearchModule.searchIPFS(
-        {
-            key: "referralTagName",
-            value: referralTagName,
-            domain,
-            domainConfig,
-        },
-        authUser,
-    );
-
-    const arweaveRecords = await TagsSearchModule.searchArweave(
-        {
-            key: "referralTagName",
-            value: referralTagName,
-            domain,
-            domainConfig,
-        },
-        authUser,
-    );
-
-    const domainRecords = [...ipfsRecords, ...arweaveRecords];
-
-    const map = new Map();
-    for (const record of domainRecords) {
-        const name = record.name || record.tagName;
-        if (!map.has(name)) {
-            map.set(name, record);
-        }
-    }
-
-    const referrals = [];
-    for (const [name, record] of map) {
-        const type = record.publicData?.type || record.metadata?.extraParams?.type || "hold";
-        const status = type === "mainnet" ? "tag_name_purchased" : "tag_name_created";
-
-        referrals.push({
-            id: record.id || record.ipfsId || name,
-            name,
-            status,
-            rewardZns: 5,
-        });
-    }
-
-    return referrals;
-};
-
-const ReferralRewardModel = require("../models/referral-rewards.model");
-const TagsTokenModule = require("./tags-token.module");
-const IPFS = require("../../../Core/ipfs");
-
-/**
  * 1. Create reward record if not found (status "pending").
  * 2. Call giveTokensAfterPurchase to send ZNS.
  * 3. On success: set status "completed", receipt fields (completedAt, payload, attempts++), save. Return { signature, rewardAmount }.
@@ -473,6 +412,7 @@ const _sendReferralRewardAndUpdateRecord = async (
     referrerTagRecord,
     friendRecord,
     rewardAmount,
+    rewardType,
 ) => {
     const referrerSolanaAddress = referrerTagRecord?.publicData?.solanaAddress;
 
@@ -484,10 +424,13 @@ const _sendReferralRewardAndUpdateRecord = async (
         throw err;
     }
 
+    const tagNameOnly = friendFullTagName.split(".")[0];
+    const keyFriendName = rewardType === "registration" ? `${tagNameOnly}.hold` : friendFullTagName;
+
     // 1. Create record if not found (addresses from referrer's tag in IPFS)
     if (!rewardRecord) {
         rewardRecord = new ReferralRewardModel({
-            tagName: friendFullTagName,
+            tagName: keyFriendName,
             domain: friendDomain,
             ethAddress: referrerEthAddress,
             solanaAddress: referrerSolanaAddress,
@@ -500,6 +443,7 @@ const _sendReferralRewardAndUpdateRecord = async (
             payload: {},
             ipfsHash: friendRecord.ipfsHash || "",
             arweaveId: friendRecord.arweaveId || "",
+            rewardType,
         });
     }
 
@@ -538,6 +482,7 @@ const _sendReferralRewardAndUpdateRecord = async (
         referrerSolanaAddress,
         referrerEthAddress,
         friendRecord,
+        rewardType,
     });
 
     return { signature, rewardAmount, ipfsCid };
@@ -559,16 +504,20 @@ const _storeReferralRewardReceipt = async ({
     referrerSolanaAddress,
     referrerEthAddress,
     friendRecord,
+    rewardType,
 }) => {
     const rewardDate = moment().format("YYYY-MM-DD");
-    const rewardPrimaryKey = `referral_${friendFullTagName}_${referralTagName}`;
+    const tagNameOnly = friendFullTagName.split(".")[0];
+    const keyFriendName = rewardType === "registration" ? `${tagNameOnly}.hold` : friendFullTagName;
+    const rewardPrimaryKey = `referral_${keyFriendName}_${referralTagName}`;
 
     const rewardData = {
         type: "referral",
+        rewardType,
         rewardPrimaryKey,
         referralTagName,
         referralDomain: domain,
-        friendTagName: friendFullTagName,
+        friendTagName: keyFriendName,
         friendDomain,
         rewardAmount,
         signature,
@@ -590,23 +539,60 @@ const _storeReferralRewardReceipt = async ({
     const ipfsMetadata = {
         rewardPrimaryKey,
         rewardedTagName: referralTagName,
-        friendTagName: friendFullTagName,
+        friendTagName: keyFriendName,
         rewardType: "referral",
+        referralRewardType: rewardType,
         rewardDate,
     };
 
     let ipfsResult = null;
+    let arweaveResult = null;
+
+    // Store in IPFS
     try {
         ipfsResult = await IPFS.pinFile(`data:application/json;base64,${base64Json}`, filename, "application/json", ipfsMetadata);
     } catch (ipfsError) {
         console.error("Error storing referral reward in IPFS:", ipfsError);
-        // Continue anyway - IPFS storage is secondary, MongoDB is primary
+    }
+
+    // Store in Arweave (required by the model schema) — same JSON payload as IPFS
+    try {
+        const rewardDataUrl = `data:application/json;base64,${base64Json}`;
+
+        arweaveResult = await TagsArweaveModule.receiptRegistration(
+            rewardDataUrl,
+            {
+                zelfProof: null,
+                hasPassword: false,
+                publicData: {
+                    type: "referral_reward",
+                    rewardType,
+                    rewardPrimaryKey,
+                    referralTagName,
+                    referralDomain: domain,
+                    friendTagName: keyFriendName,
+                    friendDomain,
+                    rewardAmount: String(rewardAmount),
+                    signature,
+                    rewardDate,
+                    status: "completed",
+                },
+            },
+            `referral-reward-${rewardPrimaryKey}`,
+        );
+    } catch (arweaveError) {
+        console.error("Error storing referral reward in Arweave:", arweaveError);
     }
 
     // Update MongoDB record with receipt
     rewardRecord.status = "completed";
     rewardRecord.completedAt = new Date();
-    rewardRecord.payload = { signature, rewardAmount, ipfsCid: ipfsResult?.IpfsHash || null };
+    rewardRecord.payload = {
+        signature,
+        rewardAmount,
+        ipfsCid: ipfsResult?.IpfsHash || null,
+        arweaveId: arweaveResult?.id || null,
+    };
     rewardRecord.attempts += 1;
     rewardRecord.solanaAddress = referrerSolanaAddress;
     rewardRecord.ethAddress = referrerEthAddress;
@@ -615,11 +601,17 @@ const _storeReferralRewardReceipt = async ({
         rewardRecord.ipfsHash = ipfsResult.IpfsHash;
     }
 
+    // Set arweaveId (required field) - use the ID from Arweave or fallback to IPFS hash
+    rewardRecord.arweaveId = arweaveResult?.id || ipfsResult?.IpfsHash || `pending_${Date.now()}`;
+
     await rewardRecord.save();
 
-    console.log({ ipfsResult });
-
-    return { signature, rewardAmount, ipfsCid: ipfsResult?.IpfsHash || null };
+    return {
+        signature,
+        rewardAmount,
+        ipfsCid: ipfsResult?.IpfsHash || null,
+        arweaveId: arweaveResult?.id || null,
+    };
 };
 
 /**
@@ -627,11 +619,12 @@ const _storeReferralRewardReceipt = async ({
  * @param {string} referralTagName - Full referrer tag (e.g. miguel.zelf)
  * @param {string} friendFullTagName - Full friend tag to find (e.g. one5024.sui)
  * @param {string} friendDomain - Friend's domain
+ * @param {string} rewardType - "registration" or "purchase"
  * @param {Object} authUser - Authenticated user (referrer)
  * @returns {Promise<Object>} The friend's IPFS/Arweave record
  * @throws {Error} "referral_not_found" if no record matches friendFullTagName
  */
-const _findReferralRecordInStorage = async (referralTagName, friendFullTagName, friendDomain, authUser) => {
+const _findReferralRecordInStorage = async (referralTagName, friendFullTagName, friendDomain, rewardType, authUser) => {
     const domainConfig = getDomainConfig(friendDomain);
 
     const ipfsRecords = await TagsSearchModule.searchIPFS(
@@ -656,7 +649,9 @@ const _findReferralRecordInStorage = async (referralTagName, friendFullTagName, 
 
     const records = [...ipfsRecords, ...arweaveRecords];
 
-    const friendRecord = records.find((r) => (r.name || r.tagName) === friendFullTagName);
+    const targetName = rewardType === "registration" ? `${friendFullTagName}.hold` : friendFullTagName;
+
+    const friendRecord = records.find((r) => (r.publicData?.tagName || r.publicData?.zelfName) === targetName);
 
     if (!friendRecord) throw new Error("referral_not_found");
 
@@ -664,59 +659,88 @@ const _findReferralRecordInStorage = async (referralTagName, friendFullTagName, 
 };
 
 /**
+ * Derive duration string for getPrice from tag's registeredAt and expiresAt.
+ * @param {string} registeredAt - e.g. '2026-01-29 11:30:07'
+ * @param {string} expiresAt - e.g. '2027-01-29 11:30:07'
+ * @returns {string} "1" | "2" | "3" | "4" | "5" | "lifetime"
+ */
+const _durationFromRegisteredAndExpires = (registeredAt, expiresAt) => {
+    if (!registeredAt || !expiresAt) return "1";
+    const start = moment(registeredAt);
+    const end = moment(expiresAt);
+    if (!start.isValid() || !end.isValid() || end.isSameOrBefore(start)) return "1";
+    const years = end.diff(start, "years", true);
+    if (years >= 5) return "lifetime";
+    const durationYears = Math.min(5, Math.max(1, Math.round(years)));
+    return String(durationYears);
+};
+
+/**
  * Step 3: Calculate referral reward amount (ZNS tokens).
- * - Hold (non-mainnet): fixed 10 ZNS.
- * - Mainnet (purchased): 10% of friend's tag purchase price, converted to ZNS using config.token.rewardPrice (cents per ZNS; default 0.05).
- *   Formula: rewardAmount = (tagPrice * 0.1) / znsPrice.
- * @param {Object} friendRecord - Friend's IPFS/Arweave record (publicData.type, publicData.price or metadata.extraParams)
+ * - Registration (hold): fixed 10 ZNS.
+ * - Purchase (mainnet): 10% of friend's tag purchase price, converted to ZNS.
+ * @param {Object} friendRecord - Friend's IPFS/Arweave record
+ * @param {Object} domainConfig - Domain config
+ * @param {string} rewardType - "registration" or "purchase"
  * @returns {number} ZNS reward amount
  */
-const _calculateReferralRewardAmount = (friendRecord) => {
-    const type = friendRecord.publicData?.type || friendRecord.metadata?.extraParams?.type || "hold";
-
-    const isMainnet = type === "mainnet";
-
-    let rewardAmount = 10; // Default: 10 ZNS for hold (tag created, not purchased)
-
-    if (isMainnet) {
-        const tagPrice = friendRecord.publicData?.price || friendRecord.metadata?.extraParams?.price || 0;
-        const znsPrice = config.token?.rewardPrice || 0.05; // Cents per ZNS
-        if (tagPrice > 0) {
-            rewardAmount = (tagPrice * 0.1) / znsPrice; // 10% of purchase price in ZNS
-        }
+const _calculateReferralRewardAmount = (friendRecord, domainConfig, rewardType = null) => {
+    // If rewardType is not provided, derive it from record status (for backward compatibility if needed)
+    if (!rewardType) {
+        const type = friendRecord.publicData?.type || friendRecord.metadata?.extraParams?.type || "hold";
+        rewardType = type === "mainnet" ? "purchase" : "registration";
     }
 
-    return rewardAmount;
+    if (rewardType === "registration") {
+        return 10; // Flat 10 ZNS for registration
+    }
+
+    // Purchase reward: 10% of tag price
+    let tagPrice = friendRecord.publicData?.price || friendRecord.metadata?.extraParams?.price || 0;
+
+    if (!tagPrice) {
+        const registeredAt = friendRecord.publicData?.registeredAt || friendRecord.metadata?.extraParams?.registeredAt;
+        const expiresAt = friendRecord.publicData?.expiresAt || friendRecord.metadata?.extraParams?.expiresAt;
+        const duration = _durationFromRegisteredAndExpires(registeredAt, expiresAt);
+        const tagNameForPrice = friendRecord.name || friendRecord.tagName || friendRecord.publicData?.tagName || friendRecord.publicData?.zelfName;
+        const priceResult = domainConfig.getPrice(tagNameForPrice, duration);
+        tagPrice = priceResult?.price ?? 0;
+    }
+
+    const znsPrice = config.token?.rewardPrice || 0.05; // Cents per ZNS
+    let rewardAmount = 0;
+
+    if (tagPrice > 0) {
+        rewardAmount = (tagPrice * 0.1) / znsPrice;
+    }
+
+    return Math.round(rewardAmount * 10000) / 10000;
 };
 
 /**
  * Step 4: Check if referral reward has already been claimed.
- * Checks IPFS first (permanent record), then MongoDB as backup.
- * @param {string} friendFullTagName - Friend's full tag (e.g. one5024.sui)
- * @param {string} referralTagName - Referrer's full tag (e.g. miguel.zelf)
- * @returns {Promise<Object|null>} Existing MongoDB record if found (for retry), or null if no claim
- * @throws {Error} "reward_already_claimed" if already claimed in IPFS or completed in MongoDB
+ * @param {string} friendFullTagName - Friend's full tag
+ * @param {string} referralTagName - Referrer's full tag
+ * @param {string} rewardType - "registration" or "purchase"
  */
-const _checkIfRewardAlreadyClaimed = async (friendFullTagName, referralTagName) => {
-    // Check IPFS for existing reward record using rewardPrimaryKey
-    const rewardPrimaryKey = `referral_${friendFullTagName}_${referralTagName}`;
+const _checkIfRewardAlreadyClaimed = async (friendFullTagName, referralTagName, rewardType) => {
+    const keyFriendName = rewardType === "registration" ? `${friendFullTagName}.hold` : friendFullTagName;
+
+    const rewardPrimaryKey = `referral_${keyFriendName}_${referralTagName}`;
+
     const ipfsRewards = await IPFS.filter("rewardPrimaryKey", rewardPrimaryKey);
 
-    if (ipfsRewards && ipfsRewards.length > 0) {
-        throw new Error("reward_already_claimed");
-    }
+    if (ipfsRewards && ipfsRewards.length > 0) throw new Error("reward_already_claimed");
 
     // Backup: Check MongoDB
     const rewardRecord = await ReferralRewardModel.findOne({
-        tagName: friendFullTagName,
+        tagName: keyFriendName,
         referralTagName: referralTagName,
+        rewardType, // Distinguish records in Mongo too
     });
 
-    if (rewardRecord && rewardRecord.status === "completed") {
-        throw new Error("reward_already_claimed");
-    }
+    if (rewardRecord && rewardRecord.status === "completed") throw new Error("reward_already_claimed");
 
-    // Return existing record (pending/failed) for retry, or null for new claim
     return rewardRecord;
 };
 
@@ -728,31 +752,36 @@ const _checkIfRewardAlreadyClaimed = async (friendFullTagName, referralTagName) 
  * @param {string} friendDomain - Friend domain
  * @param {Object} authUser - Authenticated user (referrer)
  */
-const claimReferralReward = async (tagName, domain, friendTagName, friendDomain, authUser) => {
+const claimReferralReward = async (tagName, domain, friendTagName, friendDomain, authUser, rewardType = null) => {
     const referralTagName = tagName.includes(".") ? tagName : `${tagName}.${domain}`;
+
     const friendFullTagName = friendTagName.includes(".") ? friendTagName : `${friendTagName}.${friendDomain}`;
 
     // 1. Verify referral exists in IPFS/Arweave
-    const friendRecord = await _findReferralRecordInStorage(referralTagName, friendFullTagName, friendDomain, authUser);
+    const friendRecord = await _findReferralRecordInStorage(referralTagName, friendFullTagName, friendDomain, rewardType, authUser);
 
-    // 2. Get referrer's tag from IPFS (addresses for reward record and ZNS transfer come from here)
-    const referrerTagData = await searchTag({ tagName: referralTagName, domain }, {});
+    const normalizedDomain = (domain || "").replace(/^\./, "").trim().toLowerCase();
 
-    if (referrerTagData.available || !referrerTagData.tagObject) {
-        const err = new Error("referrer_tag_not_found");
-        err.status = 404;
-        throw err;
-    }
+    const domainConfig = getDomainConfig(normalizedDomain);
+
+    if (!domainConfig) throw new Error("400:domain_not_supported");
+
+    const referrerTagData = await searchTag({ tagName: referralTagName, domain: normalizedDomain }, {});
+
+    if (referrerTagData.available || !referrerTagData.tagObject) throw new Error("404:referrer_tag_not_found");
 
     const referrerTagRecord = referrerTagData.tagObject;
 
-    // 3. Check if already claimed (IPFS first, MongoDB backup)
-    const rewardRecord = await _checkIfRewardAlreadyClaimed(friendFullTagName, referralTagName);
+    // Derived type if not provided
+    if (!rewardType) {
+        const type = friendRecord.publicData?.type || friendRecord.metadata?.extraParams?.type || "hold";
+        rewardType = type === "mainnet" ? "purchase" : "registration";
+    }
 
-    // 4. Determine Reward (ZNS amount)
-    const rewardAmount = _calculateReferralRewardAmount(friendRecord);
+    const rewardRecord = await _checkIfRewardAlreadyClaimed(friendFullTagName, referralTagName, rewardType);
 
-    // 5. Send ZNS and update record (addresses from referrer's tag in IPFS)
+    const rewardAmount = _calculateReferralRewardAmount(friendRecord, domainConfig, rewardType);
+
     const {
         signature,
         rewardAmount: amount,
@@ -766,9 +795,132 @@ const claimReferralReward = async (tagName, domain, friendTagName, friendDomain,
         referrerTagRecord,
         friendRecord,
         rewardAmount,
+        rewardType,
     );
 
     return { success: true, rewardAmount: amount, signature, ipfsCid };
+};
+
+/**
+ * Get my referrals for a specific tag (referrer) in a single domain.
+ * Includes claim status and rewarded amount.
+ * @param {string} tagName - Referrer tag name without domain (e.g. "miguel")
+ * @param {string} domain - Domain (e.g. "zelf") -> full referrer tag = "miguel.zelf"
+ * @param {Object} authUser
+ */
+const getMyReferrals = async (tagName, domain, authUser) => {
+    const referralTagName = tagName.includes(".") ? tagName : `${tagName}.${domain}`;
+
+    const domainConfig = getDomainConfig(domain);
+
+    const ipfsRecords = await TagsSearchModule.searchIPFS(
+        {
+            key: "referralTagName",
+            value: referralTagName,
+            domain,
+            domainConfig,
+        },
+        authUser,
+    );
+
+    const arweaveRecords = await TagsSearchModule.searchArweave(
+        {
+            key: "referralTagName",
+            value: referralTagName,
+            domain,
+            domainConfig,
+        },
+        authUser,
+    );
+
+    const domainRecords = [...ipfsRecords, ...arweaveRecords];
+
+    const tagKey = domainConfig?.getTagKey?.() || "tagName";
+
+    const map = new Map();
+
+    for (const record of domainRecords) {
+        const name = record.publicData?.[tagKey] || record.name || record.tagName || record.publicData?.tagName || record.publicData?.zelfName;
+
+        if (!name) continue;
+
+        if (!map.has(name)) {
+            map.set(name, record);
+        }
+    }
+
+    const referrals = [];
+    let totalEarnedInZNS = 0;
+
+    for (const [name, record] of map) {
+        if (!name) continue;
+
+        const type = record.publicData?.type || record.metadata?.extraParams?.type || "hold";
+
+        const tagNameOnly = name.split(".")[0];
+
+        // 1. Check Registration Reward (10 ZNS)
+        const regKeyFriendName = `${tagNameOnly}.hold`;
+        const regPrimaryKey = `referral_${regKeyFriendName}_${referralTagName}`;
+        const ipfsRegReward = (await IPFS.filter("rewardPrimaryKey", regPrimaryKey))?.[0];
+        const mongoRegRecord = await ReferralRewardModel.findOne({
+            tagName: regKeyFriendName,
+            referralTagName,
+            rewardType: "registration",
+        });
+
+        const regClaimed = !!ipfsRegReward || (mongoRegRecord && mongoRegRecord.status === "completed");
+
+        const regAmount = ipfsRegReward?.publicData?.rewardAmount || mongoRegRecord?.payload?.rewardAmount || 10;
+
+        if (regClaimed) totalEarnedInZNS += Number(regAmount);
+
+        referrals.push({
+            ...record,
+            name,
+            status: "tag_name_created",
+            rewardZNS: 10,
+            claimed: !!regClaimed,
+            claimStatus: regClaimed ? "completed" : mongoRegRecord?.status || "none",
+            rewardAmount: regClaimed ? Number(regAmount) : 0,
+            rewardType: "registration",
+            ipfsHash: ipfsRegReward?.cid || mongoRegRecord?.ipfsHash || null,
+        });
+
+        // 2. Check Purchase Reward (10%) - only if mainnet
+        if (type === "mainnet") {
+            const purPrimaryKey = `referral_${name}_${referralTagName}`;
+            const ipfsPurReward = (await IPFS.filter("rewardPrimaryKey", purPrimaryKey))?.[0];
+            const mongoPurRecord = await ReferralRewardModel.findOne({
+                tagName: name,
+                referralTagName,
+                rewardType: "purchase", // or just null for legacy
+            });
+
+            const purClaimed = !!ipfsPurReward || (mongoPurRecord && mongoPurRecord.status === "completed");
+            const purAmountPotential = _calculateReferralRewardAmount(record, domainConfig, "purchase");
+            const purAmountActual = ipfsPurReward?.publicData?.rewardAmount || mongoPurRecord?.payload?.rewardAmount || purAmountPotential;
+
+            if (purClaimed) totalEarnedInZNS += Number(purAmountActual);
+
+            referrals.push({
+                ...record,
+                name,
+                status: "tag_name_purchased",
+                rewardZNS: purAmountPotential,
+                claimed: !!purClaimed,
+                claimStatus: purClaimed ? "completed" : mongoPurRecord?.status || "none",
+                rewardAmount: purClaimed ? Number(purAmountActual) : 0,
+                rewardType: "purchase",
+                ipfsHash: ipfsPurReward?.cid || mongoPurRecord?.ipfsHash || null,
+            });
+        }
+    }
+
+    return {
+        referrals,
+        totalEarnedInZNS,
+    };
 };
 
 module.exports = {

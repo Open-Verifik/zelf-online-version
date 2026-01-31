@@ -1,7 +1,6 @@
 const { TurboFactory, USD, WinstonToTokenAmount, productionTurboConfiguration } = require("@ardrive/turbo-sdk");
 const Arweave = require("arweave");
-const fs = require("fs");
-const path = require("path");
+const { Readable } = require("stream");
 const config = require("../../../Core/config");
 const axios = require("axios");
 const { getDomainConfiguration, generateStorageKey } = require("./domain-registry.module");
@@ -49,17 +48,10 @@ const tagRegistration = async (tagProofQRCode, tagObject, fileName) => {
 		...productionTurboConfiguration,
 	});
 
-	// Convert base64 string to a buffer
-	// Convert base64 string to a buffer
+	// Convert base64 string to a buffer; upload from memory (no temp file → no nodemon restart)
 	const base64Data = tagProofQRCode.replace(/^data:image\/\w+;base64,/, "");
-
 	const buffer = Buffer.from(base64Data, "base64");
-
 	const fileSize = buffer.length;
-
-	const tempFilePath = path.join(__dirname, `${fileName}.png`);
-
-	fs.writeFileSync(tempFilePath, buffer);
 
 	const tags = [
 		{
@@ -95,29 +87,95 @@ const tagRegistration = async (tagProofQRCode, tagObject, fileName) => {
 		});
 	}
 
-	// if the size is greater than 100kb, we need to skip the upload
 	if (fileSize > 100 * 1024) {
 		console.info("skipping upload because the file size is greater than 100kb", {
 			fileInKb: fileSize / 1024,
 			fileInMb: fileSize / 1024 / 1024,
 		});
-
-		return {
-			skipped: true,
-		};
+		return { skipped: true };
 	}
 
-	// Upload the data item
 	const uploadResult = await turboAuthClient.uploadFile({
-		fileStreamFactory: () => fs.createReadStream(tempFilePath),
+		fileStreamFactory: () => Readable.from(buffer),
 		fileSizeFactory: () => fileSize,
-		dataItemOpts: {
-			tags,
-		},
+		dataItemOpts: { tags },
 	});
 
-	// Clean up the temporary file after upload
-	fs.unlinkSync(tempFilePath);
+	return formatCreatedRecord({
+		...uploadResult,
+		publicData,
+		url: `${arweaveUrl}/${uploadResult.id}`,
+		explorerUrl: `${explorerUrl}/${uploadResult.id}`,
+	});
+};
+
+/**
+ * Register a receipt (e.g. referral reward JSON) on Arweave.
+ * Accepts any data URL (application/json, image/png, etc.); tagRegistration is image-only.
+ * @param {string} dataUrl - Data URL (e.g. data:application/json;base64,...)
+ * @param {Object} tagObject - { publicData }
+ * @param {string} fileName - File name (no extension)
+ * @returns {Object} - Arweave registration result
+ */
+const receiptRegistration = async (dataUrl, tagObject, fileName) => {
+	const { publicData } = tagObject;
+
+	const env = config.arwave.env;
+
+	const jwk = {
+		kty: "RSA",
+		n: env === "development" ? config.arwave.hold.n : config.arwave.n,
+		e: env === "development" ? config.arwave.hold.e : config.arwave.e,
+		d: env === "development" ? config.arwave.hold.d : config.arwave.d,
+		p: env === "development" ? config.arwave.hold.p : config.arwave.p,
+		q: env === "development" ? config.arwave.hold.q : config.arwave.q,
+		dp: env === "development" ? config.arwave.hold.dp : config.arwave.dp,
+		dq: env === "development" ? config.arwave.hold.dq : config.arwave.dq,
+		qi: env === "development" ? config.arwave.hold.qi : config.arwave.qi,
+		kid: "2011-04-29",
+	};
+
+	const turboAuthClient = TurboFactory.authenticated({
+		privateKey: jwk,
+		...productionTurboConfiguration,
+	});
+
+	const dataUrlMatch = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+	const contentType = dataUrlMatch ? dataUrlMatch[1] : "application/json";
+	const base64Data = dataUrlMatch ? dataUrlMatch[2] : dataUrl.replace(/^data:[^;]+;base64,/, "");
+
+	const buffer = Buffer.from(base64Data, "base64");
+	const fileSize = buffer.length;
+
+	const tags = [
+		{
+			name: "Content-Type",
+			value: contentType,
+		},
+	];
+
+	const publicKeys = Object.keys(publicData);
+	for (let index = 0; index < publicKeys.length; index++) {
+		const publicKey = publicKeys[index];
+		tags.push({
+			name: publicKey,
+			value: `${publicData[publicKey]}`,
+		});
+	}
+
+	if (fileSize > 100 * 1024) {
+		console.info("skipping receipt upload because the file size is greater than 100kb", {
+			fileInKb: fileSize / 1024,
+			fileInMb: fileSize / 1024 / 1024,
+		});
+		return { skipped: true };
+	}
+
+	const uploadResult = await turboAuthClient.uploadFile({
+		fileStreamFactory: () => Readable.from(buffer),
+		fileSizeFactory: () => fileSize,
+		dataItemOpts: { tags },
+	});
 
 	return formatCreatedRecord({
 		...uploadResult,
@@ -282,6 +340,7 @@ const formatCreatedRecord = (record) => {
 
 module.exports = {
 	tagRegistration,
+	receiptRegistration,
 	searchByStorageKey,
 	searchByDomain,
 	arweaveIDToBase64,

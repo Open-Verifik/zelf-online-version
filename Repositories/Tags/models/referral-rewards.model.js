@@ -9,26 +9,27 @@ const { requiredEnumField, requiredField, refField, defaultField, addBasicPlugin
 //####################################################//
 
 const ReferralRewardSchema = new Schema({
-	tagName: requiredField(String),
-	domain: requiredField(String),
-	ethAddress: requiredField(String),
-	solanaAddress: requiredField(String),
-	referralTagName: requiredField(String),
-	referralDomain: requiredField(String),
-	status: requiredEnumField(String, ["pending", "completed", "failed"], "pending"),
-	referralSolanaAddress: requiredField(String),
-	attempts: requiredField(Number),
-	ipfsHash: requiredField(String),
-	arweaveId: requiredField(String),
-	tagPrice: requiredField(Number),
-	payload: {
-		type: Object,
-		default: {},
-	},
-	completedAt: {
-		type: Date,
-		default: Date.now,
-	},
+    tagName: requiredField(String),
+    domain: requiredField(String),
+    ethAddress: requiredField(String),
+    solanaAddress: requiredField(String),
+    referralTagName: requiredField(String),
+    referralDomain: requiredField(String),
+    status: requiredEnumField(String, ["pending", "completed", "failed"], "pending"),
+    referralSolanaAddress: requiredField(String),
+    attempts: requiredField(Number),
+    ipfsHash: requiredField(String),
+    arweaveId: requiredField(String),
+    tagPrice: requiredField(Number),
+    rewardType: requiredEnumField(String, ["registration", "purchase"], "registration"),
+    payload: {
+        type: Object,
+        default: {},
+    },
+    completedAt: {
+        type: Date,
+        default: Date.now,
+    },
 });
 
 // Add a unique compound index for tagName and referralTagName
@@ -38,11 +39,11 @@ ReferralRewardSchema.index({ tagName: 1, referralTagName: 1 }, { unique: true })
 ReferralRewardSchema.index({ domain: 1, status: 1 });
 
 ReferralRewardSchema.pre("save", async (next) => {
-	const _this = this;
+    const _this = this;
 });
 
 ReferralRewardSchema.post("save", async (next) => {
-	const _this = this;
+    const _this = this;
 });
 
 /**

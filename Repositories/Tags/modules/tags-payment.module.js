@@ -21,20 +21,20 @@ const TagsArweaveModule = require("./tags-arweave.module");
  * @returns {Object} - Validation result
  */
 const validateCurrency = (domain, currency) => {
-	const domainConfig = getDomainConfig(domain);
+    const domainConfig = getDomainConfig(domain);
 
-	if (!domainConfig) {
-		return { valid: false, error: "Domain not supported" };
-	}
+    if (!domainConfig) {
+        return { valid: false, error: "Domain not supported" };
+    }
 
-	const supportedCurrencies = getDomainCurrencies(domain);
-	const isValid = supportedCurrencies.includes(currency);
+    const supportedCurrencies = getDomainCurrencies(domain);
+    const isValid = supportedCurrencies.includes(currency);
 
-	return {
-		valid: isValid,
-		error: isValid ? null : `Currency '${currency}' not supported for domain '${domain}'`,
-		supportedCurrencies,
-	};
+    return {
+        valid: isValid,
+        error: isValid ? null : `Currency '${currency}' not supported for domain '${domain}'`,
+        supportedCurrencies,
+    };
 };
 
 /**
@@ -45,153 +45,152 @@ const validateCurrency = (domain, currency) => {
  * @param {Object} authUser
  */
 const getPaymentOptions = async (tagName, domain, duration, authUser) => {
-	const domainConfig = getDomainConfig(domain);
+    const domainConfig = getDomainConfig(domain);
 
-	// Get current tag data
-	const tagData = await searchTag({ tagName, domain, domainConfig }, authUser);
+    // Get current tag data
+    const tagData = await searchTag({ tagName, domain, domainConfig }, authUser);
 
-	if (tagData.available) throw new Error("404:tag_not_found");
+    if (tagData.available) throw new Error("404:tag_not_found");
 
-	const tagObject = tagData.tagObject;
+    const tagObject = tagData.tagObject;
 
-	const priceDetails = domainConfig.getPrice(tagName, duration, tagObject.publicData.referralTagName);
+    const priceDetails = domainConfig.getPrice(tagName, duration, tagObject.publicData.referralTagName);
 
-	const zelfPayCount = tagData.ipfs?.length || tagData.arweave?.length;
+    const zelfPayCount = tagData.ipfs?.length || tagData.arweave?.length;
 
-	const renewTagPayObject = await _fetchTagPayRecord(
-		{
-			tagName: `${tagData.tagName}.${domain}`,
-			publicData: tagObject.publicData,
-		},
-		zelfPayCount,
-		priceDetails,
-		domainConfig
-	);
+    const renewTagPayObject = await _fetchTagPayRecord(
+        {
+            tagName: `${tagData.tagName}.${domain}`,
+            publicData: tagObject.publicData,
+        },
+        zelfPayCount,
+        priceDetails,
+        domainConfig,
+    );
 
-	if (!renewTagPayObject) {
-		const error = new Error("tagPayRecord_not_found");
-		error.status = 404;
-		throw error;
-	}
+    if (!renewTagPayObject) {
+        const error = new Error("tagPayRecord_not_found");
+        error.status = 404;
+        throw error;
+    }
 
-	const paymentAddress = {
-		ethAddress: renewTagPayObject?.publicData?.ethAddress,
-		avalancheAddress: renewTagPayObject?.publicData?.ethAddress,
-		btcAddress: renewTagPayObject?.publicData?.btcAddress,
-		solanaAddress: renewTagPayObject?.publicData?.solanaAddress,
-	};
+    const paymentAddress = {
+        ethAddress: renewTagPayObject?.publicData?.ethAddress,
+        avalancheAddress: renewTagPayObject?.publicData?.ethAddress,
+        btcAddress: renewTagPayObject?.publicData?.btcAddress,
+        solanaAddress: renewTagPayObject?.publicData?.solanaAddress,
+    };
 
-	const prices = {
-		ETH: null,
-		SOL: null,
-		BTC: null,
-		AVAX: null,
-		BDAG: null,
-	};
+    const prices = {
+        ETH: null,
+        SOL: null,
+        BTC: null,
+        AVAX: null,
+        BDAG: null,
+    };
 
-	// Check for enabled networks and their native currencies
-	// Support both old structure (payment.currencies) and new structure (payment.networks)
-	const networks = domainConfig?.tags?.payment?.networks;
-	const oldCurrencies = domainConfig?.tags?.payment?.currencies;
+    // Check for enabled networks and their native currencies
+    // Support both old structure (payment.currencies) and new structure (payment.networks)
+    const networks = domainConfig?.tags?.payment?.networks;
+    const oldCurrencies = domainConfig?.tags?.payment?.currencies;
 
-	// ETH - Check ethereum network
-	if (
-		oldCurrencies?.includes("ETH") ||
-		(networks?.ethereum?.enabled && networks?.ethereum?.nativeCurrency?.enabled && networks?.ethereum?.nativeCurrency?.code === "ETH")
-	) {
-		prices.ETH = await calculateCryptoValue("ETH", priceDetails.price);
-	}
+    // ETH - Check ethereum network
+    if (
+        oldCurrencies?.includes("ETH") ||
+        (networks?.ethereum?.enabled && networks?.ethereum?.nativeCurrency?.enabled && networks?.ethereum?.nativeCurrency?.code === "ETH")
+    ) {
+        prices.ETH = await calculateCryptoValue("ETH", priceDetails.price);
+    }
 
-	// SOL - Check solana network
-	if (
-		oldCurrencies?.includes("SOL") ||
-		(networks?.solana?.enabled && networks?.solana?.nativeCurrency?.enabled && networks?.solana?.nativeCurrency?.code === "SOL")
-	) {
-		prices.SOL = await calculateCryptoValue("SOL", priceDetails.price);
-	}
+    // SOL - Check solana network
+    if (
+        oldCurrencies?.includes("SOL") ||
+        (networks?.solana?.enabled && networks?.solana?.nativeCurrency?.enabled && networks?.solana?.nativeCurrency?.code === "SOL")
+    ) {
+        prices.SOL = await calculateCryptoValue("SOL", priceDetails.price);
+    }
 
-	// BTC - Check bitcoin network
-	if (
-		oldCurrencies?.includes("BTC") ||
-		(networks?.bitcoin?.enabled && networks?.bitcoin?.nativeCurrency?.enabled && networks?.bitcoin?.nativeCurrency?.code === "BTC")
-	) {
-		prices.BTC = await calculateCryptoValue("BTC", priceDetails.price);
-	}
+    // BTC - Check bitcoin network
+    if (
+        oldCurrencies?.includes("BTC") ||
+        (networks?.bitcoin?.enabled && networks?.bitcoin?.nativeCurrency?.enabled && networks?.bitcoin?.nativeCurrency?.code === "BTC")
+    ) {
+        prices.BTC = await calculateCryptoValue("BTC", priceDetails.price);
+    }
 
-	// AVAX - Check avalanche network
-	if (
-		oldCurrencies?.includes("AVAX") ||
-		(networks?.avalanche?.enabled && networks?.avalanche?.nativeCurrency?.enabled && networks?.avalanche?.nativeCurrency?.code === "AVAX")
-	) {
-		prices.AVAX = await calculateCryptoValue("AVAX", priceDetails.price);
-	}
+    // AVAX - Check avalanche network
+    if (
+        oldCurrencies?.includes("AVAX") ||
+        (networks?.avalanche?.enabled && networks?.avalanche?.nativeCurrency?.enabled && networks?.avalanche?.nativeCurrency?.code === "AVAX")
+    ) {
+        prices.AVAX = await calculateCryptoValue("AVAX", priceDetails.price);
+    }
 
-	// BDAG - Check blockdag network (new)
-	if (networks?.blockdag?.enabled && networks?.blockdag?.nativeCurrency?.enabled && networks?.blockdag?.nativeCurrency?.code === "BDAG") {
-		prices.BDAG = await calculateCryptoValue("BDAG", priceDetails.price);
-	}
+    // BDAG - Check blockdag network (new)
+    if (networks?.blockdag?.enabled && networks?.blockdag?.nativeCurrency?.enabled && networks?.blockdag?.nativeCurrency?.code === "BDAG") {
+        prices.BDAG = await calculateCryptoValue("BDAG", priceDetails.price);
+    }
 
-	const returnData = {
-		paymentAddress,
-		prices,
-		tagName: `${tagData.tagName}.${domain}`,
-		tagPayName: `${tagData.tagName}.${domain}pay`,
-		expiresAt: tagObject.publicData.expiresAt,
-		initiatedAt: moment().unix(),
-		ttl: moment().add("2", "hours").unix(),
-		duration: parseInt(duration || 1),
-		coinbase_hosted_url: renewTagPayObject.publicData?.coinbase_hosted_url,
-		coinbase_expires_at: renewTagPayObject.publicData?.coinbase_expires_at,
-		count: parseInt(renewTagPayObject.publicData?.count),
-		publicData: renewTagPayObject.publicData,
-		payment: {
-			registeredAt: renewTagPayObject.publicData?.registeredAt,
-			expiresAt: renewTagPayObject.publicData?.expiresAt,
-			referralTagName: tagObject.publicData?.referralTagName,
-			referralSolanaAddress: tagObject.publicData?.referralSolanaAddress,
-		},
-	};
+    const returnData = {
+        paymentAddress,
+        prices,
+        tagName: `${tagData.tagName}.${domain}`,
+        tagPayName: `${tagData.tagName}.${domain}pay`,
+        expiresAt: tagObject.publicData.expiresAt,
+        initiatedAt: moment().unix(),
+        ttl: moment().add("2", "hours").unix(),
+        duration: parseInt(duration || 1),
+        coinbase_hosted_url: renewTagPayObject.publicData?.coinbase_hosted_url,
+        coinbase_expires_at: renewTagPayObject.publicData?.coinbase_expires_at,
+        count: parseInt(renewTagPayObject.publicData?.count),
+        publicData: renewTagPayObject.publicData,
+        payment: {
+            registeredAt: renewTagPayObject.publicData?.registeredAt,
+            expiresAt: renewTagPayObject.publicData?.expiresAt,
+            referralTagName: tagObject.publicData?.referralTagName,
+            referralSolanaAddress: tagObject.publicData?.referralSolanaAddress,
+        },
+    };
 
-	const signedDataPrice = jwt.sign(returnData, config.JWT_SECRET);
+    const signedDataPrice = jwt.sign(returnData, config.JWT_SECRET);
 
-	return {
-		...returnData,
-		signedDataPrice,
-	};
+    return {
+        ...returnData,
+        signedDataPrice,
+    };
 };
 
 const calculateCryptoValue = async (token = "ETH", price_) => {
-	try {
-		// Special handling for tokens not available on Binance
-		const FALLBACK_PRICES = {
-			BDAG: 0.05, // BlockDAG price in USD - update this manually or use another API
-		};
+    try {
+        // Special handling for tokens not available on Binance
+        const FALLBACK_PRICES = {
+            BDAG: 0.05, // BlockDAG price in USD - update this manually or use another API
+        };
 
-		let tokenPrice;
+        let tokenPrice;
 
-		// Check if token has a fallback price
-		if (FALLBACK_PRICES[token]) {
-			console.log(`Using fallback price for ${token}: $${FALLBACK_PRICES[token]}`);
-			tokenPrice = FALLBACK_PRICES[token];
-		} else {
-			// Fetch from Binance
-			const { price } = await getTickerPrice({ symbol: `${token}` });
-			if (!price) throw new Error(`Unable to fetch ${token} price`);
-			tokenPrice = price;
-		}
+        // Check if token has a fallback price
+        if (FALLBACK_PRICES[token]) {
+            tokenPrice = FALLBACK_PRICES[token];
+        } else {
+            // Fetch from Binance
+            const { price } = await getTickerPrice({ symbol: `${token}` });
+            if (!price) throw new Error(`Unable to fetch ${token} price`);
+            tokenPrice = price;
+        }
 
-		const cryptoValue = price_ / tokenPrice;
+        const cryptoValue = price_ / tokenPrice;
 
-		return {
-			amountToSend: parseFloat(cryptoValue.toFixed(7)),
-			ratePriceInUSD: parseFloat(parseFloat(tokenPrice).toFixed(5)),
-			price: price_,
-		};
-	} catch (error) {
-		// If token is not supported, log warning and return null
-		console.warn(`Unable to calculate price for ${token}:`, error.message);
-		return null;
-	}
+        return {
+            amountToSend: parseFloat(cryptoValue.toFixed(7)),
+            ratePriceInUSD: parseFloat(parseFloat(tokenPrice).toFixed(5)),
+            price: price_,
+        };
+    } catch (error) {
+        // If token is not supported, log warning and return null
+        console.warn(`Unable to calculate price for ${token}:`, error.message);
+        return null;
+    }
 };
 
 /**
@@ -201,30 +200,30 @@ const calculateCryptoValue = async (token = "ETH", price_) => {
  * @returns {boolean} - true if the tag pay object requires an update, false otherwise
  */
 const _requiresUpdate = async (tagPayObject, priceDetails, tagObject) => {
-	const sameDuration = !tagPayObject || tagPayObject?.publicData?.duration == priceDetails.duration;
+    const sameDuration = !tagPayObject || tagPayObject?.publicData?.duration == priceDetails.duration;
 
-	if (!tagPayObject) return false;
+    if (!tagPayObject) return false;
 
-	const registeredAtCondition = Boolean(
-		tagObject.publicData.registeredAt &&
-			tagPayObject?.publicData?.registeredAt &&
-			moment(tagObject.publicData.registeredAt).isAfter(moment(tagPayObject?.publicData?.registeredAt))
-	);
+    const registeredAtCondition = Boolean(
+        tagObject.publicData.registeredAt &&
+        tagPayObject?.publicData?.registeredAt &&
+        moment(tagObject.publicData.registeredAt).isAfter(moment(tagPayObject?.publicData?.registeredAt)),
+    );
 
-	if (registeredAtCondition) return true;
+    if (registeredAtCondition) return true;
 
-	if (!sameDuration && tagPayObject?.zelfProofQRCode) {
-		await TagsIpfsModule.unPinFiles([tagPayObject.ipfsId]);
+    if (!sameDuration && tagPayObject?.zelfProofQRCode) {
+        await TagsIpfsModule.unPinFiles([tagPayObject.ipfsId]);
 
-		return true;
-	}
+        return true;
+    }
 
-	// now check if the coinbase_expires_at is before the current date
-	if (tagPayObject?.publicData?.coinbase_expires_at && moment(tagPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
-		await TagsIpfsModule.unPinFiles([tagPayObject.ipfsId]);
+    // now check if the coinbase_expires_at is before the current date
+    if (tagPayObject?.publicData?.coinbase_expires_at && moment(tagPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
+        await TagsIpfsModule.unPinFiles([tagPayObject.ipfsId]);
 
-		return true;
-	}
+        return true;
+    }
 };
 
 /**
@@ -236,32 +235,32 @@ const _requiresUpdate = async (tagPayObject, priceDetails, tagObject) => {
  * @returns {Object} - tag pay object
  */
 const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainConfig) => {
-	const { tagName } = tagObject;
+    const { tagName } = tagObject;
 
-	const tagPayName = `${tagName}pay`;
+    const tagPayName = `${tagName}pay`;
 
-	let tagPayRecords = await searchTag({ tagName: tagPayName, domainConfig, environment: "ipfs", type: "mainnet" });
+    let tagPayRecords = await searchTag({ tagName: tagPayName, domainConfig, environment: "ipfs", type: "mainnet" });
 
-	const tagPayObject = tagPayRecords.tagObject || {};
+    const tagPayObject = tagPayRecords.tagObject || {};
 
-	const requiresUpdate = await _requiresUpdate(tagPayObject, priceDetails, tagObject);
+    const requiresUpdate = await _requiresUpdate(tagPayObject, priceDetails, tagObject);
 
-	if (!tagPayObject?.id || requiresUpdate) {
-		const newTagPayObject = await createTagPay(
-			{
-				...tagPayObject,
-				tagPayName,
-			},
-			tagObject,
-			priceDetails,
-			currentCount + 1,
-			domainConfig
-		);
+    if (!tagPayObject?.id || requiresUpdate) {
+        const newTagPayObject = await createTagPay(
+            {
+                ...tagPayObject,
+                tagPayName,
+            },
+            tagObject,
+            priceDetails,
+            currentCount + 1,
+            domainConfig,
+        );
 
-		return newTagPayObject.tagObject;
-	}
+        return newTagPayObject.tagObject;
+    }
 
-	return tagPayObject;
+    return tagPayObject;
 };
 
 /**
@@ -273,28 +272,28 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
  * @returns {Object} - Coinbase charge object
  */
 const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, { ethAddress, btcAddress, solanaAddress }) => {
-	const coinbasePayload = {
-		name: tagPayName,
-		description: `Purchase of the Zelf Name > ${tagPayName} for $${priceDetails.price}`,
-		pricing_type: "fixed_price",
-		local_price: {
-			amount: `${priceDetails.price}`,
-			currency: "USD",
-		},
-		metadata: {
-			zelfName: tagPayName,
-			ethAddress: ethAddress,
-			btcAddress: btcAddress,
-			solanaAddress: solanaAddress,
-			count: `${currentCount}`,
-		},
-		redirect_url: "https://zelf.world/tags/payment/checkout/coinbase",
-		cancel_url: "https://zelf.world/tags/payment",
-	};
+    const coinbasePayload = {
+        name: tagPayName,
+        description: `Purchase of the Zelf Name > ${tagPayName} for $${priceDetails.price}`,
+        pricing_type: "fixed_price",
+        local_price: {
+            amount: `${priceDetails.price}`,
+            currency: "USD",
+        },
+        metadata: {
+            zelfName: tagPayName,
+            ethAddress: ethAddress,
+            btcAddress: btcAddress,
+            solanaAddress: solanaAddress,
+            count: `${currentCount}`,
+        },
+        redirect_url: "https://zelf.world/tags/payment/checkout/coinbase",
+        cancel_url: "https://zelf.world/tags/payment",
+    };
 
-	const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
+    const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
 
-	return coinbaseCharge;
+    return coinbaseCharge;
 };
 
 /**
@@ -307,91 +306,91 @@ const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, { e
  * @returns {Object} - Tag pay object
  */
 const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount, domainConfig) => {
-	let coinbaseCharge = null;
+    let coinbaseCharge = null;
 
-	const mnemonic = generateMnemonic(12);
-	const jsonfile = require("../../../config/0012589021.json");
-	const eth = createEthWallet(mnemonic);
-	const btc = createBTCWallet(mnemonic);
-	const solana = await createSolanaWallet(mnemonic);
+    const mnemonic = generateMnemonic(12);
+    const jsonfile = require("../../../config/0012589021.json");
+    const eth = createEthWallet(mnemonic);
+    const btc = createBTCWallet(mnemonic);
+    const solana = await createSolanaWallet(mnemonic);
 
-	const dataToEncrypt = {
-		publicData: {
-			ethAddress: eth.address,
-			solanaAddress: solana.address,
-			btcAddress: btc.address,
-			customerZelfName: tagObject.tagName,
-			[domainConfig.getTagKey()]: tagPayObject.tagPayName,
-			currentCount: `${currentCount}`,
-		},
-		metadata: {
-			mnemonic,
-		},
-		faceBase64: jsonfile.faceBase64,
-		password: jsonfile.password,
-		_id: tagPayObject.tagPayName,
-		tolerance: "REGULAR",
-		addServerPassword: true,
-	};
+    const dataToEncrypt = {
+        publicData: {
+            ethAddress: eth.address,
+            solanaAddress: solana.address,
+            btcAddress: btc.address,
+            customerZelfName: tagObject.tagName,
+            [domainConfig.getTagKey()]: tagPayObject.tagPayName,
+            currentCount: `${currentCount}`,
+        },
+        metadata: {
+            mnemonic,
+        },
+        faceBase64: jsonfile.faceBase64,
+        password: jsonfile.password,
+        _id: tagPayObject.tagPayName,
+        tolerance: "REGULAR",
+        addServerPassword: true,
+    };
 
-	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagPayObject);
+    await TagsPartsModule.generateZelfProof(dataToEncrypt, tagPayObject);
 
-	if (!tagPayObject.publicData) tagPayObject.publicData = {};
+    if (!tagPayObject.publicData) tagPayObject.publicData = {};
 
-	tagPayObject.publicData.ethAddress = eth.address;
-	tagPayObject.publicData.btcAddress = btc.address;
-	tagPayObject.publicData.solanaAddress = solana.address;
+    tagPayObject.publicData.ethAddress = eth.address;
+    tagPayObject.publicData.btcAddress = btc.address;
+    tagPayObject.publicData.solanaAddress = solana.address;
 
-	if (domainConfig?.tags?.payment?.methods?.includes("coinbase")) {
-		coinbaseCharge = await _createCoinbaseCharge(tagPayObject.tagPayName, priceDetails, currentCount, {
-			ethAddress: tagPayObject.publicData.ethAddress,
-			btcAddress: tagPayObject.publicData.btcAddress,
-			solanaAddress: tagPayObject.publicData.solanaAddress,
-		});
-	}
+    if (domainConfig?.tags?.payment?.methods?.includes("coinbase")) {
+        coinbaseCharge = await _createCoinbaseCharge(tagPayObject.tagPayName, priceDetails, currentCount, {
+            ethAddress: tagPayObject.publicData.ethAddress,
+            btcAddress: tagPayObject.publicData.btcAddress,
+            solanaAddress: tagPayObject.publicData.solanaAddress,
+        });
+    }
 
-	const payload = {
-		base64: tagPayObject.zelfProofQRCode,
-		name: tagPayObject.tagPayName,
-		metadata: {
-			hasPassword: tagObject.publicData.hasPassword,
-			type: "mainnet",
-			ethAddress: tagPayObject.publicData.ethAddress,
-			solanaAddress: tagPayObject.publicData.solanaAddress,
-			btcAddress: tagPayObject.publicData.btcAddress,
-			[domainConfig.getTagKey()]: tagPayObject.tagPayName,
-			extraParams: JSON.stringify({
-				expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
-				registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-				price: priceDetails.price,
-				duration: priceDetails.duration,
-				count: `${currentCount}`,
-			}),
-		},
-		pinIt: true,
-	};
+    const payload = {
+        base64: tagPayObject.zelfProofQRCode,
+        name: tagPayObject.tagPayName,
+        metadata: {
+            hasPassword: tagObject.publicData.hasPassword,
+            type: "mainnet",
+            ethAddress: tagPayObject.publicData.ethAddress,
+            solanaAddress: tagPayObject.publicData.solanaAddress,
+            btcAddress: tagPayObject.publicData.btcAddress,
+            [domainConfig.getTagKey()]: tagPayObject.tagPayName,
+            extraParams: JSON.stringify({
+                expiresAt: moment().add(100, "year").format("YYYY-MM-DD HH:mm:ss"),
+                registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+                price: priceDetails.price,
+                duration: priceDetails.duration,
+                count: `${currentCount}`,
+            }),
+        },
+        pinIt: true,
+    };
 
-	if (coinbaseCharge) {
-		payload.metadata.coinBase = JSON.stringify({
-			hosted_url: coinbaseCharge.hosted_url,
-			expires_at: coinbaseCharge.expires_at,
-		});
-	}
+    if (coinbaseCharge) {
+        payload.metadata.coinBase = JSON.stringify({
+            hosted_url: coinbaseCharge.hosted_url,
+            expires_at: coinbaseCharge.expires_at,
+        });
+    }
 
-	let ipfs = await TagsIpfsModule.insert(payload, { pro: true });
+    let ipfs = await TagsIpfsModule.insert(payload, { pro: true });
 
-	ipfs = TagsIpfsModule.formatRecord(ipfs);
+    ipfs = TagsIpfsModule.formatRecord(ipfs);
 
-	return {
-		ipfs: [ipfs],
-		tagObject: {
-			...ipfs,
-			zelfProofQRCode: tagObject.zelfProofQRCode,
-			zelfProof: tagObject.zelfProof,
-		},
-		available: false,
-		arweave: [],
-	};
+    return {
+        ipfs: [ipfs],
+        tagObject: {
+            ...ipfs,
+            zelfProofQRCode: tagObject.zelfProofQRCode,
+            zelfProof: tagObject.zelfProof,
+        },
+        available: false,
+        arweave: [],
+    };
 };
 
 /**
@@ -399,113 +398,118 @@ const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount,
  * @returns {Object} - Pricing table
  */
 const getPricingTable = () => {
-	const pricingTable = {};
+    const pricingTable = {};
 
-	Object.entries(require("../config/supported-domains").SUPPORTED_DOMAINS).forEach(([domain, config]) => {
-		pricingTable[domain] = {
-			basePrice: config.price,
-			yearly: getDomainPrice(domain, "yearly"),
-			lifetime: getDomainPrice(domain, "lifetime"),
-			currencies: getDomainCurrencies(domain),
-			methods: getDomainPaymentMethods(domain),
-			discounts: config.payment?.discounts || {},
-			limits: getDomainLimits(domain),
-		};
-	});
+    Object.entries(require("../config/supported-domains").SUPPORTED_DOMAINS).forEach(([domain, config]) => {
+        pricingTable[domain] = {
+            basePrice: config.price,
+            yearly: getDomainPrice(domain, "yearly"),
+            lifetime: getDomainPrice(domain, "lifetime"),
+            currencies: getDomainCurrencies(domain),
+            methods: getDomainPaymentMethods(domain),
+            discounts: config.payment?.discounts || {},
+            limits: getDomainLimits(domain),
+        };
+    });
 
-	return pricingTable;
+    return pricingTable;
 };
 
 const buildMetadata = (params, tagObject, domainConfig) => {
-	tagObject.fullTagName = `${params.tagName}.${params.domain}`;
+    tagObject.fullTagName = `${params.tagName}.${params.domain}`;
 
-	const storageKey = domainConfig.getTagKey();
-	const domain = tagObject.publicData.domain || params.domain || "zelf";
-	const price = params.price || tagObject.publicData.price;
-	const duration = params.duration || tagObject.publicData.duration;
+    const storageKey = domainConfig.getTagKey();
+    const domain = tagObject.publicData.domain || params.domain || "zelf";
+    const price = params.price || tagObject.publicData.price;
+    const duration = params.duration || tagObject.publicData.duration;
 
-	const metadata = {
-		[storageKey]: tagObject.fullTagName,
-		domain,
-		ethAddress: tagObject.publicData.ethAddress,
-		solanaAddress: tagObject.publicData.solanaAddress,
-		btcAddress: tagObject.publicData.btcAddress,
-		extraParams: {
-			origin: tagObject.publicData.origin || "online",
-			price,
-			duration: tagObject.publicData.duration ? `${Number(tagObject.publicData.duration) + Number(duration)}` : duration,
-			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-			renewedAt: tagObject.publicData.type === "mainnet" ? moment().format("YYYY-MM-DD HH:mm:ss") : undefined,
-			expiresAt: moment(tagObject.publicData.expiresAt).add(duration, "year").format("YYYY-MM-DD HH:mm:ss"),
-			type: "mainnet",
-			hasPassword: tagObject.publicData.hasPassword,
-			eventID: params.eventID || undefined,
-			eventPrice: params.eventPrice || undefined,
-		},
-		suiAddress: tagObject.publicData.suiAddress,
-	};
+    const metadata = {
+        [storageKey]: tagObject.fullTagName,
+        domain,
+        ethAddress: tagObject.publicData.ethAddress,
+        solanaAddress: tagObject.publicData.solanaAddress,
+        btcAddress: tagObject.publicData.btcAddress,
+        extraParams: {
+            origin: tagObject.publicData.origin || "online",
+            price,
+            duration: tagObject.publicData.duration ? `${Number(tagObject.publicData.duration) + Number(duration)}` : duration,
+            registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+            renewedAt: tagObject.publicData.type === "mainnet" ? moment().format("YYYY-MM-DD HH:mm:ss") : undefined,
+            expiresAt: moment(tagObject.publicData.expiresAt).add(duration, "year").format("YYYY-MM-DD HH:mm:ss"),
+            type: "mainnet",
+            hasPassword: tagObject.publicData.hasPassword,
+            eventID: params.eventID || undefined,
+            eventPrice: params.eventPrice || undefined,
+        },
+        addresses: JSON.stringify({
+            arweaveAddress: tagObject.publicData.arweaveAddress,
+            suiAddress: tagObject.publicData.suiAddress,
+        }),
+    };
 
-	if (tagObject.publicData.referralTagName) {
-		metadata.referral = {
-			tagName: tagObject.publicData.referralTagName,
-			solanaAddress: tagObject.publicData.referralSolanaAddress,
-		};
+    if (tagObject.publicData.referralTagName) {
+        metadata.referral = {
+            tagName: tagObject.publicData.referralTagName,
+            solanaAddress: tagObject.publicData.referralSolanaAddress,
+        };
 
-		metadata.referral = JSON.stringify(metadata.referral);
-	}
+        metadata.referralTagName = metadata.referral.tagName;
 
-	metadata.extraParams = JSON.stringify(metadata.extraParams);
+        metadata.referral = JSON.stringify(metadata.referral);
+    }
 
-	return { metadata, fullTagName: tagObject.fullTagName };
+    metadata.extraParams = JSON.stringify(metadata.extraParams);
+
+    return { metadata, fullTagName: tagObject.fullTagName };
 };
 
 const storeInWalrus = async (tagObject, domainConfig, metadata) => {
-	tagObject.walrus = await WalrusModule.tagRegistration(
-		tagObject.zelfProofQRCode,
-		{ hasPassword: metadata.hasPassword, zelfProof: metadata.zelfProof, publicData: metadata },
-		domainConfig
-	);
+    tagObject.walrus = await WalrusModule.tagRegistration(
+        tagObject.zelfProofQRCode,
+        { hasPassword: metadata.hasPassword, zelfProof: metadata.zelfProof, publicData: metadata },
+        domainConfig,
+    );
 
-	tagObject.walrus = tagObject.walrus?.blobId;
+    tagObject.walrus = tagObject.walrus?.blobId;
 
-	return tagObject.walrus;
+    return tagObject.walrus;
 };
 
 const storeInIPFS = async (tagObject, domainConfig, metadata) => {
-	const deletedIpfsRecord = await TagsIpfsModule.deleteFiles([tagObject.ipfsId || tagObject.id]);
+    const deletedIpfsRecord = await TagsIpfsModule.deleteFiles([tagObject.ipfsId || tagObject.id]);
 
-	tagObject.ipfs = await TagsIpfsModule.insert(
-		{
-			base64: tagObject.zelfProofQRCode,
-			name: tagObject.fullTagName,
-			metadata,
-			pinIt: true,
-		},
-		{ pro: true }
-	);
+    tagObject.ipfs = await TagsIpfsModule.insert(
+        {
+            base64: tagObject.zelfProofQRCode,
+            name: tagObject.fullTagName,
+            metadata,
+            pinIt: true,
+        },
+        { pro: true },
+    );
 
-	tagObject.ipfs = TagsIpfsModule.formatRecord(tagObject.ipfs);
+    tagObject.ipfs = TagsIpfsModule.formatRecord(tagObject.ipfs);
 
-	return tagObject.ipfs;
+    return tagObject.ipfs;
 };
 
 const storeInArweave = async (tagObject, domainConfig, metadata) => {
-	tagObject.arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
-		hasPassword: metadata.hasPassword,
-		zelfProof: metadata.zelfProof,
-		publicData: metadata,
-		fileName: tagObject.tagName,
-	});
+    tagObject.arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
+        hasPassword: metadata.hasPassword,
+        zelfProof: metadata.zelfProof,
+        publicData: metadata,
+        fileName: tagObject.tagName,
+    });
 
-	return tagObject.arweave;
+    return tagObject.arweave;
 };
 
 module.exports = {
-	validateCurrency,
-	getPaymentOptions,
-	getPricingTable,
-	buildMetadata,
-	storeInWalrus,
-	storeInIPFS,
-	storeInArweave,
+    validateCurrency,
+    getPaymentOptions,
+    getPricingTable,
+    buildMetadata,
+    storeInWalrus,
+    storeInIPFS,
+    storeInArweave,
 };

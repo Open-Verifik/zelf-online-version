@@ -39,6 +39,7 @@ const schemas = {
         domain: string().required(),
         friendTagName: string().required(),
         friendDomain: string().required(),
+        rewardType: string(),
     },
 };
 

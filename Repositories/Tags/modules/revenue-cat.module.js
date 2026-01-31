@@ -3,90 +3,88 @@ const TagsModule = require("./tags.module");
 const MyTagsModule = require("./my-tags.module");
 
 const webhookHandler = async (payload) => {
-	// we going to check for the event and confirm the information
-	const event = payload.event;
+    // we going to check for the event and confirm the information
+    const event = payload.event;
 
-	console.log("event", event);
+    switch (event.type) {
+        case "NON_RENEWING_PURCHASE":
+            return await _handleWebhook(event);
+    }
 
-	switch (event.type) {
-		case "NON_RENEWING_PURCHASE":
-			return await _handleWebhook(event);
-	}
-
-	const error = new Error("webhook_failed");
-	error.status = 500;
-	throw error;
+    const error = new Error("webhook_failed");
+    error.status = 500;
+    throw error;
 };
 
 const _handleWebhook = async (event) => {
-	const attributes = {};
+    const attributes = {};
 
-	const attributeKeys = Object.keys(event.subscriber_attributes);
+    const attributeKeys = Object.keys(event.subscriber_attributes);
 
-	for (let index = 0; index < attributeKeys.length; index++) {
-		const attributeKey = attributeKeys[index];
+    for (let index = 0; index < attributeKeys.length; index++) {
+        const attributeKey = attributeKeys[index];
 
-		attributes[attributeKey] = event.subscriber_attributes[attributeKey].value;
-	}
+        attributes[attributeKey] = event.subscriber_attributes[attributeKey].value;
+    }
 
-	const previewQuery = {
-		key: "tagName",
-		value: attributes.tagName,
-		domain: attributes.domain || "zelf",
-		environment: "both",
-	};
+    const previewQuery = {
+        key: "tagName",
+        value: attributes.tagName,
+        domain: attributes.domain || "zelf",
+        environment: "both",
+    };
 
-	if (!previewQuery.value) {
-		const error = new Error("tagName_not_found");
-		error.status = 404;
-		throw error;
-	}
+    if (!previewQuery.value) {
+        const error = new Error("tagName_not_found");
+        error.status = 404;
+        throw error;
+    }
 
-	const previewResult = await TagsModule.previewTag(previewQuery, {});
+    const previewResult = await TagsModule.previewTag(previewQuery, {});
 
-	const tagRecords = previewResult.arweave ? previewResult.arweave : previewResult.ipfs ? previewResult.ipfs : previewResult;
+    const tagRecords = previewResult.arweave ? previewResult.arweave : previewResult.ipfs ? previewResult.ipfs : previewResult;
 
-	if (!tagRecords.length) {
-		const error = new Error("tagName_not_found");
-		error.status = 404;
-		throw error;
-	}
+    if (!tagRecords.length) {
+        const error = new Error("tagName_not_found");
+        error.status = 404;
+        throw error;
+    }
 
-	const tagObject = tagRecords[0];
+    const tagObject = tagRecords[0];
 
-	if (tagObject.publicData.eventID === event.id) {
-		const error = new Error("webhook_already_processed");
-		error.status = 409;
-		throw error;
-	}
+    if (tagObject.publicData.eventID === event.id) {
+        const error = new Error("webhook_already_processed");
+        error.status = 409;
+        throw error;
+    }
 
-	const preview = tagObject.preview;
+    const preview = tagObject.preview;
 
-	tagObject.publicData.duration = attributes.duration || tagObject.publicData.duration || "1";
+    tagObject.publicData.duration = attributes.duration || tagObject.publicData.duration || "1";
 
-	if (preview.publicData.ethAddress !== attributes.ethAddress) {
-		const error = new Error("zelfProof_does_not_match");
+    if (preview.publicData.ethAddress !== attributes.ethAddress) {
+        const error = new Error("zelfProof_does_not_match");
 
-		error.status = 409;
-		throw error;
-	}
+        error.status = 409;
+        throw error;
+    }
 
-	const { masterArweaveRecord, masterIPFSRecord } = await MyTagsModule.addDurationToTag(
-		{
-			tagName: tagObject.publicData.tagName,
-			domain: tagObject.publicData.domain || "zelf",
-			duration: tagObject.publicData.duration,
-			eventID: event.id,
-			eventPrice: event.price,
-		},
-		preview
-	);
+    const { masterArweaveRecord, masterIPFSRecord } = await MyTagsModule.addDurationToTag(
+        {
+            tagName: tagObject.publicData.tagName,
+            domain: tagObject.publicData.domain || "zelf",
+            duration: tagObject.publicData.duration,
+            eventID: event.id,
+            eventPrice: event.price,
+        },
+        preview,
+    );
 
-	return {
-		renewed: true,
-		ipfs: [masterIPFSRecord],
-		arweave: [masterArweaveRecord],
-	};
+    return {
+        renewed: true,
+        ipfs: [masterIPFSRecord],
+        arweave: [masterArweaveRecord],
+    };
 };
 
 // const _addDurationToTag = async (preview, tagObject) => {
@@ -133,5 +131,5 @@ const _handleWebhook = async (event) => {
 // };
 
 module.exports = {
-	webhookHandler,
+    webhookHandler,
 };
