@@ -7,6 +7,7 @@ const TagsSearchModule = require("../modules/tags-search.module");
 const { getAllSupportedDomains } = require("../modules/domain-registry.module");
 const { errorHandler } = require("../../../Core/http-handler");
 const configuration = require("../../../Core/config");
+const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 
 /**
  * Handle old tag object updates
@@ -46,6 +47,20 @@ const searchTag = async (ctx) => {
         };
 
         let data = await Module.searchTag(requestData, ctx.state.user);
+
+        if (data.tagObject?.publicData && !data.tagObject.publicData.hasPassword && data.tagObject.zelfProof) {
+            // call the preview function to get the password fields
+            const previewData = await ZelfProofModule.preview(
+                {
+                    zelfProof: data.tagObject.zelfProof,
+                },
+                ctx.state.user,
+            );
+
+            data.preview = previewData;
+
+            if (data.preview) data.tagObject.publicData.hasPassword = `${Boolean(data.preview.passwordLayer === "WithPassword")}`;
+        }
 
         ctx.body = { data };
     } catch (error) {
