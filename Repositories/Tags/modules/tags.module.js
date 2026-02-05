@@ -409,9 +409,15 @@ const _validateReferral = async (referralTagName, authUser, domainConfig) => {
 
     const result = await TagsSearchModule.searchTag(searchParams, authUser);
 
-    if (result.available === false) return result.tagObject;
+    if (result.available === true) return null;
 
-    return null;
+    const tagObject = result.tagObject;
+
+    if (tagObject.publicData.type === "hold") {
+        tagObject.publicData[domainConfig.getTagKey()] = tagObject.publicData[domainConfig.getTagKey()].replace(".hold", "");
+    }
+
+    return tagObject;
 };
 
 /**
