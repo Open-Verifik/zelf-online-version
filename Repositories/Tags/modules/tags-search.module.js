@@ -22,68 +22,68 @@ const { QRZelfProofExtractor } = require("./qr-zelfproof-extractor.module");
  * @returns {Object} - Search results
  */
 const searchTag = async (params, authUser) => {
-	const { tagName, domain, key, value, environment, type, duration } = params;
+    const { tagName, domain, key, value, environment, type, duration } = params;
 
-	let domainConfig = params.domainConfig || getDomainConfiguration(domain);
+    let domainConfig = params.domainConfig || getDomainConfiguration(domain);
 
-	try {
-		// Search in both IPFS and Arweave
-		const [ipfsResults, arweaveResults] = await Promise.all([
-			["ipfs", "all"].includes(environment) ? searchIPFS(params, authUser) : [],
-			["arweave", "all"].includes(environment) && ["both", "mainnet"].includes(type) ? searchArweave(params, authUser) : [],
-		]);
+    try {
+        // Search in both IPFS and Arweave
+        const [ipfsResults, arweaveResults] = await Promise.all([
+            ["ipfs", "all"].includes(environment) ? searchWithTimeout(searchIPFS(params, authUser), 12000, "IPFS") : [],
+            ["arweave", "all"].includes(environment) && ["both", "mainnet"].includes(type) ? searchArweave(params, authUser) : [],
+        ]);
 
-		// Combine results
-		const combinedResults = {
-			ipfs: ipfsResults,
-			arweave: arweaveResults,
-			available: ipfsResults.length === 0 && arweaveResults.length === 0,
-			tagName,
-			domain,
-		};
+        // Combine results
+        const combinedResults = {
+            ipfs: ipfsResults,
+            arweave: arweaveResults,
+            available: ipfsResults.length === 0 && arweaveResults.length === 0,
+            tagName,
+            domain,
+        };
 
-		// If results found, return the first one
-		if (arweaveResults.length > 0) {
-			combinedResults.tagObject = { ...arweaveResults[0] };
-		}
+        // If results found, return the first one
+        if (arweaveResults.length > 0) {
+            combinedResults.tagObject = { ...arweaveResults[0] };
+        }
 
-		if (ipfsResults.length > 0) {
-			if (!combinedResults.tagObject) combinedResults.tagObject = { ...ipfsResults[0] };
+        if (ipfsResults.length > 0) {
+            if (!combinedResults.tagObject) combinedResults.tagObject = { ...ipfsResults[0] };
 
-			combinedResults.tagObject.ipfsId = ipfsResults[0].id;
-		}
+            combinedResults.tagObject.ipfsId = ipfsResults[0].id;
+        }
 
-		if (combinedResults.available && domainConfig) {
-			combinedResults.price = domainConfig.getPrice(tagName, duration);
-		}
+        if (combinedResults.available && domainConfig) {
+            combinedResults.price = domainConfig.getPrice(tagName, duration);
+        }
 
-		if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
-			combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
+        if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
+            combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
 
-		// Extract ZelfProof from QR code if it's not already present in metadata
-		if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
-			try {
-				const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
+        // Extract ZelfProof from QR code if it's not already present in metadata
+        if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
+            try {
+                const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
 
-				if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
-					combinedResults.tagObject.zelfProof = extractedZelfProof;
-				}
-			} catch (error) {
-				console.error({ searchTag_error: error });
-			}
-		}
+                if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
+                    combinedResults.tagObject.zelfProof = extractedZelfProof;
+                }
+            } catch (error) {
+                console.error({ searchTag_error: error });
+            }
+        }
 
-		return combinedResults;
-	} catch (error) {
-		console.error({ searchTag_error: error });
+        return combinedResults;
+    } catch (error) {
+        console.error({ searchTag_error: error });
 
-		return {
-			available: false,
-			error: error.message,
-			tagName,
-			domain,
-		};
-	}
+        return {
+            available: false,
+            error: error.message,
+            tagName,
+            domain,
+        };
+    }
 };
 
 /**
@@ -93,36 +93,36 @@ const searchTag = async (params, authUser) => {
  * @returns {Array} - IPFS search results
  */
 const searchIPFS = async (params, authUser) => {
-	const { tagName, key, value, type, domain } = params;
+    const { tagName, key, value, type, domain } = params;
 
-	const domainConfig = params.domainConfig || getDomainConfiguration(domain);
+    const domainConfig = params.domainConfig || getDomainConfiguration(domain);
 
-	if (!domainConfig?.tags?.storage?.ipfsEnabled) {
-		return [];
-	}
+    if (!domainConfig?.tags?.storage?.ipfsEnabled) {
+        return [];
+    }
 
-	const ipfsRecords = [];
+    const ipfsRecords = [];
 
-	const _tagName = tagName ? TagsPartsModule.getFullTagName(tagName, domainConfig.name) : tagName;
+    const _tagName = tagName ? TagsPartsModule.getFullTagName(tagName, domainConfig.name) : tagName;
 
-	try {
-		switch (type) {
-			case "hold":
-				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
-			case "mainnet":
-				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
-			default:
-				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
+    try {
+        switch (type) {
+            case "hold":
+                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
+            case "mainnet":
+                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
+            default:
+                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
 
-				// now also query adding .hold to the tagName
-				ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: `${_tagName}.hold`, key, value, domainConfig })));
-		}
+                // now also query adding .hold to the tagName
+                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: `${_tagName}.hold`, key, value, domainConfig })));
+        }
 
-		return ipfsRecords;
-	} catch (error) {
-		console.error("Error searching IPFS:", error);
-		return [];
-	}
+        return ipfsRecords;
+    } catch (error) {
+        console.error("Error searching IPFS:", error);
+        return [];
+    }
 };
 
 /**
@@ -132,30 +132,30 @@ const searchIPFS = async (params, authUser) => {
  * @returns {Array} - Arweave search results
  */
 const searchArweave = async (params, authUser) => {
-	try {
-		const { tagName, domain, key, value, domainConfig } = params;
+    try {
+        const { tagName, domain, key, value, domainConfig } = params;
 
-		// Get domain configuration
-		const _domainConfig = domainConfig || getDomainConfiguration(domain);
+        // Get domain configuration
+        const _domainConfig = domainConfig || getDomainConfiguration(domain);
 
-		if (!_domainConfig?.tags?.storage?.arweaveEnabled) return [];
+        if (!_domainConfig?.tags?.storage?.arweaveEnabled) return [];
 
-		// Search by different criteria (only resolve full tagName when searching by tagName)
-		if (tagName) {
-			const _tagName = TagsPartsModule.getFullTagName(tagName, _domainConfig.name);
-			return TagsArweaveModule.searchByStorageKey({ tagName: _tagName, domainConfig: _domainConfig, domain });
-		}
+        // Search by different criteria (only resolve full tagName when searching by tagName)
+        if (tagName) {
+            const _tagName = TagsPartsModule.getFullTagName(tagName, _domainConfig.name);
+            return TagsArweaveModule.searchByStorageKey({ tagName: _tagName, domainConfig: _domainConfig, domain });
+        }
 
-		if (key && value) {
-			return TagsArweaveModule.searchByStorageKey({ key, value, domainConfig: _domainConfig, domain });
-		}
+        if (key && value) {
+            return TagsArweaveModule.searchByStorageKey({ key, value, domainConfig: _domainConfig, domain });
+        }
 
-		// Search by domain
-		return TagsArweaveModule.searchByStorageKey({ key: "domain", value: domain, domainConfig: _domainConfig }, authUser);
-	} catch (error) {
-		console.error("Error searching Arweave:", error);
-		return [];
-	}
+        // Search by domain
+        return TagsArweaveModule.searchByStorageKey({ key: "domain", value: domain, domainConfig: _domainConfig }, authUser);
+    } catch (error) {
+        console.error("Error searching Arweave:", error);
+        return [];
+    }
 };
 
 /**
@@ -167,52 +167,52 @@ const searchArweave = async (params, authUser) => {
  * @returns {Object} - Hold domain search results
  */
 const searchHoldDomain = async (params, authUser) => {
-	const { domain, name } = params;
+    const { domain, name } = params;
 
-	// Validate domain
-	if (!isDomainActive(domain)) {
-		return {
-			available: false,
-			error: `Domain '${domain}' is not active`,
-			domain,
-			name,
-		};
-	}
+    // Validate domain
+    if (!isDomainActive(domain)) {
+        return {
+            available: false,
+            error: `Domain '${domain}' is not active`,
+            domain,
+            name,
+        };
+    }
 
-	try {
-		// Search for hold domain in both IPFS and Arweave
-		const [ipfsResults, arweaveResults] = await Promise.all([
-			TagsIPFSModule.getHoldDomain({ domain, name }, authUser),
-			TagsArweaveModule.getHoldDomain({ domain, name }, authUser),
-		]);
+    try {
+        // Search for hold domain in both IPFS and Arweave
+        const [ipfsResults, arweaveResults] = await Promise.all([
+            searchWithTimeout(TagsIPFSModule.getHoldDomain({ domain, name }, authUser), 12000, "IPFS"),
+            TagsArweaveModule.getHoldDomain({ domain, name }, authUser),
+        ]);
 
-		// Combine results
-		const combinedResults = {
-			ipfs: ipfsResults,
-			arweave: arweaveResults,
-			available: ipfsResults.length === 0 && arweaveResults.length === 0,
-			domain,
-			name,
-		};
+        // Combine results
+        const combinedResults = {
+            ipfs: ipfsResults,
+            arweave: arweaveResults,
+            available: ipfsResults.length === 0 && arweaveResults.length === 0,
+            domain,
+            name,
+        };
 
-		// If results found, return the first one
-		if (ipfsResults.length > 0) {
-			combinedResults.holdObject = ipfsResults[0];
-		} else if (arweaveResults.length > 0) {
-			combinedResults.holdObject = arweaveResults[0];
-		}
+        // If results found, return the first one
+        if (ipfsResults.length > 0) {
+            combinedResults.holdObject = ipfsResults[0];
+        } else if (arweaveResults.length > 0) {
+            combinedResults.holdObject = arweaveResults[0];
+        }
 
-		return combinedResults;
-	} catch (error) {
-		console.error("Error searching hold domain:", error);
+        return combinedResults;
+    } catch (error) {
+        console.error("Error searching hold domain:", error);
 
-		return {
-			available: false,
-			error: error.message,
-			domain,
-			name,
-		};
-	}
+        return {
+            available: false,
+            error: error.message,
+            domain,
+            name,
+        };
+    }
 };
 
 /**
@@ -225,23 +225,23 @@ const searchHoldDomain = async (params, authUser) => {
  * @returns {Object} - Domain search results
  */
 const searchByDomain = async (params, authUser) => {
-	const { domain, storage, limit, pageOffset } = params;
+    const { domain, storage, limit, pageOffset } = params;
 
-	// Validate domain
-	if (!isDomainActive(domain)) {
-		return {
-			available: false,
-			error: `Domain '${domain}' is not active`,
-			domain,
-		};
-	}
+    // Validate domain
+    if (!isDomainActive(domain)) {
+        return {
+            available: false,
+            error: `Domain '${domain}' is not active`,
+            domain,
+        };
+    }
 
-	switch (storage) {
-		case "IPFS":
-			return await TagsIPFSModule.searchByDomain({ domain, limit, pageOffset }, authUser);
-		case "Arweave":
-			return await TagsArweaveModule.searchByDomain({ domain }, authUser);
-	}
+    switch (storage) {
+        case "IPFS":
+            return await TagsIPFSModule.searchByDomain({ domain, limit, pageOffset }, authUser);
+        case "Arweave":
+            return await TagsArweaveModule.searchByDomain({ domain }, authUser);
+    }
 };
 
 /**
@@ -253,62 +253,62 @@ const searchByDomain = async (params, authUser) => {
  * @returns {Object} - Storage key search results
  */
 const searchByStorageKey = async (params, authUser) => {
-	const { domain, name } = params;
+    const { domain, name } = params;
 
-	// Validate domain
-	if (!isDomainActive(domain)) {
-		return {
-			available: false,
-			error: `Domain '${domain}' is not active`,
-			domain,
-			name,
-		};
-	}
+    // Validate domain
+    if (!isDomainActive(domain)) {
+        return {
+            available: false,
+            error: `Domain '${domain}' is not active`,
+            domain,
+            name,
+        };
+    }
 
-	try {
-		// Search in both IPFS and Arweave
-		const [ipfsResults, arweaveResults] = await Promise.all([
-			TagsIPFSModule.searchByStorageKey({ domain, name }, authUser),
-			TagsArweaveModule.searchByStorageKey({ domain, name }, authUser),
-		]);
+    try {
+        // Search in both IPFS and Arweave
+        const [ipfsResults, arweaveResults] = await Promise.all([
+            TagsIPFSModule.searchByStorageKey({ domain, name }, authUser),
+            TagsArweaveModule.searchByStorageKey({ domain, name }, authUser),
+        ]);
 
-		// Combine results
-		const combinedResults = {
-			ipfs: ipfsResults,
-			arweave: arweaveResults,
-			available: ipfsResults.length === 0 && arweaveResults.length === 0,
-			domain,
-			name,
-		};
+        // Combine results
+        const combinedResults = {
+            ipfs: ipfsResults,
+            arweave: arweaveResults,
+            available: ipfsResults.length === 0 && arweaveResults.length === 0,
+            domain,
+            name,
+        };
 
-		// If results found, return the first one
-		if (ipfsResults.length > 0) {
-			combinedResults.tagObject = ipfsResults[0];
-		} else if (arweaveResults.length > 0) {
-			combinedResults.tagObject = arweaveResults[0];
-		}
+        // If results found, return the first one
+        if (ipfsResults.length > 0) {
+            combinedResults.tagObject = ipfsResults[0];
+        } else if (arweaveResults.length > 0) {
+            combinedResults.tagObject = arweaveResults[0];
+        }
 
-		// Generate QR code and extract ZelfProof if needed
-		if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
-			combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
+        // Generate QR code and extract ZelfProof if needed
+        if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
+            combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
 
-		// Extract ZelfProof from QR code if it's not already present in metadata
-		if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
-			const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
-			if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
-				combinedResults.tagObject.zelfProof = extractedZelfProof;
-			}
-		}
+        // Extract ZelfProof from QR code if it's not already present in metadata
+        if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
+            const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
+            if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {
+                combinedResults.tagObject.zelfProof = extractedZelfProof;
+            }
+        }
 
-		return combinedResults;
-	} catch (error) {
-		return {
-			available: false,
-			error: error.message,
-			domain,
-			name,
-		};
-	}
+        return combinedResults;
+    } catch (error) {
+        return {
+            available: false,
+            error: error.message,
+            domain,
+            name,
+        };
+    }
 };
 
 /**
@@ -318,34 +318,34 @@ const searchByStorageKey = async (params, authUser) => {
  * @returns {Object} - Domain statistics
  */
 const getDomainStats = async (domain, authUser) => {
-	try {
-		// Get statistics from both IPFS and Arweave
-		const [ipfsStats, arweaveStats] = await Promise.all([
-			TagsIPFSModule.getDomainStats(domain, authUser),
-			TagsArweaveModule.getDomainStats(domain, authUser),
-		]);
+    try {
+        // Get statistics from both IPFS and Arweave
+        const [ipfsStats, arweaveStats] = await Promise.all([
+            TagsIPFSModule.getDomainStats(domain, authUser),
+            TagsArweaveModule.getDomainStats(domain, authUser),
+        ]);
 
-		// Combine statistics
-		const combinedStats = {
-			domain,
-			totalTags: (ipfsStats.totalTags || 0) + (arweaveStats.totalTags || 0),
-			holdDomains: (ipfsStats.holdDomains || 0) + (arweaveStats.holdDomains || 0),
-			activeTags: (ipfsStats.activeTags || 0) + (arweaveStats.activeTags || 0),
-			ipfsStats: ipfsStats,
-			arweaveStats: arweaveStats,
-		};
+        // Combine statistics
+        const combinedStats = {
+            domain,
+            totalTags: (ipfsStats.totalTags || 0) + (arweaveStats.totalTags || 0),
+            holdDomains: (ipfsStats.holdDomains || 0) + (arweaveStats.holdDomains || 0),
+            activeTags: (ipfsStats.activeTags || 0) + (arweaveStats.activeTags || 0),
+            ipfsStats: ipfsStats,
+            arweaveStats: arweaveStats,
+        };
 
-		return combinedStats;
-	} catch (error) {
-		console.error("Error getting domain stats:", error);
-		return {
-			domain,
-			totalTags: 0,
-			holdDomains: 0,
-			activeTags: 0,
-			error: error.message,
-		};
-	}
+        return combinedStats;
+    } catch (error) {
+        console.error("Error getting domain stats:", error);
+        return {
+            domain,
+            totalTags: 0,
+            holdDomains: 0,
+            activeTags: 0,
+            error: error.message,
+        };
+    }
 };
 
 /**
@@ -357,43 +357,75 @@ const getDomainStats = async (domain, authUser) => {
  * @returns {Object} - Cross-domain search results
  */
 const searchAllDomains = async (params, authUser) => {
-	const { key, value } = params;
+    const { key, value } = params;
 
-	try {
-		// Get all active domains
-		const activeDomains = require("../config/supported-domains").getActiveDomains();
+    try {
+        // Get all active domains
+        const activeDomains = require("../config/supported-domains").getActiveDomains();
 
-		// Search across all domains
-		const domainSearches = activeDomains.map((domain) => searchByDomain({ domain: domain.domain, key, value }, authUser));
+        // Search across all domains
+        const domainSearches = activeDomains.map((domain) => searchByDomain({ domain: domain.domain, key, value }, authUser));
 
-		const results = await Promise.all(domainSearches);
+        const results = await Promise.all(domainSearches);
 
-		// Combine all results
-		const combinedResults = {
-			domains: results,
-			totalDomains: activeDomains.length,
-			totalResults: results.reduce((sum, result) => sum + (result.totalResults || 0), 0),
-		};
+        // Combine all results
+        const combinedResults = {
+            domains: results,
+            totalDomains: activeDomains.length,
+            totalResults: results.reduce((sum, result) => sum + (result.totalResults || 0), 0),
+        };
 
-		return combinedResults;
-	} catch (error) {
-		console.error("Error searching all domains:", error);
-		return {
-			domains: [],
-			totalDomains: 0,
-			totalResults: 0,
-			error: error.message,
-		};
-	}
+        return combinedResults;
+    } catch (error) {
+        console.error("Error searching all domains:", error);
+        return {
+            domains: [],
+            totalDomains: 0,
+            totalResults: 0,
+            error: error.message,
+        };
+    }
+};
+
+/**
+ * Helper to wrap a promise with a timeout
+ */
+const searchWithTimeout = async (promise, ms, name) => {
+    let timeoutId;
+    try {
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                reject(new Error("SEARCH_TIMEOUT"));
+            }, ms);
+        });
+
+        // Use Promise.race to race the actual search against the timeout
+        const result = await Promise.race([promise, timeoutPromise]);
+
+        clearTimeout(timeoutId);
+        return result;
+    } catch (error) {
+        if (timeoutId) clearTimeout(timeoutId);
+
+        if (error.message === "SEARCH_TIMEOUT") {
+            console.warn(`${name} search timed out after ${ms}ms - continuing with other results`);
+            // Return empty array to allow other search results (e.g. Arweave) to be used
+            return [];
+        }
+        // If it's a real error from the search function, we might want to log it but still return empty
+        // so we don't block the entire request
+        console.error(`${name} search error:`, error.message);
+        return [];
+    }
 };
 
 module.exports = {
-	searchTag,
-	searchIPFS,
-	searchArweave,
-	searchHoldDomain,
-	searchByDomain,
-	searchByStorageKey,
-	getDomainStats,
-	searchAllDomains,
+    searchTag,
+    searchIPFS,
+    searchArweave,
+    searchHoldDomain,
+    searchByDomain,
+    searchByStorageKey,
+    getDomainStats,
+    searchAllDomains,
 };
