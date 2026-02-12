@@ -25,6 +25,9 @@ module.exports = (server) => {
     server.get(`${PATH}/referrals`, Middleware.referralsValidation, Controller.referrals);
 
     server.post(`${PATH}/referrals/claim`, Middleware.claimReferralValidation, Controller.claimReferralReward);
+
+    // owner license extension (free)
+    server.post(`${PATH}/custom-extend`, Middleware.extendLicenseForOwnerValidation, Controller.extendLicenseForOwner);
 };
 
 /**

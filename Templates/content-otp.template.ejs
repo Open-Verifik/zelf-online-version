@@ -6,23 +6,18 @@
 					border-collapse: collapse;
 					font-family: Arial, sans-serif;
 					font-size: 15px;
-					color: #23496d;
-					word-break: break-word;
-					padding: 20px 40px 7px;
-				"
-			>
-				<div style="color: inherit; font-size: inherit; line-height: inherit">
-					<div style="color: inherit; font-size: inherit; line-height: inherit">
-						<p style="font-size: 16px; line-height: 175%; font-weight: bold; text-align: left" align="left"><%- greeting %></p>
+				<div style="color: #d1d5db; font-size: inherit; line-height: inherit">
+					<div style="color: #d1d5db; font-size: inherit; line-height: inherit">
+						<p style="font-size: 16px; line-height: 175%; font-weight: bold; text-align: left; color: #ffffff" align="left"><%- greeting %></p>
 
-						<p style="line-height: 175%; text-align: left" align="left">
-							<span style="color: #000000"><%= message %></span>
+						<p style="line-height: 175%; text-align: left; color: #d1d5db" align="left">
+							<%= message %>
 						</p>
 
 						<br />
 
 						<h1 style="margin: 0; font-size: 24px; line-height: 175%; text-align: center" align="center">
-							<span style="color: #0c5394"><%= otp %></span>
+							<span style="color: #60a5fa"><%= otp %></span>
 						</h1>
 
 						<% if (authLink && (authLink.startsWith('http://') || authLink.startsWith('https://'))) { %>
@@ -30,14 +25,15 @@
 							<a
 								href="<%= authLink %>"
 								style="
-									background-color: <%= buttonColor || '#007bff' %>;
-									color: <%= buttonTxtColor || '#ffffff' %>;
-									padding: 15px 30px;
+									background-color: <%= buttonColor || '#ffffff' %>;
+									color: <%= buttonTxtColor || '#000000' %>;
+									padding: 14px 32px;
 									text-decoration: none;
 									font-size: 16px;
 									font-weight: bold;
-									border-radius: 5px;
+									border-radius: 50px;
 									display: inline-block;
+									box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
 								"
 							>
 								<%= buttonText || 'Click Here' %>
@@ -47,21 +43,21 @@
 
 						<br />
 
-						<p style="text-align: left; line-height: 125%" align="left">
-							<span style="color: #000000"><%= do_not_share %></span>
+						<p style="text-align: left; line-height: 125%; color: #9ca3af" align="left">
+							<%= do_not_share %>
 							<br />
 							<br />
-							<span style="color: #000000"><%= did_not_request %></span>
+							<%= did_not_request %>
 						</p>
 
 						<br />
 
-						<p style="line-height: 175%; text-align: left" align="left">
-							<span style="color: #000000"><%= sincerely %></span>
+						<p style="line-height: 175%; text-align: left; color: #6b7280" align="left">
+							<%= sincerely %>
 						</p>
 
-						<h3 style="line-height: 175%; font-weight: bold; text-align: left" align="left">
-							<span style="color: #000000"><%= projectName %></span>
+						<h3 style="line-height: 175%; font-weight: bold; text-align: left; color: #d1d5db" align="left">
+							<%= projectName %>
 						</h3>
 
 						<% if (verifikSigned) { %>

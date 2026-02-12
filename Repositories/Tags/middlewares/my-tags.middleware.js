@@ -41,6 +41,13 @@ const schemas = {
         friendDomain: string().required(),
         rewardType: string(),
     },
+    extendLicenseForOwner: {
+        tagName: string().required(),
+        domain: string().required(),
+        duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
+        faceBase64: string().required(),
+        password: string(),
+    },
 };
 
 /**
@@ -214,6 +221,38 @@ const claimReferralValidation = async (ctx, next) => {
     await next();
 };
 
+/**
+ * Extend License For Owner Validation
+ * @param {*} ctx - Koa context
+ * @param {*} next - Next middleware
+ */
+const extendLicenseForOwnerValidation = async (ctx, next) => {
+    // If duration comes as a number, convert it to string to avoid Joi validation errors
+    if (typeof ctx.request.body?.duration === "number") {
+        ctx.request.body.duration = String(ctx.request.body.duration);
+    }
+
+    const valid = validate(schemas.extendLicenseForOwner, ctx.request.body);
+
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
+
+    const { tagName, domain } = ctx.request.body;
+
+    const domainValidation = await validateDomainAndName(domain, tagName);
+
+    if (!domainValidation.valid) {
+        ctx.status = 409;
+        ctx.body = { validationError: domainValidation.error };
+        return;
+    }
+
+    await next();
+};
+
 module.exports = {
     transferValidation,
     paymentOptionsValidation,
@@ -221,4 +260,5 @@ module.exports = {
     receiptEmailValidation,
     referralsValidation,
     claimReferralValidation,
+    extendLicenseForOwnerValidation,
 };

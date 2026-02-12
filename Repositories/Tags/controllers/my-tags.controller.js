@@ -124,6 +124,27 @@ const claimReferralReward = async (ctx) => {
     }
 };
 
+/**
+ * Extend license for domain owner (free extension)
+ * @param {Object} ctx - Koa context
+ * @returns {Object} - Extension results
+ */
+const extendLicenseForOwner = async (ctx) => {
+    try {
+        const { tagName, domain, duration, faceBase64, password } = ctx.request.body;
+
+        const data = await Module.extendLicenseForOwner(tagName, domain, duration, { faceBase64, password }, ctx.state.user);
+
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
+
+        ctx.status = _exception.status;
+
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
+};
+
 module.exports = {
     transferTag,
     paymentConfirmation,
@@ -131,4 +152,5 @@ module.exports = {
     receiptEmail,
     referrals,
     claimReferralReward,
+    extendLicenseForOwner,
 };

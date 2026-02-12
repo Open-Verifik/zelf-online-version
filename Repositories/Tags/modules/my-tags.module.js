@@ -16,6 +16,7 @@ const ReferralRewardModel = require("../models/referral-rewards.model");
 const TagsTokenModule = require("./tags-token.module");
 const IPFS = require("../../../Core/ipfs");
 const TagsArweaveModule = require("./tags-arweave.module");
+const LicenseModule = require("../../License/modules/license.module");
 
 /**
  * Confirm payment with Coinbase
@@ -121,7 +122,7 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
             duration: tokenDecoded.duration || 1,
             domainConfig,
         },
-        tagObject,
+        tagObject
     );
 
     return {
@@ -383,7 +384,7 @@ const sendEmailReceipt = async (tagName, domain, network, email, token) => {
             year: tokenDecoded.duration,
             yearLabel,
         },
-        tokenDecoded.language || "en",
+        tokenDecoded.language || "en"
     );
 };
 
@@ -412,7 +413,7 @@ const _sendReferralRewardAndUpdateRecord = async (
     referrerTagRecord,
     friendRecord,
     rewardAmount,
-    rewardType,
+    rewardType
 ) => {
     const referrerSolanaAddress = referrerTagRecord?.publicData?.solanaAddress;
 
@@ -578,7 +579,7 @@ const _storeReferralRewardReceipt = async ({
                     status: "completed",
                 },
             },
-            `referral-reward-${rewardPrimaryKey}`,
+            `referral-reward-${rewardPrimaryKey}`
         );
     } catch (arweaveError) {
         console.error("Error storing referral reward in Arweave:", arweaveError);
@@ -634,7 +635,7 @@ const _findReferralRecordInStorage = async (referralTagName, friendFullTagName, 
             domain: friendDomain,
             domainConfig,
         },
-        authUser,
+        authUser
     );
 
     const arweaveRecords = await TagsSearchModule.searchArweave(
@@ -644,7 +645,7 @@ const _findReferralRecordInStorage = async (referralTagName, friendFullTagName, 
             domain: friendDomain,
             domainConfig,
         },
-        authUser,
+        authUser
     );
 
     const records = [...ipfsRecords, ...arweaveRecords];
@@ -795,7 +796,7 @@ const claimReferralReward = async (tagName, domain, friendTagName, friendDomain,
         referrerTagRecord,
         friendRecord,
         rewardAmount,
-        rewardType,
+        rewardType
     );
 
     return { success: true, rewardAmount: amount, signature, ipfsCid };
@@ -820,7 +821,7 @@ const getMyReferrals = async (tagName, domain, authUser) => {
             domain,
             domainConfig,
         },
-        authUser,
+        authUser
     );
 
     const arweaveRecords = await TagsSearchModule.searchArweave(
@@ -830,7 +831,7 @@ const getMyReferrals = async (tagName, domain, authUser) => {
             domain,
             domainConfig,
         },
-        authUser,
+        authUser
     );
 
     const domainRecords = [...ipfsRecords, ...arweaveRecords];
@@ -923,11 +924,81 @@ const getMyReferrals = async (tagName, domain, authUser) => {
     };
 };
 
+/**
+ * Extend license for tag owner (free extension).
+ * Verifies that the caller owns the domain license via biometric credentials,
+ * then extends the tag duration without requiring payment.
+ * @param {string} tagName - Tag name (without domain)
+ * @param {string} domain - Domain (e.g. "zelf")
+ * @param {string|number} duration - Duration in years or "lifetime"
+ * @param {Object} ownershipCredentials - { faceBase64, password }
+ * @param {Object} authUser - Authenticated user (JWT)
+ * @returns {Object} - Updated tag object
+ */
+const extendLicenseForOwner = async (tagName, domain, duration, ownershipCredentials, authUser) => {
+    // 1. Verify that the user is the domain/license owner
+    const { faceBase64, password } = ownershipCredentials;
+
+    const { myLicense } = await LicenseModule.getMyLicense(authUser, true, {
+        faceBase64,
+        masterPassword: password,
+    });
+
+    if (!myLicense) {
+        const error = new Error("license_not_found");
+        error.status = 404;
+        throw error;
+    }
+
+    // 2. Verify the license domain matches the requested domain
+    const licenseDomain = myLicense.publicData?.licenseDomain || myLicense.domainConfig?.name;
+
+    if (!licenseDomain || licenseDomain.toLowerCase() !== domain.toLowerCase()) {
+        const error = new Error("domain_not_owned");
+        error.status = 403;
+        throw error;
+    }
+
+    // 3. Get the tag data
+    const domainConfig = getDomainConfig(domain);
+
+    const tagData = await searchTag({ tagName, domain }, {});
+
+    if (tagData.available) {
+        const error = new Error("tag_not_found");
+        error.status = 404;
+        throw error;
+    }
+
+    const tagObject = tagData.tagObject;
+
+    // 4. Extend the duration (price: 0 since owner is not paying)
+    await addDurationToTag(
+        {
+            tagName: tagObject.publicData[domainConfig.getTagKey()].split(".")[0],
+            price: 0,
+            domain,
+            duration: duration === "lifetime" ? 100 : Number(duration),
+            domainConfig,
+        },
+        tagObject
+    );
+
+    return {
+        success: true,
+        tagName: `${tagName}.${domain}`,
+        domain,
+        duration,
+        message: "License extended successfully",
+    };
+};
+
 module.exports = {
     verifyPaymentConfirmation,
     transferMyTag,
     updateOldTagObject,
     addDurationToTag,
+    extendLicenseForOwner,
     // Utility functions
     _confirmPaymentWithCoinbase,
     sendEmailReceipt,
