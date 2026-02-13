@@ -5,6 +5,7 @@ This repository contains the BlockDAG blockchain integration for the Zelf platfo
 ## Overview
 
 BlockDAG is an EVM-compatible blockchain. This integration allows users to:
+
 - Check wallet balances
 - View token holdings
 - Fetch transaction history
@@ -14,10 +15,10 @@ BlockDAG is an EVM-compatible blockchain. This integration allows users to:
 
 ## RPC Configuration
 
-- **RPC URL**: `http://13.234.176.105:18545`
-- **Chain ID**: `1043`
+- **RPC URL**: `https://rpc.bdagscan.com`
+- **Chain ID**: `1404`
 - **Currency Symbol**: `BDAG`
-- **Explorer**: `https://primordial.bdagscan.com`
+- **Explorer**: `https://bdagscan.com`
 
 ## File Structure
 
@@ -40,12 +41,15 @@ BlockDAG/
 All endpoints require JWT authentication via `SessionMiddleware.validateJWT`.
 
 ### 1. Get Address Information
+
 ```
 GET /api/blockdag/address/:address
 ```
+
 Returns comprehensive address information including balance, tokens, and recent transactions.
 
 **Example Response:**
+
 ```json
 {
   "address": "0x...",
@@ -69,66 +73,78 @@ Returns comprehensive address information including balance, tokens, and recent 
 ```
 
 ### 2. Get Transactions
+
 ```
 GET /api/blockdag/address/:address/transactions?page=0&show=20
 ```
+
 Returns paginated transaction list for an address.
 
 ### 3. Get Tokens
+
 ```
 GET /api/blockdag/address/:address/tokens
 ```
+
 Returns ERC20 token holdings for an address.
 
 ### 4. Get Transaction Status
+
 ```
 GET /api/blockdag/address/:address/transaction/:id
 ```
+
 Returns detailed information about a specific transaction.
 
 **Example Response:**
+
 ```json
 {
-  "blockNumber": 12345,
-  "confirmations": "1",
-  "from": "0x...",
-  "to": "0x...",
-  "value": "10.5",
-  "gas": "21000",
-  "gasPrice": "1000000000",
-  "gasUsed": "21000",
-  "nonce": "5",
-  "input": "0x",
-  "hash": "0x...",
-  "status": "success",
-  "transactionIndex": "0"
+    "blockNumber": 12345,
+    "confirmations": "1",
+    "from": "0x...",
+    "to": "0x...",
+    "value": "10.5",
+    "gas": "21000",
+    "gasPrice": "1000000000",
+    "gasUsed": "21000",
+    "nonce": "5",
+    "input": "0x",
+    "hash": "0x...",
+    "status": "success",
+    "transactionIndex": "0"
 }
 ```
 
 ### 5. Get Portfolio Summary
+
 ```
 GET /api/blockdag/address/:address/portfolio
 ```
+
 Returns portfolio summary including total value, token count, and transaction count.
 
 ### 6. Get Gas Tracker
+
 ```
 GET /api/blockdag/gas-tracker
 POST /api/blockdag/gas-tracker
 ```
+
 Returns current gas prices for different transaction speeds.
 
 **Example Response:**
+
 ```json
 {
-  "SafeLow": 8,
-  "Standard": 10,
-  "Fast": 12,
-  "Fastest": 15,
-  "safeLowWait": "1-2",
-  "standardWait": "1",
-  "fastWait": "1",
-  "fastestWait": "1"
+    "SafeLow": 8,
+    "Standard": 10,
+    "Fast": 12,
+    "Fastest": 15,
+    "safeLowWait": "1-2",
+    "standardWait": "1",
+    "fastWait": "1",
+    "fastestWait": "1"
 }
 ```
 
@@ -147,17 +163,20 @@ The integration uses the following JSON-RPC methods:
 ## Implementation Details
 
 ### Balance Queries
+
 - Uses `eth_getBalance` RPC method to fetch native BDAG balance
 - Converts from Wei (10^18) to BDAG
 - Calculates fiat value using BDAG price from Binance
 
 ### Transaction Queries
+
 - Currently returns empty array
 - Will be implemented when BlockDAG provides proper API documentation
 - Uses `eth_getTransactionByHash` for specific transaction details (works for known transaction hashes)
 - Uses `eth_getTransactionReceipt` for transaction status and gas used
 
 ### Token Queries
+
 - Uses `eth_call` with ERC20 `balanceOf` function to check token balances
 - Checks all tokens listed in `data/common-tokens.json`
 - Only returns tokens with non-zero balances
@@ -165,6 +184,7 @@ The integration uses the following JSON-RPC methods:
 - To add tokens, simply update `data/common-tokens.json` with contract addresses
 
 ### Gas Tracker
+
 - Uses `eth_gasPrice` to get current gas price
 - Calculates different speed tiers (SafeLow, Standard, Fast, Fastest)
 - Provides multipliers: 0.8x, 1x, 1.2x, 1.5x respectively
@@ -172,6 +192,7 @@ The integration uses the following JSON-RPC methods:
 ## Error Handling
 
 All functions include comprehensive error handling:
+
 - Timeout protection (8 seconds for address queries, 6 seconds for transactions)
 - Graceful fallbacks when API calls fail
 - Detailed error logging
@@ -186,14 +207,14 @@ To enable token detection for popular BlockDAG tokens:
 
 ```json
 [
-  {
-    "contractAddress": "0x1234...",
-    "symbol": "USDT",
-    "name": "Tether USD",
-    "decimals": 6,
-    "price": "1.0",
-    "image": "https://..."
-  }
+    {
+        "contractAddress": "0x1234...",
+        "symbol": "USDT",
+        "name": "Tether USD",
+        "decimals": 6,
+        "price": "1.0",
+        "image": "https://..."
+    }
 ]
 ```
 
@@ -244,6 +265,7 @@ curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
 ## Maintenance
 
 This integration should be maintained by:
+
 1. Monitoring RPC endpoint availability
 2. Updating BDAG price feed when listed on exchanges
 3. Expanding token detection as BlockDAG ecosystem grows
@@ -252,4 +274,3 @@ This integration should be maintained by:
 ## Contact
 
 For issues or questions about this integration, please contact the Zelf development team.
-

@@ -228,6 +228,9 @@ const _getTodayReward = async (zelfName) => {
         // Step 1: Check MongoDB first (TTL cache for first 5 minutes)
         const mongoReward = await Model.findOne({ rewardPrimaryKey });
         if (mongoReward) {
+            // FIX: If status is failed, allow retry (return null)
+            if (mongoReward.status === "failed") return null;
+
             return {
                 ...mongoReward.toObject(),
                 source: "mongodb",
@@ -309,6 +312,9 @@ const dailyRewards = async (data, authUser) => {
         const base64Json = Buffer.from(rewardJson).toString("base64");
         const filename = `daily-reward-${rewardPrimaryKey}.json`;
 
+        // FIX: Remove any existing "failed" record to avoid duplicate key error on unique index
+        await Model.deleteOne({ rewardPrimaryKey, status: "failed" });
+
         // Step 1: Save to MongoDB with TTL (5 minutes) for immediate availability
         const mongoReward = new Model({
             name: _tagName,
@@ -368,10 +374,33 @@ const dailyRewards = async (data, authUser) => {
             };
 
             // Update reward status to include token transfer failure
+            // FIX: Update status to failed so user can try again
             rewardData.tokenTransfer = tokenTransferError;
             mongoReward.tokenTransfer = tokenTransferError;
             mongoReward.tokenTransferStatus = "failed";
+            mongoReward.status = "failed"; // Mark as failed in DB
+
+            // FIX: Remove IPFS CID reference since we are going to unpin it
+            mongoReward.ipfsCid = null;
             await mongoReward.save();
+
+            // FIX: Unpin from IPFS so it doesn't show up in future checks
+            if (ipfsResult && ipfsResult.IpfsHash) {
+                try {
+                    console.log(`Unpinning failed reward from IPFS: ${ipfsResult.IpfsHash}`);
+                    await IPFS.unPinFiles([ipfsResult.IpfsHash]);
+                } catch (unpinError) {
+                    console.error("Failed to unpin IPFS file:", unpinError);
+                }
+            }
+
+            // FIX: Return success: false so frontend shows error instead of claimed
+            return {
+                success: false,
+                message: `Failed to transfer tokens: ${tokenError.message}. Please try again later.`,
+                tokenTransferStatus: "failed",
+                tokenTransferMessage: tokenError.message,
+            };
         }
 
         return {
@@ -594,7 +623,7 @@ const _getTagObject = async (tagName, domain, authUser) => {
             environment: "all",
             type: "both",
         },
-        authUser,
+        authUser
     );
 
     if (!tagResult.tagObject) throw new Error("404:tag_not_found");
@@ -634,7 +663,7 @@ const rewardFirstTransaction = async (data, authUser) => {
         // Check if user has sent ZNS tokens (indicating they've used the token)
         const sentTokenCheck = await ZNSTransactionDetector.hasSentZNSTokens(
             tagObject.publicData.solanaAddress,
-            { hours: 24 * 365, minAmount: 0.001 }, // Check last year, any amount
+            { hours: 24 * 365, minAmount: 0.001 } // Check last year, any amount
         );
 
         if (!sentTokenCheck.hasSent) {

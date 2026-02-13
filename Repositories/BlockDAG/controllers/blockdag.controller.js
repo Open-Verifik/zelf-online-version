@@ -1,10 +1,11 @@
 const {
-	getAddress,
-	getTokens,
-	getTransactionsList,
-	getTransactionStatus,
-	getGasTracker,
-	getPortfolioSummary,
+    getAddress,
+    getTokens,
+    getTransactionsList,
+    getTransactionStatus,
+    getGasTracker,
+    getPortfolioSummary,
+    fetchBDAGPrice,
 } = require("../modules/blockdag.module");
 
 /**
@@ -12,16 +13,16 @@ const {
  * @param {Object} ctx - Context object
  */
 const address = async (ctx) => {
-	try {
-		const { address } = ctx.request.params;
+    try {
+        const { address } = ctx.request.params;
 
-		const data = await getAddress({ address, ...ctx.request.query });
-		ctx.body = { data };
-	} catch (error) {
-		console.error("BlockDAG address controller error:", error.message);
-		ctx.status = 500;
-		ctx.body = { error: "Internal server error" };
-	}
+        const data = await getAddress({ address, ...ctx.request.query });
+        ctx.body = { data };
+    } catch (error) {
+        console.error("BlockDAG address controller error:", error.message);
+        ctx.status = 500;
+        ctx.body = { error: "Internal server error" };
+    }
 };
 
 /**
@@ -29,16 +30,16 @@ const address = async (ctx) => {
  * @param {Object} ctx - Context object
  */
 const tokens = async (ctx) => {
-	try {
-		const { address } = ctx.request.params;
+    try {
+        const { address } = ctx.request.params;
 
-		const data = await getTokens({ address }, ctx.request.query);
-		ctx.body = { data };
-	} catch (error) {
-		console.error("BlockDAG tokens controller error:", error.message);
-		ctx.status = 500;
-		ctx.body = { error: "Internal server error" };
-	}
+        const data = await getTokens({ address }, ctx.request.query);
+        ctx.body = { data };
+    } catch (error) {
+        console.error("BlockDAG tokens controller error:", error.message);
+        ctx.status = 500;
+        ctx.body = { error: "Internal server error" };
+    }
 };
 
 /**
@@ -46,16 +47,16 @@ const tokens = async (ctx) => {
  * @param {Object} ctx - Context object
  */
 const transactions = async (ctx) => {
-	try {
-		const { address } = ctx.request.params;
+    try {
+        const { address } = ctx.request.params;
 
-		const data = await getTransactionsList({ address, ...ctx.request.query });
-		ctx.body = { data };
-	} catch (error) {
-		console.error("BlockDAG transactions controller error:", error.message);
-		ctx.status = 500;
-		ctx.body = { error: "Internal server error" };
-	}
+        const data = await getTransactionsList({ address, ...ctx.request.query });
+        ctx.body = { data };
+    } catch (error) {
+        console.error("BlockDAG transactions controller error:", error.message);
+        ctx.status = 500;
+        ctx.body = { error: "Internal server error" };
+    }
 };
 
 /**
@@ -63,16 +64,16 @@ const transactions = async (ctx) => {
  * @param {Object} ctx - Context object
  */
 const transactionStatus = async (ctx) => {
-	try {
-		const { id } = ctx.params;
+    try {
+        const { id } = ctx.params;
 
-		const data = await getTransactionStatus({ id });
-		ctx.body = { data };
-	} catch (error) {
-		console.error("BlockDAG transaction status controller error:", error.message);
-		ctx.status = 500;
-		ctx.body = { error: "Internal server error" };
-	}
+        const data = await getTransactionStatus({ id });
+        ctx.body = { data };
+    } catch (error) {
+        console.error("BlockDAG transaction status controller error:", error.message);
+        ctx.status = 500;
+        ctx.body = { error: "Internal server error" };
+    }
 };
 
 /**
@@ -80,14 +81,14 @@ const transactionStatus = async (ctx) => {
  * @param {Object} ctx - Context object
  */
 const gasTracker = async (ctx) => {
-	try {
-		const data = await getGasTracker(ctx.request.query);
-		ctx.body = { data };
-	} catch (error) {
-		console.error("BlockDAG gas tracker controller error:", error.message);
-		ctx.status = 500;
-		ctx.body = { error: "Internal server error" };
-	}
+    try {
+        const data = await getGasTracker(ctx.request.query);
+        ctx.body = { data };
+    } catch (error) {
+        console.error("BlockDAG gas tracker controller error:", error.message);
+        ctx.status = 500;
+        ctx.body = { error: "Internal server error" };
+    }
 };
 
 /**
@@ -95,23 +96,43 @@ const gasTracker = async (ctx) => {
  * @param {Object} ctx - Context object
  */
 const portfolioSummary = async (ctx) => {
-	try {
-		const { address } = ctx.request.params;
+    try {
+        const { address } = ctx.request.params;
 
-		const data = await getPortfolioSummary({ address });
-		ctx.body = { data };
-	} catch (error) {
-		console.error("BlockDAG portfolio summary controller error:", error.message);
-		ctx.status = 500;
-		ctx.body = { error: "Internal server error" };
-	}
+        const data = await getPortfolioSummary({ address });
+        ctx.body = { data };
+    } catch (error) {
+        console.error("BlockDAG portfolio summary controller error:", error.message);
+        ctx.status = 500;
+        ctx.body = { error: "Internal server error" };
+    }
+};
+
+/**
+ * Get BlockDAG current price
+ * @param {Object} ctx - Context object
+ */
+const getPrice = async (ctx) => {
+    try {
+        const price = await fetchBDAGPrice();
+        ctx.body = {
+            data: {
+                price: parseFloat(price),
+            },
+        };
+    } catch (error) {
+        console.error("BlockDAG price controller error:", error.message);
+        ctx.status = 500;
+        ctx.body = { error: "Internal server error" };
+    }
 };
 
 module.exports = {
-	address,
-	tokens,
-	transactions,
-	transactionStatus,
-	gasTracker,
-	portfolioSummary,
+    address,
+    tokens,
+    transactions,
+    transactionStatus,
+    gasTracker,
+    portfolioSummary,
+    getPrice,
 };

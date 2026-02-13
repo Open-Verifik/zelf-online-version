@@ -6,24 +6,26 @@ const Middleware = require("../middlewares/blockdag.middleware");
 const blockdag = "/blockdag";
 
 module.exports = (server) => {
-	const PATH = config.basePath(blockdag);
+    const PATH = config.basePath(blockdag);
 
-	server.get(`${PATH}/address/:address`, SessionMiddleware.validateJWT, Middleware.validateAddress, Controller.address);
+    server.get(`${PATH}/address/:address`, SessionMiddleware.validateJWT, Middleware.validateAddress, Controller.address);
 
-	server.get(
-		`${PATH}/address/:address/transactions`,
-		SessionMiddleware.validateJWT,
-		Middleware.validateAddressTransactions,
-		Controller.transactions
-	);
+    server.get(
+        `${PATH}/address/:address/transactions`,
+        SessionMiddleware.validateJWT,
+        Middleware.validateAddressTransactions,
+        Controller.transactions
+    );
 
-	server.get(`${PATH}/address/:address/tokens`, SessionMiddleware.validateJWT, Middleware.validateAddress, Controller.tokens);
+    server.get(`${PATH}/address/:address/tokens`, SessionMiddleware.validateJWT, Middleware.validateAddress, Controller.tokens);
 
-	server.get(`${PATH}/address/:address/transaction/:id`, SessionMiddleware.validateJWT, Controller.transactionStatus);
+    server.get(`${PATH}/address/:address/transaction/:id`, SessionMiddleware.validateJWT, Controller.transactionStatus);
 
-	server.get(`${PATH}/address/:address/portfolio`, SessionMiddleware.validateJWT, Middleware.validateAddress, Controller.portfolioSummary);
+    server.get(`${PATH}/address/:address/portfolio`, SessionMiddleware.validateJWT, Middleware.validateAddress, Controller.portfolioSummary);
 
-	server.get(`${PATH}/gas-tracker`, SessionMiddleware.validateJWT, Controller.gasTracker);
+    server.get(`${PATH}/gas-tracker`, SessionMiddleware.validateJWT, Controller.gasTracker);
 
-	server.post(`${PATH}/gas-tracker`, SessionMiddleware.validateJWT, Controller.gasTracker);
+    server.post(`${PATH}/gas-tracker`, SessionMiddleware.validateJWT, Controller.gasTracker);
+
+    server.get(`${PATH}/price`, SessionMiddleware.validateJWT, Controller.getPrice);
 };

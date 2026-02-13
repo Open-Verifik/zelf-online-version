@@ -412,7 +412,7 @@ const fetchBdagBalance = async (address) => {
  * Fetch BDAG price from API
  * @returns {Promise<string>} Price as string
  */
-const fetchBdagPrice = async () => {
+const fetchBDAGPrice = async () => {
     try {
         const response = await axios.get("https://api.blockdagnetwork.io/api/v2/base/public/current_price", {
             headers: {
@@ -594,7 +594,7 @@ const getAddress = async (query) => {
             const bdagData = await fetchBdagBalance(address);
 
             // Fetch price and tokens in parallel
-            const [bdagPrice, tokensData] = await Promise.all([fetchBdagPrice(), fetchAddressTokens(address)]);
+            const [bdagPrice, tokensData] = await Promise.all([fetchBDAGPrice(), fetchAddressTokens(address)]);
 
             const bdagBalance = bdagData.balance;
 
@@ -1046,4 +1046,5 @@ module.exports = {
     getGasTracker,
     getPortfolioSummary,
     getLatestBlock,
+    fetchBDAGPrice,
 };
