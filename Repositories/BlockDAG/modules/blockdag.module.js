@@ -800,7 +800,7 @@ const getTransactionsList = async (query) => {
  */
 const getTransactionStatus = async (params) => {
     try {
-        const { id } = params;
+        const { id, address } = params;
 
         // Try API first
         const apiTx = await getTransactionFromAPI(id);
@@ -811,6 +811,7 @@ const getTransactionStatus = async (params) => {
                 confirmations: apiTx.status === "success" ? "1" : "0",
                 from: apiTx.from,
                 to: apiTx.to,
+                traffic: `${address}`.length > 20 ? (apiTx.to === address ? "IN" : "OUT") : undefined,
                 value: apiTx.value ? parseFloat(apiTx.value).toFixed(6) : "0",
                 gas: "21000", // Default or parsed if available
                 gasPrice: apiTx.txnGasPrice ? Math.floor(parseFloat(apiTx.txnGasPrice) * 1e18) : "0",

@@ -65,9 +65,10 @@ const transactions = async (ctx) => {
  */
 const transactionStatus = async (ctx) => {
     try {
-        const { id } = ctx.params;
+        const { id, address } = ctx.params;
 
-        const data = await getTransactionStatus({ id });
+        const data = await getTransactionStatus({ id, address });
+
         ctx.body = { data };
     } catch (error) {
         console.error("BlockDAG transaction status controller error:", error.message);

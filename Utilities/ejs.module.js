@@ -11,6 +11,7 @@ const EMAIL_CONTENT_TEMPLATES = {
     plain: "content-plain.template.ejs",
     purchase_receipt: "content-purchase-receipt.template.ejs",
     newsletter_welcome: "content-newsletter-welcome.template.ejs",
+    newsletter_blog: "content-newsletter-blog.template.ejs",
 };
 
 /**

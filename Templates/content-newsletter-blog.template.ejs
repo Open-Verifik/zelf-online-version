@@ -1,0 +1,63 @@
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-spacing: 0 !important; border-collapse: collapse">
+    <tbody>
+        <tr>
+            <td
+                class="hs_padded"
+                style="
+                    border-collapse: collapse;
+                    font-family: Arial, sans-serif;
+                    font-size: 15px;
+                    color: #d1d5db;
+                    word-break: break-word;
+                    padding: 20px 40px 40px;
+                "
+            >
+                <div style="color: inherit; font-size: inherit; line-height: inherit">
+                    <div style="color: inherit; font-size: inherit; line-height: inherit">
+                        <% if (image) { %>
+                        <div style="margin-bottom: 24px; text-align: center;">
+                            <img src="<%= image %>" alt="<%= title %>" style="max-width: 100%; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1);" />
+                        </div>
+                        <% } %>
+
+                        <h2
+                            style="font-size: 24px; line-height: 140%; font-weight: bold; text-align: left; color: #ffffff; margin-bottom: 16px"
+                            align="left"
+                        >
+                            <%= title %>
+                        </h2>
+
+                        <div style="font-size: 16px; line-height: 175%; text-align: left; color: #d1d5db; margin-bottom: 20px" align="left">
+                            <%- content %>
+                        </div>
+
+                        <div style="text-align: center; margin-top: 30px; margin-bottom: 40px">
+                            <a
+                                href="<%= url || 'https://zelf.world/blog' %>"
+                                style="
+                                    background-color: #ffffff;
+                                    color: #000000;
+                                    padding: 12px 24px;
+                                    border-radius: 6px;
+                                    text-decoration: none;
+                                    font-weight: bold;
+                                    font-size: 16px;
+                                "
+                                >Read on Website</a
+                            >
+                        </div>
+
+                        <p style="line-height: 175%; text-align: left; color: #6b7280; font-size: 14px" align="left">
+                            <%= sincerely %><br />
+                            <strong>The Zelf Team</strong>
+                        </p>
+
+                        <% if (typeof pixelUrl !== 'undefined' && pixelUrl) { %>
+                        <img src="<%= pixelUrl %>" alt="" width="1" height="1" border="0" style="height:1px !important;width:1px !important;border-width:0 !important;margin-top:0 !important;margin-bottom:0 !important;margin-right:0 !important;margin-left:0 !important;padding-top:0 !important;padding-bottom:0 !important;padding-right:0 !important;padding-left:0 !important;"/>
+                        <% } %>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </tbody>
+</table>
