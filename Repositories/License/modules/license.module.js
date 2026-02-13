@@ -54,7 +54,7 @@ const saveCache = (licenses) => {
         console.log(
             `Official licenses cached successfully (${licenses.length} licenses, TTL: ${
                 licenseCache.getTtl("official-licenses") ? Math.round((licenseCache.getTtl("official-licenses") - Date.now()) / 1000) : "N/A"
-            }s)`,
+            }s)`
         );
     } catch (error) {
         console.error("Error saving to cache:", error);
@@ -136,8 +136,11 @@ const searchLicense = async (query, user) => {
  * @returns {Promise<Array>} - Array of user's licenses
  */
 const getMyLicense = async (jwt, withJSON = false, ownershipCredentials) => {
+    // Determine the target email: if staff, use ownerEmail; otherwise use user's email
+    const targetEmail = jwt.accountType === "staff" && jwt.ownerEmail ? jwt.ownerEmail : jwt.email;
+
     // Get client data to get the zelfProof
-    const client = await ClientModule.get({ email: jwt.email });
+    const client = await ClientModule.get({ email: targetEmail });
 
     if (!client) throw new Error("404:client_not_found");
 
@@ -332,7 +335,7 @@ const createOrUpdateLicense = async (body, jwt) => {
                 name: `${body.domain}.license`,
                 pinIt: true,
             },
-            { pro: true },
+            { pro: true }
         );
 
         return {
@@ -551,7 +554,7 @@ const saveSubscriptionRecord = async (license, paymentData) => {
             name: `${domainName}.subscription`,
             pinIt: true,
         },
-        { pro: true },
+        { pro: true }
     );
 
     return subscriptionRecord;

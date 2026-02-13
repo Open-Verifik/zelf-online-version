@@ -4,6 +4,8 @@ const Controller = require("../controllers/my-tags.controller");
 
 const Middleware = require("../middlewares/my-tags.middleware");
 
+const RbacMiddleware = require("../middlewares/rbac.middleware");
+
 const base = "/my-tags";
 
 module.exports = (server) => {
@@ -27,7 +29,7 @@ module.exports = (server) => {
     server.post(`${PATH}/referrals/claim`, Middleware.claimReferralValidation, Controller.claimReferralReward);
 
     // owner license extension (free)
-    server.post(`${PATH}/custom-extend`, Middleware.extendLicenseForOwnerValidation, Controller.extendLicenseForOwner);
+    server.post(`${PATH}/custom-extend`, Middleware.extendLicenseForOwnerValidation, RbacMiddleware.requireWrite, Controller.extendLicenseForOwner);
 };
 
 /**
