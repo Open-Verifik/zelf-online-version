@@ -18,38 +18,38 @@ app.use(cors());
 
 // JWT error handling
 app.use((ctx, next) => {
-	return next().catch((err) => {
-		if (err.status === 401) {
-			ctx.status = 401;
-			ctx.body = { error: "Protected resource, use Authorization header to get access" };
-		} else {
-			throw err;
-		}
-	});
+    return next().catch((err) => {
+        if (err.status === 401) {
+            ctx.status = 401;
+            ctx.body = { error: "Protected resource, use Authorization header to get access" };
+        } else {
+            throw err;
+        }
+    });
 });
 
 const server = app.listen(config.port, () => {
-	console.info(`Server running on port ${config.port}`);
-	const mongooseConnection = DatabaseModule.initMongoDB();
+    console.info(`Server running on port ${config.port}`);
+    const mongooseConnection = DatabaseModule.initMongoDB();
 
-	mongooseConnection.on("error", (err) => {
-		console.error("DB connection error :::", err);
+    mongooseConnection.on("error", (err) => {
+        console.error("DB connection error :::", err);
 
-		process.exit(1);
-	});
+        process.exit(1);
+    });
 
-	mongooseConnection.once("open", async () => {
-		serverLog(`Port: ${config.port}`);
+    mongooseConnection.once("open", async () => {
+        serverLog(`Port: ${config.port}`);
 
-		serverLog(`Connected MongoDB`);
+        serverLog(`Connected MongoDB > ${mongooseConnection.name}`);
 
-		await loadOfficialLicenses(true);
+        await loadOfficialLicenses(true);
 
-		// Swagger documentation setup
-		app.use(async (ctx, next) => {
-			if (ctx.path === "/docs") {
-				ctx.type = "html";
-				ctx.body = `
+        // Swagger documentation setup
+        app.use(async (ctx, next) => {
+            if (ctx.path === "/docs") {
+                ctx.type = "html";
+                ctx.body = `
 					<!DOCTYPE html>
 					<html>
 					<head>
@@ -90,122 +90,122 @@ const server = app.listen(config.port, () => {
 					</body>
 					</html>
 				`;
-			} else if (ctx.path === "/swagger.json") {
-				ctx.type = "application/json";
-				ctx.body = swaggerSpec;
-			} else {
-				await next();
-			}
-		});
+            } else if (ctx.path === "/swagger.json") {
+                ctx.type = "application/json";
+                ctx.body = swaggerSpec;
+            } else {
+                await next();
+            }
+        });
 
-		// Unprotected routes
-		const unprotectedRoutes = require("./Routes/unprotected");
+        // Unprotected routes
+        const unprotectedRoutes = require("./Routes/unprotected");
 
-		app.use(unprotectedRoutes.routes());
+        app.use(unprotectedRoutes.routes());
 
-		app.use(
-			jwt({
-				secret,
-				getToken: (ctx) => {
-					const indexOfToken = ctx.headers?.authorization?.indexOf("ey");
+        app.use(
+            jwt({
+                secret,
+                getToken: (ctx) => {
+                    const indexOfToken = ctx.headers?.authorization?.indexOf("ey");
 
-					if (indexOfToken !== -1) {
-						return ctx.headers.authorization?.substring(indexOfToken);
-					}
+                    if (indexOfToken !== -1) {
+                        return ctx.headers.authorization?.substring(indexOfToken);
+                    }
 
-					// ok now if it starts with JWT, then we can return the token
-					if (ctx.headers?.authorization?.startsWith("JWT") || ctx.headers?.authorization?.startsWith("Bearer")) {
-						return ctx.headers.authorization?.split(" ")[1];
-					}
+                    // ok now if it starts with JWT, then we can return the token
+                    if (ctx.headers?.authorization?.startsWith("JWT") || ctx.headers?.authorization?.startsWith("Bearer")) {
+                        return ctx.headers.authorization?.split(" ")[1];
+                    }
 
-					const token = ctx.request.query?.token || ctx.request?.body?.token;
+                    const token = ctx.request.query?.token || ctx.request?.body?.token;
 
-					if (!token) return null;
+                    if (!token) return null;
 
-					const _indexOfToken = token.indexOf("ey");
+                    const _indexOfToken = token.indexOf("ey");
 
-					if (_indexOfToken !== -1) {
-						return token?.substring(_indexOfToken);
-					}
+                    if (_indexOfToken !== -1) {
+                        return token?.substring(_indexOfToken);
+                    }
 
-					loadOfficialLicenses();
+                    loadOfficialLicenses();
 
-					return null;
-				},
-			})
-		);
+                    return null;
+                },
+            })
+        );
 
-		// Protected routes
-		const protectedRoutes = require("./Routes/protected");
+        // Protected routes
+        const protectedRoutes = require("./Routes/protected");
 
-		app.use(protectedRoutes.routes());
-	});
+        app.use(protectedRoutes.routes());
+    });
 });
 
 process.on("unhandledRejection", (reason, p) => {
-	console.error("Unhandled Rejection at: Promise", p, "reason:", reason);
-	cleanup()
-		.catch(console.error)
-		.then(() => {
-			console.info("exiting...");
-			process.exit(1);
-		});
+    console.error("Unhandled Rejection at: Promise", p, "reason:", reason);
+    cleanup()
+        .catch(console.error)
+        .then(() => {
+            console.info("exiting...");
+            process.exit(1);
+        });
 });
 
 const cleanup = () => {
-	return new Promise((resolve, reject) => {
-		console.info("Cleanup initiated...");
-		server.close((err) => {
-			if (err) {
-				console.error("Error closing server:", err);
-				reject(err);
-			} else {
-				console.info("Server closed");
-				mongoose
-					.disconnect()
-					.then(() => {
-						console.info("Disconnected MongoDB");
-						resolve();
-					})
-					.catch((err) => {
-						console.error("Error disconnecting MongoDB:", err);
-						reject(err);
-					});
-			}
-		});
-	});
+    return new Promise((resolve, reject) => {
+        console.info("Cleanup initiated...");
+        server.close((err) => {
+            if (err) {
+                console.error("Error closing server:", err);
+                reject(err);
+            } else {
+                console.info("Server closed");
+                mongoose
+                    .disconnect()
+                    .then(() => {
+                        console.info("Disconnected MongoDB");
+                        resolve();
+                    })
+                    .catch((err) => {
+                        console.error("Error disconnecting MongoDB:", err);
+                        reject(err);
+                    });
+            }
+        });
+    });
 };
 
 process.on("SIGINT", () => {
-	console.info("SIGINT: Attempting to terminate");
-	cleanup()
-		.catch(console.error)
-		.then(() => {
-			console.info("exiting...");
-			process.exit(0);
-		});
+    console.info("SIGINT: Attempting to terminate");
+    cleanup()
+        .catch(console.error)
+        .then(() => {
+            console.info("exiting...");
+            process.exit(0);
+        });
 });
 
 process.on("SIGTERM", () => {
-	console.info("SIGTERM: Attempting to terminate");
-	cleanup()
-		.catch(console.error)
-		.then(() => {
-			console.info("exiting...");
-			process.exit(0);
-		});
+    console.info("SIGTERM: Attempting to terminate");
+    cleanup()
+        .catch(console.error)
+        .then(() => {
+            console.info("exiting...");
+            process.exit(0);
+        });
 });
 
 // Handle nodemon restarts (if you are using it)
 process.once("SIGUSR2", () => {
-	console.info("SIGUSR2: Attempting to terminate");
-	cleanup()
-		.catch(console.error)
-		.then(() => {
-			console.info("Exiting...");
-			setTimeout(() => {
-				process.kill(process.pid, "SIGUSR2");
-				console.info("exited..");
-			}, 1000); // 1-second delay to ensure cleanup completes
-		});
+    console.info("SIGUSR2: Attempting to terminate");
+    cleanup()
+        .catch(console.error)
+        .then(() => {
+            console.info("Exiting...");
+            setTimeout(() => {
+                process.kill(process.pid, "SIGUSR2");
+                console.info("exited..");
+            }, 1000); // 1-second delay to ensure cleanup completes
+        });
 });

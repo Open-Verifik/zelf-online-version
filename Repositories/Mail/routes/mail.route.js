@@ -7,7 +7,7 @@ const Middleware = require("../middlewares/mail.middleware");
 const base = "/mail";
 
 module.exports = (server) => {
-	const PATH = config.basePath(base);
+    const PATH = config.basePath(base);
 
-	server.post(`${PATH}/webhook`, Middleware.webhookValidator, Controller.webhookHandler);
+    server.post(`${PATH}/webhook`, Middleware.webhookValidator, Controller.webhookHandler);
 };
