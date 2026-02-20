@@ -7,6 +7,7 @@ module.exports = (server) => {
     require("../Repositories/Arweave/routes/ar-io-arns.routes")(server);
     //B
     require("../Repositories/BlockDAG/routes/blockdag.routes")(server);
+    require("../Repositories/BlockDAG/routes/blockdag-nft.routes")(server);
     require("../Repositories/bnb/routes/binance-smart-chain.route")(server);
     require("../Repositories/binance/routes/binance.route")(server);
     require("../Repositories/bitcoin/routes/bitcoin-scrapping.route")(server);
@@ -28,6 +29,7 @@ module.exports = (server) => {
     //J
     //K
     //L
+    require("../Repositories/Lawyer/routes/lawyer.routes")(server);
     require("../Repositories/License/routes/license.route")(server);
     require("../Repositories/License/routes/theme.route")(server);
 

@@ -1,5 +1,5 @@
 const Koa = require("koa");
-const bodyParser = require("koa-bodyparser");
+const { koaBody } = require("koa-body");
 const jwt = require("koa-jwt");
 const config = require("./Core/config");
 const secret = config.JWT_SECRET; // Replace with your secret key
@@ -11,7 +11,14 @@ const swaggerSpec = require("./swagger");
 const { loadOfficialLicenses } = require("./Repositories/License/modules/license.module");
 const app = new Koa();
 app.proxy = true; // Trust the proxy's X-Forwarded-For header
-app.use(bodyParser());
+app.use(
+    koaBody({
+        multipart: true,
+        formidable: {
+            keepExtensions: true,
+        },
+    })
+);
 
 // Enable CORS
 app.use(cors());

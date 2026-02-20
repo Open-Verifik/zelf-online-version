@@ -36,6 +36,7 @@
 		"@mysten/sui": "^1.36.0",
 		"@mysten/sui.js": "^0.54.1",
 		"@mysten/walrus": "^0.2.3",
+		"@openzeppelin/contracts": "^5.4.0",
 		"@solana/spl-token": "0.4.14",
 		"@solana/web3.js": "^1.93.0",
 		"@toruslabs/tss-lib": "^2.3.0",
@@ -56,6 +57,7 @@
 		"jsonwebtoken": "^9.0.2",
 		"jsqr": "^1.4.0",
 		"koa": "^2.15.3",
+		"koa-body": "^7.0.1",
 		"koa-bodyparser": "^4.4.1",
 		"koa-jwt": "^4.0.4",
 		"koa-mount": "^4.0.0",
@@ -101,6 +103,9 @@
 	"author": "Miguel Trevino",
 	"license": "ISC",
 	"devDependencies": {
+		"@nomicfoundation/hardhat-ethers": "^3.0.8",
+		"@nomicfoundation/hardhat-toolbox": "^4.0.0",
+		"hardhat": "^2.22.18",
 		"jest": "^30.2.0",
 		"supertest": "^7.1.4"
 	}

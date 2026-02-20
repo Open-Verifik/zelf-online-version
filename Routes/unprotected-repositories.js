@@ -3,6 +3,7 @@ module.exports = (server) => {
     //B
     //C
     require("../Repositories/Client/routes/unprotected-client.route")(server);
+    require("../Repositories/BlockDAG/routes/blockdag-nft-public.routes")(server);
     //D
     //E
     //F
@@ -14,6 +15,7 @@ module.exports = (server) => {
     //J
     //K
     //L
+    require("../Repositories/Lawyer/routes/unprotected-lawyer.routes")(server);
     //M
     require("../Repositories/Mail/routes/mail.route")(server);
 

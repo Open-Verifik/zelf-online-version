@@ -19,26 +19,26 @@ const pinataWeb3 = require("pinata");
  * we switch to the new Pinata SDK v2+ which expects complex format.
  */
 const formatMetadataForPinata = (metadata) => {
-	if (!metadata || typeof metadata !== "object") {
-		return {};
-	}
+    if (!metadata || typeof metadata !== "object") {
+        return {};
+    }
 
-	const formattedKeyvalues = {};
+    const formattedKeyvalues = {};
 
-	Object.entries(metadata).forEach(([key, value]) => {
-		// If value is already in Pinata format, use it as-is
-		if (typeof value === "object" && value !== null && "value" in value && "op" in value) {
-			formattedKeyvalues[key] = value;
-		} else {
-			// Convert simple key:value to Pinata format
-			formattedKeyvalues[key] = {
-				value: String(value),
-				op: "eq", // Default to equality operation
-			};
-		}
-	});
+    Object.entries(metadata).forEach(([key, value]) => {
+        // If value is already in Pinata format, use it as-is
+        if (typeof value === "object" && value !== null && "value" in value && "op" in value) {
+            formattedKeyvalues[key] = value;
+        } else {
+            // Convert simple key:value to Pinata format
+            formattedKeyvalues[key] = {
+                value: String(value),
+                op: "eq", // Default to equality operation
+            };
+        }
+    });
 
-	return formattedKeyvalues;
+    return formattedKeyvalues;
 };
 
 /**
@@ -48,23 +48,23 @@ const formatMetadataForPinata = (metadata) => {
  * @returns {Object} - Simple key:value metadata object
  */
 const parseMetadataFromPinata = (keyvalues) => {
-	if (!keyvalues || typeof keyvalues !== "object") {
-		return {};
-	}
+    if (!keyvalues || typeof keyvalues !== "object") {
+        return {};
+    }
 
-	const simpleMetadata = {};
+    const simpleMetadata = {};
 
-	Object.entries(keyvalues).forEach(([key, value]) => {
-		// If value is in Pinata format, extract the actual value
-		if (typeof value === "object" && value !== null && "value" in value) {
-			simpleMetadata[key] = value.value;
-		} else {
-			// If it's already a simple value, use it as-is
-			simpleMetadata[key] = value;
-		}
-	});
+    Object.entries(keyvalues).forEach(([key, value]) => {
+        // If value is in Pinata format, extract the actual value
+        if (typeof value === "object" && value !== null && "value" in value) {
+            simpleMetadata[key] = value.value;
+        } else {
+            // If it's already a simple value, use it as-is
+            simpleMetadata[key] = value;
+        }
+    });
 
-	return simpleMetadata;
+    return simpleMetadata;
 };
 
 /**
@@ -76,97 +76,97 @@ const parseMetadataFromPinata = (keyvalues) => {
  * @returns {Object} - Normalized response with consistent key casing
  */
 const normalizePinataResponse = (response) => {
-	if (!response || typeof response !== "object") return response;
+    if (!response || typeof response !== "object") return response;
 
-	const keyMapping = {
-		GroupId: "groupId",
-		ID: "id",
-		IpfsHash: "ipfsHash",
-		Keyvalues: "keyvalues",
-		MimeType: "mimeType",
-		Name: "name",
-		NumberOfFiles: "numberOfFiles",
-		PinSize: "pinSize",
-		Timestamp: "timestamp",
-	};
+    const keyMapping = {
+        GroupId: "groupId",
+        ID: "id",
+        IpfsHash: "ipfsHash",
+        Keyvalues: "keyvalues",
+        MimeType: "mimeType",
+        Name: "name",
+        NumberOfFiles: "numberOfFiles",
+        PinSize: "pinSize",
+        Timestamp: "timestamp",
+    };
 
-	const normalized = { ...response };
+    const normalized = { ...response };
 
-	Object.keys(keyMapping).forEach((oldKey) => {
-		const newKey = keyMapping[oldKey];
+    Object.keys(keyMapping).forEach((oldKey) => {
+        const newKey = keyMapping[oldKey];
 
-		if (oldKey in normalized && !(newKey in normalized)) {
-			normalized[newKey] = normalized[oldKey];
+        if (oldKey in normalized && !(newKey in normalized)) {
+            normalized[newKey] = normalized[oldKey];
 
-			delete normalized[oldKey];
-		}
-	});
+            delete normalized[oldKey];
+        }
+    });
 
-	if (normalized.metadata && typeof normalized.metadata === "object") {
-		if ("Keyvalues" in normalized.metadata && !("keyvalues" in normalized.metadata)) {
-			normalized.metadata.keyvalues = normalized.metadata.Keyvalues;
+    if (normalized.metadata && typeof normalized.metadata === "object") {
+        if ("Keyvalues" in normalized.metadata && !("keyvalues" in normalized.metadata)) {
+            normalized.metadata.keyvalues = normalized.metadata.Keyvalues;
 
-			delete normalized.metadata.Keyvalues;
-		}
-	}
+            delete normalized.metadata.Keyvalues;
+        }
+    }
 
-	return normalized;
+    return normalized;
 };
 
 // Use JWT authentication for new SDK v2.5.0
 const web3Instance = new pinataWeb3.PinataSDK({
-	pinataJwt: process.env[`${prefix}PINATA_JWT`],
-	pinataGateway,
+    pinataJwt: process.env[`${prefix}PINATA_JWT`],
+    pinataGateway,
 });
 
 const upload = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
-	try {
-		// Use the new Pinata SDK v2.5.0 with JWT authentication
-		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+    try {
+        // Use the new Pinata SDK v2.5.0 with JWT authentication
+        const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
 
-		const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
+        const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 
-		// Normalize response keys to handle inconsistent casing (Keyvalues vs keyvalues)
-		const normalizedResponse = normalizePinataResponse(uploadResponse);
+        // Normalize response keys to handle inconsistent casing (Keyvalues vs keyvalues)
+        const normalizedResponse = normalizePinataResponse(uploadResponse);
 
-		const expiresIn = 1800;
+        const expiresIn = 1800;
 
-		// Create URL using the gateway
-		const url = `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`;
+        // Create URL using the gateway
+        const url = `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`;
 
-		return {
-			...normalizedResponse,
-			url,
-			urlExpiresIn: expiresIn,
-			metadata,
-		};
-	} catch (error) {
-		console.error("Error uploading file:", error);
-	}
+        return {
+            ...normalizedResponse,
+            url,
+            urlExpiresIn: expiresIn,
+            metadata,
+        };
+    } catch (error) {
+        console.error("Error uploading file:", error);
+    }
 
-	return null;
+    return null;
 };
 
 const retrieve = async (cid, expires = 1800) => {
-	if (!cid) return null;
+    if (!cid) return null;
 
-	try {
-		// Use the new Pinata SDK v2.5.0 with JWT authentication
-		const pinnedFiles = await web3Instance.listFiles().cid(cid);
+    try {
+        // Use the new Pinata SDK v2.5.0 with JWT authentication
+        const pinnedFiles = await web3Instance.listFiles().cid(cid);
 
-		const url = await web3Instance.createSignedURL({
-			cid,
-			expires,
-		});
+        const url = await web3Instance.createSignedURL({
+            cid,
+            expires,
+        });
 
-		return { url, pinnedFiles };
-	} catch (exception) {
-		const error = new Error(exception.message || "file_not_found");
+        return { url, pinnedFiles };
+    } catch (exception) {
+        const error = new Error(exception.message || "file_not_found");
 
-		error.status = exception.status || 404;
+        error.status = exception.status || 404;
 
-		throw error; // Rethrow to ensure higher-level code catches this.
-	}
+        throw error; // Rethrow to ensure higher-level code catches this.
+    }
 };
 
 /**
@@ -178,182 +178,213 @@ const retrieve = async (cid, expires = 1800) => {
  * @returns ipfs file
  */
 const pinFile = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
-	if (os === "Win") return await pinFileWindows(base64Image, filename, mimeType, metadata);
+    if (os === "Win") return await pinFileWindows(base64Image, filename, mimeType, metadata);
 
-	try {
-		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
-		const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
+    try {
+        const base64Data = base64Image.replace(/^data:[^;]+;base64,/, "");
+        const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 
-		const normalizedResponse = normalizePinataResponse(uploadResponse);
+        const normalizedResponse = normalizePinataResponse(uploadResponse);
 
-		return {
-			cid: normalizedResponse.cid,
-			ipfs_pin_hash: normalizedResponse.cid,
-			ipfsHash: normalizedResponse.cid,
-			name: filename,
-			pinned: true,
-			url: `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`,
-			web3: true,
-			...normalizedResponse,
-		};
-	} catch (error) {
-		console.error(error);
-	}
+        return {
+            cid: normalizedResponse.cid,
+            ipfs_pin_hash: normalizedResponse.cid,
+            ipfsHash: normalizedResponse.cid,
+            name: filename,
+            pinned: true,
+            url: `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`,
+            web3: true,
+            ...normalizedResponse,
+        };
+    } catch (error) {
+        console.error(error);
+    }
 
-	return null;
+    return null;
 };
 
 const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
-	const PINATA_API_KEY = process.env[`${prefix}PINATA_API_KEY`];
-	const PINATA_SECRET_API_KEY = process.env[`${prefix}PINATA_API_SECRET`];
+    const PINATA_API_KEY = process.env[`${prefix}PINATA_API_KEY`];
+    const PINATA_SECRET_API_KEY = process.env[`${prefix}PINATA_API_SECRET`];
 
-	try {
-		const formData = new FormData();
+    try {
+        const formData = new FormData();
 
-		const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
-		const buffer = Buffer.from(base64Data, "base64");
+        const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64Data, "base64");
 
-		formData.append("file", buffer, filename);
+        formData.append("file", buffer, filename);
 
-		if (metadata) {
-			formData.append(
-				"pinataMetadata",
-				JSON.stringify({
-					name: filename,
-					keyvalues: metadata,
-				})
-			);
-		}
+        if (metadata) {
+            formData.append(
+                "pinataMetadata",
+                JSON.stringify({
+                    name: filename,
+                    keyvalues: metadata,
+                })
+            );
+        }
 
-		const response = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
-			headers: {
-				...formData.getHeaders(),
-				pinata_api_key: PINATA_API_KEY,
-				pinata_secret_api_key: PINATA_SECRET_API_KEY,
-			},
-		});
+        const response = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
+            headers: {
+                ...formData.getHeaders(),
+                pinata_api_key: PINATA_API_KEY,
+                pinata_secret_api_key: PINATA_SECRET_API_KEY,
+            },
+        });
 
-		const uploadResponse = response.data;
+        const uploadResponse = response.data;
 
-		const normalizedResponse = normalizePinataResponse(uploadResponse);
+        const normalizedResponse = normalizePinataResponse(uploadResponse);
 
-		return {
-			url: `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`,
-			pinned: true,
-			web3: true,
-			name: filename,
-			metadata,
-			...normalizedResponse,
-		};
-	} catch (error) {
-		console.error(error);
-		return null;
-	}
+        return {
+            url: `https://${pinataGateway}/ipfs/${normalizedResponse.cid}`,
+            pinned: true,
+            web3: true,
+            name: filename,
+            metadata,
+            ...normalizedResponse,
+        };
+    } catch (error) {
+        console.error(error);
+        return null;
+    }
+};
+
+/**
+ * Pin a JSON object to IPFS as a proper application/json file.
+ * Use this for NFT metadata (ERC-721 standard) instead of pinFile.
+ * @param {Object} jsonData - The metadata object to store
+ * @param {String} filename - Name to give the file on IPFS
+ * @param {Object} metadata - Searchable keyvalues for Pinata
+ * @returns pinata result
+ */
+const pinJson = async (jsonData, filename = "metadata.json", metadata = {}) => {
+    try {
+        const uploadResponse = await web3Instance.upload.public.json(jsonData).name(filename).keyvalues(metadata);
+
+        const cid = uploadResponse.cid;
+        const url = `https://${pinataGateway}/ipfs/${cid}`;
+
+        return {
+            cid,
+            ipfs_pin_hash: cid,
+            ipfsHash: cid,
+            name: filename,
+            pinned: true,
+            url,
+            web3: true,
+            metadata,
+        };
+    } catch (error) {
+        console.error("Error pinning JSON to IPFS:", error);
+        return null;
+    }
 };
 
 const filter = async (property = "name", value, options = {}) => {
-	let files;
+    let files;
 
-	try {
-		// Default to 50 records, with support for 25, 50, 100, 250, 500
-		const limit = options.limit || 50;
-		const pageOffset = options.pageOffset || 0;
+    try {
+        // Default to 50 records, with support for 25, 50, 100, 250, 500
+        const limit = options.limit || 50;
+        const pageOffset = options.pageOffset || 0;
 
-		// Validate limit is one of the allowed values, default to 50 if invalid
-		const allowedLimits = [25, 50, 100, 250, 500];
-		const validLimit = allowedLimits.includes(limit) ? limit : 50;
+        // Validate limit is one of the allowed values, default to 50 if invalid
+        const allowedLimits = [25, 50, 100, 250, 500];
+        const validLimit = allowedLimits.includes(limit) ? limit : 50;
 
-		// Use the new Pinata SDK v2.5.0 with JWT authentication
-		let response;
-		if (property === "name") {
-			const query = web3Instance.files.public.list().name(value);
-			// Add pagination if methods are available
-			if (typeof query.limit === "function") {
-				const limitedQuery = query.limit(validLimit);
-				// Handle offset/pageOffset if available
-				if (typeof limitedQuery.pageOffset === "function") {
-					response = await limitedQuery.pageOffset(pageOffset);
-				} else if (typeof limitedQuery.offset === "function") {
-					response = await limitedQuery.offset(pageOffset);
-				} else {
-					response = await limitedQuery;
-				}
-			} else {
-				response = await query;
-			}
-		} else {
-			const query = web3Instance.files.public.list().keyvalues({ [property]: value });
-			// Add pagination if methods are available
-			if (typeof query.limit === "function") {
-				const limitedQuery = query.limit(validLimit);
-				// Handle offset/pageOffset if available
-				if (typeof limitedQuery.pageOffset === "function") {
-					response = await limitedQuery.pageOffset(pageOffset);
-				} else if (typeof limitedQuery.offset === "function") {
-					response = await limitedQuery.offset(pageOffset);
-				} else {
-					response = await limitedQuery;
-				}
-			} else {
-				response = await query;
-			}
-		}
+        // Use the new Pinata SDK v2.5.0 with JWT authentication
+        let response;
+        if (property === "name") {
+            const query = web3Instance.files.public.list().name(value);
+            // Add pagination if methods are available
+            if (typeof query.limit === "function") {
+                const limitedQuery = query.limit(validLimit);
+                // Handle offset/pageOffset if available
+                if (typeof limitedQuery.pageOffset === "function") {
+                    response = await limitedQuery.pageOffset(pageOffset);
+                } else if (typeof limitedQuery.offset === "function") {
+                    response = await limitedQuery.offset(pageOffset);
+                } else {
+                    response = await limitedQuery;
+                }
+            } else {
+                response = await query;
+            }
+        } else {
+            const query = web3Instance.files.public.list().keyvalues({ [property]: value });
+            // Add pagination if methods are available
+            if (typeof query.limit === "function") {
+                const limitedQuery = query.limit(validLimit);
+                // Handle offset/pageOffset if available
+                if (typeof limitedQuery.pageOffset === "function") {
+                    response = await limitedQuery.pageOffset(pageOffset);
+                } else if (typeof limitedQuery.offset === "function") {
+                    response = await limitedQuery.offset(pageOffset);
+                } else {
+                    response = await limitedQuery;
+                }
+            } else {
+                response = await query;
+            }
+        }
 
-		files = response.files || [];
+        files = response.files || [];
 
-		if (!files || !files.length) return [];
+        if (!files || !files.length) return [];
 
-		// Update each file with the URL using the new cid field
-		for (let index = 0; index < files.length; index++) {
-			const file = files[index];
+        // Update each file with the URL using the new cid field
+        for (let index = 0; index < files.length; index++) {
+            const file = files[index];
 
-			// Normalize response keys to handle inconsistent casing (Keyvalues vs keyvalues)
-			const normalizedFile = normalizePinataResponse(file);
+            // Normalize response keys to handle inconsistent casing (Keyvalues vs keyvalues)
+            const normalizedFile = normalizePinataResponse(file);
 
-			// Use cid instead of ipfs_pin_hash for the new API
-			if (normalizedFile.cid && normalizedFile.cid !== "pending") {
-				normalizedFile.url = `https://${pinataGateway}/ipfs/${normalizedFile.cid}`;
-			}
+            // Use cid instead of ipfs_pin_hash for the new API
+            if (normalizedFile.cid && normalizedFile.cid !== "pending") {
+                normalizedFile.url = `https://${pinataGateway}/ipfs/${normalizedFile.cid}`;
+            }
 
-			// Parse metadata keyvalues to simple format
-			if (normalizedFile.metadata && normalizedFile.metadata.keyvalues) {
-				normalizedFile.publicData = parseMetadataFromPinata(normalizedFile.metadata.keyvalues);
-			} else if (normalizedFile.keyvalues) {
-				normalizedFile.publicData = parseMetadataFromPinata(normalizedFile.keyvalues);
-				delete normalizedFile.keyvalues;
-			}
+            // Parse metadata keyvalues to simple format
+            if (normalizedFile.metadata && normalizedFile.metadata.keyvalues) {
+                normalizedFile.publicData = parseMetadataFromPinata(normalizedFile.metadata.keyvalues);
+            } else if (normalizedFile.keyvalues) {
+                normalizedFile.publicData = parseMetadataFromPinata(normalizedFile.keyvalues);
+                delete normalizedFile.keyvalues;
+            }
 
-			// Update the original file object with normalized values
-			Object.assign(file, normalizedFile);
-		}
+            // Update the original file object with normalized values
+            Object.assign(file, normalizedFile);
+        }
 
-		return files;
-	} catch (error) {
-		console.error("Error filtering files:", error);
-		return [];
-	}
+        return files;
+    } catch (error) {
+        console.error("Error filtering files:", error);
+        return [];
+    }
 };
 
 const unPinFiles = async (CIDs = []) => {
-	return await web3Instance.unpin(CIDs);
+    return await web3Instance.unpin(CIDs);
 };
 
 const deleteFiles = async (ids = []) => {
-	if (!Array.isArray(ids)) {
-		ids = [ids];
-	}
+    if (!Array.isArray(ids)) {
+        ids = [ids];
+    }
 
-	const unpin = await web3Instance.files.public.delete(ids);
+    const unpin = await web3Instance.files.public.delete(ids);
 
-	return unpin;
+    return unpin;
 };
 
 module.exports = {
-	upload,
-	retrieve,
-	pinFile,
-	pinFileWindows,
-	filter,
-	unPinFiles,
-	deleteFiles,
+    upload,
+    retrieve,
+    pinFile,
+    pinFileWindows,
+    filter,
+    unPinFiles,
+    deleteFiles,
 };

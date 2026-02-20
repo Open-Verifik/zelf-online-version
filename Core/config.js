@@ -204,10 +204,24 @@ const configuration = {
             process.env.AVALANCHE_RPC_URL ||
             "https://wild-bitter-meadow.avalanche-mainnet.quiknode.pro/e2565749ca44c2873fe2a0a747f5ac68ae7eb14f/ext/bc/C/rpc/",
         chainId: 43114, // Avalanche C-Chain mainnet
+        privateKey: process.env.WALRUS_PRIVATE_KEY,
+    },
+    erc8004: {
+        rpcUrl: process.env.ERC8004_RPC_URL || process.env.AVALANCHE_RPC_URL || "https://api.avax.network/ext/bc/C/rpc",
+        chainId: Number(process.env.ERC8004_CHAIN_ID || 43114),
+        identityRegistryAddress: process.env.ERC8004_IDENTITY_REGISTRY || "0xd3c6Fa69B3719a1877145Ff72313F75dc0Af0F69",
+        reputationRegistryAddress: process.env.ERC8004_REPUTATION_REGISTRY || "0x5Db2BdA967b4beE92E91e8cf74627655ae3cde83",
+        validationRegistryAddress: process.env.ERC8004_VALIDATION_REGISTRY || "0x5E73485fFD6705A7ece0e046C2eb21673120E360",
     },
     cryptoPayments: {
         demoMode: process.env.CRYPTO_PAYMENTS_DEMO_MODE === "true" || false,
         demoMultiplier: 0.005, // 0.5% of original price for demo mode (max $0.049 for $9.99)
+    },
+    blockdag: {
+        defaultCollectionAddress: process.env.BLOCKDAG_DEFAULT_COLLECTION_ADDRESS || null,
+        factoryAddress: process.env.BLOCKDAG_FACTORY_ADDRESS || "0x7c6a168455C94092f8d51aBC515B73f4Ed9813a6",
+        rpcUrl: process.env.BLOCKDAG_RPC_URL || "https://rpc.primordial.bdagscan.com",
+        chainId: 1404,
     },
 };
 
