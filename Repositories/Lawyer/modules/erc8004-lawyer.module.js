@@ -61,11 +61,21 @@ const initialize = () => {
 	validationRegistry = new ethers.Contract(validationAddress, VALIDATION_REGISTRY_ABI, provider);
 
 	// Signer for write operations (prefer WALRUS_PRIVATE_KEY for Avalanche, fallback to MNEMONICS)
-	const privateKey = process.env.WALRUS_PRIVATE_KEY;
-	const mnemonic = process.env.MNEMONICS;
-	if (privateKey) {
-		signer = new ethers.Wallet(privateKey, provider);
-		console.log("[ERC8004-Lawyer] Initialized with private key signer:", signer.address);
+	// WALRUS_PRIVATE_KEY can be hex (0x + 64 chars) or mnemonic (12/24 space-separated words)
+	const rawKey = process.env.WALRUS_PRIVATE_KEY?.trim();
+	const mnemonic = process.env.MNEMONICS?.trim();
+
+	if (rawKey) {
+		// Mnemonic: contains spaces. Hex: 0x + 64 hex chars, no spaces.
+		const looksLikeMnemonic = /\s/.test(rawKey) || (rawKey.startsWith("0x") && rawKey.length > 70);
+		if (looksLikeMnemonic) {
+			const phrase = rawKey.replace(/^0x/, "").trim();
+			signer = ethers.Wallet.fromPhrase(phrase, provider);
+			console.log("[ERC8004-Lawyer] Initialized with mnemonic signer:", signer.address);
+		} else {
+			signer = new ethers.Wallet(rawKey, provider);
+			console.log("[ERC8004-Lawyer] Initialized with private key signer:", signer.address);
+		}
 	} else if (mnemonic) {
 		signer = ethers.Wallet.fromPhrase(mnemonic, provider);
 		console.log("[ERC8004-Lawyer] Initialized with mnemonic signer:", signer.address);

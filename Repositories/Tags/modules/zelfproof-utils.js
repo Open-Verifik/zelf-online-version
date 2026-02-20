@@ -1,15 +1,12 @@
 const { Buffer } = require("buffer");
 
-// Try to require canvas and jsQR, fallback to alternative if not available
-let createCanvas, loadImage, jsQR;
+// Use sharp for image decoding (avoids canvas/sharp native lib conflict)
+let sharp, jsQR;
 try {
-	const canvas = require("canvas");
-	createCanvas = canvas.createCanvas;
-	loadImage = canvas.loadImage;
+	sharp = require("sharp");
 } catch (error) {
-	console.warn("Canvas module not available, QR operations will be limited");
-	createCanvas = null;
-	loadImage = null;
+	console.warn("Sharp module not available, QR operations will be limited");
+	sharp = null;
 }
 
 try {
@@ -26,6 +23,29 @@ if (!jsQR) {
 		QrCodeReader = require("qrcode-reader");
 	} catch (error) {
 		console.warn("Neither jsQR nor qrcode-reader available");
+	}
+}
+
+/**
+ * Decode image buffer to RGBA pixel data for jsQR/qrcode-reader
+ * @param {Buffer} imageBuffer - Image buffer (PNG, JPEG, etc.)
+ * @returns {Promise<{data: Uint8ClampedArray, width: number, height: number}|null>}
+ */
+async function getImageDataFromBuffer(imageBuffer) {
+	if (!sharp) return null;
+	try {
+		const { data, info } = await sharp(imageBuffer)
+			.ensureAlpha()
+			.raw()
+			.toBuffer({ resolveWithObject: true });
+		return {
+			data: new Uint8ClampedArray(data),
+			width: info.width,
+			height: info.height,
+		};
+	} catch (err) {
+		console.warn("Sharp failed to decode image:", err.message);
+		return null;
 	}
 }
 
@@ -49,8 +69,8 @@ class ZelfProofUtils {
 	 */
 	static async extractZelfProof(base64Image) {
 		try {
-			// Check if canvas is available
-			if (!createCanvas || !loadImage) {
+			// Check if sharp is available
+			if (!sharp) {
 				return null;
 			}
 
@@ -60,17 +80,9 @@ class ZelfProofUtils {
 			// Convert base64 to buffer
 			const imageBuffer = Buffer.from(cleanBase64, "base64");
 
-			// Load image using canvas
-			const image = await loadImage(imageBuffer);
-
-			// Create canvas and draw image
-			const canvas = createCanvas(image.width, image.height);
-			const context = canvas.getContext("2d");
-
-			context.drawImage(image, 0, 0, image.width, image.height);
-
-			// Get image data
-			const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+			// Decode image to RGBA pixel data using sharp
+			const imageData = await getImageDataFromBuffer(imageBuffer);
+			if (!imageData) return null;
 
 			let qrResult = null;
 

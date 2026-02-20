@@ -9,12 +9,6 @@ let pool = null;
 const initMongoDB = () => {
     mongoose.Promise = global.Promise;
 
-    // Setup options applicable to all environments
-    const setup = {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-    };
-
     // Construct the MongoDB URI with poolSize parameter if needed
     let uri = config.db.uri;
     // if (config.env === "production") {
@@ -23,9 +17,8 @@ const initMongoDB = () => {
     // uri += uri.includes("?") ? `&${poolSizeParam}` : `?${poolSizeParam}`;
     // }
 
-    const uriKey = process.env.MONGODB_URI_PROD ? "MONGODB_URI_PROD" : "MONGODB_URI";
-    console.info(`Connecting to MongoDB [${uriKey}]: ${uri.replace(/\/\/.*@/, "//***:***@")}`);
-    mongoose.connect(uri, setup);
+
+    mongoose.connect(uri);
 
     MongoConnection = mongoose.connection;
 
