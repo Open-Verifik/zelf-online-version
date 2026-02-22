@@ -1,8 +1,13 @@
-const config = require("../../../Core/config");
-if (config.solana?.useKit) { module.exports = require("./zns-token.module.kit"); return; }
-
+/**
+ * Option A: ZNS Token Module - @solana-program/token + @solana/kit (0 vulnerabilities)
+ * Test via SOLANA_USE_KIT=true or /purchase-rewards-kit, /referral-rewards-kit routes.
+ *
+ * TODO: Migrate to @solana/kit API when ready. For now uses same manual SPL as Option B
+ * so routing works. Replace implementation with @solana-program/token when migrating.
+ */
 const solanaWeb3 = require("@solana/web3.js");
 const splManual = require("../../../Core/spl-token-manual");
+const config = require("../../../Core/config");
 const ReferralRewardModel = require("../models/referral-rewards.model");
 const PurchaseRewardModel = require("../models/purchase-rewards.model");
 const MongoORM = require("../../../Core/mongo-orm");
@@ -19,7 +24,6 @@ const initConnection = async () => {
     await connection.getSlot();
 };
 
-// Token mint address (ZNS token address)
 const tokenMintAddress = new solanaWeb3.PublicKey(config.solana.tokenMintAddress);
 
 const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
@@ -29,12 +33,10 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
         const senderKey = Uint8Array.from(JSON.parse(config.solana.sender));
         const senderWallet = solanaWeb3.Keypair.fromSecretKey(senderKey);
 
-        // Compute Budget Program Instruction (to increase gas fees)
         const computeBudgetInstruction = solanaWeb3.ComputeBudgetProgram.setComputeUnitPrice({
-            microLamports: 100000, // Adjust this value to set a higher priority fee
+            microLamports: 100000,
         });
 
-        // Get or create the sender's associated token account (Option B: manual SPL, no bigint-buffer)
         const senderTokenAccount = await splManual.getOrCreateAssociatedTokenAccount(
             connection,
             senderWallet,
@@ -42,43 +44,34 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
             senderWallet.publicKey,
         );
 
-        // Convert amount to smallest unit (8 decimals for ZNS token)
-        // Amount is expected in tokens, so always multiply by 10^8
-        // In dev mode, divide by 10000 to preserve wallet balance during testing
         const isDevMode = config.solana.devModeTokens === true || config.solana.devModeTokens === "true";
-
         const actualAmount = isDevMode ? amount / 10000 : amount;
-
         const amountToSend = Math.round(actualAmount * 10 ** 8);
 
         if (isDevMode) console.log(`[DEV MODE] Token transfer reduced: ${amount} → ${actualAmount} tokens`);
 
         if (senderTokenAccount.amount < amountToSend) throw new Error("Insufficient balance in sender's token account.");
 
-        // Receiver's public key
         const receiverPublicKey = new solanaWeb3.PublicKey(receiverSolanaAddress);
 
-        // Get or create the receiver's associated token account
         const receiverTokenAccount = await splManual.getOrCreateAssociatedTokenAccount(
             connection,
-            senderWallet, // Payer (sender pays for account creation if needed)
+            senderWallet,
             tokenMintAddress,
             receiverPublicKey,
         );
 
-        // Create the token transfer instruction
         const transferInstruction = splManual.createTransferCheckedInstruction(
-            senderTokenAccount.address, // Sender's token account
-            tokenMintAddress, // Token mint address
-            receiverTokenAccount.address, // Receiver's token account
-            senderWallet.publicKey, // Owner of the sender's token account
-            amountToSend, // Amount to send (in smallest unit)
-            8, // Decimals of the token
+            senderTokenAccount.address,
+            tokenMintAddress,
+            receiverTokenAccount.address,
+            senderWallet.publicKey,
+            amountToSend,
+            8,
         );
 
         const transferTransaction = new solanaWeb3.Transaction().add(computeBudgetInstruction, transferInstruction);
 
-        // Use sendWithRetry for reliable token transfer
         const transferSignature = await sendWithRetry(transferTransaction, [senderWallet]);
 
         return transferSignature;
@@ -88,7 +81,6 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
     }
 };
 
-// Utility function for retrying transactions
 const sendWithRetry = async (transaction, signers, retries = 3) => {
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
@@ -101,10 +93,10 @@ const sendWithRetry = async (transaction, signers, retries = 3) => {
                 commitment: "confirmed",
             });
 
-            return signature; // Successful transaction
+            return signature;
         } catch (error) {
             console.error(`Transaction attempt ${attempt} failed:`, error);
-            if (attempt === retries) throw error; // Rethrow if max retries reached
+            if (attempt === retries) throw error;
         }
     }
 };
@@ -144,7 +136,7 @@ const addPurchaseReward = async (zelfNameObject) => {
             ethAddress: zelfNameObject.ethAddress,
             solanaAddress: zelfNameObject.solanaAddress,
             zelfNamePrice: zelfNameObject.zelfNamePrice,
-            tokenAmount: 250, //Math.round(zelfNameObject.zelfNamePrice / config.token.rewardPrice),
+            tokenAmount: 250,
             status: "pending",
             attempts: 0,
             payload: {},
@@ -155,7 +147,7 @@ const addPurchaseReward = async (zelfNameObject) => {
         return await purchaseReward.save();
     } catch (error) {
         console.error("Error adding purchase:", error);
-        throw error; // Re-throw for higher-level error handling if needed
+        throw error;
     }
 };
 
@@ -165,37 +157,33 @@ const releaseReferralRewards = async (authUser) => {
 
     try {
         referralRewards = await MongoORM.groupAggregate(ReferralRewardModel, {
-            wheres: { status: "pending" }, // Match condition
-            groupBy: "referralZelfName", // Group by field
-            sum: "zelfNamePrice", // Field to sum
+            wheres: { status: "pending" },
+            groupBy: "referralZelfName",
+            sum: "zelfNamePrice",
             includeFields: ["referralZelfName", "referralSolanaAddress", "status"],
         });
 
-        // Ensure there is at least one group to process
         if (!referralRewards || referralRewards.length === 0) {
             return { nothingToProcess: true };
         }
 
         firstGroup = referralRewards[0];
 
-        // Calculate reward tokens: 5% of total purchase amount
-        const rewardTokens = Math.round(firstGroup.totalSum * 0.05 * 100) / 100; // 5% with 2 decimal places
+        const rewardTokens = Math.round(firstGroup.totalSum * 0.05 * 100) / 100;
 
-        // Send tokens using proper parameters
         await giveTokensAfterPurchase(rewardTokens, firstGroup.referralSolanaAddress);
 
-        // Update all records in this group with a single updateMany
         await ReferralRewardModel.updateMany(
             {
-                referralZelfName: firstGroup._id, // Match the grouped field
-                status: "pending", // Ensure only pending rewards are updated
+                referralZelfName: firstGroup._id,
+                status: "pending",
             },
             {
                 $set: {
                     status: "completed",
                     completedAt: new Date(),
                 },
-                $inc: { attempts: 1 }, // Increment the attempts counter
+                $inc: { attempts: 1 },
             },
         );
 
@@ -206,26 +194,20 @@ const releaseReferralRewards = async (authUser) => {
         if (referralRewards.length) {
             await ReferralRewardModel.updateMany(
                 {
-                    referralZelfName: firstGroup._id, // Match the grouped field
-                    status: "pending", // Ensure only pending rewards are updated
+                    referralZelfName: firstGroup._id,
+                    status: "pending",
                 },
                 {
                     $set: {},
-                    $inc: { attempts: 1 }, // Increment the attempts counter
+                    $inc: { attempts: 1 },
                 },
             );
         }
 
-        throw error; // Re-throw for higher-level error handling if needed
+        throw error;
     }
 };
 
-/**
- * release purchase rewards
- * @param {Object} authUser
- * @returns
- * @author Miguel Trevino
- */
 const releasePurchaseRewards = async (authUser) => {
     const purchaseReward = await MongoORM.buildQuery({ where_status: "pending", findOne: true }, PurchaseRewardModel, null);
 
@@ -233,14 +215,10 @@ const releasePurchaseRewards = async (authUser) => {
         return { nothingToProcess: true };
     }
 
-    // if attempts is 5 then mark it as failed
     if (purchaseReward.attempts === 5) {
         purchaseReward.status = "failed";
-
         purchaseReward.completedAt = new Date();
-
         await purchaseReward.save();
-
         return purchaseReward;
     }
 
@@ -259,12 +237,11 @@ const releasePurchaseRewards = async (authUser) => {
         console.error("Error releasing reward:", error);
 
         purchaseReward.status = "pending";
-
         purchaseReward.attempts += 1;
 
         await purchaseReward.save();
 
-        throw error; // Re-throw for higher-level error handling if needed
+        throw error;
     }
 };
 
@@ -286,7 +263,7 @@ const getPurchaseReward = async (zelfName, afterDate) => {
         return purchaseReward;
     } catch (error) {
         console.error("Error getting purchase reward:", error);
-        throw error; // Re-throw for higher-level error handling if needed
+        throw error;
     }
 };
 

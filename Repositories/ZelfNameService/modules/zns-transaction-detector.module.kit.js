@@ -1,40 +1,27 @@
-const config = require("../../../Core/config");
-if (config.solana?.useKit) { module.exports = require("./zns-transaction-detector.module.kit"); return; }
-
+/**
+ * Option A: ZNS Transaction Detector - @solana-program/token + @solana/kit (0 vulnerabilities)
+ * Test via SOLANA_USE_KIT=true. For now uses same manual SPL as Option B.
+ */
 const solanaWeb3 = require("@solana/web3.js");
 const splManual = require("../../../Core/spl-token-manual");
+const config = require("../../../Core/config");
 const moment = require("moment");
 
-// Initialize Solana connection
 const connection = new solanaWeb3.Connection(`https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}/`, "confirmed");
-
-// ZNS Token mint address
 const ZNS_TOKEN_MINT = new solanaWeb3.PublicKey(config.solana.tokenMintAddress);
 
-/**
- * Detect ZNS token transactions for a specific address
- * @param {string} solanaAddress - The Solana address to monitor
- * @param {Object} options - Detection options
- * @param {number} options.limit - Number of transactions to fetch (default: 20)
- * @param {string} options.before - Signature to start from (for pagination)
- * @param {boolean} options.includeFailed - Include failed transactions (default: false)
- * @returns {Array} Array of ZNS token transactions
- */
 const detectZNSTransactions = async (solanaAddress, options = {}) => {
 	try {
 		const { limit = 20, before = null, includeFailed = false } = options;
 
 		console.log(`🔍 Detecting ZNS transactions for address: ${solanaAddress}`);
 
-		// Get the associated token account for this address
 		const associatedTokenAddress = splManual.getAssociatedTokenAddress(new solanaWeb3.PublicKey(solanaAddress), ZNS_TOKEN_MINT);
 
-		// Get transaction signatures for the token account
 		const signatures = await connection.getSignaturesForAddress(associatedTokenAddress, { limit, before });
 
 		const transactions = [];
 
-		// Process each transaction signature
 		for (const sigInfo of signatures) {
 			try {
 				const transaction = await connection.getTransaction(sigInfo.signature, {
@@ -43,10 +30,8 @@ const detectZNSTransactions = async (solanaAddress, options = {}) => {
 
 				if (!transaction || !transaction.meta) continue;
 
-				// Check if transaction was successful (unless includeFailed is true)
 				if (!includeFailed && transaction.meta.err) continue;
 
-				// Extract ZNS token transfers from the transaction
 				const znsTransfers = extractZNSTransfers(transaction, solanaAddress);
 
 				if (znsTransfers.length > 0) {
@@ -58,7 +43,7 @@ const detectZNSTransactions = async (solanaAddress, options = {}) => {
 						status: transaction.meta.err ? "Failed" : "Success",
 						transfers: znsTransfers,
 						slot: transaction.slot,
-						fee: transaction.meta.fee / 1e9, // Convert lamports to SOL
+						fee: transaction.meta.fee / 1e9,
 						rawTransaction: transaction,
 					});
 				}
@@ -76,14 +61,6 @@ const detectZNSTransactions = async (solanaAddress, options = {}) => {
 	}
 };
 
-/**
- * Check if an address has sent ZNS tokens recently
- * @param {string} solanaAddress - The Solana address to check
- * @param {Object} options - Check options
- * @param {number} options.hours - Hours to look back (default: 24)
- * @param {number} options.minAmount - Minimum amount to consider (default: 0.01)
- * @returns {Object} Result with hasSent and transaction details
- */
 const hasSentZNSTokens = async (solanaAddress, options = {}) => {
 	try {
 		const { hours = 24, minAmount = 0.01 } = options;
@@ -121,25 +98,16 @@ const hasSentZNSTokens = async (solanaAddress, options = {}) => {
 	}
 };
 
-/**
- * Extract ZNS token transfers from a transaction
- * @param {Object} transaction - Solana transaction object
- * @param {string} targetAddress - Address to filter transfers for
- * @returns {Array} Array of ZNS transfers
- */
 const extractZNSTransfers = (transaction, targetAddress) => {
 	const transfers = [];
-	const targetPubkey = new solanaWeb3.PublicKey(targetAddress);
 
 	if (!transaction.meta || !transaction.meta.postTokenBalances || !transaction.meta.preTokenBalances) {
 		return transfers;
 	}
 
-	// Create maps for pre and post balances
 	const preBalances = new Map();
 	const postBalances = new Map();
 
-	// Process pre-token balances
 	for (const balance of transaction.meta.preTokenBalances) {
 		if (balance.mint === ZNS_TOKEN_MINT.toString()) {
 			preBalances.set(balance.owner, {
@@ -149,7 +117,6 @@ const extractZNSTransfers = (transaction, targetAddress) => {
 		}
 	}
 
-	// Process post-token balances
 	for (const balance of transaction.meta.postTokenBalances) {
 		if (balance.mint === ZNS_TOKEN_MINT.toString()) {
 			postBalances.set(balance.owner, {
@@ -159,7 +126,6 @@ const extractZNSTransfers = (transaction, targetAddress) => {
 		}
 	}
 
-	// Calculate transfers
 	const allOwners = new Set([...preBalances.keys(), ...postBalances.keys()]);
 
 	for (const owner of allOwners) {
@@ -175,7 +141,7 @@ const extractZNSTransfers = (transaction, targetAddress) => {
 			transfers.push({
 				owner: ownerAddress,
 				isTargetAddress,
-				change: change / Math.pow(10, preBalance.decimals), // Convert to human readable
+				change: change / Math.pow(10, preBalance.decimals),
 				changeRaw: change,
 				type: change > 0 ? "received" : "sent",
 				preBalance: preBalance.amount / Math.pow(10, preBalance.decimals),
@@ -187,11 +153,6 @@ const extractZNSTransfers = (transaction, targetAddress) => {
 	return transfers;
 };
 
-/**
- * Get ZNS token balance for an address
- * @param {string} solanaAddress - The Solana address
- * @returns {Object} Balance information
- */
 const getZNSBalance = async (solanaAddress) => {
 	try {
 		const associatedTokenAddress = splManual.getAssociatedTokenAddress(new solanaWeb3.PublicKey(solanaAddress), ZNS_TOKEN_MINT);
@@ -225,19 +186,12 @@ const getZNSBalance = async (solanaAddress) => {
 	}
 };
 
-/**
- * Monitor ZNS transactions in real-time (for webhook or polling)
- * @param {Array} addresses - Array of addresses to monitor
- * @param {Function} callback - Callback function for new transactions
- * @returns {Object} Monitoring control object
- */
 const startZNSMonitoring = (addresses, callback) => {
 	console.log(`🚀 Starting ZNS transaction monitoring for ${addresses.length} addresses`);
 
 	let isMonitoring = true;
 	const lastChecked = new Map();
 
-	// Initialize last checked times
 	addresses.forEach((addr) => {
 		lastChecked.set(addr, Date.now() / 1000);
 	});
@@ -255,10 +209,8 @@ const startZNSMonitoring = (addresses, callback) => {
 				if (newTransactions.length > 0) {
 					console.log(`🆕 Found ${newTransactions.length} new ZNS transactions for ${address}`);
 
-					// Update last checked time
 					lastChecked.set(address, Date.now() / 1000);
 
-					// Call callback with new transactions
 					await callback(address, newTransactions);
 				}
 			} catch (error) {
@@ -267,10 +219,8 @@ const startZNSMonitoring = (addresses, callback) => {
 		}
 	};
 
-	// Check every 30 seconds
 	const interval = setInterval(checkForNewTransactions, 30000);
 
-	// Initial check
 	checkForNewTransactions();
 
 	return {

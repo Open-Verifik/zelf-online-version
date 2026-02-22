@@ -3,6 +3,7 @@ const config = require("../../../Core/config");
 const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const Mailgun = require("../../../Core/mailgun");
 const IPFS = require("../../IPFS/modules/ipfs.module");
+
 const ZNSTokenModule = require("../../ZelfNameService/modules/zns-token.module");
 const axios = require("axios");
 

@@ -59,7 +59,33 @@ const createNFTValidation = async (ctx, next) => {
     await next();
 };
 
+const mintNFTValidation = async (ctx, next) => {
+    const schema = Joi.object({
+        collectionAddress: Joi.string().required(),
+        recipientAddress: Joi.string().required(),
+        tokenURI: Joi.string().required(),
+        owner: Joi.string().required(),
+        walletType: Joi.string().valid("zelf", "external").required(),
+        // Zelf Auth
+        proof: Joi.string().optional(),
+        faceBase64: Joi.string().optional(),
+        password: Joi.string().optional(),
+        // External Auth
+        signature: Joi.string().optional(),
+        message: Joi.string().optional(),
+    });
+
+    const { error } = schema.validate(ctx.request.body);
+    if (error) {
+        ctx.status = 400;
+        ctx.body = { error: error.details[0].message };
+        return;
+    }
+    await next();
+};
+
 module.exports = {
     createCollectionValidation,
     createNFTValidation,
+    mintNFTValidation,
 };

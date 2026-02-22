@@ -7,7 +7,6 @@ const cors = require("@koa/cors");
 const DatabaseModule = require("./Core/database");
 const { serverLog } = require("./Core/loggin");
 const mongoose = require("mongoose"); // Add this line
-const swaggerSpec = require("./swagger");
 const { loadOfficialLicenses } = require("./Repositories/License/modules/license.module");
 const app = new Koa();
 app.proxy = true; // Trust the proxy's X-Forwarded-For header
@@ -51,59 +50,6 @@ const server = app.listen(config.port, () => {
         serverLog(`Connected MongoDB > ${mongooseConnection.name}`);
 
         await loadOfficialLicenses(true);
-
-        // Swagger documentation setup
-        app.use(async (ctx, next) => {
-            if (ctx.path === "/docs") {
-                ctx.type = "html";
-                ctx.body = `
-					<!DOCTYPE html>
-					<html>
-					<head>
-						<title>Zelf API Documentation</title>
-						<link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
-						<style>
-							html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
-							*, *:before, *:after { box-sizing: inherit; }
-							body { margin:0; background: #fafafa; }
-							.swagger-ui .topbar { display: none; }
-							.swagger-ui .info .title { color: #2c3e50; }
-							.swagger-ui .info .description { color: #34495e; }
-						</style>
-					</head>
-					<body>
-						<div id="swagger-ui"></div>
-						<script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
-						<script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
-						<script>
-							window.onload = function() {
-								const ui = SwaggerUIBundle({
-									url: '/swagger.json',
-									dom_id: '#swagger-ui',
-									deepLinking: true,
-									presets: [
-										SwaggerUIBundle.presets.apis,
-										SwaggerUIStandalonePreset
-									],
-									plugins: [
-										SwaggerUIBundle.plugins.DownloadUrl
-									],
-									layout: "StandaloneLayout",
-									validatorUrl: null,
-									oauth2RedirectUrl: window.location.origin + '/swagger-ui/oauth2-redirect.html'
-								});
-							};
-						</script>
-					</body>
-					</html>
-				`;
-            } else if (ctx.path === "/swagger.json") {
-                ctx.type = "application/json";
-                ctx.body = swaggerSpec;
-            } else {
-                await next();
-            }
-        });
 
         // Unprotected routes
         const unprotectedRoutes = require("./Routes/unprotected");

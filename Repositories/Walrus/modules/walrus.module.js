@@ -33,22 +33,18 @@ let walrusAvailable = false;
 
 try {
 	// Initialize Sui client for mainnet
-	console.log("🔍 DEBUG: Starting Walrus client initialization...");
-	console.log("🔍 DEBUG: Current working directory:", process.cwd());
-	console.log("🔍 DEBUG: Module file path:", __filename);
-
 	suiClient = new SuiClient({
 		url: getFullnodeUrl(WALRUS_NETWORK),
 	});
-	console.log("🔍 DEBUG: Sui client created successfully");
+	// console.log("🔍 DEBUG: Sui client created successfully");
 
 	// Simple Walrus client initialization
-	console.log("🔍 DEBUG: Creating WalrusClient...");
+	// console.log("🔍 DEBUG: Creating WalrusClient...");
 	walrusClient = new WalrusClient({
 		network: WALRUS_NETWORK,
 		suiClient,
 	});
-	console.log("🔍 DEBUG: WalrusClient created successfully");
+	// console.log("🔍 DEBUG: WalrusClient created successfully");
 
 	walrusAvailable = true;
 	console.log(`✅ Walrus client initialized successfully on ${WALRUS_NETWORK}`);
@@ -738,16 +734,16 @@ const getExplorerUrls = (id) => {
 			walrus:
 				idInfo.type === "walrus_blob"
 					? {
-							explorer: idInfo.walruscanUrl,
-							publicAccess: idInfo.publicUrl,
-					  }
+						explorer: idInfo.walruscanUrl,
+						publicAccess: idInfo.publicUrl,
+					}
 					: null,
 			sui:
 				idInfo.type === "sui_object"
 					? {
-							suiscan: idInfo.suiscanUrl,
-							suiexplorer: idInfo.suiexplorerUrl,
-					  }
+						suiscan: idInfo.suiscanUrl,
+						suiexplorer: idInfo.suiexplorerUrl,
+					}
 					: null,
 		},
 	};

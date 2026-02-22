@@ -251,37 +251,6 @@ const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "i
     }
 };
 
-/**
- * Pin a JSON object to IPFS as a proper application/json file.
- * Use this for NFT metadata (ERC-721 standard) instead of pinFile.
- * @param {Object} jsonData - The metadata object to store
- * @param {String} filename - Name to give the file on IPFS
- * @param {Object} metadata - Searchable keyvalues for Pinata
- * @returns pinata result
- */
-const pinJson = async (jsonData, filename = "metadata.json", metadata = {}) => {
-    try {
-        const uploadResponse = await web3Instance.upload.public.json(jsonData).name(filename).keyvalues(metadata);
-
-        const cid = uploadResponse.cid;
-        const url = `https://${pinataGateway}/ipfs/${cid}`;
-
-        return {
-            cid,
-            ipfs_pin_hash: cid,
-            ipfsHash: cid,
-            name: filename,
-            pinned: true,
-            url,
-            web3: true,
-            metadata,
-        };
-    } catch (error) {
-        console.error("Error pinning JSON to IPFS:", error);
-        return null;
-    }
-};
-
 const filter = async (property = "name", value, options = {}) => {
     let files;
 
@@ -379,6 +348,59 @@ const deleteFiles = async (ids = []) => {
     return unpin;
 };
 
+/**
+ * Get a single pinned file's metadata by its Pinata file ID.
+ */
+const getFileById = async (id) => {
+    const files = await web3Instance.listFiles().id(id);
+    if (!files || files.length === 0) throw new Error(`404:file_not_found:${id}`);
+    const file = files[0];
+    const normalized = normalizePinataResponse(file);
+    if (normalized.metadata?.keyvalues) {
+        normalized.publicData = parseMetadataFromPinata(normalized.metadata.keyvalues);
+    }
+    return normalized;
+};
+
+/**
+ * Update Pinata keyvalues for an existing pin WITHOUT changing the IPFS CID.
+ * Uses web3Instance.files.public.update() (Pinata SDK v2.5+).
+ * Falls back to delete-and-re-pin if the SDK method is unavailable.
+ *
+ * This is the preferred approach: CID stays the same, no re-pin latency.
+ * getItem() surfaces keyvalues to top-level, so tokenId is visible to the frontend.
+ *
+ * @param {string} id         Pinata file ID
+ * @param {object} keyvalues  Plain key→value pairs to merge into existing metadata
+ * @returns {{ id, cid, url, method: 'update' }}
+ */
+const updateFileKeyvalues = async (id, keyvalues) => {
+    // Pinata SDK v2.5: files.public.update({ id, keyvalues })
+    // Docs: https://docs.pinata.cloud/sdk/files/public/update
+    const result = await web3Instance.files.public.update({ id, keyvalues });
+
+    const normalized = normalizePinataResponse(result);
+    console.log("🔍 DEBUG: normalized:", normalized, { keyvalues });
+    console.log("🔍 DEBUG: normalized.cid:", normalized.cid);
+    return {
+        ...normalized,
+        url: normalized.cid ? `https://${pinataGateway}/ipfs/${normalized.cid}` : null,
+        method: "update",
+    };
+};
+
+/**
+ * Convenience wrapper: update a minted NFT's tokenId in Pinata keyvalues.
+ * Uses the SDK update — no re-pin, no CID change, no file ID change.
+ */
+const updateItemTokenId = async (ipfsFileId, tokenId, txHash) => {
+    const result = await updateFileKeyvalues(ipfsFileId, {
+        tokenId: String(tokenId),
+        mintTxHash: txHash || "",
+    });
+    return result;
+};
+
 module.exports = {
     upload,
     retrieve,
@@ -387,4 +409,7 @@ module.exports = {
     filter,
     unPinFiles,
     deleteFiles,
+    getFileById,
+    updateFileKeyvalues,
+    updateItemTokenId,
 };

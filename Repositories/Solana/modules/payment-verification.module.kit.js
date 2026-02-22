@@ -1,38 +1,21 @@
-const config = require("../../../Core/config");
-if (config.solana?.useKit) { module.exports = require("./payment-verification.module.kit"); return; }
-
-const { Connection, PublicKey } = require("@solana/web3.js");
-
 /**
- * Solana Payment Verification Module
- * Verifies ZNS token payments on Solana blockchain
- *
- * ZNS Token Address: GfF6PSkH8bKLkws5RMFdzgASwcVbgCfhhKfp8zeoFBkx
+ * Option A: Solana Payment Verification - @solana-program/token + @solana/kit (0 vulnerabilities)
+ * Test via SOLANA_USE_KIT=true. Uses only @solana/web3.js (no spl-token).
  */
+const { Connection, PublicKey } = require("@solana/web3.js");
+const config = require("../../../Core/config");
 
-// Solana configuration
 const SOLANA_CONFIG = {
 	rpcEndpoint: process.env.SOLANA_RPC_URL || process.env.SOLANA_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com",
 	znsTokenMint: "GfF6PSkH8bKLkws5RMFdzgASwcVbgCfhhKfp8zeoFBkx",
-	serviceWallet: process.env.SOLANA_SERVICE_WALLET || process.env.SOLANA_SENDER_PUBLIC_KEY || "", // Your service wallet address
-	confirmations: 1, // Number of confirmations required
+	serviceWallet: process.env.SOLANA_SERVICE_WALLET || process.env.SOLANA_SENDER_PUBLIC_KEY || "",
+	confirmations: 1,
 };
 
-// Initialize Solana connection
 const connection = new Connection(SOLANA_CONFIG.rpcEndpoint, "confirmed");
 
-/**
- * Verify a payment transaction on Solana
- * @param {Object} params - Payment verification parameters
- * @param {string} params.txHash - Transaction signature/hash
- * @param {number} params.expectedAmount - Expected payment amount in ZNS tokens
- * @param {string} params.proof - Payment proof (optional additional verification)
- * @param {string} params.userWallet - User's wallet address
- * @returns {Object} Verification result
- */
 const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 	try {
-		// Validate inputs
 		if (!txHash) {
 			return {
 				valid: false,
@@ -47,7 +30,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 			};
 		}
 
-		// Fetch transaction details
 		const transaction = await connection.getTransaction(txHash, {
 			maxSupportedTransactionVersion: 0,
 		});
@@ -63,7 +45,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 			};
 		}
 
-		// Check transaction status
 		if (transaction.meta?.err) {
 			return {
 				valid: false,
@@ -74,7 +55,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 			};
 		}
 
-		// Verify transaction is confirmed
 		const slot = transaction.slot;
 		const currentSlot = await connection.getSlot();
 		const confirmations = currentSlot - slot;
@@ -90,7 +70,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 			};
 		}
 
-		// Parse transaction to find token transfer
 		const tokenTransfer = await parseTokenTransfer(transaction);
 
 		if (!tokenTransfer) {
@@ -100,7 +79,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 			};
 		}
 
-		// Verify it's a ZNS token transfer
 		if (tokenTransfer.mint !== SOLANA_CONFIG.znsTokenMint) {
 			return {
 				valid: false,
@@ -112,7 +90,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 			};
 		}
 
-		// Verify recipient is the service wallet
 		if (tokenTransfer.destination !== SOLANA_CONFIG.serviceWallet) {
 			return {
 				valid: false,
@@ -124,7 +101,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 			};
 		}
 
-		// Verify sender matches user wallet (if provided)
 		if (userWallet && tokenTransfer.source !== userWallet) {
 			return {
 				valid: false,
@@ -136,7 +112,6 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 			};
 		}
 
-		// Verify amount (convert from lamports to tokens)
 		const actualAmount = tokenTransfer.amount / Math.pow(10, tokenTransfer.decimals);
 
 		if (actualAmount < expectedAmount) {
@@ -176,21 +151,14 @@ const verifyPayment = async ({ txHash, expectedAmount, proof, userWallet }) => {
 	}
 };
 
-/**
- * Parse token transfer from transaction
- * @param {Object} transaction - Solana transaction object
- * @returns {Object|null} Token transfer details or null
- */
 const parseTokenTransfer = async (transaction) => {
 	try {
-		// Look for SPL Token transfer in transaction
 		const preTokenBalances = transaction.meta?.preTokenBalances || [];
 		const postTokenBalances = transaction.meta?.postTokenBalances || [];
 
 		let recipientUpdate = null;
 		let senderUpdate = null;
 
-		// Find the token transfer by comparing pre and post balances
 		for (const postBalance of postTokenBalances) {
 			const preBalance = preTokenBalances.find((pre) => pre.accountIndex === postBalance.accountIndex);
 
@@ -200,7 +168,6 @@ const parseTokenTransfer = async (transaction) => {
 			const postAmount = parseInt(postBalance.uiTokenAmount.amount);
 			const difference = postAmount - preAmount;
 
-			// If there's a positive difference, this account received tokens
 			if (difference > 0) {
 				recipientUpdate = {
 					mint: postBalance.mint,
@@ -210,7 +177,6 @@ const parseTokenTransfer = async (transaction) => {
 				};
 			}
 
-			// If there's a negative difference, this account sent tokens
 			if (difference < 0) {
 				senderUpdate = {
 					source: postBalance.owner,
@@ -233,17 +199,11 @@ const parseTokenTransfer = async (transaction) => {
 	}
 };
 
-/**
- * Get ZNS token balance for a wallet
- * @param {string} walletAddress - Wallet address to check
- * @returns {number} Token balance
- */
 const getZNSBalance = async (walletAddress) => {
 	try {
 		const publicKey = new PublicKey(walletAddress);
 		const tokenMint = new PublicKey(SOLANA_CONFIG.znsTokenMint);
 
-		// Get token accounts for this wallet
 		const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
 			mint: tokenMint,
 		});
@@ -252,7 +212,6 @@ const getZNSBalance = async (walletAddress) => {
 			return 0;
 		}
 
-		// Sum up all token account balances
 		const totalBalance = tokenAccounts.value.reduce((sum, account) => {
 			const balance = account.account.data.parsed.info.tokenAmount.uiAmount;
 			return sum + balance;
@@ -265,11 +224,6 @@ const getZNSBalance = async (walletAddress) => {
 	}
 };
 
-/**
- * Generate payment instructions for users
- * @param {number} amount - Amount of ZNS tokens required
- * @returns {Object} Payment instructions
- */
 const getPaymentInstructions = (amount) => {
 	return {
 		chain: "solana",

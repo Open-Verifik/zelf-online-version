@@ -145,6 +145,7 @@ const configuration = {
         nodeSecret: process.env.SOLANA_NODE_SECRET,
         tokenMintAddress: process.env.SOLANA_TOKEN_MINT_ADDRESS,
         devModeTokens: process.env.SOLANA_DEV_MODE_TOKENS, // Set to "true" to divide token transfers by 10000 for testing
+        useKit: process.env.SOLANA_USE_KIT === "true", // Use .kit.js modules (Option A: @solana-program/token) for testing
     },
     oklink: {
         apiKey: process.env.OKLINK_API_KEY,

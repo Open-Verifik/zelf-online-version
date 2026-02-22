@@ -230,30 +230,27 @@ const storeNFT = async (data, authdUser) => {
     const base64Json = `data:application/json;base64,${base64Data}`;
     const ipfsResult = await IPFS.pinFile(base64Json, fileName, "application/json", ipfsMetadata);
 
-    // 4. Mint on-chain (if collection address provided)
-    let onChain = null;
-    if (collectionAddress && ethers.isAddress(collectionAddress)) {
-        try {
-            onChain = await mintOnChain(collectionAddress, owner, ipfsResult.url);
-        } catch (mintErr) {
-            console.warn("[BlockDAG NFT] On-chain mint failed (IPFS storage succeeded):", mintErr.message);
-        }
-    }
+    // Note: on-chain minting is handled by the frontend (user signs their own tx).
+    // After minting, the frontend calls PATCH /api/blockdag/nft/item/:ipfsId/token
+    // to persist the tokenId back into the IPFS metadata.
 
     return {
         success: true,
         ipfs: ipfsResult,
         nft: nftData,
-        tokenId: onChain?.tokenId ?? null,
-        txHash: onChain?.txHash ?? null,
     };
 };
 
 /**
- * List all collections — enriched with real IPFS JSON content
+ * List collections — enriched with real IPFS JSON content.
+ * Optionally filtered by owner address (case-insensitive).
  */
-const listCollections = async () => {
-    const results = await IPFS.filter("category", "blockdag_nft_collection");
+const listCollections = async ({ owner } = {}) => {
+    let results = await IPFS.filter("category", "blockdag_nft_collection");
+
+    if (owner) {
+        results = results.filter((item) => item.publicData?.owner?.toLowerCase() === owner.toLowerCase());
+    }
 
     const enriched = await Promise.all(
         results.map(async (item) => {
@@ -421,6 +418,68 @@ const mintOnChain = async (collectionAddress, recipientAddress, tokenURI) => {
     return { tokenId, txHash: receipt.hash };
 };
 
+/**
+ * Update an NFT item's on-chain tokenId.
+ * Uses IPFS.updateItemTokenId (SDK update when possible).
+ */
+const updateItemTokenId = async (ipfsFileId, tokenId, txHash) => {
+    const newPin = await IPFS.updateItemTokenId(ipfsFileId, tokenId, txHash);
+
+    return {
+        success: true,
+        method: newPin.method || "update",
+        newIpfsId: newPin.id || ipfsFileId,
+        newCid: newPin.cid,
+        newUrl: newPin.url,
+        tokenId,
+        txHash,
+    };
+};
+
+/**
+ * Replace an NFT pin with updated metadata (tokenId, txHash, owner).
+ * Pinata does NOT allow updating keyvalues — we must delete and re-pin.
+ * Returns the new Pinata file ID; frontend must redirect to the new URL.
+ *
+ * @param {string} ipfsFileId - Current Pinata file ID
+ * @param {string|number} tokenId - On-chain token ID
+ * @param {string} txHash - Mint/sale tx hash
+ * @param {string} [owner] - New owner (when provided, e.g. after buy/acceptOffer). Otherwise keeps existing owner.
+ */
+const replaceNftItemWithNewOwner = async (ipfsFileId, tokenId, txHash, owner) => {
+    const item = await getItem(ipfsFileId);
+    const publicData = item.publicData || {};
+    const resolvedOwner = owner ?? item.owner ?? publicData.owner ?? "";
+
+    const keyvalues = {
+        category: "blockdag_nft_item",
+        collection: item.collection || publicData.collection || "",
+        name: item.name || publicData.name || "NFT",
+        owner: resolvedOwner,
+        tokenId: String(tokenId),
+        mintTxHash: txHash || publicData.mintTxHash || "",
+    };
+
+    const newPin = await IPFS.updateFileKeyvalues(ipfsFileId, keyvalues);
+
+    return {
+        success: true,
+        newIpfsId: newPin.id ?? ipfsFileId,
+        newCid: newPin.cid,
+        newUrl: newPin.url,
+        tokenId,
+        txHash,
+    };
+};
+
+/**
+ * Generic Pinata keyvalue update for any pinned file.
+ * Delegates to IPFS.updateFileKeyvalues.
+ */
+const updatePinKeyvalues = async (ipfsFileId, keyvalues) => {
+    return IPFS.updateFileKeyvalues(ipfsFileId, keyvalues);
+};
+
 module.exports = {
     upload,
     getItem,
@@ -431,4 +490,7 @@ module.exports = {
     listCollections,
     listItems,
     mintOnChain,
+    updateItemTokenId,
+    replaceNftItemWithNewOwner,
+    updatePinKeyvalues,
 };

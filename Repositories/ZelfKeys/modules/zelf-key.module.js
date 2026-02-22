@@ -11,10 +11,8 @@ const WalrusModule = require("../../Walrus/modules/walrus.module");
 const IPFS = require("../../../Core/ipfs");
 const QRZelfProofExtractor = require("../../Tags/modules/qr-zelfproof-extractor.module");
 const {
-    getDomainConfig,
     isWalrusStorageSupported,
     isIPFSStorageSupported,
-    isArweaveStorageSupported,
 } = require("../../Tags/config/supported-domains");
 const { createNFT } = require("../../Avalanche/modules/avax-nft.module");
 
@@ -163,15 +161,15 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken) =
         NFT =
             config.avalanche.createNFT && qrCodeIPFS
                 ? await createNFT(
-                      {
-                          identifier,
-                          publicData,
-                          url: qrCodeIPFS.url,
-                          zelfProof: zelfKey.zelfProof,
-                          zelfQR: zelfKey.zelfProofQRCode,
-                      },
-                      authToken,
-                  )
+                    {
+                        identifier,
+                        publicData,
+                        url: qrCodeIPFS.url,
+                        zelfProof: zelfKey.zelfProof,
+                        zelfQR: zelfKey.zelfProofQRCode,
+                    },
+                    authToken,
+                )
                 : null;
 
         if (NFT) {
