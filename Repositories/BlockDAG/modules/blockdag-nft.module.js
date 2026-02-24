@@ -19,6 +19,7 @@ const ERC721_ABI = [
     "function mint(address to, string uri) public returns (uint256)",
     "function ownerOf(uint256 tokenId) view returns (address)",
     "function totalSupply() view returns (uint256)",
+    "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
 ];
 
 /**
@@ -417,12 +418,17 @@ const mintOnChain = async (collectionAddress, recipientAddress, tokenURI) => {
 
     // tokenId is the return value of mint() — read from Transfer event
     let tokenId = null;
-    const transferTopic = ethers.id("Transfer(address,address,uint256)");
     for (const log of receipt.logs) {
-        if (log.topics[0] === transferTopic) {
-            tokenId = parseInt(log.topics[3], 16);
-            break;
-        }
+        try {
+            const parsed = collection.interface.parseLog({
+                topics: [...log.topics],
+                data: log.data,
+            });
+            if (parsed && parsed.name === "Transfer") {
+                tokenId = (parsed.args[2] || parsed.args.tokenId).toString();
+                break;
+            }
+        } catch (e) {}
     }
 
     return { tokenId, txHash: receipt.hash };
