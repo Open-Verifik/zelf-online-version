@@ -191,6 +191,33 @@ const storeCollection = async (data, authdUser) => {
 };
 
 /**
+ * Delete a Collection from IPFS
+ * @param {string} id - IPFS Hash / Pinata ID
+ * @param {Object} authdUser - The full auth payload { walletType, owner, signature, message, etc }
+ */
+const deleteCollection = async (id, authdUser) => {
+    // 1. Fetch existing IPFS metadata payload to discover true owner
+    const existingFile = await IPFS.getFileById(id);
+
+    if (!existingFile || !existingFile.publicData) throw new Error("404:collection_not_found");
+
+    const { owner: actualOwner } = existingFile.publicData;
+
+    if (!actualOwner) throw new Error("400:collection_owner_undefined");
+    if (!authdUser) throw new Error("400:missing_auth_payload_body_empty");
+
+    // 2. Mathematically verify the user holds the private key to the requested `owner` address
+    await _validateAuth(authdUser);
+
+    // 3. Prevent malicious signatures from other users
+    if (actualOwner.toLowerCase() !== authdUser.owner.toLowerCase()) throw new Error("403:unauthorized");
+
+    // 4. Securely unpin file
+    const result = await IPFS.deleteFiles([id]);
+    return { success: true, result };
+};
+
+/**
  * Store NFT Metadata to IPFS
  * @param {Object} data
  * @param {Object} authdUser
@@ -502,6 +529,7 @@ module.exports = {
     getDefaultCollection,
     deployDefaultCollection,
     storeCollection,
+    deleteCollection,
     storeNFT,
     listCollections,
     listItems,

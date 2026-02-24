@@ -1,4 +1,5 @@
 const BlockDagNftModule = require("../modules/blockdag-nft.module");
+const httpHandler = require("../../../Core/http-handler");
 
 /**
  * Upload a file to IPFS
@@ -69,11 +70,36 @@ const createNFT = async (ctx) => {
 };
 
 /**
+ * Delete a Collection
+ */
+const deleteCollection = async (ctx) => {
+    try {
+        const { id } = ctx.request.params;
+
+        const result = await BlockDagNftModule.deleteCollection(id, ctx.request.body);
+
+        ctx.body = {
+            success: true,
+            data: result,
+        };
+    } catch (error) {
+        const _exception = httpHandler.errorHandler(error, ctx);
+
+        ctx.status = _exception.status || 500;
+
+        ctx.body = {
+            code: _exception.code,
+            message: _exception.message,
+        };
+    }
+};
+
+/**
  * List Collections
  */
 const getCollections = async (ctx) => {
     try {
-        const { owner } = ctx.query;
+        const { owner } = ctx.request.query;
         const result = await BlockDagNftModule.listCollections({ owner });
         ctx.body = {
             success: true,
@@ -93,7 +119,7 @@ const getCollections = async (ctx) => {
  */
 const getItems = async (ctx) => {
     try {
-        const result = await BlockDagNftModule.listItems(ctx.query);
+        const result = await BlockDagNftModule.listItems(ctx.request.query);
         ctx.body = {
             success: true,
             data: result,
@@ -112,7 +138,7 @@ const getItems = async (ctx) => {
  */
 const getItem = async (ctx) => {
     try {
-        const { id } = ctx.params;
+        const { id } = ctx.request.params;
         const result = await BlockDagNftModule.getItem(id);
 
         // Surface tokenId and txHash from Pinata keyvalues to top-level for convenience
@@ -138,7 +164,7 @@ const getItem = async (ctx) => {
  */
 const updateTokenId = async (ctx) => {
     try {
-        const { id } = ctx.params;
+        const { id } = ctx.request.params;
 
         const { tokenId, txHash, owner } = ctx.request.body;
 
@@ -207,6 +233,7 @@ const deployDefaultCollection = async (ctx) => {
 module.exports = {
     upload,
     createCollection,
+    deleteCollection,
     createNFT,
     mintNFT,
     getCollections,

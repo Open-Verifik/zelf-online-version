@@ -152,9 +152,9 @@ const retrieve = async (cid, expires = 1800) => {
 
     try {
         // Use the new Pinata SDK v2.5.0 with JWT authentication
-        const pinnedFiles = await web3Instance.listFiles().cid(cid);
+        const pinnedFiles = await web3Instance.files.public.list().cid(cid);
 
-        const url = await web3Instance.createSignedURL({
+        const url = await web3Instance.gateways.private.createAccessLink({
             cid,
             expires,
         });
@@ -362,14 +362,19 @@ const deleteFiles = async (ids = []) => {
  * Get a single pinned file's metadata by its Pinata file ID.
  */
 const getFileById = async (id) => {
-    const files = await web3Instance.listFiles().id(id);
-    if (!files || files.length === 0) throw new Error(`404:file_not_found:${id}`);
-    const file = files[0];
-    const normalized = normalizePinataResponse(file);
-    if (normalized.metadata?.keyvalues) {
-        normalized.publicData = parseMetadataFromPinata(normalized.metadata.keyvalues);
+    try {
+        const file = await web3Instance.files.public.get(id);
+        if (!file) throw new Error(`404:file_not_found:${id}`);
+        const normalized = normalizePinataResponse(file);
+        if (normalized.metadata?.keyvalues) {
+            normalized.publicData = parseMetadataFromPinata(normalized.metadata.keyvalues);
+        } else if (normalized.keyvalues) {
+            normalized.publicData = parseMetadataFromPinata(normalized.keyvalues);
+        }
+        return normalized;
+    } catch (e) {
+        throw new Error(`404:file_not_found:${id}`);
     }
-    return normalized;
 };
 
 /**
