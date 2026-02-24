@@ -21,6 +21,8 @@ const createCollectionValidation = async (ctx, next) => {
         // External Auth
         signature: Joi.string().optional(),
         message: Joi.string().optional(),
+        // Collection Meta
+        category: Joi.string().optional(),
     }).unknown(true);
 
     const { error } = schema.validate(ctx.request.body);
@@ -48,6 +50,8 @@ const createNFTValidation = async (ctx, next) => {
         // External Auth
         signature: Joi.string().optional(),
         message: Joi.string().optional(),
+        // NFT Meta
+        category: Joi.string().optional(),
     });
 
     const { error } = schema.validate(ctx.request.body);

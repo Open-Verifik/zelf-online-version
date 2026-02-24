@@ -197,10 +197,20 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
             ...normalizedResponse,
         };
     } catch (error) {
-        console.error(error);
-    }
+        console.error("IPFS Pinning Error:", error);
 
-    return null;
+        // Extract real Pinata message if available
+        let errorMessage = "ipfs_pinning_failed";
+        if (error.response?.data?.error?.details) {
+            errorMessage = error.response.data.error.details;
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
+        const pinError = new Error(errorMessage);
+        pinError.status = 400;
+        throw pinError;
+    }
 };
 
 const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {

@@ -142,6 +142,7 @@ const storeCollection = async (data, authdUser) => {
         owner,
         faceBase64,
         password,
+        category,
     } = data;
 
     // 1. Validate Auth
@@ -161,6 +162,7 @@ const storeCollection = async (data, authdUser) => {
         createdAt: new Date().toISOString(),
         verified: false, // Default
         walletType,
+        category,
     };
 
     // 3. Pin to IPFS
@@ -173,6 +175,7 @@ const storeCollection = async (data, authdUser) => {
         name: name,
         symbol: symbol,
         walletType: walletType,
+        collectionCategory: category || "Art", // Store for easy Pinata querying
     };
 
     const base64Data = Buffer.from(JSON.stringify(collectionData)).toString("base64");
@@ -192,7 +195,8 @@ const storeCollection = async (data, authdUser) => {
  * @param {Object} authdUser
  */
 const storeNFT = async (data, authdUser) => {
-    const { name, description, image, attributes, collectionAddress, walletType, proof, signature, message, owner, faceBase64, password } = data;
+    const { name, description, image, attributes, collectionAddress, walletType, proof, signature, message, owner, faceBase64, password, category } =
+        data;
 
     // 1. Validate Auth
     await _validateAuth({ walletType, proof, signature, message, owner, faceBase64, password });
@@ -203,6 +207,7 @@ const storeNFT = async (data, authdUser) => {
         description,
         image,
         external_url: "https://zelf.world",
+        category: category || "Art",
         attributes: attributes || [],
         properties: {
             files: [
@@ -224,6 +229,7 @@ const storeNFT = async (data, authdUser) => {
         owner: owner,
         collection: collectionAddress,
         name: name,
+        nftCategory: category || "Art", // Store for easy Pinata filtering
     };
 
     const base64Data = Buffer.from(JSON.stringify(nftData)).toString("base64");
@@ -258,6 +264,8 @@ const listCollections = async ({ owner } = {}) => {
             return {
                 ...metadata,
                 ...item.publicData,
+                // Fix key collision with Pinata root key
+                category: metadata?.category || item.publicData?.collectionCategory || "Art",
                 ipfsUrl: item.url,
                 ipfsId: item.id,
             };
@@ -300,6 +308,7 @@ const getItem = async (id) => {
     return {
         ...metadata,
         ...item.publicData,
+        category: metadata?.category || item.publicData?.nftCategory || "Art",
         ipfsUrl: item.url,
         ipfsId: item.id,
     };
@@ -332,6 +341,7 @@ const listItems = async (filterParams) => {
                 ...metadata,
                 // Pinata searchable fields as fallback / supplement
                 ...item.publicData,
+                category: metadata?.category || item.publicData?.nftCategory || "Art",
                 ipfsUrl: item.url,
                 ipfsId: item.id,
             };
