@@ -87,38 +87,45 @@ const deployDefaultCollection = async () => {
 const _validateAuth = async (params) => {
     const { walletType, proof, signature, message, owner, faceBase64, password } = params;
 
-    if (walletType === "zelf") {
-        if (!proof || !faceBase64) throw new Error("400:missing_zelf_proof_data");
+    if (!signature || !message) throw new Error("400:missing_signature_data");
 
-        // Verify ZelfProof by attempting to decrypt it
-        // If decryption works, the proof is valid and belongs to the user
-        const decrypted = await ZelfProofModule.decrypt({
-            faceBase64,
-            password, // Optional depending on setup
-            zelfProof: proof,
-            os: "WEB", // Assumed context
-        });
+    // Verify EVM signature
+    const recoveredAddress = ethers.verifyMessage(message, signature);
 
-        if (!decrypted || decrypted.error) {
-            throw new Error("401:invalid_zelf_proof");
-        }
+    if (recoveredAddress.toLowerCase() !== owner.toLowerCase()) throw new Error("401:signature_mismatch");
 
-        // Return decrypted metadata in case we need it
-        return decrypted;
-    } else if (walletType === "external") {
-        if (!signature || !message) throw new Error("400:missing_signature_data");
+    return { verified: true, address: recoveredAddress };
 
-        // Verify EVM signature
-        const recoveredAddress = ethers.verifyMessage(message, signature);
+    // if (walletType === "zelf") {
+    //     if (!proof || !faceBase64) throw new Error("400:missing_zelf_proof_data");
 
-        if (recoveredAddress.toLowerCase() !== owner.toLowerCase()) {
-            throw new Error("401:signature_mismatch");
-        }
+    //     // Verify ZelfProof by attempting to decrypt it
+    //     // If decryption works, the proof is valid and belongs to the user
+    //     const decrypted = await ZelfProofModule.decrypt({
+    //         faceBase64,
+    //         password, // Optional depending on setup
+    //         zelfProof: proof,
+    //         os: "WEB", // Assumed context
+    //     });
 
-        return { verified: true, address: recoveredAddress };
-    } else {
-        throw new Error("400:invalid_wallet_type");
-    }
+    //     if (!decrypted || decrypted.error) {
+    //         throw new Error("401:invalid_zelf_proof");
+    //     }
+
+    //     // Return decrypted metadata in case we need it
+    //     return decrypted;
+    // } else if (walletType === "external") {
+    //     if (!signature || !message) throw new Error("400:missing_signature_data");
+
+    //     // Verify EVM signature
+    //     const recoveredAddress = ethers.verifyMessage(message, signature);
+
+    //     if (recoveredAddress.toLowerCase() !== owner.toLowerCase()) throw new Error("401:signature_mismatch");
+
+    //     return { verified: true, address: recoveredAddress };
+    // } else {
+    //     throw new Error("400:invalid_wallet_type");
+    // }
 };
 
 /**
@@ -215,6 +222,68 @@ const deleteCollection = async (id, authdUser) => {
     // 4. Securely unpin file
     const result = await IPFS.deleteFiles([id]);
     return { success: true, result };
+};
+
+/**
+ * Update Collection coverImage and/or avatarImage.
+ * Owner-only. Verifies signature, then delete+repin with merged metadata.
+ * @param {string} id - Pinata file ID
+ * @param {Object} updates - { coverImage?, avatarImage? }
+ * @param {Object} authdUser - { walletType, owner, signature, message } or Zelf proof
+ */
+const updateCollection = async (id, updates, authdUser) => {
+    const { coverImage, avatarImage } = updates;
+
+    if (!coverImage && !avatarImage) throw new Error("400:provide_cover_image_or_avatar_image");
+
+    // 1. Fetch existing file and JSON content
+    const existingFile = await IPFS.getFileById(id);
+
+    if (!existingFile || !existingFile.publicData) throw new Error("404:collection_not_found");
+
+    const { owner: actualOwner } = existingFile.publicData;
+    if (!actualOwner) throw new Error("400:collection_owner_undefined");
+    if (!authdUser) throw new Error("400:missing_auth_payload_body_empty");
+
+    // 2. Fetch existing JSON content
+    const existingJson = await _fetchIpfsJson(existingFile.url);
+    if (!existingJson) throw new Error("404:collection_content_not_found");
+
+    // 3. Verify auth
+    await _validateAuth(authdUser);
+
+    if (actualOwner.toLowerCase() !== authdUser.owner.toLowerCase()) throw new Error("403:unauthorized");
+
+    // 4. Merge updates (only non-empty values)
+    const collectionData = {
+        ...existingJson,
+        ...(coverImage && { coverImage }),
+        ...(avatarImage && { avatarImage }),
+    };
+
+    // 5. Delete old pin
+    await IPFS.deleteFiles([id]);
+
+    // 6. Re-pin with updated content
+    const fileName = `collection_${collectionData.name?.replace(/\s+/g, "_") || "collection"}_${Date.now()}.json`;
+    const ipfsMetadata = {
+        category: "blockdag_nft_collection",
+        owner: collectionData.owner,
+        contractAddress: collectionData.contractAddress || "",
+        name: collectionData.name,
+        symbol: collectionData.symbol,
+        walletType: collectionData.walletType || "external",
+        collectionCategory: collectionData.category || "Art",
+    };
+    const base64Data = Buffer.from(JSON.stringify(collectionData)).toString("base64");
+    const base64Json = `data:application/json;base64,${base64Data}`;
+    const ipfsResult = await IPFS.pinFile(base64Json, fileName, "application/json", ipfsMetadata);
+
+    return {
+        success: true,
+        ipfs: ipfsResult,
+        collection: collectionData,
+    };
 };
 
 /**
@@ -455,7 +524,7 @@ const mintOnChain = async (collectionAddress, recipientAddress, tokenURI) => {
                 tokenId = (parsed.args[2] || parsed.args.tokenId).toString();
                 break;
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     return { tokenId, txHash: receipt.hash };
@@ -529,6 +598,7 @@ module.exports = {
     getDefaultCollection,
     deployDefaultCollection,
     storeCollection,
+    updateCollection,
     deleteCollection,
     storeNFT,
     listCollections,

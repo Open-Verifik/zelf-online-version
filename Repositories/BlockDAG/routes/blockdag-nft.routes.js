@@ -9,6 +9,7 @@ module.exports = (server) => {
     // Protected: Upload, Create Collection & Item
     server.post(`${PATH}/upload`, Controller.upload);
     server.post(`${PATH}/collection`, Middleware.createCollectionValidation, Controller.createCollection);
+    server.patch(`${PATH}/collection/:id`, Middleware.updateCollectionValidation, Controller.updateCollection);
     server.post(`${PATH}/item`, Middleware.createNFTValidation, Controller.createNFT);
     // Protected: Server-side mint for shared/owner-only collections (uses deployer key)
     server.post(`${PATH}/item/mint`, Middleware.mintNFTValidation, Controller.mintNFT);

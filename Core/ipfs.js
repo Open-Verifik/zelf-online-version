@@ -371,6 +371,11 @@ const getFileById = async (id) => {
         } else if (normalized.keyvalues) {
             normalized.publicData = parseMetadataFromPinata(normalized.keyvalues);
         }
+        if (normalized.cid) {
+            normalized.url = `https://${pinataGateway}/ipfs/${normalized.cid}`;
+        } else if (normalized.ipfsHash) {
+            normalized.url = `https://${pinataGateway}/ipfs/${normalized.ipfsHash}`;
+        }
         return normalized;
     } catch (e) {
         throw new Error(`404:file_not_found:${id}`);

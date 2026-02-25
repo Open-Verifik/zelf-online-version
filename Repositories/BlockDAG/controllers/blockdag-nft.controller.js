@@ -70,6 +70,30 @@ const createNFT = async (ctx) => {
 };
 
 /**
+ * Update a Collection (coverImage and/or avatarImage). Owner-only.
+ */
+const updateCollection = async (ctx) => {
+    try {
+        const { id } = ctx.request.params;
+        const { coverImage, avatarImage, ...auth } = ctx.request.body;
+
+        const result = await BlockDagNftModule.updateCollection(id, { coverImage, avatarImage }, auth);
+
+        ctx.body = {
+            success: true,
+            data: result,
+        };
+    } catch (error) {
+        const _exception = httpHandler.errorHandler(error, ctx);
+        ctx.status = _exception.status || 500;
+        ctx.body = {
+            code: _exception.code,
+            message: _exception.message,
+        };
+    }
+};
+
+/**
  * Delete a Collection
  */
 const deleteCollection = async (ctx) => {
@@ -233,6 +257,7 @@ const deployDefaultCollection = async (ctx) => {
 module.exports = {
     upload,
     createCollection,
+    updateCollection,
     deleteCollection,
     createNFT,
     mintNFT,
