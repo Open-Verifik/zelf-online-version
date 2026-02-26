@@ -158,21 +158,65 @@ const getItems = async (ctx) => {
 };
 
 /**
- * Get a single NFT item by Pinata file ID
+ * Get items for a collection by collection address (contract address).
+ * Dedicated endpoint — uses single-key filter by "collection" (Pinata limitation).
+ */
+const getCollectionItems = async (ctx) => {
+    try {
+        const { id } = ctx.request.params;
+        const { owner } = ctx.request.query;
+        const result = await BlockDagNftModule.getItemsByCollection(id, { owner });
+        ctx.body = {
+            success: true,
+            data: result,
+        };
+    } catch (error) {
+        ctx.status = error.status || 500;
+        ctx.body = {
+            success: false,
+            error: error.message,
+        };
+    }
+};
+
+/**
+ * Get a single NFT item by query param ?cid= (IPFS CID).
+ * Preferred: standard content-addressed identifier.
+ */
+const getItemByQuery = async (ctx) => {
+    try {
+        const { cid } = ctx.request.query;
+        if (!cid) {
+            ctx.status = 400;
+            ctx.body = { success: false, error: "cid query parameter is required" };
+            return;
+        }
+        const result = await BlockDagNftModule.getItem(cid);
+        _surfaceTokenId(result);
+        ctx.body = { success: true, data: result };
+    } catch (error) {
+        const status = parseInt(error.message?.split(":")[0]) || 500;
+        ctx.status = status;
+        ctx.body = { success: false, error: error.message };
+    }
+};
+
+const _surfaceTokenId = (result) => {
+    const kv = result?.publicData || result?.metadata?.keyvalues || {};
+    if (kv.tokenId != null && result) {
+        result.tokenId = kv.tokenId;
+        result.mintTxHash = kv.mintTxHash || null;
+    }
+};
+
+/**
+ * Get a single NFT item by path param (CID or Pinata file ID)
  */
 const getItem = async (ctx) => {
     try {
         const { id } = ctx.request.params;
         const result = await BlockDagNftModule.getItem(id);
-
-        // Surface tokenId and txHash from Pinata keyvalues to top-level for convenience
-        const kv = result?.publicData || result?.metadata?.keyvalues || {};
-
-        if (kv.tokenId != null && result) {
-            result.tokenId = kv.tokenId;
-            result.mintTxHash = kv.mintTxHash || null;
-        }
-
+        _surfaceTokenId(result);
         ctx.body = { success: true, data: result };
     } catch (error) {
         const status = parseInt(error.message?.split(":")[0]) || 500;
@@ -263,7 +307,9 @@ module.exports = {
     mintNFT,
     getCollections,
     getItems,
+    getCollectionItems,
     getItem,
+    getItemByQuery,
     getDefaultCollection,
     deployDefaultCollection,
     updateTokenId,

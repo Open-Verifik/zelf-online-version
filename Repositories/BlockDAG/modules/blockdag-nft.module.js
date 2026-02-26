@@ -388,15 +388,57 @@ const _fetchIpfsJson = async (url) => {
 };
 
 /**
- * Get a single NFT item by its Pinata file ID.
- * Returns the Pinata keyvalue metadata merged with the real IPFS JSON content.
+ * Enrich raw IPFS file results with fetched JSON metadata.
+ * Shared by listItems and getItemsByCollection.
+ */
+const _enrichItems = async (rawResults) => {
+    return Promise.all(
+        rawResults.map(async (item) => {
+            const metadata = await _fetchIpfsJson(item.url);
+            return {
+                ...metadata,
+                ...item.publicData,
+                category: metadata?.category || item.publicData?.nftCategory || "Art",
+                ipfsUrl: item.url,
+                ipfsId: item.id,
+            };
+        })
+    );
+};
+
+/**
+ * Check if a string looks like an IPFS CID (v0 Qm... or v1 bafy.../bafk.../bafz...).
+ */
+const _isIpfsCid = (s) => {
+    if (!s || typeof s !== "string") return false;
+    const t = s.trim();
+    return t.startsWith("Qm") || t.startsWith("baf") || t.startsWith("ba") || /^[a-zA-Z0-9]{46,}$/.test(t);
+};
+
+/**
+ * Get a single NFT item by Pinata file ID or IPFS CID.
+ * Prefers CID lookup when the id looks like a CID (standard, content-addressed).
  */
 const getItem = async (id) => {
     if (!id) throw new Error("400:missing_id");
 
-    // List all NFT items and find the one matching this ID
-    const results = await IPFS.filter("category", "blockdag_nft_item");
-    const item = results.find((r) => r.id === id);
+    let item;
+
+    if (_isIpfsCid(id)) {
+        // Lookup by IPFS CID (standard, content-addressed)
+        const results = await IPFS.filter("cid", id.trim());
+        item = results[0];
+    } else {
+        // Lookup by Pinata file ID (UUID)
+        try {
+            item = await IPFS.getFileById(id);
+        } catch {
+            throw new Error("404:nft_not_found");
+        }
+        if (item?.publicData?.category !== "blockdag_nft_item") {
+            throw new Error("404:nft_not_found");
+        }
+    }
 
     if (!item) throw new Error("404:nft_not_found");
 
@@ -408,7 +450,31 @@ const getItem = async (id) => {
         category: metadata?.category || item.publicData?.nftCategory || "Art",
         ipfsUrl: item.url,
         ipfsId: item.id,
+        cid: item.cid,
     };
+};
+
+/**
+ * Get items for a single collection.
+ * Uses single-key filter (Pinata only supports one key) — filter by "collection" to avoid category's 50-item limit.
+ * @param {string} collectionAddress - Contract address of the collection (0x...)
+ * @param {Object} options - { owner } for optional owner filter
+ */
+const getItemsByCollection = async (collectionAddress, options = {}) => {
+    if (!collectionAddress) return [];
+
+    // Pinata supports only ONE key filter — use "collection" (items with this key are NFT items)
+    const colNorm = collectionAddress.toLowerCase();
+    let results = await IPFS.filter("collection", colNorm, { limit: 250 });
+    if (results.length === 0 && collectionAddress !== colNorm) {
+        results = await IPFS.filter("collection", collectionAddress, { limit: 250 });
+    }
+
+    if (options.owner) {
+        results = results.filter((item) => item.publicData?.owner?.toLowerCase() === options.owner.toLowerCase());
+    }
+
+    return _enrichItems(results);
 };
 
 /**
@@ -417,35 +483,15 @@ const getItem = async (id) => {
 const listItems = async (filterParams) => {
     const { owner, collection } = filterParams;
 
-    // Base filter
-    let results = await IPFS.filter("category", "blockdag_nft_item");
+    if (collection) {
+        return getItemsByCollection(collection, { owner });
+    }
 
-    // Client-side filtering
+    let results = await IPFS.filter("category", "blockdag_nft_item");
     if (owner) {
         results = results.filter((item) => item.publicData?.owner?.toLowerCase() === owner.toLowerCase());
     }
-
-    if (collection) {
-        results = results.filter((item) => item.publicData?.collection?.toLowerCase() === collection.toLowerCase());
-    }
-
-    // Fetch real NFT metadata from IPFS in parallel
-    const enriched = await Promise.all(
-        results.map(async (item) => {
-            const metadata = await _fetchIpfsJson(item.url);
-            return {
-                // Real ERC-721 fields from the stored JSON (name, image, description, attributes, etc.)
-                ...metadata,
-                // Pinata searchable fields as fallback / supplement
-                ...item.publicData,
-                category: metadata?.category || item.publicData?.nftCategory || "Art",
-                ipfsUrl: item.url,
-                ipfsId: item.id,
-            };
-        })
-    );
-
-    return enriched;
+    return _enrichItems(results);
 };
 
 /**
@@ -603,6 +649,7 @@ module.exports = {
     storeNFT,
     listCollections,
     listItems,
+    getItemsByCollection,
     mintOnChain,
     updateItemTokenId,
     replaceNftItemWithNewOwner,

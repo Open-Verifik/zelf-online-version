@@ -261,83 +261,43 @@ const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "i
     }
 };
 
-const filter = async (property = "name", value, options = {}) => {
-    let files;
+const _executeListQuery = async (query, validLimit, pageOffset) => {
+    if (typeof query.limit !== "function") return await query;
+    const limited = query.limit(validLimit);
+    if (typeof limited.pageOffset === "function") return await limited.pageOffset(pageOffset);
+    if (typeof limited.offset === "function") return await limited.offset(pageOffset);
+    return await limited;
+};
 
+const _normalizeFiles = (files) => {
+    for (const file of files) {
+        const n = normalizePinataResponse(file);
+        if (n.cid && n.cid !== "pending") n.url = `https://${pinataGateway}/ipfs/${n.cid}`;
+        if (n.metadata?.keyvalues) n.publicData = parseMetadataFromPinata(n.metadata.keyvalues);
+        else if (n.keyvalues) {
+            n.publicData = parseMetadataFromPinata(n.keyvalues);
+            delete n.keyvalues;
+        }
+        Object.assign(file, n);
+    }
+    return files;
+};
+
+const filter = async (property = "name", value, options = {}) => {
     try {
-        // Default to 50 records, with support for 25, 50, 100, 250, 500
         const limit = options.limit || 50;
         const pageOffset = options.pageOffset || 0;
+        const validLimit = [25, 50, 100, 250, 500].includes(limit) ? limit : 50;
 
-        // Validate limit is one of the allowed values, default to 50 if invalid
-        const allowedLimits = [25, 50, 100, 250, 500];
-        const validLimit = allowedLimits.includes(limit) ? limit : 50;
+        let query;
+        if (property === "name") query = web3Instance.files.public.list().name(value);
+        else if (property === "cid") query = web3Instance.files.public.list().cid(value);
+        else query = web3Instance.files.public.list().keyvalues({ [property]: value });
 
-        // Use the new Pinata SDK v2.5.0 with JWT authentication
-        let response;
-        if (property === "name") {
-            const query = web3Instance.files.public.list().name(value);
-            // Add pagination if methods are available
-            if (typeof query.limit === "function") {
-                const limitedQuery = query.limit(validLimit);
-                // Handle offset/pageOffset if available
-                if (typeof limitedQuery.pageOffset === "function") {
-                    response = await limitedQuery.pageOffset(pageOffset);
-                } else if (typeof limitedQuery.offset === "function") {
-                    response = await limitedQuery.offset(pageOffset);
-                } else {
-                    response = await limitedQuery;
-                }
-            } else {
-                response = await query;
-            }
-        } else {
-            const query = web3Instance.files.public.list().keyvalues({ [property]: value });
-            // Add pagination if methods are available
-            if (typeof query.limit === "function") {
-                const limitedQuery = query.limit(validLimit);
-                // Handle offset/pageOffset if available
-                if (typeof limitedQuery.pageOffset === "function") {
-                    response = await limitedQuery.pageOffset(pageOffset);
-                } else if (typeof limitedQuery.offset === "function") {
-                    response = await limitedQuery.offset(pageOffset);
-                } else {
-                    response = await limitedQuery;
-                }
-            } else {
-                response = await query;
-            }
-        }
-
-        files = response.files || [];
-
-        if (!files || !files.length) return [];
-
-        // Update each file with the URL using the new cid field
-        for (let index = 0; index < files.length; index++) {
-            const file = files[index];
-
-            // Normalize response keys to handle inconsistent casing (Keyvalues vs keyvalues)
-            const normalizedFile = normalizePinataResponse(file);
-
-            // Use cid instead of ipfs_pin_hash for the new API
-            if (normalizedFile.cid && normalizedFile.cid !== "pending") {
-                normalizedFile.url = `https://${pinataGateway}/ipfs/${normalizedFile.cid}`;
-            }
-
-            // Parse metadata keyvalues to simple format
-            if (normalizedFile.metadata && normalizedFile.metadata.keyvalues) {
-                normalizedFile.publicData = parseMetadataFromPinata(normalizedFile.metadata.keyvalues);
-            } else if (normalizedFile.keyvalues) {
-                normalizedFile.publicData = parseMetadataFromPinata(normalizedFile.keyvalues);
-                delete normalizedFile.keyvalues;
-            }
-
-            // Update the original file object with normalized values
-            Object.assign(file, normalizedFile);
-        }
-
-        return files;
+        const response = await _executeListQuery(query, validLimit, pageOffset);
+        const files = response.files || [];
+        if (!files.length) return [];
+        return _normalizeFiles(files);
     } catch (error) {
         console.error("Error filtering files:", error);
         return [];
@@ -364,8 +324,11 @@ const deleteFiles = async (ids = []) => {
 const getFileById = async (id) => {
     try {
         const file = await web3Instance.files.public.get(id);
+
         if (!file) throw new Error(`404:file_not_found:${id}`);
+
         const normalized = normalizePinataResponse(file);
+
         if (normalized.metadata?.keyvalues) {
             normalized.publicData = parseMetadataFromPinata(normalized.metadata.keyvalues);
         } else if (normalized.keyvalues) {
