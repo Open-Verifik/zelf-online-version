@@ -4,6 +4,7 @@ module.exports = (server) => {
     //C
     require("../Repositories/Client/routes/unprotected-client.route")(server);
     require("../Repositories/BlockDAG/routes/blockdag-nft-public.routes")(server);
+    require("../Repositories/BlockDAG/routes/blockdag-public.routes")(server);
     //D
     //E
     //F
