@@ -164,8 +164,8 @@ const getItems = async (ctx) => {
 const getCollectionItems = async (ctx) => {
     try {
         const { id } = ctx.request.params;
-        const { owner } = ctx.request.query;
-        const result = await BlockDagNftModule.getItemsByCollection(id, { owner });
+        const { owner, limit } = ctx.request.query;
+        const result = await BlockDagNftModule.getItemsByCollection(id, { owner, limit });
         ctx.body = {
             success: true,
             data: result,
@@ -181,7 +181,6 @@ const getCollectionItems = async (ctx) => {
 
 /**
  * Get a single NFT item by query param ?cid= (IPFS CID).
- * Preferred: standard content-addressed identifier.
  */
 const getItemByQuery = async (ctx) => {
     try {

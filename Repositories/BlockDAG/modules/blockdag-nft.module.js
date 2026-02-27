@@ -365,6 +365,7 @@ const listCollections = async ({ owner } = {}) => {
                 category: metadata?.category || item.publicData?.collectionCategory || "Art",
                 ipfsUrl: item.url,
                 ipfsId: item.id,
+                cid: item.cid,
             };
         })
     );
@@ -401,6 +402,7 @@ const _enrichItems = async (rawResults) => {
                 category: metadata?.category || item.publicData?.nftCategory || "Art",
                 ipfsUrl: item.url,
                 ipfsId: item.id,
+                cid: item.cid,
             };
         })
     );
@@ -458,16 +460,19 @@ const getItem = async (id) => {
  * Get items for a single collection.
  * Uses single-key filter (Pinata only supports one key) — filter by "collection" to avoid category's 50-item limit.
  * @param {string} collectionAddress - Contract address of the collection (0x...)
- * @param {Object} options - { owner } for optional owner filter
+ * @param {Object} options - { owner, limit } for optional filters
  */
 const getItemsByCollection = async (collectionAddress, options = {}) => {
     if (!collectionAddress) return [];
 
+    const rawLimit = options.limit != null ? Number(options.limit) : 250;
+    const validLimit = [25, 50, 100, 250, 500].includes(rawLimit) ? rawLimit : 250;
+
     // Pinata supports only ONE key filter — use "collection" (items with this key are NFT items)
     const colNorm = collectionAddress.toLowerCase();
-    let results = await IPFS.filter("collection", colNorm, { limit: 250 });
+    let results = await IPFS.filter("collection", colNorm, { limit: validLimit });
     if (results.length === 0 && collectionAddress !== colNorm) {
-        results = await IPFS.filter("collection", collectionAddress, { limit: 250 });
+        results = await IPFS.filter("collection", collectionAddress, { limit: validLimit });
     }
 
     if (options.owner) {
@@ -481,10 +486,10 @@ const getItemsByCollection = async (collectionAddress, options = {}) => {
  * List items (optionally filtered by owner or collection)
  */
 const listItems = async (filterParams) => {
-    const { owner, collection } = filterParams;
+    const { owner, collection, limit } = filterParams;
 
     if (collection) {
-        return getItemsByCollection(collection, { owner });
+        return getItemsByCollection(collection, { owner, limit });
     }
 
     let results = await IPFS.filter("category", "blockdag_nft_item");
@@ -578,10 +583,13 @@ const mintOnChain = async (collectionAddress, recipientAddress, tokenURI) => {
 
 /**
  * Update an NFT item's on-chain tokenId.
- * Uses IPFS.updateItemTokenId (SDK update when possible).
  */
 const updateItemTokenId = async (ipfsFileId, tokenId, txHash) => {
-    const newPin = await IPFS.updateItemTokenId(ipfsFileId, tokenId, txHash);
+    const keyvalues = {
+        tokenId: String(tokenId),
+        mintTxHash: txHash || "",
+    };
+    const newPin = await IPFS.updateFileKeyvalues(ipfsFileId, keyvalues);
 
     return {
         success: true,
@@ -596,18 +604,30 @@ const updateItemTokenId = async (ipfsFileId, tokenId, txHash) => {
 
 /**
  * Replace an NFT pin with updated metadata (tokenId, txHash, owner).
- * Pinata does NOT allow updating keyvalues — we must delete and re-pin.
- * Returns the new Pinata file ID; frontend must redirect to the new URL.
+ * Verifies owner on-chain via ownerOf(tokenId) instead of trusting frontend.
+ * Falls back to provided owner if chain call fails.
  *
  * @param {string} ipfsFileId - Current Pinata file ID
  * @param {string|number} tokenId - On-chain token ID
  * @param {string} txHash - Mint/sale tx hash
- * @param {string} [owner] - New owner (when provided, e.g. after buy/acceptOffer). Otherwise keeps existing owner.
+ * @param {string} [owner] - Hint; overridden by on-chain ownerOf when available.
  */
 const replaceNftItemWithNewOwner = async (ipfsFileId, tokenId, txHash, owner) => {
     const item = await getItem(ipfsFileId);
     const publicData = item.publicData || {};
-    const resolvedOwner = owner ?? item.owner ?? publicData.owner ?? "";
+    const collectionAddr = item.collection || publicData.collection || "";
+
+    let resolvedOwner = owner ?? item.owner ?? publicData.owner ?? "";
+    if (collectionAddr && collectionAddr !== "none" && tokenId) {
+        try {
+            const rpcUrl = config.blockdag?.rpcUrl || "https://rpc.bdagscan.com";
+            const provider = new ethers.JsonRpcProvider(rpcUrl);
+            const contract = new ethers.Contract(collectionAddr, ERC721_ABI, provider);
+            resolvedOwner = await contract.ownerOf(BigInt(tokenId));
+        } catch {
+            // Chain call failed — fall back to provided owner
+        }
+    }
 
     const keyvalues = {
         category: "blockdag_nft_item",

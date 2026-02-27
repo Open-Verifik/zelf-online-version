@@ -11,7 +11,7 @@ module.exports = (server) => {
     server.get(`${PATH}/items`, Controller.getItems);
     server.get(`${PATH}/collection/:id/items`, Controller.getCollectionItems);
 
-    // Public: Get a single NFT item — by CID (query) or by path (CID or Pinata ID)
+    // Public: Get a single NFT item — by ?cid= (query) or by path param (CID or Pinata ID)
     server.get(`${PATH}/item`, Controller.getItemByQuery);
 
     server.get(`${PATH}/item/:id`, Controller.getItem);
