@@ -261,14 +261,6 @@ const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "i
     }
 };
 
-const _executeListQuery = async (query, validLimit, pageOffset) => {
-    if (typeof query.limit !== "function") return await query;
-    const limited = query.limit(validLimit);
-    if (typeof limited.pageOffset === "function") return await limited.pageOffset(pageOffset);
-    if (typeof limited.offset === "function") return await limited.offset(pageOffset);
-    return await limited;
-};
-
 const _normalizeFiles = (files) => {
     for (const file of files) {
         const n = normalizePinataResponse(file);
@@ -283,21 +275,42 @@ const _normalizeFiles = (files) => {
     return files;
 };
 
+/**
+ * Auto-paginating filter using Pinata cursor-based pagination.
+ * Keeps fetching pages via next_page_token until exhausted or safety cap (1000) is hit.
+ * Each page requests 100 items (Pinata max per request).
+ */
 const filter = async (property = "name", value, options = {}) => {
+    const PAGE_SIZE = 100; // Pinata max per request
+    const SAFETY_CAP = options.limit || 1000;
+    const allFiles = [];
+
     try {
-        const limit = options.limit || 50;
-        const pageOffset = options.pageOffset || 0;
-        const validLimit = [25, 50, 100, 250, 500].includes(limit) ? limit : 50;
+        let pageToken = null;
 
-        let query;
-        if (property === "name") query = web3Instance.files.public.list().name(value);
-        else if (property === "cid") query = web3Instance.files.public.list().cid(value);
-        else query = web3Instance.files.public.list().keyvalues({ [property]: value });
+        while (allFiles.length < SAFETY_CAP) {
+            let query;
+            if (property === "name") query = web3Instance.files.public.list().name(value);
+            else if (property === "cid") query = web3Instance.files.public.list().cid(value);
+            else query = web3Instance.files.public.list().keyvalues({ [property]: value });
 
-        const response = await _executeListQuery(query, validLimit, pageOffset);
-        const files = response.files || [];
-        if (!files.length) return [];
-        return _normalizeFiles(files);
+            query = query.limit(PAGE_SIZE);
+            if (pageToken && typeof query.pageToken === "function") {
+                query = query.pageToken(pageToken);
+            }
+
+            const response = await query;
+            const files = response.files || [];
+            allFiles.push(...files);
+
+            pageToken = response.next_page_token || null;
+
+            // Stop if Pinata says there are no more pages, or this page was empty
+            if (!pageToken || files.length === 0) break;
+        }
+
+        if (!allFiles.length) return [];
+        return _normalizeFiles(allFiles);
     } catch (error) {
         console.error("Error filtering files:", error);
         return [];

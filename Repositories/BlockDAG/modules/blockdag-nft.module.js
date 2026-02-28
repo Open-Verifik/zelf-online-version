@@ -349,10 +349,14 @@ const storeNFT = async (data, authdUser) => {
  * Optionally filtered by owner address (case-insensitive).
  */
 const listCollections = async ({ owner } = {}) => {
-    let results = await IPFS.filter("category", "blockdag_nft_collection");
+    let results;
 
     if (owner) {
-        results = results.filter((item) => item.publicData?.owner?.toLowerCase() === owner.toLowerCase());
+        results = await IPFS.filter("owner", owner);
+
+        results = results.filter((item) => item.publicData?.category === "blockdag_nft_collection");
+    } else {
+        results = await IPFS.filter("category", "blockdag_nft_collection");
     }
 
     const enriched = await Promise.all(
@@ -492,10 +496,13 @@ const listItems = async (filterParams) => {
         return getItemsByCollection(collection, { owner, limit });
     }
 
-    let results = await IPFS.filter("category", "blockdag_nft_item");
     if (owner) {
-        results = results.filter((item) => item.publicData?.owner?.toLowerCase() === owner.toLowerCase());
+        const results = await IPFS.filter("owner", owner);
+        return _enrichItems(results);
     }
+
+    let results = await IPFS.filter("category", "blockdag_nft_item");
+
     return _enrichItems(results);
 };
 
@@ -575,7 +582,7 @@ const mintOnChain = async (collectionAddress, recipientAddress, tokenURI) => {
                 tokenId = (parsed.args[2] || parsed.args.tokenId).toString();
                 break;
             }
-        } catch (e) { }
+        } catch (e) {}
     }
 
     return { tokenId, txHash: receipt.hash };
