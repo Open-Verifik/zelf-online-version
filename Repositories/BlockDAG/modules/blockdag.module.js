@@ -2,6 +2,7 @@ const axios = require("axios");
 const moment = require("moment");
 const https = require("https");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
+const config = require("../../../Core/config");
 
 // Create axios instance with timeout and better error handling
 const agent = new https.Agent({
@@ -24,7 +25,8 @@ const generateRandomUserAgent = () => {
 };
 
 // BlockDAG RPC endpoint
-const BLOCKDAG_RPC = "https://rpc.bdagscan.com";
+const BLOCKDAG_RPC = config.blockdag?.rpcUrl || "https://rpc.bdagscan.com";
+const NOWNODES_BLOCKDAG_RPC = "https://bdag.nownodes.io";
 const BLOCKDAG_TESTNET_RPC = "https://testnet-rpc.blockdag.network"; // Keep for reference if needed
 const BLOCKDAG_EXPLORER = "https://bdagscan.com";
 const apiForAddressBalance = "https://api.bdagscan.com/v1/api/transaction/getAddressInfo?address=";
@@ -239,6 +241,59 @@ const transformApiTransaction = (tx, address) => {
 };
 
 /**
+ * Centralized RPC request handler with NowNodes support and fallback
+ * @param {string} method - RPC method
+ * @param {Array} params - RPC parameters
+ * @returns {Promise<Object>} RPC response data
+ */
+const requestRPC = async (method, params = []) => {
+    const nowNodesAPIKey = config.blockdag?.nowNodesAPIKey;
+
+    if (nowNodesAPIKey) {
+        try {
+            const response = await instance.post(
+                NOWNODES_BLOCKDAG_RPC,
+                {
+                    jsonrpc: "2.0",
+                    method,
+                    params,
+                    id: 1,
+                },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "api-key": nowNodesAPIKey,
+                    },
+                }
+            );
+            if (response.data && !response.data.error) {
+                return response.data;
+            }
+            if (response.data?.error) {
+                console.warn(`NowNodes RPC error for ${method}:`, response.data.error.message);
+            }
+        } catch (error) {
+            console.warn(`NowNodes RPC connection failed for ${method}:`, error.message);
+        }
+    }
+
+    // Fallback to default RPC
+    const response = await instance.post(
+        BLOCKDAG_RPC,
+        {
+            jsonrpc: "2.0",
+            method,
+            params,
+            id: 1,
+        },
+        {
+            headers: { "Content-Type": "application/json" },
+        }
+    );
+    return response.data;
+};
+
+/**
  * Transform RPC transaction format to expected format
  * @param {Object} tx - Transaction from RPC
  * @param {string} address - Address to determine transaction direction
@@ -292,49 +347,20 @@ const transformRpcTransaction = (tx, address) => {
  * @returns {Array} Array of raw RPC transactions
  */
 const fetchTransactionsFromRPC = async (address) => {
-    let rpcUrl = BLOCKDAG_RPC;
     let response = null;
-
     try {
-        response = await instance.post(
-            rpcUrl,
-            {
-                jsonrpc: "2.0",
-                method: "getAddressTxs",
-                params: [address],
-                id: 1,
-            },
-            {
-                headers: { "Content-Type": "application/json" },
-            }
-        );
+        response = await requestRPC("getAddressTxs", [address]);
     } catch (testnetError) {
-        console.log("Testnet RPC failed, trying mainnet RPC:", testnetError.message);
-        // Fallback to mainnet RPC
-        rpcUrl = BLOCKDAG_RPC;
-        try {
-            response = await instance.post(
-                rpcUrl,
-                {
-                    jsonrpc: "2.0",
-                    method: "getAddressTxs",
-                    params: [address],
-                    id: 1,
-                },
-                {
-                    headers: { "Content-Type": "application/json" },
-                }
-            );
-        } catch (mainnetError) {
-            console.error("Both RPC endpoints failed:", mainnetError.message);
-            throw mainnetError;
-        }
+        console.log("NowNodes or primary RPC failed, trying fallback logic if any:", testnetError.message);
+        // The requestRPC already handled the fallback to BLOCKDAG_RPC.
+        // If we reach here, it means both failed or returned an error.
+        throw testnetError;
     }
 
-    if (!response || !response.data || response.data.error) {
-        const errorCode = response?.data?.error?.code;
+    if (!response || response.error) {
+        const errorCode = response?.error?.code;
         if (errorCode === -32601) {
-            console.log(`BlockDAG RPC: getAddressTxs method not available on ${rpcUrl}. Returning empty transactions.`);
+            console.log(`BlockDAG RPC: getAddressTxs method not available. Returning empty transactions.`);
         } else {
             console.error("RPC error:", response?.data?.error || "Unknown error");
         }
@@ -347,19 +373,8 @@ const fetchTransactionsFromRPC = async (address) => {
 // Helper function to get latest block number
 const getLatestBlock = async () => {
     try {
-        const response = await instance.post(
-            BLOCKDAG_RPC,
-            {
-                jsonrpc: "2.0",
-                method: "eth_blockNumber",
-                params: [],
-                id: 1,
-            },
-            {
-                headers: { "Content-Type": "application/json" },
-            }
-        );
-        return parseInt(response.data.result, 16);
+        const data = await requestRPC("eth_blockNumber");
+        return parseInt(data.result, 16);
     } catch (error) {
         console.error("BlockDAG getLatestBlock error:", error.message);
         return 0;
@@ -379,19 +394,8 @@ const fetchBdagBalance = async (address) => {
     } catch (apiError) {
         console.log("BlockDAG API balance fetch failed, trying RPC:", apiError.message);
         try {
-            const balanceResponse = await instance.post(
-                BLOCKDAG_RPC,
-                {
-                    jsonrpc: "2.0",
-                    method: "eth_getBalance",
-                    params: [address, "latest"],
-                    id: 1,
-                },
-                {
-                    headers: { "Content-Type": "application/json" },
-                }
-            );
-            const balance = balanceResponse.data.result ? (parseInt(balanceResponse.data.result, 16) / Math.pow(10, 18)).toString() : "0";
+            const data = await requestRPC("eth_getBalance", [address, "latest"]);
+            const balance = data.result ? (parseInt(data.result, 16) / Math.pow(10, 18)).toString() : "0";
             return {
                 balance,
                 firstTransaction: null,
@@ -662,27 +666,16 @@ const getTokens = async (params, query) => {
         for (const token of commonTokens) {
             try {
                 // Get token balance using ERC20 balanceOf function via RPC
-                const balanceResponse = await instance.post(
-                    BLOCKDAG_RPC,
+                const data = await requestRPC("eth_call", [
                     {
-                        jsonrpc: "2.0",
-                        method: "eth_call",
-                        params: [
-                            {
-                                to: token.contractAddress,
-                                data: "0x70a08231" + "000000000000000000000000" + address.slice(2), // balanceOf(address)
-                            },
-                            "latest",
-                        ],
-                        id: 1,
+                        to: token.contractAddress,
+                        data: "0x70a08231" + "000000000000000000000000" + address.slice(2), // balanceOf(address)
                     },
-                    {
-                        headers: { "Content-Type": "application/json" },
-                    }
-                );
+                    "latest",
+                ]);
 
-                if (balanceResponse.data.result && balanceResponse.data.result !== "0x" && balanceResponse.data.result !== "0x0") {
-                    const balance = parseInt(balanceResponse.data.result, 16);
+                if (data.result && data.result !== "0x" && data.result !== "0x0") {
+                    const balance = parseInt(data.result, 16);
                     if (balance > 0) {
                         const amount = balance / Math.pow(10, token.decimals);
                         const price = token.price || "0";
@@ -828,21 +821,10 @@ const getTransactionStatus = async (params) => {
         console.log("Transaction not found in API, falling back to RPC...");
 
         // Get transaction details via RPC
-        const response = await instance.post(
-            BLOCKDAG_RPC,
-            {
-                jsonrpc: "2.0",
-                method: "eth_getTransactionByHash",
-                params: [id],
-                id: 1,
-            },
-            {
-                headers: { "Content-Type": "application/json" },
-            }
-        );
+        const data = await requestRPC("eth_getTransactionByHash", [id]);
 
         // If transaction not found, it might be dropped or never existed
-        if (!response.data.result || response.data.result === null) {
+        if (!data.result || data.result === null) {
             return {
                 error: "Transaction not found",
                 status: "dropped",
@@ -855,19 +837,8 @@ const getTransactionStatus = async (params) => {
         // Get transaction receipt for status
         let receipt = null;
         try {
-            const receiptResponse = await instance.post(
-                BLOCKDAG_RPC,
-                {
-                    jsonrpc: "2.0",
-                    method: "eth_getTransactionReceipt",
-                    params: [id],
-                    id: 1,
-                },
-                {
-                    headers: { "Content-Type": "application/json" },
-                }
-            );
-            receipt = receiptResponse.data.result;
+            const data = await requestRPC("eth_getTransactionReceipt", [id]);
+            receipt = data.result;
         } catch (receiptError) {
             console.log("Receipt fetch failed:", receiptError.message);
         }
@@ -928,19 +899,8 @@ const getPortfolioSummary = async (params) => {
         let bdagBalance = "0";
         let bdagPrice = "0.005"; // Default placeholder
         try {
-            const balanceResponse = await instance.post(
-                BLOCKDAG_RPC,
-                {
-                    jsonrpc: "2.0",
-                    method: "eth_getBalance",
-                    params: [address, "latest"],
-                    id: 1,
-                },
-                {
-                    headers: { "Content-Type": "application/json" },
-                }
-            );
-            bdagBalance = balanceResponse.data.result ? (parseInt(balanceResponse.data.result, 16) / Math.pow(10, 18)).toString() : "0";
+            const data = await requestRPC("eth_getBalance", [address, "latest"]);
+            bdagBalance = data.result ? (parseInt(data.result, 16) / Math.pow(10, 18)).toString() : "0";
 
             try {
                 const priceData = await getTickerPrice({ symbol: "BDAG" });
@@ -965,19 +925,8 @@ const getPortfolioSummary = async (params) => {
         // Get transaction count
         let transactionCount = 0;
         try {
-            const nonceResponse = await instance.post(
-                BLOCKDAG_RPC,
-                {
-                    jsonrpc: "2.0",
-                    method: "eth_getTransactionCount",
-                    params: [address, "latest"],
-                    id: 1,
-                },
-                {
-                    headers: { "Content-Type": "application/json" },
-                }
-            );
-            transactionCount = nonceResponse.data.result ? parseInt(nonceResponse.data.result, 16) : 0;
+            const data = await requestRPC("eth_getTransactionCount", [address, "latest"]);
+            transactionCount = data.result ? parseInt(data.result, 16) : 0;
         } catch (error) {
             console.error("Transaction count fetch failed:", error.message);
         }
@@ -1008,20 +957,9 @@ const getPortfolioSummary = async (params) => {
 const getGasTracker = async (query) => {
     try {
         // Get gas price from RPC
-        const response = await instance.post(
-            BLOCKDAG_RPC,
-            {
-                jsonrpc: "2.0",
-                method: "eth_gasPrice",
-                params: [],
-                id: 1,
-            },
-            {
-                headers: { "Content-Type": "application/json" },
-            }
-        );
+        const data = await requestRPC("eth_gasPrice");
 
-        const gasPrice = response.data.result ? parseInt(response.data.result, 16) / Math.pow(10, 9) : 0;
+        const gasPrice = data.result ? parseInt(data.result, 16) / Math.pow(10, 9) : 0;
 
         return {
             SafeLow: Math.floor(gasPrice * 0.8),
