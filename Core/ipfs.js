@@ -376,8 +376,6 @@ const updateFileKeyvalues = async (id, keyvalues) => {
     const result = await web3Instance.files.public.update({ id, keyvalues });
 
     const normalized = normalizePinataResponse(result);
-    console.log("🔍 DEBUG: normalized:", normalized, { keyvalues });
-    console.log("🔍 DEBUG: normalized.cid:", normalized.cid);
     return {
         ...normalized,
         url: normalized.cid ? `https://${pinataGateway}/ipfs/${normalized.cid}` : null,

@@ -178,12 +178,12 @@ const storeCollection = async (data, authdUser) => {
 
     const ipfsMetadata = {
         category: "blockdag_nft_collection",
-        owner: owner,
+        owner: ethers.getAddress(owner), // Always store as EIP-55 checksum for consistent Pinata filtering
         contractAddress: contractAddress || "",
         name: name,
         symbol: symbol,
         walletType: walletType,
-        collectionCategory: category || "Art", // Store for easy Pinata querying
+        collectionCategory: category || "Art",
     };
 
     const base64Data = Buffer.from(JSON.stringify(collectionData)).toString("base64");
@@ -323,10 +323,10 @@ const storeNFT = async (data, authdUser) => {
     // Non-standard fields stored as searchable Pinata keyvalues only (not in the token URI JSON)
     const ipfsMetadata = {
         category: "blockdag_nft_item",
-        owner: owner,
+        owner: ethers.getAddress(owner), // Always store as EIP-55 checksum for consistent Pinata filtering
         collection: collectionAddress,
         name: name,
-        nftCategory: category || "Art", // Store for easy Pinata filtering
+        nftCategory: category || "Art",
     };
 
     const base64Data = Buffer.from(JSON.stringify(nftData)).toString("base64");
@@ -352,9 +352,27 @@ const listCollections = async ({ owner } = {}) => {
     let results;
 
     if (owner) {
-        results = await IPFS.filter("owner", owner);
-
+        // Pinata keyvalue filter is case-sensitive. Existing pins may have the owner
+        // stored as EIP-55 checksum OR all-lowercase depending on when they were created.
+        // We run both queries and deduplicate by file id to guarantee full coverage.
+        const ownerChecksum = ethers.getAddress(owner);
+        const ownerLower = owner.toLowerCase();
+        const queries = [IPFS.filter("owner", ownerChecksum)];
+        if (ownerLower !== ownerChecksum) queries.push(IPFS.filter("owner", ownerLower));
+        const all = (await Promise.all(queries)).flat();
+        const seen = new Set();
+        results = all.filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+        });
         results = results.filter((item) => item.publicData?.category === "blockdag_nft_collection");
+        // Self-heal: normalize any mismatched owner keyvalues in the background
+        results.forEach((item) => {
+            if (item.publicData?.owner && item.publicData.owner !== ownerChecksum) {
+                IPFS.updateFileKeyvalues(item.id, { owner: ownerChecksum }).catch(() => {});
+            }
+        });
     } else {
         results = await IPFS.filter("category", "blockdag_nft_collection");
     }
@@ -497,7 +515,25 @@ const listItems = async (filterParams) => {
     }
 
     if (owner) {
-        const results = await IPFS.filter("owner", owner);
+        // Pinata keyvalue filter is case-sensitive. Run both EIP-55 and lowercase
+        // queries to cover all existing pins regardless of how they were stored.
+        const ownerChecksum = ethers.getAddress(owner);
+        const ownerLower = owner.toLowerCase();
+        const queries = [IPFS.filter("owner", ownerChecksum)];
+        if (ownerLower !== ownerChecksum) queries.push(IPFS.filter("owner", ownerLower));
+        const all = (await Promise.all(queries)).flat();
+        const seen = new Set();
+        const results = all.filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+        });
+        // Self-heal: normalize any mismatched owner keyvalues in the background
+        results.forEach((item) => {
+            if (item.publicData?.owner && item.publicData.owner !== ownerChecksum) {
+                IPFS.updateFileKeyvalues(item.id, { owner: ownerChecksum }).catch(() => {});
+            }
+        });
         return _enrichItems(results);
     }
 
