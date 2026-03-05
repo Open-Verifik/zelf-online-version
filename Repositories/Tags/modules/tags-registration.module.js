@@ -4,9 +4,12 @@ const TagsArweaveModule = require("./tags-arweave.module");
 const moment = require("moment");
 const { getDomainConfig } = require("../config/supported-domains");
 
+const PINATA_KEYVALUE_MAX_LENGTH = 250;
+
 /**
- * Cleans extraParams to stay under Pinata's 250-char limit per key/value.
- * Removes redundant fields from st (security token) that can be inferred.
+ * Cleans extraParams only when needed to stay under Pinata's 250-char limit.
+ * Strips fields from st progressively (redundant first, then ip, then session)
+ * until under the limit. Keeps full data when already under 250.
  * @param {Object} extraParams - extraParams object before stringify
  * @returns {Object} - Cleaned extraParams
  */
@@ -16,8 +19,23 @@ const cleanExtraParamsForPinata = (extraParams) => {
 	const cleaned = { ...extraParams };
 
 	if (cleaned.st && typeof cleaned.st === "object") {
-		const { domain, ethAddress, tagName, iat, ...stRest } = cleaned.st;
-		cleaned.st = stRest;
+		const checkLength = (obj) => JSON.stringify(obj).length;
+
+		if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
+
+		// Strip redundant: domain, ethAddress, tagName, iat
+		const { domain, ethAddress, tagName, iat, ...st1 } = cleaned.st;
+		cleaned.st = st1;
+		if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
+
+		// Strip ip
+		const { ip, ...st2 } = cleaned.st;
+		cleaned.st = st2;
+		if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
+
+		// Strip session (keeps identifier)
+		const { session, ...st3 } = cleaned.st;
+		cleaned.st = st3;
 	}
 
 	return cleaned;
