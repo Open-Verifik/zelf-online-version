@@ -189,7 +189,7 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
             exceedsLimit: key.length >= 250 || String(value ?? "").length >= 250,
         }));
 
-        console.log("IPFS pinFile metadata key/value lengths:", JSON.stringify(keyValueLengths, null, 2));
+        console.log({ metadata, keyValueLengths });
 
         const base64Data = base64Image.replace(/^data:[^;]+;base64,/, "");
         const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
