@@ -1,7 +1,7 @@
 const { Buffer } = require("buffer");
 
 // Use sharp for image decoding (avoids canvas/sharp native lib conflict)
-let sharp, jsQR;
+let sharp;
 try {
 	sharp = require("sharp");
 } catch (error) {
@@ -9,25 +9,16 @@ try {
 	sharp = null;
 }
 
+// zxing-wasm is more robust than jsQR for dense binary QR codes (e.g. ZelfProof)
+let readBarcodesFromImageData = null;
 try {
-	jsQR = require("jsqr");
+	readBarcodesFromImageData = require("zxing-wasm").readBarcodesFromImageData;
 } catch (error) {
-	console.warn("jsQR module not available, falling back to qrcode-reader");
-	jsQR = null;
-}
-
-// Fallback to qrcode-reader if jsQR is not available
-let QrCodeReader = null;
-if (!jsQR) {
-	try {
-		QrCodeReader = require("qrcode-reader");
-	} catch (error) {
-		console.warn("Neither jsQR nor qrcode-reader available");
-	}
+	console.warn("zxing-wasm not available for QR extraction:", error.message);
 }
 
 /**
- * Decode image buffer to RGBA pixel data for jsQR/qrcode-reader
+ * Decode image buffer to RGBA pixel data for zxing-wasm
  * @param {Buffer} imageBuffer - Image buffer (PNG, JPEG, etc.)
  * @returns {Promise<{data: Uint8ClampedArray, width: number, height: number}|null>}
  */
@@ -88,64 +79,46 @@ class QRZelfProofExtractor {
 
 			if (!imageData) return null;
 
-			let qrResult = null;
-
-			// Try jsQR first (preferred method, matches frontend)
-			if (jsQR) {
-				qrResult = jsQR(imageData.data, imageData.width, imageData.height, {
-					inversionAttempts: "attemptBoth",
-				});
-			} else if (QrCodeReader) {
-				// Fallback to qrcode-reader - but this won't work for binary data
-				console.warn("Using qrcode-reader fallback - this may not work for binary ZelfProof data");
-				const qr = new QrCodeReader();
-				qrResult = await new Promise((resolve, reject) => {
-					qr.callback = (err, value) => {
-						if (err) {
-							reject(err);
-						} else {
-							resolve(value);
-						}
-					};
-					qr.decode(imageData);
-				});
-			} else {
-				console.warn("No QR code reader available");
+			if (!readBarcodesFromImageData) {
+				console.warn("No QR code reader available (zxing-wasm)");
 				return null;
 			}
 
-			if (!qrResult) return null;
+			const results = await readBarcodesFromImageData(
+				{
+					data: imageData.data,
+					width: imageData.width,
+					height: imageData.height,
+				},
+				{
+					formats: ["QRCode"],
+					tryHarder: true,
+					tryDownscale: true,
+					tryRotate: true,
+					tryInvert: true,
+					maxNumberOfSymbols: 1,
+				}
+			);
 
-			// Handle jsQR result (preferred)
-			if (jsQR && qrResult.binaryData) {
-				// Extract binary data like in frontend
-				const hexString = this._toHexString(qrResult.binaryData);
-				const buffer = Buffer.from(hexString.replace(/\s/g, ""), "hex");
-				return buffer.toString("base64");
+			if (!results || results.length === 0) return null;
+
+			const result = results[0];
+
+			// Prefer raw bytes (binary ZelfProof) over text
+			if (result.bytes && result.bytes.length > 0) {
+				return Buffer.from(result.bytes).toString("base64");
 			}
 
-			// Handle qrcode-reader result (fallback)
-			if (QrCodeReader && qrResult.result) {
-				let zelfProof = qrResult.result;
-				// console.info("QR result from qrcode-reader:", zelfProof);
-
-				// If it's already base64, return it
-				if (this._isBase64(zelfProof)) {
-					return zelfProof;
+			// Fallback: if only text is available, try to interpret it
+			if (result.text) {
+				const text = result.text;
+				if (this._isBase64(text)) return text;
+				if (this._isHex(text)) {
+					return Buffer.from(text.replace(/\s/g, ""), "hex").toString("base64");
 				}
-
-				// If it's hex, convert to base64
-				if (this._isHex(zelfProof)) {
-					const buffer = Buffer.from(zelfProof.replace(/\s/g, ""), "hex");
-					return buffer.toString("base64");
-				}
-
-				// If it's plain text, try to convert to base64
-				const buffer = Buffer.from(zelfProof, "utf8");
-				return buffer.toString("base64");
+				return Buffer.from(text, "utf8").toString("base64");
 			}
 
-			console.warn("No QR code result");
 			return null;
 		} catch (error) {
 			console.error("Error extracting ZelfProof from QR code:", error);
