@@ -181,6 +181,16 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
     if (os === "Win") return await pinFileWindows(base64Image, filename, mimeType, metadata);
 
     try {
+        // Log metadata key/value lengths to debug Pinata 250-char limit
+        const keyValueLengths = Object.entries(metadata).map(([key, value]) => ({
+            key,
+            keyLength: key.length,
+            valueLength: String(value ?? "").length,
+            exceedsLimit: key.length >= 250 || String(value ?? "").length >= 250,
+        }));
+
+        console.log("IPFS pinFile metadata key/value lengths:", JSON.stringify(keyValueLengths, null, 2));
+
         const base64Data = base64Image.replace(/^data:[^;]+;base64,/, "");
         const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 

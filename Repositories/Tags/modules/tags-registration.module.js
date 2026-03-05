@@ -141,6 +141,15 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
 
 	metadata.extraParams = JSON.stringify(metadata.extraParams);
 
+	// Debug: log metadata key/value lengths for Pinata 250-char limit
+	const keyValueLengths = Object.entries(metadata).map(([key, value]) => ({
+		key,
+		keyLength: key.length,
+		valueLength: String(value ?? "").length,
+		exceedsLimit: key.length >= 250 || String(value ?? "").length >= 250,
+	}));
+	console.log("saveHoldTagInIPFS metadata key/value lengths:", JSON.stringify(keyValueLengths, null, 2));
+
 	tagObject.ipfs = await TagsIPFSModule.insert(
 		{
 			base64: tagObject.zelfProofQRCode,
