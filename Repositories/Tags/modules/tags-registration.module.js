@@ -5,6 +5,25 @@ const moment = require("moment");
 const { getDomainConfig } = require("../config/supported-domains");
 
 /**
+ * Cleans extraParams to stay under Pinata's 250-char limit per key/value.
+ * Removes redundant fields from st (security token) that can be inferred.
+ * @param {Object} extraParams - extraParams object before stringify
+ * @returns {Object} - Cleaned extraParams
+ */
+const cleanExtraParamsForPinata = (extraParams) => {
+	if (!extraParams || typeof extraParams !== "object") return extraParams;
+
+	const cleaned = { ...extraParams };
+
+	if (cleaned.st && typeof cleaned.st === "object") {
+		const { domain, ethAddress, tagName, iat, ...stRest } = cleaned.st;
+		cleaned.st = stRest;
+	}
+
+	return cleaned;
+};
+
+/**
  * Confirm free tag (for recovery)
  * @param {Object} tagObject - Tag object
  * @param {Object} referralTagObject - Referral tag object
@@ -139,16 +158,7 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
 		metadata.referral = JSON.stringify(metadata.referral);
 	}
 
-	metadata.extraParams = JSON.stringify(metadata.extraParams);
-
-	// Debug: log metadata key/value lengths for Pinata 250-char limit
-	const keyValueLengths = Object.entries(metadata).map(([key, value]) => ({
-		key,
-		keyLength: key.length,
-		valueLength: String(value ?? "").length,
-		exceedsLimit: key.length >= 250 || String(value ?? "").length >= 250,
-	}));
-	console.log("saveHoldTagInIPFS metadata key/value lengths:", JSON.stringify(keyValueLengths, null, 2));
+	metadata.extraParams = JSON.stringify(cleanExtraParamsForPinata(metadata.extraParams));
 
 	tagObject.ipfs = await TagsIPFSModule.insert(
 		{
