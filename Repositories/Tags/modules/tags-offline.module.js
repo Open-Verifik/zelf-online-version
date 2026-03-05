@@ -169,6 +169,7 @@ const leaseOfflineTag = async (params, authUser) => {
 	const { password } = decryptedParams;
 
 	if (!zelfProof) {
+		console.log("zelfProofQRCode", { params });
 		zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(zelfProofQRCode);
 	}
 
