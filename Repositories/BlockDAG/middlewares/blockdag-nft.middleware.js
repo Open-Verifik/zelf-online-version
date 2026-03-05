@@ -112,6 +112,7 @@ const updateCollectionValidation = async (ctx, next) => {
     const schema = Joi.object({
         coverImage: Joi.string().optional().allow(""),
         avatarImage: Joi.string().optional().allow(""),
+        name: Joi.string().optional().allow(""),
         walletType: Joi.string().valid("zelf", "external").required(),
         owner: Joi.string().required(),
         proof: Joi.string().optional(),
@@ -119,7 +120,7 @@ const updateCollectionValidation = async (ctx, next) => {
         password: Joi.string().optional(),
         signature: Joi.string().optional(),
         message: Joi.string().optional(),
-    }).or("coverImage", "avatarImage");
+    }).or("coverImage", "avatarImage", "name");
 
     const { error } = schema.validate(ctx.request.body);
     if (error) {

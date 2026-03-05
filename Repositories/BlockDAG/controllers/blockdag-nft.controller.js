@@ -70,14 +70,14 @@ const createNFT = async (ctx) => {
 };
 
 /**
- * Update a Collection (coverImage and/or avatarImage). Owner-only.
+ * Update a Collection (coverImage, avatarImage, and/or name). Owner-only.
  */
 const updateCollection = async (ctx) => {
     try {
         const { id } = ctx.request.params;
-        const { coverImage, avatarImage, ...auth } = ctx.request.body;
+        const { coverImage, avatarImage, name, ...auth } = ctx.request.body;
 
-        const result = await BlockDagNftModule.updateCollection(id, { coverImage, avatarImage }, auth);
+        const result = await BlockDagNftModule.updateCollection(id, { coverImage, avatarImage, name }, auth);
 
         ctx.body = {
             success: true,

@@ -27,5 +27,5 @@ module.exports = (server) => {
 
     server.post(`${PATH}/gas-tracker`, SessionMiddleware.validateJWT, Controller.gasTracker);
 
-    server.get(`${PATH}/price`, SessionMiddleware.validateJWT, Controller.getPrice);
+    server.get(`${PATH}/price`, Controller.getPrice);
 };

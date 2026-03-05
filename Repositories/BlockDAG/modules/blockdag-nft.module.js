@@ -225,16 +225,16 @@ const deleteCollection = async (id, authdUser) => {
 };
 
 /**
- * Update Collection coverImage and/or avatarImage.
+ * Update Collection coverImage, avatarImage, and/or name.
  * Owner-only. Verifies signature, then delete+repin with merged metadata.
  * @param {string} id - Pinata file ID
- * @param {Object} updates - { coverImage?, avatarImage? }
+ * @param {Object} updates - { coverImage?, avatarImage?, name? }
  * @param {Object} authdUser - { walletType, owner, signature, message } or Zelf proof
  */
 const updateCollection = async (id, updates, authdUser) => {
-    const { coverImage, avatarImage } = updates;
+    const { coverImage, avatarImage, name } = updates;
 
-    if (!coverImage && !avatarImage) throw new Error("400:provide_cover_image_or_avatar_image");
+    if (!coverImage && !avatarImage && name === undefined) throw new Error("400:provide_cover_image_avatar_image_or_name");
 
     // 1. Fetch existing file and JSON content
     const existingFile = await IPFS.getFileById(id);
@@ -259,6 +259,7 @@ const updateCollection = async (id, updates, authdUser) => {
         ...existingJson,
         ...(coverImage && { coverImage }),
         ...(avatarImage && { avatarImage }),
+        ...(name !== undefined && { name: name || existingJson.name }),
     };
 
     // 5. Delete old pin
