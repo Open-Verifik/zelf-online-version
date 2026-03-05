@@ -172,6 +172,8 @@ const leaseOfflineTag = async (params, authUser) => {
 		zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(zelfProofQRCode);
 	}
 
+	if (!zelfProof || typeof zelfProof !== "string") throw new Error("400:missing_or_invalid_zelf_proof");
+
 	const { preview } = await previewZelfProof({ zelfProof }, authUser);
 
 	if (preview.publicData[tagKey] !== tagName) throw new Error("tag_does_not_match_in_zelfProof");

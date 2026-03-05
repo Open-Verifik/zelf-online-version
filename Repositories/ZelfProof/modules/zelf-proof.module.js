@@ -124,6 +124,8 @@ const decrypt = async (data) => {
  * @returns {Object}
  */
 const preview = async (data) => {
+	if (!data.zelfProof || typeof data.zelfProof !== "string") throw new Error("400:missing_zelf_proof");
+
 	try {
 		const encryptedResponse = await axios.post("/zelf/preview", {
 			senseprint_base_64: data.zelfProof,
