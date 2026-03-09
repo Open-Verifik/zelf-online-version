@@ -123,8 +123,8 @@ const deleteCollection = async (ctx) => {
  */
 const getCollections = async (ctx) => {
     try {
-        const { owner } = ctx.request.query;
-        const result = await BlockDagNftModule.listCollections({ owner });
+        const { owner, limit } = ctx.request.query;
+        const result = await BlockDagNftModule.listCollections({ owner, limit });
         ctx.body = {
             success: true,
             data: result,
