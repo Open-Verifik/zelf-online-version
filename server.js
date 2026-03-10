@@ -13,8 +13,10 @@ app.proxy = true; // Trust the proxy's X-Forwarded-For header
 app.use(
     koaBody({
         multipart: true,
+        formLimit: '6mb',
         formidable: {
             keepExtensions: true,
+            maxFileSize: 6 * 1024 * 1024,
         },
     })
 );
