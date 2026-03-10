@@ -19,20 +19,20 @@ const SessionModule = require("../../Session/modules/session.module");
  * @returns {Object} - Decrypted parameters
  */
 const decryptParams = async (params, authUser) => {
-	if (params.removePGP) {
-		return {
-			face: params.faceBase64,
-			password: params.password,
-			mnemonic: params.mnemonic,
-		};
-	}
+    if (params.removePGP) {
+        return {
+            face: params.faceBase64,
+            password: params.password,
+            mnemonic: params.mnemonic,
+        };
+    }
 
-	// Only decrypt if the values exist and are not null/undefined
-	const password = params.password ? await SessionModule.sessionDecrypt(params.password, authUser) : null;
-	const mnemonic = params.mnemonic ? await SessionModule.sessionDecrypt(params.mnemonic, authUser) : null;
-	const face = params.faceBase64 ? await SessionModule.sessionDecrypt(params.faceBase64, authUser) : null;
+    // Only decrypt if the values exist and are not null/undefined
+    const password = params.password ? await SessionModule.sessionDecrypt(params.password, authUser) : null;
+    const mnemonic = params.mnemonic ? await SessionModule.sessionDecrypt(params.mnemonic, authUser) : null;
+    const face = params.faceBase64 ? await SessionModule.sessionDecrypt(params.faceBase64, authUser) : null;
 
-	return { password, mnemonic, face };
+    return { password, mnemonic, face };
 };
 
 /**
@@ -42,36 +42,36 @@ const decryptParams = async (params, authUser) => {
  * @returns {Object} - Encrypted parameters
  */
 const encryptParams = async (params, authUser) => {
-	const { faceBase64, password, metadata, tagName, domain } = params;
+    const { faceBase64, password, metadata, tagName, domain } = params;
 
-	// Get domain configuration
-	const domainConfig = getDomainConfig(domain);
+    // Get domain configuration
+    const domainConfig = getDomainConfig(domain);
 
-	if (!domainConfig) {
-		throw new Error(`Domain '${domain}' is not supported`);
-	}
+    if (!domainConfig) {
+        throw new Error(`Domain '${domain}' is not supported`);
+    }
 
-	// Encrypt data
-	const encryptedResult = await encrypt({
-		faceBase64,
-		password,
-		metadata,
-		verifierKey: config.zelfEncrypt.serverKey,
-	});
+    // Encrypt data
+    const encryptedResult = await encrypt({
+        faceBase64,
+        password,
+        metadata,
+        verifierKey: config.zelfEncrypt.serverKey,
+    });
 
-	if (encryptedResult.error) {
-		const error = new Error(encryptedResult.error.code);
-		error.status = 409;
-		throw error;
-	}
+    if (encryptedResult.error) {
+        const error = new Error(encryptedResult.error.code);
+        error.status = 409;
+        throw error;
+    }
 
-	return {
-		zelfProof: encryptedResult.zelfProof,
-		zelfProofQRCode: encryptedResult.zelfProofQRCode,
-		tagName,
-		domain,
-		domainConfig,
-	};
+    return {
+        zelfProof: encryptedResult.zelfProof,
+        zelfProofQRCode: encryptedResult.zelfProofQRCode,
+        tagName,
+        domain,
+        domainConfig,
+    };
 };
 
 /**
@@ -81,27 +81,27 @@ const encryptParams = async (params, authUser) => {
  * @returns {Object} - Preview result
  */
 const previewTag = async (params, authUser) => {
-	const { zelfProof, tagName, domain } = params;
+    const { zelfProof, tagName, domain } = params;
 
-	// Get domain configuration
-	const domainConfig = getDomainConfig(domain);
+    // Get domain configuration
+    const domainConfig = getDomainConfig(domain);
 
-	if (!domainConfig) {
-		throw new Error(`Domain '${domain}' is not supported`);
-	}
+    if (!domainConfig) {
+        throw new Error(`Domain '${domain}' is not supported`);
+    }
 
-	// Preview the data
-	const previewResult = await preview({
-		zelfProof,
-		verifierKey: config.zelfEncrypt.serverKey,
-	});
+    // Preview the data
+    const previewResult = await preview({
+        zelfProof,
+        verifierKey: config.zelfEncrypt.serverKey,
+    });
 
-	return {
-		preview: previewResult,
-		tagName,
-		domain,
-		domainConfig,
-	};
+    return {
+        preview: previewResult,
+        tagName,
+        domain,
+        domainConfig,
+    };
 };
 
 /**
@@ -111,27 +111,27 @@ const previewTag = async (params, authUser) => {
  * @returns {Object} - QR code result
  */
 const generateQRCode = async (params, authUser) => {
-	const { zelfProof, tagName, domain } = params;
+    const { zelfProof, tagName, domain } = params;
 
-	// Get domain configuration
-	const domainConfig = getDomainConfig(domain);
+    // Get domain configuration
+    const domainConfig = getDomainConfig(domain);
 
-	if (!domainConfig) {
-		throw new Error(`Domain '${domain}' is not supported`);
-	}
+    if (!domainConfig) {
+        throw new Error(`Domain '${domain}' is not supported`);
+    }
 
-	// Generate QR code
-	const qrCodeResult = await encryptQRCode({
-		zelfProof,
-		verifierKey: config.zelfEncrypt.serverKey,
-	});
+    // Generate QR code
+    const qrCodeResult = await encryptQRCode({
+        zelfProof,
+        verifierKey: config.zelfEncrypt.serverKey,
+    });
 
-	return {
-		qrCode: qrCodeResult,
-		tagName,
-		domain,
-		domainConfig,
-	};
+    return {
+        qrCode: qrCodeResult,
+        tagName,
+        domain,
+        domainConfig,
+    };
 };
 
 /**
@@ -140,15 +140,15 @@ const generateQRCode = async (params, authUser) => {
  * @returns {Promise<string>} - Base64 encoded data
  */
 const urlToBase64 = async (url) => {
-	try {
-		const response = await fetch(url);
-		const buffer = await response.arrayBuffer();
-		const base64 = Buffer.from(buffer).toString("base64");
-		return `data:image/png;base64,${base64}`;
-	} catch (error) {
-		console.error("Error converting URL to base64:", error);
-		return null;
-	}
+    try {
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString("base64");
+        return `data:image/png;base64,${base64}`;
+    } catch (error) {
+        console.error("Error converting URL to base64:", error);
+        return null;
+    }
 };
 
 /**
@@ -158,7 +158,7 @@ const urlToBase64 = async (url) => {
  * @returns {string} - Hold domain name
  */
 const generateDomainHoldDomain = (domain, name) => {
-	return generateHoldDomain(domain, name);
+    return generateHoldDomain(domain, name);
 };
 
 /**
@@ -168,33 +168,33 @@ const generateDomainHoldDomain = (domain, name) => {
  * @returns {Object} - Validation result
  */
 const validateDomainData = (data, domain) => {
-	// Get domain configuration
-	const domainConfig = getDomainConfig(domain);
+    // Get domain configuration
+    const domainConfig = getDomainConfig(domain);
 
-	if (!domainConfig) {
-		return { valid: false, error: `Domain '${domain}' is not supported` };
-	}
+    if (!domainConfig) {
+        return { valid: false, error: `Domain '${domain}' is not supported` };
+    }
 
-	// Check required fields
-	const requiredFields = ["tagName", "domain", "publicData", "privateData"];
-	for (const field of requiredFields) {
-		if (!data[field]) {
-			return { valid: false, error: `Missing required field: ${field}` };
-		}
-	}
+    // Check required fields
+    const requiredFields = ["tagName", "domain", "publicData", "privateData"];
+    for (const field of requiredFields) {
+        if (!data[field]) {
+            return { valid: false, error: `Missing required field: ${field}` };
+        }
+    }
 
-	// Check domain-specific validation
-	if (data.domain !== domain) {
-		return { valid: false, error: "Domain mismatch" };
-	}
+    // Check domain-specific validation
+    if (data.domain !== domain) {
+        return { valid: false, error: "Domain mismatch" };
+    }
 
-	// Check tag name format
-	const tagNameParts = data.tagName.split(".");
-	if (tagNameParts.length < 2 || tagNameParts[tagNameParts.length - 1] !== domain) {
-		return { valid: false, error: "Invalid tag name format" };
-	}
+    // Check tag name format
+    const tagNameParts = data.tagName.split(".");
+    if (tagNameParts.length < 2 || tagNameParts[tagNameParts.length - 1] !== domain) {
+        return { valid: false, error: "Invalid tag name format" };
+    }
 
-	return { valid: true };
+    return { valid: true };
 };
 
 /**
@@ -204,42 +204,42 @@ const validateDomainData = (data, domain) => {
  * @returns {Object} - Processed metadata
  */
 const processDomainMetadata = (metadata, domain) => {
-	// Get domain configuration
-	const domainConfig = getDomainConfig(domain);
+    // Get domain configuration
+    const domainConfig = getDomainConfig(domain);
 
-	if (!domainConfig) {
-		throw new Error(`Domain '${domain}' is not supported`);
-	}
+    if (!domainConfig) {
+        throw new Error(`Domain '${domain}' is not supported`);
+    }
 
-	// Generate domain-specific storage key
-	const storageKey = generateStorageKey(domain, metadata.tagName);
+    // Generate domain-specific storage key
+    const storageKey = generateStorageKey(domain, metadata.tagName);
 
-	// Process metadata with domain-specific information
-	const processedMetadata = {
-		...metadata,
-		storageKey,
-		domain,
-		domainConfig: domainConfig.type,
-		timestamp: new Date().toISOString(),
-		version: "1.0.0",
-	};
+    // Process metadata with domain-specific information
+    const processedMetadata = {
+        ...metadata,
+        storageKey,
+        domain,
+        domainConfig: domainConfig.type,
+        timestamp: new Date().toISOString(),
+        version: "1.0.0",
+    };
 
-	// Add domain-specific features
-	if (domainConfig.features) {
-		processedMetadata.features = domainConfig.features;
-	}
+    // Add domain-specific features
+    if (domainConfig.features) {
+        processedMetadata.features = domainConfig.features;
+    }
 
-	// Add domain-specific limits
-	if (domainConfig.limits) {
-		processedMetadata.limits = domainConfig.limits;
-	}
+    // Add domain-specific limits
+    if (domainConfig.limits) {
+        processedMetadata.limits = domainConfig.limits;
+    }
 
-	// Add domain-specific payment info
-	if (domainConfig.payment) {
-		processedMetadata.payment = domainConfig.payment;
-	}
+    // Add domain-specific payment info
+    if (domainConfig.payment) {
+        processedMetadata.payment = domainConfig.payment;
+    }
 
-	return processedMetadata;
+    return processedMetadata;
 };
 
 /**
@@ -253,42 +253,42 @@ const processDomainMetadata = (metadata, domain) => {
  * @returns {Object} - Tag object
  */
 const createTagObject = async (params, authUser) => {
-	const { tagName, domain, publicData, privateData } = params;
+    const { tagName, domain, publicData, privateData } = params;
 
-	// Get domain configuration
-	const domainConfig = getDomainConfig(domain);
+    // Get domain configuration
+    const domainConfig = getDomainConfig(domain);
 
-	if (!domainConfig) {
-		throw new Error(`Domain '${domain}' is not supported`);
-	}
+    if (!domainConfig) {
+        throw new Error(`Domain '${domain}' is not supported`);
+    }
 
-	// Generate domain-specific storage key
-	const storageKey = generateStorageKey(domain, tagName);
+    // Generate domain-specific storage key
+    const storageKey = generateStorageKey(domain, tagName);
 
-	// Create tag object
-	const tagObject = {
-		publicData: {
-			...publicData,
-			tagName: `${tagName}.${domain}`,
-			domain,
-			storageKey,
-			domainConfig: domainConfig.type,
-			timestamp: new Date().toISOString(),
-		},
-		privateData: {
-			...privateData,
-			domain,
-			storageKey,
-		},
-	};
+    // Create tag object
+    const tagObject = {
+        publicData: {
+            ...publicData,
+            tagName: `${tagName}.${domain}`,
+            domain,
+            storageKey,
+            domainConfig: domainConfig.type,
+            timestamp: new Date().toISOString(),
+        },
+        privateData: {
+            ...privateData,
+            domain,
+            storageKey,
+        },
+    };
 
-	// Validate the tag object
-	const validation = validateDomainData(tagObject, domain);
-	if (!validation.valid) {
-		throw new Error(validation.error);
-	}
+    // Validate the tag object
+    const validation = validateDomainData(tagObject, domain);
+    if (!validation.valid) {
+        throw new Error(validation.error);
+    }
 
-	return tagObject;
+    return tagObject;
 };
 
 /**
@@ -302,218 +302,224 @@ const createTagObject = async (params, authUser) => {
  * @returns {Object} - Hold object
  */
 const createHoldObject = async (params, authUser) => {
-	const { tagName, domain, publicData, privateData } = params;
+    const { tagName, domain, publicData, privateData } = params;
 
-	// Get domain configuration
-	const domainConfig = getDomainConfig(domain);
-	if (!domainConfig) {
-		throw new Error(`Domain '${domain}' is not supported`);
-	}
+    // Get domain configuration
+    const domainConfig = getDomainConfig(domain);
+    if (!domainConfig) {
+        throw new Error(`Domain '${domain}' is not supported`);
+    }
 
-	// Generate hold domain name
-	const holdDomain = generateHoldDomain(domain, tagName);
-	const holdStorageKey = generateStorageKey(domain, `${tagName}${domainConfig.holdSuffix}`);
+    // Generate hold domain name
+    const holdDomain = generateHoldDomain(domain, tagName);
+    const holdStorageKey = generateStorageKey(domain, `${tagName}${domainConfig.holdSuffix}`);
 
-	// Create hold object
-	const holdObject = {
-		publicData: {
-			...publicData,
-			tagName: holdDomain,
-			domain,
-			storageKey: holdStorageKey,
-			domainConfig: domainConfig.type,
-			holdSuffix: domainConfig.holdSuffix,
-			timestamp: new Date().toISOString(),
-			status: "hold",
-		},
-		privateData: {
-			...privateData,
-			domain,
-			storageKey: holdStorageKey,
-			holdSuffix: domainConfig.holdSuffix,
-		},
-	};
+    // Create hold object
+    const holdObject = {
+        publicData: {
+            ...publicData,
+            tagName: holdDomain,
+            domain,
+            storageKey: holdStorageKey,
+            domainConfig: domainConfig.type,
+            holdSuffix: domainConfig.holdSuffix,
+            timestamp: new Date().toISOString(),
+            status: "hold",
+        },
+        privateData: {
+            ...privateData,
+            domain,
+            storageKey: holdStorageKey,
+            holdSuffix: domainConfig.holdSuffix,
+        },
+    };
 
-	return holdObject;
+    return holdObject;
 };
 
 const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainConfig) => {
-	const { referralTagObject } = payload;
+    const { referralTagObject } = payload;
 
-	const referralTagName = referralTagObject?.publicData?.[domainConfig.tags.storage.keyPrefix]?.split(".")[0];
+    const tagKey = domainConfig.tags?.storage?.keyPrefix || "tagName";
+    const referralTagName = (
+        referralTagObject?.publicData?.[tagKey] ||
+        referralTagObject?.publicData?.tagName ||
+        referralTagObject?.publicData?.zelfName
+    )?.split(".")[0];
 
-	const { price, reward, discount, discountType } = domainConfig.getPrice(
-		tagObject[domainConfig.tags.storage.keyPrefix],
-		"1",
-		referralTagName ? `${referralTagName}.${domainConfig.name}` : ""
-	);
+    const { price, reward, discount, discountType } = domainConfig.getPrice(
+        tagObject[tagKey] || tagObject.tagName || tagObject.zelfName,
+        "1",
+        referralTagName ? `${referralTagName}.${domainConfig.name}` : ""
+    );
 
-	const { eth, btc, solana, sui, arweave } = addresses;
+    const { eth, btc, solana, sui, arweave } = addresses;
 
-	tagObject.price = price;
-	tagObject.reward = reward;
-	tagObject.discount = discount;
-	tagObject.discountType = discountType;
-	tagObject.ethAddress = eth.address;
-	tagObject.btcAddress = btc.address;
-	tagObject.solanaAddress = solana.address;
-	tagObject.suiAddress = sui.address;
-	tagObject.arweaveAddress = arweave.address;
-	tagObject.hasPassword = `${Boolean(payload.password)}`;
+    tagObject.price = price;
+    tagObject.reward = reward;
+    tagObject.discount = discount;
+    tagObject.discountType = discountType;
+    tagObject.ethAddress = eth.address;
+    tagObject.btcAddress = btc.address;
+    tagObject.solanaAddress = solana.address;
+    tagObject.suiAddress = sui.address;
+    tagObject.arweaveAddress = arweave.address;
+    tagObject.hasPassword = `${Boolean(payload.password)}`;
 };
 
 const _generateZelfProof = async (dataToEncrypt, tagObject) => {
-	const zelfProofQRCode = (await encryptQRCode(dataToEncrypt))?.zelfQR;
+    const zelfProofQRCode = (await encryptQRCode(dataToEncrypt))?.zelfQR;
 
-	tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(zelfProofQRCode);
+    tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(zelfProofQRCode);
 
-	tagObject.zelfProofQRCode = zelfProofQRCode;
+    tagObject.zelfProofQRCode = zelfProofQRCode;
 };
 
 const getFullTagName = (tagName, domain) => {
-	if (!tagName || !domain) throw new Error(`Invalid parameters: tagName=${tagName}, domain=${domain}`);
+    if (!tagName || !domain) throw new Error(`Invalid parameters: tagName=${tagName}, domain=${domain}`);
 
-	if (tagName.includes(`.${domain}`)) return tagName;
+    if (tagName.includes(`.${domain}`)) return tagName;
 
-	return `${tagName}.${domain}`;
+    return `${tagName}.${domain}`;
 };
 
 const getTagNameFromPublicData = (tagObject, type = "full", domainConfig) => {
-	if (!domainConfig) domainConfig = getDomainConfig(tagObject.publicData.domain);
+    if (!domainConfig) domainConfig = getDomainConfig(tagObject.publicData.domain);
 
-	const keyPrefix = domainConfig.getTagKey();
+    const keyPrefix = domainConfig.getTagKey() || "tagName";
 
-	switch (type) {
-		case "full":
-			return tagObject.publicData[keyPrefix];
-		case "name":
-			return tagObject.publicData[keyPrefix].split(".")[0];
-		default:
-			return tagObject.publicData[keyPrefix];
-	}
+    switch (type) {
+        case "full":
+            return tagObject.publicData[keyPrefix] || tagObject.publicData.tagName || tagObject.publicData.zelfName;
+        case "name":
+            const name = tagObject.publicData[keyPrefix] || tagObject.publicData.tagName || tagObject.publicData.zelfName;
+            return name ? name.split(".")[0] : "";
+        default:
+            return tagObject.publicData[keyPrefix] || tagObject.publicData.tagName || tagObject.publicData.zelfName;
+    }
 };
 
 const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
-	const { eth, solana, sui, arweave } = addresses;
+    const { eth, solana, sui, arweave } = addresses;
 
-	const { mnemonic, zkProof } = dataToEncrypt.metadata;
+    const { mnemonic, zkProof } = dataToEncrypt.metadata;
 
-	let encryptedMessage;
+    let encryptedMessage;
 
-	let privateKey;
+    let privateKey;
 
-	const pgpKeys = await SessionModule.walletEncrypt(
-		{
-			mnemonic,
-			zkProof,
-			solanaPrivateKey: solana.secretKey,
-			suiSecretKey: sui.secretKey,
-			arweavePrivateKey: arweave.privateKey,
-		},
-		eth.address,
-		password
-	);
+    const pgpKeys = await SessionModule.walletEncrypt(
+        {
+            mnemonic,
+            zkProof,
+            solanaPrivateKey: solana.secretKey,
+            suiSecretKey: sui.secretKey,
+            arweavePrivateKey: arweave.privateKey,
+        },
+        eth.address,
+        password
+    );
 
-	encryptedMessage = pgpKeys.encryptedMessage;
+    encryptedMessage = pgpKeys.encryptedMessage;
 
-	privateKey = pgpKeys.privateKey;
+    privateKey = pgpKeys.privateKey;
 
-	return {
-		encryptedMessage,
-		privateKey,
-	};
+    return {
+        encryptedMessage,
+        privateKey,
+    };
 };
 
 const decryptCreditCardParams = async (params, authUser) => {
-	let { cvv, cardNumber, masterPassword } = params;
+    let { cvv, cardNumber, masterPassword } = params;
 
-	if (params.removePGP) {
-		return {
-			cvv,
-			cardNumber,
-			masterPassword,
-		};
-	}
+    if (params.removePGP) {
+        return {
+            cvv,
+            cardNumber,
+            masterPassword,
+        };
+    }
 
-	cvv = await SessionModule.sessionDecrypt(params.cvv, authUser);
-	cardNumber = params.cardNumber ? await SessionModule.sessionDecrypt(params.cardNumber, authUser) : null;
-	masterPassword = params.masterPassword ? await SessionModule.sessionDecrypt(params.masterPassword, authUser) : null;
+    cvv = await SessionModule.sessionDecrypt(params.cvv, authUser);
+    cardNumber = params.cardNumber ? await SessionModule.sessionDecrypt(params.cardNumber, authUser) : null;
+    masterPassword = params.masterPassword ? await SessionModule.sessionDecrypt(params.masterPassword, authUser) : null;
 
-	return { cvv, cardNumber, masterPassword };
+    return { cvv, cardNumber, masterPassword };
 };
 
 const decryptPasswordParams = async (params, authUser) => {
-	let { password } = params;
+    let { password } = params;
 
-	if (params.removePGP) {
-		return {
-			password,
-		};
-	}
+    if (params.removePGP) {
+        return {
+            password,
+        };
+    }
 
-	password = await SessionModule.sessionDecrypt(params.password, authUser);
+    password = await SessionModule.sessionDecrypt(params.password, authUser);
 
-	return { password };
+    return { password };
 };
 
 const decryptNotesParams = async (params, authUser) => {
-	const { keyValuePairs } = params;
+    const { keyValuePairs } = params;
 
-	if (params.removePGP) {
-		return {
-			keyValuePairs,
-		};
-	}
+    if (params.removePGP) {
+        return {
+            keyValuePairs,
+        };
+    }
 
-	keyValuePairs.content = await SessionModule.sessionDecrypt(keyValuePairs.content, authUser);
+    keyValuePairs.content = await SessionModule.sessionDecrypt(keyValuePairs.content, authUser);
 
-	return { keyValuePairs };
+    return { keyValuePairs };
 };
 
 const encryptCreditCardParams = async (params, authUser) => {
-	const { cvv, cardNumber, masterPassword } = params;
+    const { cvv, cardNumber, masterPassword } = params;
 
-	const pgp = await SessionModule.walletEncrypt({ cvv, cardNumber }, authUser.ethAddress, masterPassword);
+    const pgp = await SessionModule.walletEncrypt({ cvv, cardNumber }, authUser.ethAddress, masterPassword);
 
-	return pgp;
+    return pgp;
 };
 
 const encryptPasswordParams = async (params, authUser) => {
-	const { password, masterPassword } = params;
+    const { password, masterPassword } = params;
 
-	const pgp = await SessionModule.walletEncrypt({ password }, authUser.ethAddress, masterPassword);
+    const pgp = await SessionModule.walletEncrypt({ password }, authUser.ethAddress, masterPassword);
 
-	return pgp;
+    return pgp;
 };
 
 const encryptNotesParams = async (params, authUser) => {
-	const { content, masterPassword } = params;
+    const { content, masterPassword } = params;
 
-	const pgp = await SessionModule.walletEncrypt({ content }, authUser.ethAddress, masterPassword);
+    const pgp = await SessionModule.walletEncrypt({ content }, authUser.ethAddress, masterPassword);
 
-	return pgp;
+    return pgp;
 };
 
 module.exports = {
-	decryptParams,
-	encryptParams,
-	previewTag,
-	generateQRCode,
-	urlToBase64,
-	generateDomainHoldDomain,
-	validateDomainData,
-	processDomainMetadata,
-	createTagObject,
-	createHoldObject,
-	assignProperties,
-	generateZelfProof: _generateZelfProof,
-	getFullTagName,
-	getTagNameFromPublicData,
-	generatePGPKeys,
-	decryptCreditCardParams,
-	decryptPasswordParams,
-	decryptNotesParams,
-	encryptCreditCardParams,
-	encryptPasswordParams,
-	encryptNotesParams,
+    decryptParams,
+    encryptParams,
+    previewTag,
+    generateQRCode,
+    urlToBase64,
+    generateDomainHoldDomain,
+    validateDomainData,
+    processDomainMetadata,
+    createTagObject,
+    createHoldObject,
+    assignProperties,
+    generateZelfProof: _generateZelfProof,
+    getFullTagName,
+    getTagNameFromPublicData,
+    generatePGPKeys,
+    decryptCreditCardParams,
+    decryptPasswordParams,
+    decryptNotesParams,
+    encryptCreditCardParams,
+    encryptPasswordParams,
+    encryptNotesParams,
 };

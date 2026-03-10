@@ -14,31 +14,31 @@ const PINATA_KEYVALUE_MAX_LENGTH = 250;
  * @returns {Object} - Cleaned extraParams
  */
 const cleanExtraParamsForPinata = (extraParams) => {
-	if (!extraParams || typeof extraParams !== "object") return extraParams;
+    if (!extraParams || typeof extraParams !== "object") return extraParams;
 
-	const cleaned = { ...extraParams };
+    const cleaned = { ...extraParams };
 
-	if (cleaned.st && typeof cleaned.st === "object") {
-		const checkLength = (obj) => JSON.stringify(obj).length;
+    if (cleaned.st && typeof cleaned.st === "object") {
+        const checkLength = (obj) => JSON.stringify(obj).length;
 
-		if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
+        if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
 
-		// Strip redundant: domain, ethAddress, tagName, iat
-		const { domain, ethAddress, tagName, iat, ...st1 } = cleaned.st;
-		cleaned.st = st1;
-		if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
+        // Strip redundant: domain, ethAddress, tagName, iat
+        const { domain, ethAddress, tagName, iat, ...st1 } = cleaned.st;
+        cleaned.st = st1;
+        if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
 
-		// Strip ip
-		const { ip, ...st2 } = cleaned.st;
-		cleaned.st = st2;
-		if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
+        // Strip ip
+        const { ip, ...st2 } = cleaned.st;
+        cleaned.st = st2;
+        if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
 
-		// Strip session (keeps identifier)
-		const { session, ...st3 } = cleaned.st;
-		cleaned.st = st3;
-	}
+        // Strip session (keeps identifier)
+        const { session, ...st3 } = cleaned.st;
+        cleaned.st = st3;
+    }
 
-	return cleaned;
+    return cleaned;
 };
 
 /**
@@ -49,78 +49,77 @@ const cleanExtraParamsForPinata = (extraParams) => {
  * @param {Object} authUser - Authenticated user
  */
 const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUser) => {
-	const storageKey = domainConfig.getTagKey();
+    const storageKey = domainConfig.getTagKey() || "tagName";
 
-	const tagName = tagObject[storageKey];
+    const tagName = tagObject[storageKey] || tagObject.tagName || tagObject.zelfName;
 
-	const domain = tagObject.domain || "zelf";
+    const domain = tagObject.domain || "zelf";
 
-	const metadata = {
-		[storageKey]: tagName,
-		domain,
-		ethAddress: tagObject.ethAddress,
-		solanaAddress: tagObject.solanaAddress,
-		btcAddress: tagObject.btcAddress,
-		extraParams: {
-			origin: tagObject.origin || "online",
-			price: tagObject.price,
-			duration: 1,
-			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-			expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
-			type: "mainnet",
-			hasPassword: tagObject.hasPassword,
-		},
-		addresses: JSON.stringify({
-			arweaveAddress: tagObject.arweaveAddress,
-			suiAddress: tagObject.suiAddress,
-		}),
-	};
+    const metadata = {
+        [storageKey]: tagName,
+        domain,
+        ethAddress: tagObject.ethAddress,
+        solanaAddress: tagObject.solanaAddress,
+        btcAddress: tagObject.btcAddress,
+        extraParams: {
+            origin: tagObject.origin || "online",
+            price: tagObject.price,
+            duration: 1,
+            registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+            expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
+            type: "mainnet",
+            hasPassword: tagObject.hasPassword,
+        },
+        addresses: JSON.stringify({
+            arweaveAddress: tagObject.arweaveAddress,
+            suiAddress: tagObject.suiAddress,
+        }),
+    };
 
-	if (referralTagObject) {
-		metadata.referral = {
-			tagName: referralTagObject.publicData?.[storageKey] || referralTagObject.metadata?.[storageKey],
-			solanaAddress: referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress,
-		};
+    if (referralTagObject) {
+        metadata.referral = {
+            tagName: referralTagObject.publicData?.[storageKey] || referralTagObject.metadata?.[storageKey],
+            solanaAddress: referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress,
+        };
 
-		metadata.referralTagName = metadata.referral.tagName;
+        metadata.referralTagName = metadata.referral.tagName;
 
-		metadata.referral = JSON.stringify(metadata.referral);
-	}
+        metadata.referral = JSON.stringify(metadata.referral);
+    }
 
-	metadata.extraParams = JSON.stringify(metadata.extraParams);
+    metadata.extraParams = JSON.stringify(metadata.extraParams);
 
-	// only add it if the domain supports it
-	if (domainConfig.isWalrusEnabled()) {
-		tagObject.walrus = await WalrusModule.tagRegistration(
-			tagObject.zelfProofQRCode,
-			{ hasPassword: metadata.hasPassword, zelfProof: metadata.zelfProof, publicData: metadata },
-			domainConfig
-		);
+    // only add it if the domain supports it
+    if (domainConfig.isWalrusEnabled()) {
+        tagObject.walrus = await WalrusModule.tagRegistration(
+            tagObject.zelfProofQRCode,
+            { hasPassword: metadata.hasPassword, zelfProof: metadata.zelfProof, publicData: metadata },
+            domainConfig
+        );
 
-		metadata.walrus = tagObject.walrus.blobId;
-	}
+        metadata.walrus = tagObject.walrus.blobId;
+    }
 
+    tagObject.ipfs = await TagsIPFSModule.insert(
+        {
+            base64: tagObject.zelfProofQRCode,
+            name: tagObject[storageKey],
+            metadata,
+            pinIt: true,
+        },
+        { ...authUser, pro: true }
+    );
 
-	tagObject.ipfs = await TagsIPFSModule.insert(
-		{
-			base64: tagObject.zelfProofQRCode,
-			name: tagObject[storageKey],
-			metadata,
-			pinIt: true,
-		},
-		{ ...authUser, pro: true }
-	);
+    tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
 
-	tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
-
-	if (domainConfig.isArweaveEnabled()) {
-		tagObject.arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
-			hasPassword: metadata.hasPassword,
-			zelfProof: metadata.zelfProof,
-			publicData: metadata,
-			fileName: tagName,
-		});
-	}
+    if (domainConfig.isArweaveEnabled()) {
+        tagObject.arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
+            hasPassword: metadata.hasPassword,
+            zelfProof: metadata.zelfProof,
+            publicData: metadata,
+            fileName: tagName,
+        });
+    }
 };
 
 /**
@@ -132,66 +131,68 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
  * @param {Object} authUser - Authenticated user
  */
 const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, securityType, authUser) => {
-	const domain = tagObject.domain || "zelf";
+    const domain = tagObject.domain || "zelf";
 
-	const _domainConfig = domainConfig || getDomainConfig(domain);
+    const _domainConfig = domainConfig || getDomainConfig(domain);
 
-	const holdSuffix = _domainConfig?.holdSuffix || ".hold";
+    const holdSuffix = _domainConfig?.holdSuffix || ".hold";
 
-	const tagKey = _domainConfig.getTagKey();
+    const tagKey = _domainConfig.getTagKey() || "tagName";
 
-	const holdName = `${tagObject[tagKey]}${holdSuffix}`;
+    const tagName = tagObject[tagKey] || tagObject.tagName || tagObject.zelfName;
 
-	const metadata = {
-		[tagKey]: holdName,
-		domain,
-		ethAddress: tagObject.ethAddress,
-		solanaAddress: tagObject.solanaAddress,
-		btcAddress: tagObject.btcAddress,
-		extraParams: {
-			hasPassword: tagObject.hasPassword,
-			type: "hold",
-			origin: tagObject.origin || "online",
-			registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-			expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
-		},
-		addresses: JSON.stringify({
-			arweaveAddress: tagObject.arweaveAddress,
-			suiAddress: tagObject.suiAddress,
-		}),
-	};
+    const holdName = `${tagName}${holdSuffix}`;
 
-	if (securityType && tagObject.hasPassword == "true") {
-		metadata.extraParams.st = securityType;
-	}
+    const metadata = {
+        [tagKey]: holdName,
+        domain,
+        ethAddress: tagObject.ethAddress,
+        solanaAddress: tagObject.solanaAddress,
+        btcAddress: tagObject.btcAddress,
+        extraParams: {
+            hasPassword: tagObject.hasPassword,
+            type: "hold",
+            origin: tagObject.origin || "online",
+            registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+            expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
+        },
+        addresses: JSON.stringify({
+            arweaveAddress: tagObject.arweaveAddress,
+            suiAddress: tagObject.suiAddress,
+        }),
+    };
 
-	if (referralTagObject) {
-		metadata.referral = {
-			tagName: referralTagObject.publicData?.[tagKey] || referralTagObject.metadata?.[tagKey],
-			solanaAddress: referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress,
-		};
+    if (securityType && tagObject.hasPassword == "true") {
+        metadata.extraParams.st = securityType;
+    }
 
-		metadata.referralTagName = metadata.referral.tagName;
+    if (referralTagObject) {
+        metadata.referral = {
+            tagName: referralTagObject.publicData?.[tagKey] || referralTagObject.metadata?.[tagKey],
+            solanaAddress: referralTagObject.publicData?.solanaAddress || referralTagObject.metadata?.solanaAddress,
+        };
 
-		metadata.referral = JSON.stringify(metadata.referral);
-	}
+        metadata.referralTagName = metadata.referral.tagName;
 
-	metadata.extraParams = JSON.stringify(cleanExtraParamsForPinata(metadata.extraParams));
+        metadata.referral = JSON.stringify(metadata.referral);
+    }
 
-	tagObject.ipfs = await TagsIPFSModule.insert(
-		{
-			base64: tagObject.zelfProofQRCode,
-			name: holdName,
-			metadata,
-			pinIt: true,
-		},
-		{ ...authUser, pro: true }
-	);
+    metadata.extraParams = JSON.stringify(cleanExtraParamsForPinata(metadata.extraParams));
 
-	tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
+    tagObject.ipfs = await TagsIPFSModule.insert(
+        {
+            base64: tagObject.zelfProofQRCode,
+            name: holdName,
+            metadata,
+            pinIt: true,
+        },
+        { ...authUser, pro: true }
+    );
+
+    tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
 };
 
 module.exports = {
-	confirmFreeTag,
-	saveHoldTagInIPFS,
+    confirmFreeTag,
+    saveHoldTagInIPFS,
 };

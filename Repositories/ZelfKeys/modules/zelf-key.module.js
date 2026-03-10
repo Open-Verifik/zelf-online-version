@@ -504,9 +504,20 @@ const createNFTReadyData = async (data, authToken) => {
  */
 const listData = async (data, authToken) => {
     try {
-        const { category } = data;
-        const identifier = authToken.tagName || authToken.identifier;
-        const domain = authToken.domain || "zelf";
+        const { category, tagName: queryTagName } = data;
+        let identifier = authToken.tagName || authToken.identifier;
+
+        // Allow tagName override only for staff or when it matches the authenticated user
+        let domain = authToken.domain || "zelf";
+        if (queryTagName && queryTagName.trim()) {
+            const isStaff = authToken.accountType === "staff";
+            const userTagName = TagsPartsModule.getFullTagName(identifier, domain);
+            if (isStaff || queryTagName === userTagName) {
+                const parts = queryTagName.split(".");
+                identifier = parts[0] || queryTagName;
+                domain = parts[1] || domain;
+            }
+        }
         const fullTagName = TagsPartsModule.getFullTagName(identifier, domain);
 
         let searchCategory = category;
@@ -577,6 +588,91 @@ const listData = async (data, authToken) => {
         console.error("Error listing data:", error);
         throw new Error(`Failed to list data: ${error.message}`);
     }
+};
+
+const SUPPORTED_CATEGORIES = ["password", "notes", "credit_card", "contact", "zotp"];
+
+/**
+ * List data for dashboard - requires identifier (user.domain), enforces staff/ownership
+ * @param {string} identifier - Full tag name (e.g. miguel.zelf)
+ * @param {string} [category] - Optional category filter
+ * @param {Object} authToken - Authentication token
+ * @returns {Promise<Object>} List of data items
+ */
+const listDataForDashboard = async (identifier, category, authToken) => {
+	const parts = identifier.split(".");
+	if (parts.length < 2) {
+		throw new Error("400:Invalid identifier format. Use user.domain (e.g. miguel.zelf)");
+	}
+	const domainPart = parts.pop();
+	const identifierPart = parts.join(".");
+
+	const accountType = authToken.accountType || authToken.publicData?.accountType || "";
+	const isPrivileged = ["staff", "staff_account", "lawyer", "lawyer_account"].includes(accountType);
+	const userIdentifier = authToken.tagName || authToken.identifier;
+	if (!isPrivileged && userIdentifier) {
+		const userTagName = TagsPartsModule.getFullTagName(userIdentifier, authToken.domain || "zelf");
+		if (identifier !== userTagName) {
+			throw new Error("403:Not authorized to query ZelfKeys for this identifier");
+		}
+	}
+
+	const syntheticAuthToken = { ...authToken, tagName: identifierPart, identifier: identifierPart, domain: domainPart };
+
+	if (category) {
+		return listData({ category }, syntheticAuthToken);
+	}
+	return listAllData({}, syntheticAuthToken);
+};
+
+/**
+ * List all data for dashboard across all categories
+ * @param {string} identifier - Full tag name (e.g. miguel.zelf)
+ * @param {Object} authToken - Authentication token
+ * @returns {Promise<Object>} Merged list of all data items by category
+ */
+const listAllDataForDashboard = async (identifier, authToken) => {
+	const resultsByCategory = {};
+	let totalCount = 0;
+
+	for (const cat of SUPPORTED_CATEGORIES) {
+		const listResult = await listDataForDashboard(identifier, cat, authToken);
+		resultsByCategory[cat] = listResult.data || [];
+		totalCount += (listResult.data || []).length;
+	}
+
+	return {
+		success: true,
+		message: `Found ${totalCount} items across all categories`,
+		data: resultsByCategory,
+		timestamp: new Date().toISOString(),
+		totalCount,
+	};
+};
+
+/**
+ * List all data across all categories
+ * @param {Object} data - Query parameters (optional tagName)
+ * @param {Object} authToken - Authentication token
+ * @returns {Promise<Object>} Merged list of all data items by category
+ */
+const listAllData = async (data, authToken) => {
+    const resultsByCategory = {};
+    let totalCount = 0;
+
+    for (const category of SUPPORTED_CATEGORIES) {
+        const listResult = await listData({ ...data, category }, authToken);
+        resultsByCategory[category] = listResult.data || [];
+        totalCount += (listResult.data || []).length;
+    }
+
+    return {
+        success: true,
+        message: `Found ${totalCount} items across all categories`,
+        data: resultsByCategory,
+        timestamp: new Date().toISOString(),
+        totalCount,
+    };
 };
 
 const deleteZelfKey = async (data, authToken) => {
@@ -657,4 +753,14 @@ const _isValidCreditCard = (cardNumber) => {
     return sum % 10 === 0;
 };
 
-module.exports = { storeData, retrieveData, previewData, createNFTReadyData, listData, deleteZelfKey };
+module.exports = {
+	storeData,
+	retrieveData,
+	previewData,
+	createNFTReadyData,
+	listData,
+	listAllData,
+	listDataForDashboard,
+	listAllDataForDashboard,
+	deleteZelfKey,
+};
