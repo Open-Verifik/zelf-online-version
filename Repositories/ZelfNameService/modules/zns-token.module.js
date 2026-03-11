@@ -22,6 +22,26 @@ const initConnection = async () => {
 // Token mint address (ZNS token address)
 const tokenMintAddress = new solanaWeb3.PublicKey(config.solana.tokenMintAddress);
 
+const isAccountActive = async (solanaAddress) => {
+    try {
+        await initConnection();
+        const publicKey = new solanaWeb3.PublicKey(solanaAddress);
+        const accountInfo = await connection.getAccountInfo(publicKey);
+        
+        // If accountInfo is null, the account does not exist (not activated)
+        // If lamports is 0, it's also not funded
+        if (!accountInfo || accountInfo.lamports === 0) {
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error("Error checking account activity:", error);
+        // If the public key is invalid or another error occurs, default to inactive to be safe
+        return false;
+    }
+};
+
 const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
     try {
         await initConnection();
@@ -297,4 +317,5 @@ module.exports = {
     releaseReferralRewards,
     releasePurchaseRewards,
     giveTokensAfterPurchase,
+    isAccountActive,
 };

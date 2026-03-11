@@ -160,6 +160,9 @@ const getRouletteWheel = async (data, authUser) => {
         const type = tagObject.publicData.type || "hold";
         const segments = _getWheelSegments(type);
 
+        // Check if the user's Solana account is active/funded
+        const isAccountActive = await ZNSTokenModule.isAccountActive(tagObject.publicData.solanaAddress);
+
         // Calculate next claim time (tomorrow at midnight UTC)
         const nextClaimAvailable = moment().add(1, "day").startOf("day").toISOString();
 
@@ -185,8 +188,9 @@ const getRouletteWheel = async (data, authUser) => {
             type,
             segments,
             segmentCount: segments.length,
-            canSpin: !todayReward,
+            canSpin: isAccountActive && !todayReward,
             alreadyClaimedToday: !!todayReward,
+            isAccountActive, // Tell frontend if account is active or not
             nextClaimAvailable,
             todayReward: todayRewardData,
         };
@@ -260,6 +264,17 @@ const dailyRewards = async (data, authUser) => {
         const { tagName, domain } = data;
 
         const { tagObject, _tagName, domainConfig } = await _getTagObject(tagName, domain, authUser);
+
+        // Check if the user's Solana account is active/funded
+        const isAccountActive = await ZNSTokenModule.isAccountActive(tagObject.publicData.solanaAddress);
+
+        if (!isAccountActive) {
+            return {
+                success: false,
+                isAccountActive: false,
+                message: "Your Solana account is not activated yet. Please deposit some SOL to activate your wallet before spinning the wheel.",
+            };
+        }
 
         // Check if user already claimed today
         const todayReward = await _getTodayReward(_tagName);
