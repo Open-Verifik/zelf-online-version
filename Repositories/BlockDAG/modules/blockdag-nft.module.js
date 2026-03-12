@@ -176,8 +176,7 @@ const storeCollection = async (data, authdUser) => {
     // 3. Pin to IPFS
     const fileName = `collection_${name.replace(/\s+/g, "_")}_${Date.now()}.json`;
 
-    // Pinata allows max 9 keyvalues per pin. Only include filterable/searchable fields.
-    // coverImage, avatarImage live in the JSON body only; no need to query by them.
+    // Pinata allows max 9 keyvalues per pin. Only filterable fields; display content lives in JSON body.
     const ipfsMetadata = {
         category: "blockdag_nft_collection",
         owner: ethers.getAddress(owner),
@@ -186,7 +185,6 @@ const storeCollection = async (data, authdUser) => {
         symbol: symbol,
         walletType: walletType,
         collectionCategory: category || "Art",
-        description: (description || "").slice(0, 200),
     };
 
     const base64Data = Buffer.from(JSON.stringify(collectionData)).toString("base64");
@@ -270,7 +268,7 @@ const updateCollection = async (id, updates, authdUser) => {
 
     // 6. Re-pin with updated content
     const fileName = `collection_${collectionData.name?.replace(/\s+/g, "_") || "collection"}_${Date.now()}.json`;
-    // Pinata allows max 9 keyvalues per pin. Only filterable fields; coverImage/avatarImage in JSON body.
+    // Pinata allows max 9 keyvalues per pin. Only filterable fields; display content in JSON body.
     const ipfsMetadata = {
         category: "blockdag_nft_collection",
         owner: collectionData.owner,
@@ -279,7 +277,6 @@ const updateCollection = async (id, updates, authdUser) => {
         symbol: collectionData.symbol,
         walletType: collectionData.walletType || "external",
         collectionCategory: collectionData.category || "Art",
-        description: (collectionData.description || "").slice(0, 200),
     };
     const base64Data = Buffer.from(JSON.stringify(collectionData)).toString("base64");
     const base64Json = `data:application/json;base64,${base64Data}`;
