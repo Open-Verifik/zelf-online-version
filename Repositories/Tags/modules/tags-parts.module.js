@@ -142,6 +142,19 @@ const generateQRCode = async (params, authUser) => {
 const urlToBase64 = async (url) => {
     try {
         const response = await fetch(url);
+
+        if (!response.ok) {
+            console.warn(`urlToBase64: HTTP ${response.status} for ${url}`);
+            return null;
+        }
+
+        const contentType = response.headers.get("content-type") || "";
+
+        if (!contentType.startsWith("image/png") && !contentType.startsWith("application/octet-stream")) {
+            console.warn(`urlToBase64: expected image/png, got ${contentType} for ${url}`);
+            return null;
+        }
+
         const buffer = await response.arrayBuffer();
         const base64 = Buffer.from(buffer).toString("base64");
         return `data:image/png;base64,${base64}`;

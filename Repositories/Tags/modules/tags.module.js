@@ -114,8 +114,11 @@ const leaseTag = async (params, authUser) => {
         await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, securityType, authUser);
     }
 
+    if (!tagObject.zelfProof && tagObject.ipfs?.publicData?.zelfProof) {
+        tagObject.zelfProof = tagObject.ipfs.publicData.zelfProof;
+    }
+
     if (!tagObject.zelfProof) {
-        // from ipfs
         tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
     }
 

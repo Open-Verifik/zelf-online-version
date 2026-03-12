@@ -17,9 +17,15 @@ try {
 	console.warn("zxing-wasm not available for QR extraction:", error.message);
 }
 
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function _isPNG(buffer) {
+	return buffer.length >= 8 && buffer.slice(0, 8).equals(PNG_SIGNATURE);
+}
+
 /**
  * Decode image buffer to RGBA pixel data for zxing-wasm
- * @param {Buffer} imageBuffer - Image buffer (PNG, JPEG, etc.)
+ * @param {Buffer} imageBuffer - PNG image buffer
  * @returns {Promise<{data: Uint8ClampedArray, width: number, height: number}|null>}
  */
 async function getImageDataFromBuffer(imageBuffer) {
@@ -54,27 +60,43 @@ class QRZelfProofExtractor {
 		if (!base64Image) return null;
 
 		if (base64Image?.includes("https")) {
-			const response = await fetch(base64Image);
-			const buffer = await response.arrayBuffer();
-			const base64 = Buffer.from(buffer).toString("base64");
+			try {
+				const response = await fetch(base64Image);
 
-			base64Image = `data:image/png;base64,${base64}`;
+				if (!response.ok) {
+					console.warn(`extractZelfProof: HTTP ${response.status} for ${base64Image}`);
+					return null;
+				}
+
+				const contentType = response.headers.get("content-type") || "";
+				if (!contentType.startsWith("image/png") && !contentType.startsWith("application/octet-stream")) {
+					console.warn(`extractZelfProof: expected image/png, got ${contentType} for ${base64Image}`);
+					return null;
+				}
+
+				const buffer = await response.arrayBuffer();
+				const base64 = Buffer.from(buffer).toString("base64");
+				base64Image = `data:image/png;base64,${base64}`;
+			} catch (fetchError) {
+				console.warn("extractZelfProof: fetch failed:", fetchError.message);
+				return null;
+			}
 		}
 
 		try {
-			// Check if sharp is available
 			if (!sharp) {
 				console.warn("Sharp module not available, cannot extract ZelfProof from QR code");
 				return null;
 			}
 
-			// Clean the base64 string (remove data URL prefix if present)
 			const cleanBase64 = this._cleanBase64String(base64Image);
-
-			// Convert base64 to buffer
 			const imageBuffer = Buffer.from(cleanBase64, "base64");
 
-			// Decode image to RGBA pixel data using sharp
+			if (!_isPNG(imageBuffer)) {
+				console.warn("ZelfProof QR expected PNG, skipping non-PNG buffer");
+				return null;
+			}
+
 			const imageData = await getImageDataFromBuffer(imageBuffer);
 
 			if (!imageData) return null;
