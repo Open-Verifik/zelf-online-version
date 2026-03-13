@@ -35,6 +35,7 @@ module.exports = (server) => {
 	//S
 	require("../Repositories/sui/routes/sui-scrapping.route")(server);
 	require("../Repositories/Solana/routes/solana-scrapping.route")(server);
+	require("../Repositories/Stellar/routes/stellar-scrapping.route")(server);
 	//T
 	//U
 	//V
