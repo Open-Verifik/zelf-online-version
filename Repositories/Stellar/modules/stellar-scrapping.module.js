@@ -2,6 +2,7 @@ const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const { generateRandomUserAgent } = require("../../../Core/helpers");
 const moment = require("moment");
+const { getTickerPrice } = require("../../binance/modules/binance.module");
 
 const HORIZON_URL = "https://horizon.stellar.org";
 const STROOPS_TO_XLM = 1 / 10_000_000;
@@ -140,22 +141,32 @@ const getAddress = async (params, query = {}) => {
 			tokenHoldings.total = tokenHoldings.tokens.length;
 		}
 
+		let xlmPrice = 0;
+		try {
+			const { price } = await getTickerPrice({ symbol: "XLM" });
+			xlmPrice = parseFloat(price) || 0;
+		} catch (err) {
+			console.error("Stellar getTickerPrice error:", err?.message);
+		}
+
+		const xlmFiatBalance = xlmBalance * xlmPrice;
+
 		const _response = {
 			address: params.id,
 			balance: xlmBalance,
 			type: data.type || "account",
-			fiatBalance: 0,
+			fiatBalance: xlmFiatBalance,
 			account: {
 				asset: "XLM",
-				fiatValue: "0",
-				price: "0",
+				fiatValue: xlmFiatBalance.toFixed(5),
+				price: String(xlmPrice),
 			},
 			tokenHoldings,
 			transactions: [],
 			transactionsNext: false,
 		};
 
-		if (tokenHoldings.balance) _response.fiatBalance += tokenHoldings.balance;
+		if (tokenHoldings.fiatBalance) _response.fiatBalance += tokenHoldings.fiatBalance;
 
 		// Include transactions in the response (always return array, empty if none)
 		try {
