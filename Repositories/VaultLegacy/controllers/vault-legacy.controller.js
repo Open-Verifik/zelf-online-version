@@ -7,26 +7,6 @@ const Module = require("../modules/vault-legacy.module");
 
 // ---- Vault share endpoints ----
 
-const encryptShares = async (ctx) => {
-    try {
-        const result = await Module.encryptShares(ctx.request.body);
-        ctx.body = { success: true, ...result };
-    } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
-    }
-};
-
-const decryptShare = async (ctx) => {
-    try {
-        const result = await Module.decryptShare(ctx.request.body);
-        ctx.body = { success: true, ...result };
-    } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
-    }
-};
-
 const collectShares = async (ctx) => {
     try {
         const result = await Module.collectShares(ctx.request.body);
@@ -210,8 +190,6 @@ const rejectVault = async (ctx) => {
 };
 
 module.exports = {
-    encryptShares,
-    decryptShare,
     collectShares,
     getShares,
     getManifest,

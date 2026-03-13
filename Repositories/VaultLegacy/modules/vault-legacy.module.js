@@ -1,8 +1,11 @@
 /**
  * VaultLegacy Module
  * Core business logic for ZelfLegacy vault operations.
- * Wraps LitManager, IPFSManager, and AvalancheManager into clean
+ * Wraps IPFSManager and AvalancheManager into clean
  * service functions called from the Koa controller.
+ *
+ * Note: Lit Protocol operations (encrypt/decrypt) are handled by the
+ * VerifikWallet hidden WebView bundle, not by this server.
  *
  * Adapted from ZelfLegacyAvax/backend/server.js
  */
@@ -11,23 +14,12 @@ const path = require("path");
 const fs = require("fs");
 const { ethers } = require("ethers");
 const config = require("../../../Core/config");
-const LitManager = require("./lit.module");
 const IPFSManager = require("./ipfs-legacy.module");
 const AvalancheManager = require("./avalanche-legacy.module");
 
-// Lazy-initialized singletons (so the heavy Lit connection is made only on first use)
-let _litManager = null;
+// Lazy-initialized singletons
 let _ipfsManager = null;
 let _avalancheManager = null;
-
-const getLitManager = () => {
-    if (!_litManager) {
-        const key = process.env.LEGACY_RELAYER_PRIVATE_KEY;
-        if (!key) throw new Error("LEGACY_RELAYER_PRIVATE_KEY env var is not set");
-        _litManager = new LitManager(key);
-    }
-    return _litManager;
-};
 
 const getIPFSManager = () => {
     if (!_ipfsManager) {
@@ -108,85 +100,6 @@ const saveSharesToDisk = (sharesData) => {
 // ---------------------------------------------------------------------------
 // Vault share operations
 // ---------------------------------------------------------------------------
-
-/**
- * Encrypt shares using Lit Protocol, upload to IPFS, and return the manifest CID.
- * @param {{ shares: Array<{address, passwordparty, passwordlawyer}>, vaultId: string, contractAddress: string }} params
- */
-const encryptShares = async ({ shares, vaultId, contractAddress }) => {
-    if (!shares || !Array.isArray(shares) || !vaultId || !contractAddress) {
-        throw new Error("Missing required fields or invalid shares format");
-    }
-
-    const litManager = getLitManager();
-    const ipfsManager = getIPFSManager();
-    const officialContractAddress = process.env.LEGACY_VAULT_REGISTRY_ADDRESS;
-    const encryptedSharesManifest = [];
-
-    for (const sharePair of shares) {
-        const { address, passwordparty, passwordlawyer } = sharePair;
-        console.log(`  - Encrypting shares for beneficiary: ${address}`);
-
-        const [encryptedParty, encryptedLawyer] = await Promise.all([
-            litManager.encryptPasswordShare(passwordparty, vaultId, officialContractAddress),
-            litManager.encryptPasswordShare(passwordlawyer, vaultId, officialContractAddress),
-        ]);
-
-        const [partyCID, lawyerCID] = await Promise.all([
-            ipfsManager.uploadEncryptedShare(encryptedParty, `passwordparty_${address}`, vaultId),
-            ipfsManager.uploadEncryptedShare(encryptedLawyer, `passwordlawyer_${address}`, vaultId),
-        ]);
-
-        encryptedSharesManifest.push({ address, party: `ipfs://${partyCID}`, lawyer: `ipfs://${lawyerCID}` });
-    }
-
-    // Double-encrypt the manifest
-    const manifest = JSON.stringify({ shares: encryptedSharesManifest });
-    const encryptedManifest = await litManager.encryptPasswordShare(manifest, vaultId, officialContractAddress);
-    const manifestCID = await ipfsManager.uploadEncryptedShare(encryptedManifest, "manifest", vaultId);
-
-    return { manifestCID };
-};
-
-/**
- * Decrypt a single password share from IPFS.
- * @param {{ cid, vaultId, contractAddress, authSig }} params
- */
-const decryptShare = async ({ cid, vaultId, contractAddress, authSig }) => {
-    if (!cid || !vaultId || !contractAddress || !authSig) {
-        throw new Error("Missing required fields");
-    }
-
-    let recoveredAddress;
-    try {
-        recoveredAddress = verifyAuthSig(authSig, "Lit Protocol Access");
-    } catch (e) {
-        const err = new Error(e.message);
-        err.status = 401;
-        throw err;
-    }
-
-    const avalancheManager = getAvalancheManager();
-    const isBen = await avalancheManager.contract.isBeneficiary(vaultId, recoveredAddress);
-    if (!isBen) {
-        const err = new Error("Caller is not an authorized beneficiary");
-        err.status = 403;
-        throw err;
-    }
-
-    const ipfsManager = getIPFSManager();
-    const encryptedData = await ipfsManager.retrieve(cid);
-
-    const litManager = getLitManager();
-    const decryptedShare = await litManager.decryptPasswordShare(
-        encryptedData.ciphertext,
-        encryptedData.dataToEncryptHash,
-        vaultId,
-        process.env.LEGACY_VAULT_REGISTRY_ADDRESS
-    );
-
-    return { passwordShare: decryptedShare };
-};
 
 /**
  * Collect a beneficiary's Level-1 share.
@@ -381,8 +294,6 @@ const rejectVault = async ({ authSig, vaultId }) => {
 
 module.exports = {
     // Vault share ops
-    encryptShares,
-    decryptShare,
     collectShares,
     getShares,
     getManifest,

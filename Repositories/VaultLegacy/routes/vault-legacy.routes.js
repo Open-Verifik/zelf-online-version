@@ -27,8 +27,6 @@ module.exports = (server) => {
     server.get(`${RELAY_PATH}/shares/:vaultId`, requireJWT, RelayController.getShares);
 
     // --- Vault share operations ---
-    server.post(`${PATH}/vault/encrypt-shares`, requireJWT, Controller.encryptShares);
-    server.post(`${PATH}/vault/decrypt-share`, requireJWT, Controller.decryptShare);
     server.post(`${PATH}/vault/collect-shares`, requireJWT, Controller.collectShares);
     server.get(`${PATH}/vault/shares/:vaultId`, requireJWT, Controller.getShares);
     server.get(`${PATH}/vault/manifest/:cid`, requireJWT, Controller.getManifest);
