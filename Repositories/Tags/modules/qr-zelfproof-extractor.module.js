@@ -18,14 +18,23 @@ try {
 }
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const JPEG_SIGNATURE = Buffer.from([0xff, 0xd8, 0xff]);
 
 function _isPNG(buffer) {
 	return buffer.length >= 8 && buffer.slice(0, 8).equals(PNG_SIGNATURE);
 }
 
+function _isJPEG(buffer) {
+	return buffer.length >= 3 && buffer.slice(0, 3).equals(JPEG_SIGNATURE);
+}
+
+function _isSupportedImage(buffer) {
+	return _isPNG(buffer) || _isJPEG(buffer);
+}
+
 /**
  * Decode image buffer to RGBA pixel data for zxing-wasm
- * @param {Buffer} imageBuffer - PNG image buffer
+ * @param {Buffer} imageBuffer - PNG or JPEG image buffer
  * @returns {Promise<{data: Uint8ClampedArray, width: number, height: number}|null>}
  */
 async function getImageDataFromBuffer(imageBuffer) {
@@ -48,12 +57,12 @@ async function getImageDataFromBuffer(imageBuffer) {
 
 /**
  * Utility class for extracting ZelfProof from QR codes
- * Converts base64 PNG images containing QR codes to ZelfProof binary data
+ * Converts base64 PNG/JPEG images containing QR codes to ZelfProof binary data
  */
 class QRZelfProofExtractor {
 	/**
-	 * Extracts ZelfProof from a base64 encoded PNG QR code image
-	 * @param {string} base64Image - Base64 encoded PNG image (with or without data URL prefix)
+	 * Extracts ZelfProof from a base64 encoded PNG or JPEG QR code image
+	 * @param {string} base64Image - Base64 encoded PNG or JPEG image (with or without data URL prefix)
 	 * @returns {Promise<string|null>} - Base64 encoded ZelfProof or null if extraction fails
 	 */
 	static async extractZelfProof(base64Image) {
@@ -69,8 +78,12 @@ class QRZelfProofExtractor {
 				}
 
 				const contentType = response.headers.get("content-type") || "";
-				if (!contentType.startsWith("image/png") && !contentType.startsWith("application/octet-stream")) {
-					console.warn(`extractZelfProof: expected image/png, got ${contentType} for ${base64Image}`);
+				if (
+					!contentType.startsWith("image/png") &&
+					!contentType.startsWith("image/jpeg") &&
+					!contentType.startsWith("application/octet-stream")
+				) {
+					console.warn(`extractZelfProof: expected image/png or image/jpeg, got ${contentType} for ${base64Image}`);
 					return null;
 				}
 
@@ -92,8 +105,16 @@ class QRZelfProofExtractor {
 			const cleanBase64 = this._cleanBase64String(base64Image);
 			const imageBuffer = Buffer.from(cleanBase64, "base64");
 
-			if (!_isPNG(imageBuffer)) {
-				console.warn("ZelfProof QR expected PNG, skipping non-PNG buffer");
+			if (!_isSupportedImage(imageBuffer)) {
+				const detected =
+					imageBuffer[0] === 0xff && imageBuffer[1] === 0xd8
+						? "JPEG"
+						: imageBuffer[0] === 0x89
+							? "possibly corrupted PNG"
+							: "unknown";
+				console.warn(
+					`ZelfProof QR expected PNG or JPEG, got ${detected} (first bytes: ${imageBuffer.slice(0, 4).toString("hex")})`
+				);
 				return null;
 			}
 
@@ -221,7 +242,7 @@ class QRZelfProofExtractor {
 
 /**
  * Convenience function for quick ZelfProof extraction
- * @param {string} base64Image - Base64 encoded PNG image
+ * @param {string} base64Image - Base64 encoded PNG or JPEG image
  * @returns {Promise<string|null>} - Base64 encoded ZelfProof or null
  */
 async function extractZelfProofFromQR(base64Image) {
