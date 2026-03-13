@@ -1,0 +1,13 @@
+{
+  "0x26799d71204f8a8e8b36a88fa647b348f66ad60fef104b2c192a989d93377b42": {
+    "testatorEmail": "charliesbleck@hotmail.com",
+    "lawyerEmail": "charliesbleck@gmail.com",
+    "beneficiaryEmails": [
+      "carlos.bleck@zelf.world"
+    ],
+    "beneficiaryTagNames": [
+      "legacy_ben1_val_c6ab4215a"
+    ],
+    "registeredAt": "2026-03-05T21:02:47.059Z"
+  }
+}
