@@ -350,19 +350,14 @@ const loadDynamicDomains = async (licenses = null, force = false) => {
 
 const getSupportedDomains = (licenses = null) => {
     try {
-        // First, try to get from cache (synchronous)
-        const cachedDomains = loadCache();
-        if (cachedDomains) {
-            // Merge cached dynamic domains with static ones
-            return { ...SUPPORTED_DOMAINS, ...cachedDomains };
-        }
+        // When licenses are provided (from loadOfficialLicenses), use them first so
+        // fresh data (e.g. metadata.logo) is not overridden by stale domains cache
+        const licenseList = Array.isArray(licenses) ? licenses : licenses && typeof licenses === "object" ? Object.values(licenses) : null;
 
-        // If licenses are provided, process them synchronously
-        // (Note: This is a legacy path - in practice, licenses should be pre-loaded)
-        if (licenses && Array.isArray(licenses)) {
+        if (licenseList && licenseList.length > 0) {
             const dynamicDomains = {};
-            for (const license of licenses) {
-                if (license.name) {
+            for (const license of licenseList) {
+                if (license && license.name) {
                     dynamicDomains[license.name.toLowerCase()] = new Domain(license);
                 }
             }
@@ -370,6 +365,12 @@ const getSupportedDomains = (licenses = null) => {
                 saveCache(dynamicDomains);
                 return { ...SUPPORTED_DOMAINS, ...dynamicDomains };
             }
+        }
+
+        // Fall back to cache when no licenses provided
+        const cachedDomains = loadCache();
+        if (cachedDomains) {
+            return { ...SUPPORTED_DOMAINS, ...cachedDomains };
         }
 
         // If no cache and no licenses provided, trigger async fetch in background

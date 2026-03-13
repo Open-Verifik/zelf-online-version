@@ -176,9 +176,10 @@ const storeCollection = async (data, authdUser) => {
     // 3. Pin to IPFS
     const fileName = `collection_${name.replace(/\s+/g, "_")}_${Date.now()}.json`;
 
+    // Pinata allows max 9 keyvalues per pin. Only filterable fields; display content lives in JSON body.
     const ipfsMetadata = {
         category: "blockdag_nft_collection",
-        owner: ethers.getAddress(owner), // Always store as EIP-55 checksum for consistent Pinata filtering
+        owner: ethers.getAddress(owner),
         contractAddress: contractAddress || "",
         name: name,
         symbol: symbol,
@@ -219,7 +220,36 @@ const deleteCollection = async (id, authdUser) => {
     // 3. Prevent malicious signatures from other users
     if (actualOwner.toLowerCase() !== authdUser.owner.toLowerCase()) throw new Error("403:unauthorized");
 
-    // 4. Securely unpin file
+    // 4. Message binding: signed message must authorize the exact id being deleted (prevents signature reuse)
+    const collMatch = authdUser.message.match(/^I authorize deleting collection (.+?)\. Timestamp: \d+$/);
+    if (!collMatch || collMatch[1] !== id) throw new Error("400:message_id_mismatch");
+
+    // 5. Securely unpin file
+    const result = await IPFS.deleteFiles([id]);
+    return { success: true, result };
+};
+
+/**
+ * Delete an NFT item from IPFS (owner-only).
+ * Use for orphaned drafts (uploaded but mint failed) to remove duplicates.
+ * @param {string} id - IPFS file ID / Pinata ID
+ * @param {Object} authdUser - { walletType, owner, signature, message } or Zelf proof
+ */
+const deleteItem = async (id, authdUser) => {
+    const existingFile = await IPFS.getFileById(id);
+    if (!existingFile || !existingFile.publicData) throw new Error("404:item_not_found");
+
+    const { owner: actualOwner } = existingFile.publicData;
+    if (!actualOwner) throw new Error("400:item_owner_undefined");
+    if (!authdUser) throw new Error("400:missing_auth_payload_body_empty");
+
+    await _validateAuth(authdUser);
+    if (actualOwner.toLowerCase() !== authdUser.owner.toLowerCase()) throw new Error("403:unauthorized");
+
+    // Message binding: signed message must authorize the exact id being deleted (prevents signature reuse)
+    const itemMatch = authdUser.message.match(/^I authorize deleting NFT metadata (.+?) from IPFS\. Timestamp: \d+$/);
+    if (!itemMatch || itemMatch[1] !== id) throw new Error("400:message_id_mismatch");
+
     const result = await IPFS.deleteFiles([id]);
     return { success: true, result };
 };
@@ -267,6 +297,7 @@ const updateCollection = async (id, updates, authdUser) => {
 
     // 6. Re-pin with updated content
     const fileName = `collection_${collectionData.name?.replace(/\s+/g, "_") || "collection"}_${Date.now()}.json`;
+    // Pinata allows max 9 keyvalues per pin. Only filterable fields; display content in JSON body.
     const ipfsMetadata = {
         category: "blockdag_nft_collection",
         owner: collectionData.owner,
@@ -321,13 +352,16 @@ const storeNFT = async (data, authdUser) => {
     // 3. Pin to IPFS (ERC-721 standard JSON metadata)
     const fileName = `nft_${name.replace(/\s+/g, "_")}_${Date.now()}.json`;
 
-    // Non-standard fields stored as searchable Pinata keyvalues only (not in the token URI JSON)
+    // Non-standard fields stored as searchable Pinata keyvalues only (not in the token URI JSON).
+    // image + description are included so list endpoints can skip the gateway fetch entirely.
     const ipfsMetadata = {
         category: "blockdag_nft_item",
-        owner: ethers.getAddress(owner), // Always store as EIP-55 checksum for consistent Pinata filtering
+        owner: ethers.getAddress(owner),
         collection: collectionAddress,
         name: name,
         nftCategory: category || "Art",
+        image: (image || "").slice(0, 250),
+        description: (description || "").slice(0, 200),
     };
 
     const base64Data = Buffer.from(JSON.stringify(nftData)).toString("base64");
@@ -348,18 +382,19 @@ const storeNFT = async (data, authdUser) => {
 /**
  * List collections — enriched with real IPFS JSON content.
  * Optionally filtered by owner address (case-insensitive).
+ * @param {Object} options
+ * @param {string} [options.owner] - Filter by owner address
+ * @param {number} [options.limit=25] - Max results (capped at 100)
  */
-const listCollections = async ({ owner } = {}) => {
+const listCollections = async ({ owner, limit } = {}) => {
+    const maxResults = Math.min(Number(limit) || 25, 100);
     let results;
 
     if (owner) {
-        // Pinata keyvalue filter is case-sensitive. Existing pins may have the owner
-        // stored as EIP-55 checksum OR all-lowercase depending on when they were created.
-        // We run both queries and deduplicate by file id to guarantee full coverage.
         const ownerChecksum = ethers.getAddress(owner);
         const ownerLower = owner.toLowerCase();
-        const queries = [IPFS.filter("owner", ownerChecksum)];
-        if (ownerLower !== ownerChecksum) queries.push(IPFS.filter("owner", ownerLower));
+        const queries = [IPFS.filter("owner", ownerChecksum, { limit: maxResults })];
+        if (ownerLower !== ownerChecksum) queries.push(IPFS.filter("owner", ownerLower, { limit: maxResults }));
         const all = (await Promise.all(queries)).flat();
         const seen = new Set();
         results = all.filter((item) => {
@@ -368,24 +403,45 @@ const listCollections = async ({ owner } = {}) => {
             return true;
         });
         results = results.filter((item) => item.publicData?.category === "blockdag_nft_collection");
-        // Self-heal: normalize any mismatched owner keyvalues in the background
         results.forEach((item) => {
             if (item.publicData?.owner && item.publicData.owner !== ownerChecksum) {
                 IPFS.updateFileKeyvalues(item.id, { owner: ownerChecksum }).catch(() => {});
             }
         });
     } else {
-        results = await IPFS.filter("category", "blockdag_nft_collection");
+        results = await IPFS.filter("category", "blockdag_nft_collection", { limit: maxResults });
     }
+
+    if (results.length > maxResults) results = results.slice(0, maxResults);
 
     const enriched = await Promise.all(
         results.map(async (item) => {
+            const pd = item.publicData || {};
+
+            // Skip gateway fetch when keyvalues already contain display fields
+            if (pd.coverImage) {
+                return {
+                    name: pd.name || item.name || "",
+                    symbol: pd.symbol || "",
+                    description: pd.description || "",
+                    coverImage: pd.coverImage || "",
+                    avatarImage: pd.avatarImage || "",
+                    category: pd.collectionCategory || pd.category || "Art",
+                    owner: pd.owner || "",
+                    contractAddress: pd.contractAddress || "",
+                    walletType: pd.walletType || "",
+                    verified: false,
+                    ipfsUrl: item.url,
+                    ipfsId: item.id,
+                    cid: item.cid,
+                };
+            }
+
             const metadata = await _fetchIpfsJson(item.url);
             return {
                 ...metadata,
-                ...item.publicData,
-                // Fix key collision with Pinata root key
-                category: metadata?.category || item.publicData?.collectionCategory || "Art",
+                ...pd,
+                category: metadata?.category || pd.collectionCategory || "Art",
                 ipfsUrl: item.url,
                 ipfsId: item.id,
                 cid: item.cid,
@@ -396,28 +452,96 @@ const listCollections = async ({ owner } = {}) => {
     return enriched;
 };
 
+// ── CID-level cache for IPFS gateway JSON fetches (node-cache) ───────────────
+// Top CIDs were being re-fetched ~5 000 times each; this eliminates repeat calls.
+const NodeCache = require("node-cache");
+const _ipfsJsonCache = new NodeCache({
+    stdTTL: 600, // 10 minutes
+    checkperiod: 120,
+    useClones: false,
+});
+
+const _extractCid = (url) => {
+    const m = url.match(/\/ipfs\/([^/?#]+)/);
+    return m ? m[1] : null;
+};
+
+const _isDev = config.env === "development";
+
 /**
  * Fetch the actual JSON content stored at an IPFS URL.
+ * Results are cached by CID (via node-cache, 10 min TTL) to avoid repeated gateway calls.
  * Returns null if the fetch fails or the content is not valid JSON.
  */
 const _fetchIpfsJson = async (url) => {
     if (!url) return null;
+
+    const cid = _extractCid(url);
+    const cacheKey = cid || url;
+
+    const cached = _ipfsJsonCache.get(cacheKey);
+    if (cached !== undefined) {
+        if (_isDev) {
+            const { hits, misses } = _ipfsJsonCache.getStats();
+            const note = cached === null ? "cached failure (5min)" : "from cache";
+            console.log(`[IPFS-cache] HIT  ${cacheKey.slice(0, 20)}…  ← ${note} | session: ${hits} hits, ${misses} gateway fetches`);
+        }
+        return cached;
+    }
+
+    if (_isDev) {
+        const { misses } = _ipfsJsonCache.getStats();
+        console.log(`[IPFS-cache] MISS ${cacheKey.slice(0, 20)}…  → fetching from gateway (fetch #${misses + 1} this session)`);
+    }
+
     try {
         const res = await fetch(url);
-        if (!res.ok) return null;
-        return await res.json();
+        if (!res.ok) {
+            _ipfsJsonCache.set(cacheKey, null, 300); // cache failures for 5 min
+            return null;
+        }
+        const json = await res.json();
+        _ipfsJsonCache.set(cacheKey, json);
+        return json;
     } catch (e) {
+        _ipfsJsonCache.set(cacheKey, null, 300); // cache failures for 5 min
         return null;
     }
 };
 
 /**
+ * Build a list-view item from Pinata keyvalues only (no gateway fetch).
+ * Used when publicData already contains essential fields like image.
+ */
+const _buildLightItem = (item) => {
+    const pd = item.publicData || {};
+    return {
+        name: pd.name || item.name || "",
+        description: pd.description || "",
+        image: pd.image || "",
+        category: pd.nftCategory || pd.collectionCategory || pd.category || "Art",
+        owner: pd.owner || "",
+        collection: pd.collection || "",
+        contractAddress: pd.contractAddress || pd.collection || "",
+        tokenId: pd.tokenId || "",
+        mintTxHash: pd.mintTxHash || "",
+        ipfsUrl: item.url,
+        ipfsId: item.id,
+        cid: item.cid,
+    };
+};
+
+/**
  * Enrich raw IPFS file results with fetched JSON metadata.
- * Shared by listItems and getItemsByCollection.
+ * Skips the gateway fetch when publicData already has the `image` field
+ * (items stored after the keyvalue migration). Falls back to gateway
+ * fetch (served from CID cache when available) for older items.
  */
 const _enrichItems = async (rawResults) => {
     return Promise.all(
         rawResults.map(async (item) => {
+            if (item.publicData?.image) return _buildLightItem(item);
+
             const metadata = await _fetchIpfsJson(item.url);
             return {
                 ...metadata,
@@ -488,8 +612,8 @@ const getItem = async (id) => {
 const getItemsByCollection = async (collectionAddress, options = {}) => {
     if (!collectionAddress) return [];
 
-    const rawLimit = options.limit != null ? Number(options.limit) : 250;
-    const validLimit = [25, 50, 100, 250, 500].includes(rawLimit) ? rawLimit : 250;
+    const rawLimit = options.limit != null ? Number(options.limit) : 50;
+    const validLimit = [25, 50, 100, 250, 500].includes(rawLimit) ? rawLimit : 50;
 
     // Pinata supports only ONE key filter — use "collection" (items with this key are NFT items)
     const colNorm = collectionAddress.toLowerCase();
@@ -506,39 +630,39 @@ const getItemsByCollection = async (collectionAddress, options = {}) => {
 };
 
 /**
- * List items (optionally filtered by owner or collection)
+ * List items (optionally filtered by owner or collection).
+ * Default limit: 50 (max 200). Reduces Pinata + gateway request volume.
  */
 const listItems = async (filterParams) => {
     const { owner, collection, limit } = filterParams;
+    const maxResults = Math.min(Number(limit) || 50, 200);
 
     if (collection) {
-        return getItemsByCollection(collection, { owner, limit });
+        return getItemsByCollection(collection, { owner, limit: limit || 50 });
     }
 
     if (owner) {
-        // Pinata keyvalue filter is case-sensitive. Run both EIP-55 and lowercase
-        // queries to cover all existing pins regardless of how they were stored.
         const ownerChecksum = ethers.getAddress(owner);
         const ownerLower = owner.toLowerCase();
-        const queries = [IPFS.filter("owner", ownerChecksum)];
-        if (ownerLower !== ownerChecksum) queries.push(IPFS.filter("owner", ownerLower));
+        const queries = [IPFS.filter("owner", ownerChecksum, { limit: maxResults })];
+        if (ownerLower !== ownerChecksum) queries.push(IPFS.filter("owner", ownerLower, { limit: maxResults }));
         const all = (await Promise.all(queries)).flat();
         const seen = new Set();
-        const results = all.filter((item) => {
+        let results = all.filter((item) => {
             if (seen.has(item.id)) return false;
             seen.add(item.id);
             return true;
         });
-        // Self-heal: normalize any mismatched owner keyvalues in the background
         results.forEach((item) => {
             if (item.publicData?.owner && item.publicData.owner !== ownerChecksum) {
                 IPFS.updateFileKeyvalues(item.id, { owner: ownerChecksum }).catch(() => {});
             }
         });
+        if (results.length > maxResults) results = results.slice(0, maxResults);
         return _enrichItems(results);
     }
 
-    let results = await IPFS.filter("category", "blockdag_nft_item");
+    let results = await IPFS.filter("category", "blockdag_nft_item", { limit: maxResults });
 
     return _enrichItems(results);
 };
@@ -710,6 +834,7 @@ module.exports = {
     storeCollection,
     updateCollection,
     deleteCollection,
+    deleteItem,
     storeNFT,
     listCollections,
     listItems,

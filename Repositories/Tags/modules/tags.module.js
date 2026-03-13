@@ -42,14 +42,14 @@ const generateDomainHoldDomain = (domain, name) => {
  * @param {Object} authUser
  */
 const leaseTag = async (params, authUser) => {
-    const { tagName, domain, referralTagName, securityType } = params;
-
+    const { tagName, domain, referralTagName } = params;
+    let securityType = params.securityType;
     const domainConfig = getDomainConfig(domain);
 
     if (!domainConfig) throw new Error(`Unsupported domain: ${domain}`);
 
     // Get tag key using the method
-    const tagKey = domainConfig.getTagKey();
+    const tagKey = domainConfig.getTagKey() || "tagName";
 
     await _findDuplicatedTag(tagName, domain, domainConfig);
 
@@ -62,6 +62,10 @@ const leaseTag = async (params, authUser) => {
     if (!face) throw new Error("409:face_not_found");
 
     if (!password && securityType !== "withoutPassword") throw new Error("409:password_not_found");
+
+    if (password && !securityType) {
+        securityType = Number(password).toString() === password && password.length === 6 ? "pin" : "password";
+    }
 
     const { eth, btc, solana, sui, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
         ...params,
@@ -99,7 +103,7 @@ const leaseTag = async (params, authUser) => {
         dataToEncrypt,
         { eth, btc, solana, sui, arweave },
         { ...params, password: dataToEncrypt.password, referralTagObject },
-        domainConfig,
+        domainConfig
     );
 
     await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
@@ -110,8 +114,11 @@ const leaseTag = async (params, authUser) => {
         await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, securityType, authUser);
     }
 
+    if (!tagObject.zelfProof && tagObject.ipfs?.publicData?.zelfProof) {
+        tagObject.zelfProof = tagObject.ipfs.publicData.zelfProof;
+    }
+
     if (!tagObject.zelfProof) {
-        // from ipfs
         tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
     }
 
@@ -135,10 +142,10 @@ const leaseTag = async (params, authUser) => {
             config.env === "production"
                 ? undefined
                 : {
-                      // for development porposes so we can visualize the arweave private key and the mnemonic for testing.
-                      mnemonic,
-                      arweavePrivateKey: arweave.privateKey,
-                  },
+                    // for development porposes so we can visualize the arweave private key and the mnemonic for testing.
+                    mnemonic,
+                    arweavePrivateKey: arweave.privateKey,
+                },
     };
 };
 
@@ -164,7 +171,7 @@ const searchTag = async (params, authUser) => {
                 domainConfig: _domainConfig,
                 duration: duration || "1",
             },
-            authUser,
+            authUser
         );
 
         if (result.ipfs?.length) {
@@ -220,7 +227,7 @@ const decryptTag = async (params, authUser) => {
 
     const { mnemonic, zkProof, solanaSecretKey } = decryptedZelfProof.metadata;
 
-    const tagKey = domainConfig.getTagKey();
+    const tagKey = domainConfig.getTagKey() || "tagName";
 
     // Generate Arweave wallet from mnemonic for consistency
     const arweave = await ArweaveModule.generateWalletFromMnemonic(mnemonic);
@@ -251,10 +258,10 @@ const decryptTag = async (params, authUser) => {
         pgp: { encryptedMessage, privateKey },
         durationToken: jwt.sign(
             {
-                tagName: tagObject.publicData[tagKey],
+                tagName: tagObject.publicData[tagKey] || tagObject.publicData.tagName || tagObject.publicData.zelfName,
                 exp: moment().add(1, "month").unix(),
             },
-            config.JWT_SECRET,
+            config.JWT_SECRET
         ),
         metadata: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey, arweavePrivateKey: arweave.privateKey } : undefined,
     };

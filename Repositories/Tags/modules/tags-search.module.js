@@ -57,10 +57,13 @@ const searchTag = async (params, authUser) => {
             combinedResults.price = domainConfig.getPrice(tagName, duration);
         }
 
+        if (combinedResults.tagObject && combinedResults.tagObject.publicData?.zelfProof) {
+            combinedResults.tagObject.zelfProof = combinedResults.tagObject.publicData.zelfProof;
+        }
+
         if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
             combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
 
-        // Extract ZelfProof from QR code if it's not already present in metadata
         if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
             try {
                 const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
@@ -288,11 +291,13 @@ const searchByStorageKey = async (params, authUser) => {
             combinedResults.tagObject = arweaveResults[0];
         }
 
-        // Generate QR code and extract ZelfProof if needed
+        if (combinedResults.tagObject && combinedResults.tagObject.publicData?.zelfProof) {
+            combinedResults.tagObject.zelfProof = combinedResults.tagObject.publicData.zelfProof;
+        }
+
         if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
             combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
 
-        // Extract ZelfProof from QR code if it's not already present in metadata
         if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
             const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);
             if (extractedZelfProof && QRZelfProofExtractor.validateZelfProof(extractedZelfProof)) {

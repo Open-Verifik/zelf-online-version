@@ -58,6 +58,17 @@ const schemas = {
 	},
 	list: {
 		category: stringEnum(SUPPORTED_CATEGORIES).required(),
+		tagName: string().optional(),
+	},
+	listAll: {
+		tagName: string().optional(),
+	},
+	listDashboard: {
+		identifier: string().required().pattern(/^.+\..+$/),
+		category: stringEnum(SUPPORTED_CATEGORIES).optional(),
+	},
+	listAllDashboard: {
+		identifier: string().required().pattern(/^.+\..+$/),
 	},
 	delete: {
 		id: string().required(),
@@ -202,6 +213,48 @@ const listValidation = async (ctx, next) => {
 	await next();
 };
 
+const listAllValidation = async (ctx, next) => {
+	const valid = validate(schemas.listAll, ctx.request.query);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
+/**
+ * Dashboard list validation - requires identifier (user.domain format)
+ */
+const listDashboardValidation = async (ctx, next) => {
+	const valid = validate(schemas.listDashboard, ctx.request.query);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
+/**
+ * Dashboard list-all validation - requires identifier (user.domain format)
+ */
+const listAllDashboardValidation = async (ctx, next) => {
+	const valid = validate(schemas.listAllDashboard, ctx.request.query);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
 /**
  * Preview data validation middleware
  */
@@ -242,5 +295,8 @@ module.exports = {
 	retrieveValidation,
 	previewValidation,
 	listValidation,
+	listAllValidation,
+	listDashboardValidation,
+	listAllDashboardValidation,
 	deleteZelfKeyValidation,
 };

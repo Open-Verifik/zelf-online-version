@@ -157,6 +157,62 @@ const listData = async (ctx) => {
 };
 
 /**
+ * List all data across all categories
+ * @param {Object} ctx - Koa context
+ */
+const listAllData = async (ctx) => {
+	try {
+		const data = await Module.listAllData(ctx.request.query, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
+/**
+ * List data by category (dashboard) - requires identifier
+ * @param {Object} ctx - Koa context
+ */
+const listDataDashboard = async (ctx) => {
+	try {
+		const { identifier, category } = ctx.request.query;
+		const data = await Module.listDataForDashboard(identifier, category, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
+/**
+ * List all data across all categories (dashboard) - requires identifier
+ * @param {Object} ctx - Koa context
+ */
+const listAllDataDashboard = async (ctx) => {
+	try {
+		const { identifier } = ctx.request.query;
+		const data = await Module.listAllDataForDashboard(identifier, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
+/**
  * Delete ZelfKey
  * @param {Object} ctx - Koa context
  */
@@ -189,5 +245,8 @@ module.exports = {
 	retrieveData,
 	previewData,
 	listData,
+	listAllData,
+	listDataDashboard,
+	listAllDataDashboard,
 	deleteZelfKey,
 };

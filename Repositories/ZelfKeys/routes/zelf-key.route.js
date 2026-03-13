@@ -17,6 +17,9 @@ module.exports = (server) => {
 	server.post(`${PATH}/store/credit-card`, Middleware.storeCreditCardValidation, Controller.storeCreditCard);
 
 	server.get(`${PATH}/list`, Middleware.listValidation, Controller.listData);
+	server.get(`${PATH}/list-all`, Middleware.listAllValidation, Controller.listAllData);
+	server.get(`${PATH}/dashboard/list`, Middleware.listDashboardValidation, Controller.listDataDashboard);
+	server.get(`${PATH}/dashboard/list-all`, Middleware.listAllDashboardValidation, Controller.listAllDataDashboard);
 	server.post(`${PATH}/retrieve`, Middleware.retrieveValidation, Controller.retrieveData);
 	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewData);
 

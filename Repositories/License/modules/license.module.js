@@ -289,13 +289,46 @@ const filterUserModifiableFields = (domainConfig, existingLicense = null) => {
 };
 
 /**
+ * Upload license logo to IPFS and set metadata.logo on filteredDomainConfig
+ * @param {string} logoBase64 - Data URI or base64 image
+ * @param {string} domain - License domain name
+ * @param {Object} filteredDomainConfig - Domain config to mutate with logo URL
+ */
+const _uploadLicenseLogo = async (logoBase64, domain, filteredDomainConfig) => {
+    if (!logoBase64 || !logoBase64.trim()) return;
+
+    try {
+        const mimeMatch = logoBase64.match(/^data:([^;]+);base64,/);
+        let ext = mimeMatch ? (mimeMatch[1].split("/")[1] || "png") : "png";
+        if (ext.includes("svg")) ext = "svg";
+        const fileName = `${domain}_logo_${Date.now()}.${ext}`;
+        const ipfsResult = await IPFS.insert(
+            {
+                base64: logoBase64,
+                metadata: { type: "license_logo", licenseDomain: domain },
+                name: fileName,
+                pinIt: true,
+            },
+            { pro: true }
+        );
+        if (ipfsResult?.url) {
+            filteredDomainConfig.metadata = filteredDomainConfig.metadata || {};
+            filteredDomainConfig.metadata.logo = ipfsResult.url;
+        }
+    } catch (logoError) {
+        console.error("Logo IPFS upload error:", logoError);
+        throw new Error("500:logo_upload_failed");
+    }
+};
+
+/**
  * Create or update license
  * @param {Object} body - Request body
  * @param {Object} user - User object
  * @returns {Object} - License data
  */
 const createOrUpdateLicense = async (body, jwt) => {
-    const { faceBase64, masterPassword, domainConfig } = body;
+    const { faceBase64, masterPassword, domainConfig, logoBase64 } = body;
 
     try {
         const { myLicense, zelfAccount, accountZelfProof } = await getMyLicense(jwt, false, { faceBase64, masterPassword });
@@ -307,6 +340,8 @@ const createOrUpdateLicense = async (body, jwt) => {
 
         // Filter domain config to only include user-modifiable fields
         const filteredDomainConfig = filterUserModifiableFields(domainConfig, myLicense);
+
+        await _uploadLicenseLogo(logoBase64, body.domain, filteredDomainConfig);
 
         const licenseMetadata = {
             ...filteredDomainConfig,

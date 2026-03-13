@@ -119,12 +119,37 @@ const deleteCollection = async (ctx) => {
 };
 
 /**
+ * Delete an NFT item from IPFS (owner-only, for orphaned drafts)
+ */
+const deleteItem = async (ctx) => {
+    try {
+        const { id } = ctx.request.params;
+
+        const result = await BlockDagNftModule.deleteItem(id, ctx.request.body);
+
+        ctx.body = {
+            success: true,
+            data: result,
+        };
+    } catch (error) {
+        const _exception = httpHandler.errorHandler(error, ctx);
+
+        ctx.status = _exception.status || 500;
+
+        ctx.body = {
+            code: _exception.code,
+            message: _exception.message,
+        };
+    }
+};
+
+/**
  * List Collections
  */
 const getCollections = async (ctx) => {
     try {
-        const { owner } = ctx.request.query;
-        const result = await BlockDagNftModule.listCollections({ owner });
+        const { owner, limit } = ctx.request.query;
+        const result = await BlockDagNftModule.listCollections({ owner, limit });
         ctx.body = {
             success: true,
             data: result,
@@ -302,6 +327,7 @@ module.exports = {
     createCollection,
     updateCollection,
     deleteCollection,
+    deleteItem,
     createNFT,
     mintNFT,
     getCollections,

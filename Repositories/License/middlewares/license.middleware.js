@@ -15,6 +15,7 @@ const schemas = {
 			.required(),
 		faceBase64: string().base64().required(),
 		masterPassword: string().optional().allow(""),
+		logoBase64: string().optional().allow(""), // Data URI or raw base64; validated in module
 		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).optional(),
 		domainConfig: object({
 			name: string().required(),
@@ -115,6 +116,7 @@ const schemas = {
 				community: string().optional(),
 				enterprise: string().optional(),
 				support: stringEnum(["standard", "premium", "enterprise"]).default("standard"),
+				logo: string().uri().optional(),
 			}).optional(),
 		}).required(),
 	},
@@ -181,12 +183,13 @@ const getMyLicenseValidation = async (ctx, next) => {
 const createValidation = async (ctx, next) => {
 	const payload = Object.assign(ctx.request.query, ctx.request.body);
 
-	const { domain, faceBase64, masterPassword, os, domainConfig } = payload;
+	const { domain, faceBase64, masterPassword, logoBase64, os, domainConfig } = payload;
 
 	const valid = validate(schemas.create, {
 		domain,
 		faceBase64,
 		masterPassword,
+		logoBase64,
 		os,
 		domainConfig,
 	});
