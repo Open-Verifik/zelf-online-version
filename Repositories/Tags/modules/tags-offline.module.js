@@ -6,7 +6,7 @@ const moment = require("moment");
 const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const TagsRegistrationModule = require("./tags-registration.module");
-const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
+const { extractZelfProofFromQR, generateQRFromZelfProof } = require("./qr-zelfproof-extractor.module");
 
 const _getExtraPublicData = async (password, zelfProof, syncPublicData) => {
 	if (!password || !zelfProof || !syncPublicData) {
@@ -169,10 +169,14 @@ const leaseOfflineTag = async (params, authUser) => {
 	const { password } = decryptedParams;
 
 	if (!zelfProof) {
-		zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(zelfProofQRCode);
+		zelfProof = await extractZelfProofFromQR(zelfProofQRCode);
 	}
 
 	if (!zelfProof || typeof zelfProof !== "string") throw new Error("400:missing_or_invalid_zelf_proof");
+
+	if (!zelfProofQRCode) {
+		zelfProofQRCode = await generateQRFromZelfProof(zelfProof);
+	}
 
 	const { preview } = await previewZelfProof({ zelfProof }, authUser);
 

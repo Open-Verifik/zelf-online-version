@@ -2,6 +2,11 @@ const { Buffer } = require("buffer");
 
 // Use sharp for image decoding (avoids canvas/sharp native lib conflict)
 let sharp;
+
+// QRCode is used to generate QR images from a raw ZelfProof string
+let QRCode = require("qrcode");
+
+
 try {
 	sharp = require("sharp");
 } catch (error) {
@@ -249,7 +254,62 @@ async function extractZelfProofFromQR(base64Image) {
 	return await QRZelfProofExtractor.extractZelfProof(base64Image);
 }
 
+/**
+ * Computes optimal QR pixel size based on ZelfProof binary byte length.
+ * Larger ZelfProofs produce denser QR codes that require more pixels per module
+ * to remain reliably scannable on mobile devices (≥2.5 px/module recommended).
+ *
+ * Formula: estimate QR version from byte count (H-level capacity ≈ byteCount/32),
+ * then size = modules × 2.5, clamped to [256, 512].
+ *
+ * @param {number} byteCount - Length of the raw ZelfProof buffer
+ * @returns {number} - Recommended pixel width/height
+ */
+function getOptimalQRSize(byteCount) {
+	const version = Math.max(1, Math.min(40, Math.ceil(byteCount / 32)));
+	const modules = 17 + 4 * version;
+	return Math.max(256, Math.min(512, Math.ceil(modules * 2.5)));
+}
+
+/**
+ * Generates a QR code PNG image from a base64-encoded ZelfProof string.
+ * Encodes the raw binary data (byte mode) so the QR is identical to the original.
+ * Image size is computed automatically from the ZelfProof byte length.
+ *
+ * @param {string} zelfProof - Base64-encoded ZelfProof
+ * @param {Object} [options]
+ * @param {number} [options.size] - Width/height in px (default: auto via getOptimalQRSize)
+ * @param {string} [options.errorCorrectionLevel="H"] - QR error correction level
+ * @param {number} [options.margin=2] - Quiet zone modules around the QR code
+ * @returns {Promise<string|null>} - data:image/png;base64,... or null on failure
+ */
+async function generateQRFromZelfProof(zelfProof, options = {}) {
+	if (!zelfProof || typeof zelfProof !== "string") return null;
+	if (!QRCode) {
+		console.warn("qrcode module not available, cannot generate QR from ZelfProof");
+		return null;
+	}
+	try {
+		const buffer = Buffer.from(zelfProof, "base64");
+		const size = options.size ?? getOptimalQRSize(buffer.length);
+		const { errorCorrectionLevel = "H", margin = 2 } = options;
+
+		const dataUrl = await QRCode.toDataURL([{ data: buffer, mode: "byte" }], {
+			type: "png",
+			width: size,
+			margin,
+			errorCorrectionLevel,
+		});
+		return dataUrl;
+	} catch (error) {
+		console.error("generateQRFromZelfProof failed:", error.message);
+		return null;
+	}
+}
+
 module.exports = {
 	QRZelfProofExtractor,
 	extractZelfProofFromQR,
+	generateQRFromZelfProof,
+	getOptimalQRSize,
 };

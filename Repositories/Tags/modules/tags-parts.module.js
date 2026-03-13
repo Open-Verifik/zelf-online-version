@@ -1,5 +1,5 @@
 const { decrypt, encrypt, preview, encryptQRCode } = require("../../ZelfProof/modules/zelf-proof.module");
-const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
+const { generateQRFromZelfProof, extractZelfProofFromQR } = require("./qr-zelfproof-extractor.module");
 const { generateStorageKey, generateHoldDomain } = require("./domain-registry.module");
 const config = require("../../../Core/config");
 const { getDomainConfig } = require("../config/supported-domains");
@@ -381,11 +381,10 @@ const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainCo
 };
 
 const _generateZelfProof = async (dataToEncrypt, tagObject) => {
-    const zelfProofQRCode = (await encryptQRCode(dataToEncrypt))?.zelfQR;
+    const { zelfProof } = await encrypt(dataToEncrypt);
 
-    tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(zelfProofQRCode);
-
-    tagObject.zelfProofQRCode = zelfProofQRCode;
+    tagObject.zelfProof = zelfProof;
+    tagObject.zelfProofQRCode = await generateQRFromZelfProof(zelfProof);
 };
 
 const getFullTagName = (tagName, domain) => {
