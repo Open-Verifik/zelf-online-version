@@ -1,6 +1,8 @@
-const solanaWeb3 = require("@solana/web3.js");
-const splToken = require("@solana/spl-token");
 const config = require("../../../Core/config");
+if (config.solana?.useKit) { module.exports = require("./zns-transaction-detector.module.kit"); return; }
+
+const solanaWeb3 = require("@solana/web3.js");
+const splManual = require("../../../Core/spl-token-manual");
 const moment = require("moment");
 
 // Initialize Solana connection
@@ -25,7 +27,7 @@ const detectZNSTransactions = async (solanaAddress, options = {}) => {
 		console.log(`🔍 Detecting ZNS transactions for address: ${solanaAddress}`);
 
 		// Get the associated token account for this address
-		const associatedTokenAddress = await splToken.getAssociatedTokenAddress(ZNS_TOKEN_MINT, new solanaWeb3.PublicKey(solanaAddress));
+		const associatedTokenAddress = splManual.getAssociatedTokenAddress(new solanaWeb3.PublicKey(solanaAddress), ZNS_TOKEN_MINT);
 
 		// Get transaction signatures for the token account
 		const signatures = await connection.getSignaturesForAddress(associatedTokenAddress, { limit, before });
@@ -192,7 +194,7 @@ const extractZNSTransfers = (transaction, targetAddress) => {
  */
 const getZNSBalance = async (solanaAddress) => {
 	try {
-		const associatedTokenAddress = await splToken.getAssociatedTokenAddress(ZNS_TOKEN_MINT, new solanaWeb3.PublicKey(solanaAddress));
+		const associatedTokenAddress = splManual.getAssociatedTokenAddress(new solanaWeb3.PublicKey(solanaAddress), ZNS_TOKEN_MINT);
 
 		const tokenAccount = await connection.getTokenAccountBalance(associatedTokenAddress);
 

@@ -1,0 +1,74 @@
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-spacing: 0 !important; border-collapse: collapse">
+    <tbody>
+        <tr>
+            <td
+                class="hs_padded"
+                style="
+                    border-collapse: collapse;
+                    font-family: Arial, sans-serif;
+                    font-size: 15px;
+                    color: #d1d5db;
+                    word-break: break-word;
+                    padding: 20px 40px 40px;
+                "
+            >
+                <div style="color: inherit; font-size: inherit; line-height: inherit">
+                    <div style="color: inherit; font-size: inherit; line-height: inherit">
+                        <h2
+                            style="font-size: 24px; line-height: 140%; font-weight: bold; text-align: center; color: #ffffff; margin-bottom: 24px"
+                            align="center"
+                        >
+                            <%= t.title %>
+                        </h2>
+
+                        <p style="font-size: 16px; line-height: 175%; text-align: left; color: #d1d5db; margin-bottom: 20px" align="left">
+                            <%- greeting %>
+                        </p>
+
+                        <p style="font-size: 16px; line-height: 175%; text-align: left; color: #d1d5db; margin-bottom: 20px" align="left">
+                            <%- t.intro %>
+                        </p>
+
+                        <p style="font-size: 16px; line-height: 175%; text-align: left; color: #d1d5db; margin-bottom: 10px" align="left">
+                            <%= t.expect %>
+                        </p>
+
+                        <ul
+                            style="font-size: 16px; line-height: 175%; text-align: left; color: #d1d5db; padding-left: 20px; margin-bottom: 30px"
+                            align="left"
+                        >
+                            <li style="margin-bottom: 8px"><%- t.benefits.item1 %></li>
+                            <li style="margin-bottom: 8px"><%- t.benefits.item2 %></li>
+                            <li style="margin-bottom: 8px"><%- t.benefits.item3 %></li>
+                        </ul>
+
+                        <p style="font-size: 16px; line-height: 175%; text-align: left; color: #d1d5db; margin-bottom: 30px" align="left">
+                            <%= t.philosophy %>
+                        </p>
+
+                        <div style="text-align: center; margin-bottom: 40px">
+                            <a
+                                href="https://zelf.world"
+                                style="
+                                    background-color: #ffffff;
+                                    color: #000000;
+                                    padding: 12px 24px;
+                                    border-radius: 6px;
+                                    text-decoration: none;
+                                    font-weight: bold;
+                                    font-size: 16px;
+                                "
+                                ><%= t.cta %></a
+                            >
+                        </div>
+
+                        <p style="line-height: 175%; text-align: left; color: #6b7280; font-size: 14px" align="left">
+                            <%= sincerely %><br />
+                            <strong><%= t.team %></strong>
+                        </p>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </tbody>
+</table>

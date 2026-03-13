@@ -1,0 +1,12 @@
+{
+  "network": "avalanche",
+  "chainId": 43114,
+  "rpcUrl": "",
+  "deployer": "0x787389C8ec43D94362648310316F4348A4dE8C83",
+  "contracts": {
+    "identityRegistry": "0xd3c6Fa69B3719a1877145Ff72313F75dc0Af0F69",
+    "reputationRegistry": "0x5Db2BdA967b4beE92E91e8cf74627655ae3cde83",
+    "validationRegistry": "0x5E73485fFD6705A7ece0e046C2eb21673120E360"
+  },
+  "deployedAt": "2026-02-19T17:03:41.418Z"
+}

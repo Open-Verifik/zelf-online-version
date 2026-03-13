@@ -1,148 +1,230 @@
-require("dotenv").config();
+require("dotenv").config({ path: require("path").resolve(__dirname, "../.env"), override: true });
 
 const API_ROOT = "/api";
 
 const configuration = {
-	name: "API",
-	env: process.env.NODE_ENV || "development",
-	port: process.env.PORT || "3000",
-	base_url: process.env.BASE_URL || "https://verifik.co",
-	sessionSecret: process.env.SESSION_SECRET,
-	so: process.env.ENVOS,
-	sessions: {
-		version: 2,
-		globalLimit: process.env.GLOBAL_LIMIT || 5 * 60 * 10, // 5 requests per second for 10 minutes
-		previewLimit: process.env.PREVIEW_LIMIT || 1 * 30 * 10, // 1 request per 2 seconds for 10 minutes
-		searchLimit: process.env.SEARCH_LIMIT || 1 * 30 * 10, // 1 request per 2 seconds for 10 minutes
-		leaseLimit: process.env.LEASE_LIMIT || 15, // 30 requests max per 10 minutes
-		decryptLimit: process.env.DECRYPT_LIMIT || 30, // 30 requests max per 10 minutes
-	},
-	email_providers: {
-		mailgun: {
-			proxyEmail: process.env.MAILGUN_PROXY_EMAIL,
-			apiKey: process.env.MAILGUN_API_KEY,
-		},
-	},
-	signedData: {
-		key: process.env.SECRET_KEY_PRICI,
-	},
-	debug: {
-		mongo: process.env.DEBUG_MONGO === "true",
-		sendEmail: process.env.DEBUG_SEND_EMAIL === "true",
-	},
-	db: {
-		uri: process.env.MONGODB_URI_PROD || process.env.MONGODB_URI,
-		user: process.env.MONGO_USER,
-		password: process.env.MONGO_PASSWORD,
-		poolSize: Number(process.env.MONGO_POOLSIZE) || 50,
-		test_uri: "mongodb://127.0.0.1:27017/testdb",
-	},
-	queue: {
-		collectionName: process.env.QUEUE_NAME,
-		instance: Number(process.env.QUEUE_INSTANCE),
-		time: process.env.QUEUE_TIME,
-	},
-	JWT_SECRET: process.env.CONNECTION_KEY,
-	SUPERADMIN_JWT_SECRET: process.env.SUPER_ADMINS_JWT_SECRET,
-	encryptionSecret: process.env.FRONTEND_KEY,
-	basePath: (path) => {
-		return API_ROOT.replace(/\/$/, "") + "/" + path.replace(/^\//, "");
-	},
-	full_url: process.env.BASE_URL + ":" + process.env.PORT,
-	zelfEncrypt: {
-		serverKey: process.env.ZELF_ENCRYPT_SERVER_KEY,
-	},
-	zelfProof: {
-		url: process.env.ZELF_PROOF_URL || "https://api.zelf.world",
-		apiKey: process.env.ZELF_PROOF_API_KEY || "password",
-		skipArweave: process.env.SKIP_ARWEAVE || false,
-	},
-	token: {
-		rewardPrice: process.env.REWARD_PRICE || 0.05,
-		whitelist: process.env.WHITELIST || "",
-		priceEnv: process.env.PRICE_ENV || "production",
-	},
-	pgp: {
-		secretKey: process.env.PGP_SECRET_KEY || "",
-		passphrase: process.env.PGP_PASSPHRASE || "",
-		globalSecretKey: process.env.PGP_GLOBAL_SECRET_KEY || "",
-		globalPassphrase: process.env.PGP_GLOBAL_PASSPHRASE || "",
-	},
-	etherscan: {
-		urlEtherscan: "https://api.etherscan.io/api",
-		apiKey: process.env.INFURA_APIKEY,
-	},
-	binance: {
-		urlBinance: "https://api.binance.com/",
-	},
-	mailgun: {
-		apiKey: process.env.MAILGUN_API_KEY || "my_key",
-	},
-	terms: {
-		zk: process.env.ZK1 || "_",
-		_zk: process.env.ZELF1 || "_",
-	},
-	arwave: {
-		key: process.env.ARWAVE_KEY,
-		owner: process.env.ARWEAVE_OWNER,
-		n: process.env.ARWAVE_N,
-		e: process.env.ARWAVE_E,
-		d: process.env.ARWAVE_D,
-		p: process.env.ARWAVE_P,
-		q: process.env.ARWAVE_Q,
-		dp: process.env.ARWAVE_DP,
-		dq: process.env.ARWAVE_DQ,
-		qi: process.env.ARWAVE_QI,
-		hold: {
-			owner: process.env._ARWEAVE_OWNER,
-			n: process.env._ARWAVE_N,
-			e: process.env._ARWAVE_E,
-			d: process.env._ARWAVE_D,
-			p: process.env._ARWAVE_P,
-			q: process.env._ARWAVE_Q,
-			dp: process.env._ARWAVE_DP,
-			dq: process.env._ARWAVE_DQ,
-			qi: process.env._ARWAVE_QI,
-		},
-		parentName: process.env.ARWEAVE_PARENT_NAME,
-		processId: process.env.ARWEAVE_PROCESS_ID,
-		transactionId: process.env.ARWEAVE_TRANSACTION_ID,
-	},
-	walrus: {
-		network: process.env.WALRUS_NETWORK || "testnet",
-		privateKey: process.env.WALRUS_PRIVATE_KEY,
-		suiRpcUrl: process.env.WALRUS_SUI_RPC_URL || "https://fullnode.testnet.sui.io:443",
-		defaultEpochs: Number(process.env.WALRUS_DEFAULT_EPOCHS) || 5,
-		maxFileSize: Number(process.env.WALRUS_MAX_FILE_SIZE) || 100 * 1024, // 100KB
-	},
-	coinbase: {
-		key: process.env.COINBASE_API_KEY,
-		forceApproval: Boolean(process.env.COINBASE_FORCE_APPROVAL === "true"),
-	},
-	google: {
-		captchaProjectID: process.env.CAPTCHA_PROJECT_ID,
-		webSiteKey: process.env.CAPTCHA_WEB_SITE_KEY,
-		androidSiteKey: process.env.CAPTCHA_ANDROID_SITE_KEY,
-		iOSSiteKey: process.env.CAPTCHA_IOS_SITE_KEY,
-		captchaApproval: Boolean(process.env.CAPTCHA_APPROVAL === "true"),
-	},
-	revenueCat: {
-		allowedEmail: process.env.REVENUECAT_ALLOWED_EMAIL,
-	},
-	solana: {
-		senderPublicKey: process.env.SOLANA_SENDER_PUBLIC_KEY,
-		sender: process.env.SENDER_KEY,
-		nodeSecret: process.env.SOLANA_NODE_SECRET,
-		tokenMintAddress: process.env.SOLANA_TOKEN_MINT_ADDRESS,
-	},
-	oklink: {
-		apiKey: process.env.OKLINK_API_KEY,
-	},
-	lifi: {
-		url: process.env.LIFI_API_URL || "https://li.quest/v1",
-		apiKey: process.env.LIFI_API_KEY,
-		integrator: process.env.LIFI_INTEGRATOR,
-	},
+    name: "API",
+    env: process.env.NODE_ENV || "development",
+    port: process.env.PORT || "3000",
+    base_url: process.env.BASE_URL || "https://verifik.co",
+    sessionSecret: process.env.SESSION_SECRET,
+    so: process.env.ENVOS,
+    sessions: {
+        version: 2,
+        globalLimit: process.env.GLOBAL_LIMIT || 5 * 60 * 10, // 5 requests per second for 10 minutes
+        previewLimit: process.env.PREVIEW_LIMIT || 1 * 30 * 10, // 1 request per 2 seconds for 10 minutes
+        searchLimit: process.env.SEARCH_LIMIT || 1 * 30 * 10, // 1 request per 2 seconds for 10 minutes
+        leaseLimit: process.env.LEASE_LIMIT || 15, // 30 requests max per 10 minutes
+        decryptLimit: process.env.DECRYPT_LIMIT || 30, // 30 requests max per 10 minutes
+    },
+    email_providers: {
+        mailgun: {
+            proxyEmail: process.env.MAILGUN_PROXY_EMAIL || "miguel@zelf.world",
+            apiKey: process.env.MAILGUN_API_KEY,
+        },
+    },
+    signedData: {
+        key: process.env.SECRET_KEY_PRICI,
+    },
+    debug: {
+        mongo: process.env.DEBUG_MONGO === "true",
+        sendEmail: process.env.DEBUG_SEND_EMAIL === "true",
+    },
+    db: {
+        uri: process.env.MONGODB_URI_PROD || process.env.MONGODB_URI,
+        user: process.env.MONGO_USER,
+        password: process.env.MONGO_PASSWORD,
+        poolSize: Number(process.env.MONGO_POOLSIZE) || 50,
+        test_uri: "mongodb://127.0.0.1:27017/testdb",
+    },
+    queue: {
+        collectionName: process.env.QUEUE_NAME,
+        instance: Number(process.env.QUEUE_INSTANCE),
+        time: process.env.QUEUE_TIME,
+    },
+    JWT_SECRET: process.env.CONNECTION_KEY,
+    SUPERADMIN_JWT_SECRET: process.env.SUPER_ADMINS_JWT_SECRET,
+    encryptionSecret: process.env.FRONTEND_KEY,
+    basePath: (path) => {
+        return API_ROOT.replace(/\/$/, "") + "/" + path.replace(/^\//, "");
+    },
+    full_url: process.env.BASE_URL + ":" + process.env.PORT,
+    zelfEncrypt: {
+        serverKey: process.env.ZELF_ENCRYPT_SERVER_KEY,
+    },
+    zelfProof: {
+        url: process.env.ZELF_PROOF_URL || "https://api.zelf.world",
+        apiKey: process.env.ZELF_PROOF_API_KEY || "password",
+        skipArweave: process.env.SKIP_ARWEAVE || false,
+    },
+    token: {
+        rewardPrice: process.env.REWARD_PRICE || 0.05,
+        whitelist: process.env.WHITELIST || "",
+        priceEnv: process.env.PRICE_ENV || "production",
+    },
+    landingUrl: process.env.LANDING_URL || (process.env.NODE_ENV === "development" ? "http://localhost:3009" : "https://zelf.world"),
+    pgp: {
+        secretKey: process.env.PGP_SECRET_KEY || "",
+        passphrase: process.env.PGP_PASSPHRASE || "",
+        globalSecretKey: process.env.PGP_GLOBAL_SECRET_KEY || "",
+        globalPassphrase: process.env.PGP_GLOBAL_PASSPHRASE || "",
+    },
+    etherscan: {
+        urlEtherscan: "https://api.etherscan.io/api",
+        apiKey: process.env.INFURA_APIKEY,
+    },
+    binance: {
+        urlBinance: "https://api.binance.com/",
+    },
+    mailgun: {
+        apiKey: process.env.MAILGUN_API_KEY || "my_key",
+    },
+    terms: {
+        zk: process.env.ZK1 || "_",
+        _zk: process.env.ZELF1 || "_",
+    },
+    arwave: {
+        env: process.env.ARWAVE_ENV || "production",
+        key: process.env.ARWAVE_KEY,
+        owner: process.env.ARWEAVE_OWNER,
+        n: process.env.ARWAVE_N,
+        e: process.env.ARWAVE_E,
+        d: process.env.ARWAVE_D,
+        p: process.env.ARWAVE_P,
+        q: process.env.ARWAVE_Q,
+        dp: process.env.ARWAVE_DP,
+        dq: process.env.ARWAVE_DQ,
+        qi: process.env.ARWAVE_QI,
+        hold: {
+            owner: process.env._ARWEAVE_OWNER,
+            n: process.env._ARWAVE_N,
+            e: process.env._ARWAVE_E,
+            d: process.env._ARWAVE_D,
+            p: process.env._ARWAVE_P,
+            q: process.env._ARWAVE_Q,
+            dp: process.env._ARWAVE_DP,
+            dq: process.env._ARWAVE_DQ,
+            qi: process.env._ARWAVE_QI,
+        },
+        parentName: process.env.ARWEAVE_PARENT_NAME,
+        processId: process.env.ARWEAVE_PROCESS_ID,
+        transactionId: process.env.ARWEAVE_TRANSACTION_ID,
+    },
+    arns: {
+        processId: process.env.ARNS_PROCESS_ID,
+        index_transaction_id: process.env.ARNS_INDEX_TRANSACTION_ID,
+        blockdag_transaction_id: process.env.ARNS_BLOCKDAG_TRANSACTION_ID || "9Kz-HCKRaWmM5fAc9A2q7sJbUIRAGQ5X9GDKdI7l76Q",
+    },
+    walrus: {
+        network: process.env.WALRUS_NETWORK || "testnet",
+        privateKey: process.env.WALRUS_PRIVATE_KEY,
+        suiRpcUrl: process.env.WALRUS_SUI_RPC_URL || "https://fullnode.testnet.sui.io:443",
+        defaultEpochs: Number(process.env.WALRUS_DEFAULT_EPOCHS) || 5,
+        maxFileSize: Number(process.env.WALRUS_MAX_FILE_SIZE) || 100 * 1024, // 100KB
+    },
+    coinbase: {
+        key: process.env.COINBASE_API_KEY,
+        forceApproval: Boolean(process.env.COINBASE_FORCE_APPROVAL === "true"),
+        devMode: Boolean(process.env.COINBASE_DEV_MODE === "true"),
+    },
+    google: {
+        captchaProjectID: process.env.CAPTCHA_PROJECT_ID,
+        webSiteKey: process.env.CAPTCHA_WEB_SITE_KEY,
+        androidSiteKey: process.env.CAPTCHA_ANDROID_SITE_KEY,
+        iOSSiteKey: process.env.CAPTCHA_IOS_SITE_KEY,
+        captchaApproval: Boolean(process.env.CAPTCHA_APPROVAL === "true"),
+        geminiApiKey: process.env.GEMINI_API_KEY,
+        geminiAuthMode: process.env.GEMINI_AUTH_MODE || "api_key", // 'api_key' or 'service_account'
+    },
+    revenueCat: {
+        allowedEmail: process.env.REVENUECAT_ALLOWED_EMAIL,
+    },
+    solana: {
+        senderPublicKey: process.env.SOLANA_SENDER_PUBLIC_KEY,
+        sender: process.env.SENDER_KEY,
+        nodeSecret: process.env.SOLANA_NODE_SECRET,
+        tokenMintAddress: process.env.SOLANA_TOKEN_MINT_ADDRESS,
+        devModeTokens: process.env.SOLANA_DEV_MODE_TOKENS, // Set to "true" to divide token transfers by 10000 for testing
+        useKit: process.env.SOLANA_USE_KIT === "true", // Use .kit.js modules (Option A: @solana-program/token) for testing
+    },
+    oklink: {
+        apiKey: process.env.OKLINK_API_KEY,
+    },
+    lifi: {
+        url: process.env.LIFI_API_URL || "https://li.quest/v1",
+        apiKey: process.env.LIFI_API_KEY,
+        integrator: process.env.LIFI_INTEGRATOR,
+    },
+    fantom: {
+        rpcUrl: process.env.FANTOM_RPC_URL || "https://fragrant-wild-smoke.fantom.quiknode.pro/9f6de2bac71c11f7c08e97e7be74a9d770c62a86",
+    },
+    stripe: {
+        frontendUrl: process.env.FRONTEND_URL || "http://localhost:4200",
+        redirectUrl: process.env.STRIPE_REDIRECTURL || "https://verifik.app",
+        secretKey: process.env.STRIPE_SECRET_KEY || "",
+        taxes: 0.19,
+        zelfKeys: {
+            success: `${process.env.FRONTEND_URL}/zelfkeys/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel: `${process.env.FRONTEND_URL}/zelfkeys/cancel?canceled=true`,
+        },
+        dashboard: {
+            success: `${process.env.DASHBOARD_URL}/settings/plan-billing?session_id={CHECKOUT_SESSION_ID}`,
+            cancel: `${process.env.DASHBOARD_URL}/settings/plan-billing?canceled=true`,
+        },
+        plans: {
+            basic: {
+                currency: "usd",
+                description: "20 new encryptions per month.",
+                interval: "month",
+                name: "Basic Plan",
+                price: 4.99,
+                priceId: process.env.STRIPE_BASIC_PRICE_ID,
+            },
+            pro: {
+                currency: "usd",
+                description: "50 new encryptions per month",
+                interval: "month",
+                name: "Pro Plan",
+                price: 9.99,
+                priceId: process.env.STRIPE_PRO_PRICE_ID,
+            },
+            enterprise: {
+                currency: "usd",
+                description: "100 new encryptions per month.",
+                interval: "month",
+                name: "Enterprise Plan",
+                price: 19.99,
+                priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
+            },
+        },
+    },
+    avalanche: {
+        contractAddress: process.env.AVALANCHE_CONTRACT_ADDRESS || "0x6C995090C530756d59E6eEa5a3bA209863e0E167",
+        createNFT: process.env.AVALANCHE_CREATE_NFT === "true",
+        rpcUrl:
+            process.env.AVALANCHE_RPC_URL ||
+            "https://wild-bitter-meadow.avalanche-mainnet.quiknode.pro/e2565749ca44c2873fe2a0a747f5ac68ae7eb14f/ext/bc/C/rpc/",
+        chainId: 43114, // Avalanche C-Chain mainnet
+        privateKey: process.env.WALRUS_PRIVATE_KEY,
+    },
+    erc8004: {
+        rpcUrl: process.env.ERC8004_RPC_URL || process.env.AVALANCHE_RPC_URL || "https://api.avax.network/ext/bc/C/rpc",
+        chainId: Number(process.env.ERC8004_CHAIN_ID || 43114),
+        identityRegistryAddress: process.env.ERC8004_IDENTITY_REGISTRY || "0xd3c6Fa69B3719a1877145Ff72313F75dc0Af0F69",
+        reputationRegistryAddress: process.env.ERC8004_REPUTATION_REGISTRY || "0x5Db2BdA967b4beE92E91e8cf74627655ae3cde83",
+        validationRegistryAddress: process.env.ERC8004_VALIDATION_REGISTRY || "0x5E73485fFD6705A7ece0e046C2eb21673120E360",
+    },
+    cryptoPayments: {
+        demoMode: process.env.CRYPTO_PAYMENTS_DEMO_MODE === "true" || false,
+        demoMultiplier: 0.005, // 0.5% of original price for demo mode (max $0.049 for $9.99)
+    },
+    blockdag: {
+        defaultCollectionAddress: process.env.BLOCKDAG_DEFAULT_COLLECTION_ADDRESS || null,
+        factoryAddress: process.env.BLOCKDAG_FACTORY_ADDRESS || "0x7c6a168455C94092f8d51aBC515B73f4Ed9813a6",
+        rpcUrl: process.env.BLOCKDAG_RPC_URL || "https://rpc.bdagscan.com",
+        chainId: 1404,
+        nowNodesAPIKey: process.env.BLOCKDAG_NOW_NODES_API_KEY,
+    },
 };
 
 module.exports = configuration;

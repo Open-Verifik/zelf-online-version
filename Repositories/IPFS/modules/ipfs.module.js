@@ -42,9 +42,9 @@ const insert = async (data, authUser) => {
 	return await IPFS.upload(base64, name, null, metadata);
 };
 
-const unPinFiles = async (CIDs = []) => {
+const unPinFiles = async (ids = []) => {
 	try {
-		const unpinnedFiles = await IPFS.unPinFiles(CIDs);
+		const unpinnedFiles = await IPFS.deleteFiles(ids);
 
 		return unpinnedFiles;
 	} catch (exception) {}
@@ -54,7 +54,7 @@ const unPinFiles = async (CIDs = []) => {
 
 const update = async (previousIpfsPinHash, data, authUser) => {
 	//unpin previous file
-	await IPFS.unPinFiles([previousIpfsPinHash]);
+	await IPFS.deleteFiles([previousIpfsPinHash]);
 
 	const { base64, metadata, name } = data;
 

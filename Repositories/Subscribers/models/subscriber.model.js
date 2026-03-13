@@ -9,22 +9,31 @@ const { requiredEnumField, requiredField, refField, defaultField, addBasicPlugin
 //####################################################//
 
 const SubscriberSchema = new Schema({
-	email: requiredField(String),
-	sentWelcomeEmail: defaultField(Boolean, false),
-	name: defaultField(String), // optional
-	lists: [
-		{
-			type: String,
-		},
-	],
+    email: requiredField(String),
+    sentWelcomeEmail: defaultField(Boolean, false),
+    name: { type: String, required: false }, // optional
+    lists: [
+        {
+            type: String,
+        },
+    ],
+    emailsReceived: [
+        {
+            articleId: { type: mongoose.Schema.Types.ObjectId, ref: "Article" },
+            sentAt: { type: Date, default: Date.now },
+            openedAt: { type: Date },
+        },
+    ],
+    unsubscribeReason: defaultField(String),
+    unsubscribedAt: defaultField(Date),
 });
 
 SubscriberSchema.pre("save", async (next) => {
-	const _this = this;
+    const _this = this;
 });
 
 SubscriberSchema.post("save", async (next) => {
-	const _this = this;
+    const _this = this;
 });
 
 /**

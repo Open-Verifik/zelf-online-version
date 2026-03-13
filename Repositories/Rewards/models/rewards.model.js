@@ -6,7 +6,6 @@ const rewardsSchema = new mongoose.Schema(
 			type: String,
 			required: true,
 			unique: true,
-			index: true,
 		},
 		name: {
 			type: String,
@@ -70,10 +69,8 @@ const rewardsSchema = new mongoose.Schema(
 );
 
 // Indexes
-rewardsSchema.index({ rewardPrimaryKey: 1 }, { unique: true });
-rewardsSchema.index({ zelfName: 1, type: 1 });
-rewardsSchema.index({ zelfName: 1, status: 1 });
+rewardsSchema.index({ name: 1, type: 1 });
+rewardsSchema.index({ name: 1, status: 1 });
 rewardsSchema.index({ createdAt: -1 });
-rewardsSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index
 
 module.exports = mongoose.model("Rewards", rewardsSchema);

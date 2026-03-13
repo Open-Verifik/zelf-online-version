@@ -7,27 +7,22 @@ const config = require("./config");
 let pool = null;
 
 const initMongoDB = () => {
-	mongoose.Promise = global.Promise;
+    mongoose.Promise = global.Promise;
 
-	// Setup options applicable to all environments
-	const setup = {
-		useNewUrlParser: true,
-		useUnifiedTopology: true,
-	};
+    // Construct the MongoDB URI with poolSize parameter if needed
+    let uri = config.db.uri;
+    // if (config.env === "production") {
+    // const poolSizeParam = `poolSize=${config.db.poolSize}`;
 
-	// Construct the MongoDB URI with poolSize parameter if needed
-	let uri = config.db.uri;
-	// if (config.env === "production") {
-	// const poolSizeParam = `poolSize=${config.db.poolSize}`;
+    // uri += uri.includes("?") ? `&${poolSizeParam}` : `?${poolSizeParam}`;
+    // }
 
-	// uri += uri.includes("?") ? `&${poolSizeParam}` : `?${poolSizeParam}`;
-	// }
 
-	mongoose.connect(uri, setup);
+    mongoose.connect(uri);
 
-	MongoConnection = mongoose.connection;
+    MongoConnection = mongoose.connection;
 
-	return MongoConnection;
+    return MongoConnection;
 };
 
 /**
@@ -35,14 +30,14 @@ const initMongoDB = () => {
  * @return {Promise}
  */
 const disconnect = () => {
-	// return sequelize.close();
+    // return sequelize.close();
 };
 
 module.exports = {
-	initMongoDB,
-	MongoConnection,
-	disconnect,
-	getPool: () => {
-		return pool;
-	},
+    initMongoDB,
+    MongoConnection,
+    disconnect,
+    getPool: () => {
+        return pool;
+    },
 };

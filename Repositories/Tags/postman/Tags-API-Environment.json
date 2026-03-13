@@ -1,0 +1,67 @@
+{
+	"id": "tags-api-environment",
+	"name": "Tags API Environment",
+	"values": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "jwt_token",
+			"value": "",
+			"type": "secret",
+			"enabled": true
+		},
+		{
+			"key": "domain",
+			"value": "avax",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "tag_name",
+			"value": "testuser",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "payment_method",
+			"value": "coinbase",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "currency",
+			"value": "USD",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "duration",
+			"value": "yearly",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "face_base64",
+			"value": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "password",
+			"value": "testpassword123",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "mnemonic",
+			"value": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+			"type": "default",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "environment"
+}

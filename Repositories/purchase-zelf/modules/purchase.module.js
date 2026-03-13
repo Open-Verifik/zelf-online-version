@@ -4,7 +4,7 @@ const Mailgun = require("../../../Core/mailgun");
 const Model = require("../../Subscribers/models/subscriber.model");
 const MongoORM = require("../../../Core/mongo-orm");
 const { calculateZelfNamePrice } = require("../../ZelfNameService/modules/zns-parts.module");
-const { createZelfPay, previewZelfName, searchZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
+const { createZelfPay, searchZelfName } = require("../../ZelfNameService/modules/zns.v2.module");
 const { getAddress } = require("../../etherscan/modules/etherscan-scrapping.module");
 const ZNSPartsModule = require("../../ZelfNameService/modules/zns-parts.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
@@ -148,8 +148,9 @@ const selectMethod = async (network, price) => {
 };
 
 const pay = async (zelfName_, network, signedDataPrice) => {
+	const _zelfPay = zelfName_.replace(/\.zelf(\.hold)?$/, ".zelfpay");
 	const zelfNameRecords = await searchZelfName({
-		zelfName: zelfName_.replace(".zelf", ".zelfpay"),
+		zelfName: _zelfPay,
 		environment: "mainnet",
 	});
 
@@ -161,7 +162,7 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 
 	const zelfPayObject = zelfNameRecords?.ipfs[0] || zelfNameRecords?.arweave[0];
 
-	if (network === "CB") {
+	if (network === "CB" || network === "coinbase") {
 		const chargeID = zelfPayObject.publicData.coinbase_hosted_url.split("/pay/")[1];
 
 		return await checkoutPayCoinbase(chargeID);
@@ -188,7 +189,7 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 	const priceInIPFS =
 		parseFloat(zelfPayObject.publicData.price) || ZNSPartsModule.calculateZelfNamePrice(zelfName_.split(".zelf")[0].length, 1).price;
 
-	if (price !== priceInIPFS) {
+	if (price !== priceInIPFS && config.token.priceEnv !== "development") {
 		const error = new Error(`Validation_failed:${price}!==${priceInIPFS}`);
 		error.status = 409;
 		throw error;
@@ -352,6 +353,9 @@ const sendEmail = async (payload) => {
 
 	const emailTemplate = templatesMap[payload.language] ? templatesMap[payload.language][payload.template] : templatesMap.en[payload.template];
 
+	// Format year label to be singular or plural
+	const yearLabel = payload.year === 1 ? "1 YEAR" : `${payload.year} YEARS`;
+
 	const extraParams = {
 		"recipient-variables": {
 			[payload.email]: {
@@ -361,7 +365,8 @@ const sendEmail = async (payload) => {
 				total: payload.price,
 				expires: payload.expires,
 				year: payload.year,
-				zelfName: payload.zelfName,
+				yearLabel: yearLabel,
+				tagName: payload.tagName,
 			},
 		},
 	};
@@ -424,4 +429,5 @@ module.exports = {
 	getReceiptEmail,
 	selectMethod,
 	pay,
+	sendEmail,
 };

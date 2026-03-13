@@ -14,7 +14,9 @@ module.exports = (server) => {
 
 	server.get(`${PATH}/transaction/:id`, SessionMiddleware.validateJWT, Middleware.validateTransactionHash, Controller.transaction);
 
-	server.get(`${PATH}/transactions/:id`, SessionMiddleware.validateJWT, Middleware.validateAddressTransactions, Controller.transactions);
+	server.get(`${PATH}/:id/transactions`, SessionMiddleware.validateJWT, Middleware.validateAddressTransactions, Controller.transactions);
+
+	server.get(`${PATH}/transactions/:id`, SessionMiddleware.validateJWT, Middleware.validateAddressTransactions, Controller.transactions); // extension posiblemente lo usa
 
 	server.get(`${PATH}/gas-tracker`, SessionMiddleware.validateJWT, Controller.gasTracker);
 

@@ -1,0 +1,14 @@
+{
+    "subject": "Bienvenue chez Zelf !",
+    "title": "Bienvenue dans le futur de l'identité",
+    "intro": "Vous avez franchi la première étape vers une vie numérique plus sûre et décentralisée. En rejoignant <strong>Zelf</strong>, vous faites partie d'un mouvement pour réclamer votre identité numérique.",
+    "expect": "Voici ce que vous pouvez attendre de nous :",
+    "benefits": {
+        "item1": "Mises à jour exclusives sur les lancements de <strong>ZNS (Zelf Name Service)</strong>.",
+        "item2": "Aperçus de nos dernières <strong>avancées en matière de sécurité biométrique</strong>.",
+        "item3": "Invitations à des événements communautaires et opportunités d'accès anticipé."
+    },
+    "philosophy": "Nous construisons un monde où vous n'avez pas besoin de mots de passe ou de phrases de récupération, juste vous. Votre visage est votre clé.",
+    "cta": "Explorez Zelf World",
+    "team": "L'équipe Zelf"
+}

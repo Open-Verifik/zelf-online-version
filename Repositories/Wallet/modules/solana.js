@@ -1,7 +1,8 @@
 const { derivePath } = require("ed25519-hd-key");
 const { Keypair } = require("@solana/web3.js");
 const bip39 = require("bip39");
-const bs58 = require("bs58");
+const bs58Middleware = require("bs58");
+const bs58 = bs58Middleware.default || bs58Middleware;
 
 const createSolanaWallet = async (mnemonic) => {
 	const seed = await bip39.mnemonicToSeed(mnemonic);

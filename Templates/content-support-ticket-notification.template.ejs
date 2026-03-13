@@ -1,0 +1,136 @@
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-spacing: 0 !important; border-collapse: collapse">
+	<tbody>
+		<tr>
+			<td
+				style="
+					border-collapse: collapse;
+					font-family: Arial, sans-serif;
+					font-size: 15px;
+					color: #23496d;
+					word-break: break-word;
+					padding: 20px 40px 7px;
+				"
+			>
+				<div style="color: inherit; font-size: inherit; line-height: inherit">
+					<div style="color: inherit; font-size: inherit; line-height: inherit">
+						<p style="font-size: 16px; line-height: 175%; text-align: left" align="left">
+							<span style="color: #000000"><%- greeting %></span>
+						</p>
+
+						<p style="line-height: 175%; text-align: left" align="left">
+							<span style="color: #000000"><%- body1 %></span>
+						</p>
+
+						<p style="line-height: 175%; text-align: left; font-weight: bold" align="left">
+							<span style="color: #000000"><%= automatedEmailMessage %></span>
+						</p>
+
+						<p style="line-height: 175%; text-align: left" align="left">
+							<span style="color: #000000"><%- messageTitle %></span>
+						</p>
+
+						<table
+							role="presentation"
+							width="100%"
+							cellpadding="0"
+							cellspacing="0"
+							style="border-spacing: 0 !important; border-collapse: collapse; margin: 16px 0"
+						>
+							<tr>
+								<td
+									style="
+										border-left: 4px solid #0c5394;
+										background-color: #f5f7fa;
+										padding: 16px 20px;
+										font-style: italic;
+										color: #23496d;
+										font-size: 15px;
+										line-height: 175%;
+										word-break: break-word;
+									"
+								>
+									<%- message %>
+								</td>
+							</tr>
+						</table>
+
+						<p style="line-height: 175%; text-align: left" align="left">
+							<span style="color: #000000"><%- body2 %></span>
+						</p>
+
+						<br />
+
+						<% if (buttonLink && (buttonLink.startsWith('http://') || buttonLink.startsWith('https://'))) { %>
+						<p style="text-align: center; line-height: 125%" align="center">
+							<a
+								href="<%= buttonLink %>"
+								style="
+									background-color: #007bff;
+									color: #ffffff;
+									padding: 15px 30px;
+									text-decoration: none;
+									font-size: 16px;
+									font-weight: bold;
+									border-radius: 5px;
+									display: inline-block;
+								"
+							>
+								<%= buttonText %>
+							</a>
+						</p>
+						<% } %>
+
+						<p style="line-height: 175%; text-align: left" align="left">
+							<span style="color: #000000">Best regards,</span>
+						</p>
+
+						<h3 style="line-height: 175%; font-weight: bold; text-align: left" align="left">
+							<span style="color: #000000"><%= projectName %></span>
+						</h3>
+
+						<% if (isVerifikSigned) { %>
+						<table
+							role="presentation"
+							width="100%"
+							cellpadding="0"
+							cellspacing="0"
+							style="border-spacing: 0 !important; border-collapse: collapse"
+						>
+							<tbody>
+								<tr>
+									<td
+										align="center"
+										valign="top"
+										style="
+											border-collapse: collapse;
+											font-family: Arial, sans-serif;
+											color: #23496d;
+											word-break: break-word;
+											text-align: center;
+											padding: 10px 20px;
+											font-size: 0px;
+										"
+									>
+										<img
+											src="https://22733348.fs1.hubspotusercontent-na1.net/hub/22733348/hubfs/PiedePagina.png?width=1120&amp;upscale=true&amp;name=PiedePagina.png"
+											style="
+												outline: none;
+												text-decoration: none;
+												-ms-interpolation-mode: bicubic;
+												max-width: 100%;
+												font-size: 16px;
+											"
+											width="600"
+											align="middle"
+										/>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<% } %>
+					</div>
+				</div>
+			</td>
+		</tr>
+	</tbody>
+</table>

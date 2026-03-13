@@ -8,9 +8,6 @@ class NotificationService {
 	static async sendRewardClaimedNotification(zelfName, amount, rewardType = "daily") {
 		// TODO: Implement push notification logic
 		// This could integrate with Firebase, OneSignal, or custom notification system
-
-		console.log(`📧 Notification: ${zelfName} claimed ${amount} ZNS ${rewardType} reward`);
-
 		return {
 			sent: false, // Change to true when implemented
 			message: `Congratulations! You've earned ${amount} ZNS from your ${rewardType} reward!`,
@@ -22,8 +19,6 @@ class NotificationService {
 	// Send daily reminder to users who haven't claimed
 	static async sendDailyReminderNotification(zelfName) {
 		// TODO: Implement reminder notification logic
-
-		console.log(`🔔 Reminder: ${zelfName} can claim their daily reward`);
 
 		return {
 			sent: false, // Change to true when implemented
@@ -38,8 +33,6 @@ class NotificationService {
 		// TODO: Implement weekly summary notification
 
 		const { totalEarned, daysActive, streak } = weeklyStats;
-
-		console.log(`📊 Weekly Summary: ${zelfName} earned ${totalEarned} ZNS this week`);
 
 		return {
 			sent: false, // Change to true when implemented
@@ -56,8 +49,6 @@ class NotificationService {
 		const milestones = [7, 30, 100, 365]; // Days
 
 		if (milestones.includes(streakDays)) {
-			console.log(`🔥 Milestone: ${zelfName} reached ${streakDays} day streak!`);
-
 			return {
 				sent: false, // Change to true when implemented
 				message: `Amazing! You've reached a ${streakDays}-day streak! Keep up the great work!`,
@@ -73,8 +64,6 @@ class NotificationService {
 	static async sendBonusRewardNotification(zelfName, amount, reason) {
 		// TODO: Implement bonus reward notification
 
-		console.log(`🎁 Bonus: ${zelfName} received ${amount} ZNS bonus for ${reason}`);
-
 		return {
 			sent: false, // Change to true when implemented
 			message: `Bonus reward! You've earned ${amount} ZNS for ${reason}!`,
@@ -86,8 +75,6 @@ class NotificationService {
 	// Batch send reminders to multiple users
 	static async batchSendReminders(zelfNames) {
 		// TODO: Implement batch notification sending
-
-		console.log(`📬 Batch reminders sent to ${zelfNames.length} users`);
 
 		const results = [];
 
@@ -122,8 +109,6 @@ class NotificationService {
 	static async updateUserNotificationPreferences(zelfName, preferences) {
 		// TODO: Implement user preferences update
 
-		console.log(`⚙️  Updated notification preferences for ${zelfName}`);
-
 		return {
 			updated: false, // Change to true when implemented
 			preferences,
@@ -133,11 +118,6 @@ class NotificationService {
 
 	// Schedule notification for later delivery
 	static async scheduleNotification(zelfName, message, deliveryTime) {
-		// TODO: Implement notification scheduling
-		// This could integrate with a job queue like Bull/Agenda
-
-		console.log(`⏰ Scheduled notification for ${zelfName} at ${deliveryTime}`);
-
 		return {
 			scheduled: false, // Change to true when implemented
 			scheduledFor: deliveryTime,

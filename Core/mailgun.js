@@ -1,23 +1,94 @@
 const formData = require("form-data");
-
-const config = require("./config");
 const axios = require("axios");
+const config = require("./config");
+const ejs = require("../Utilities/ejs.module");
+
 const domain = "mg.zelf.world";
 
+const sendRequest = async (data) => {
+	try {
+		const form = new formData();
+		Object.keys(data).forEach((key) => {
+			form.append(key, data[key]);
+		});
+
+		const auth = `api:${config.email_providers.mailgun.apiKey || "key-yourkeyhere"}`;
+		const headers = {
+			...form.getHeaders(),
+			Authorization: `Basic ${Buffer.from(auth).toString("base64")}`,
+		};
+
+		const response = await axios.post(`https://api.mailgun.net/v3/${domain}/messages`, form, {
+			headers,
+		});
+
+		console.log("✅ Email sent:", response.data);
+		return response.data;
+	} catch (error) {
+		throw error;
+	}
+};
+
+/**
+ * Send custom email with EJS template
+ * @param {string} to - Recipient email
+ * @param {string} contentTemplate - Template name (e.g., 'staff_invitation')
+ * @param {object} data - Template data
+ * @param {string} userLanguage - Language code
+ * @returns {Promise<object|null>}
+ */
+const sendCustomEmail = async (to, contentTemplate, data = {}, userLanguage = "en") => {
+	try {
+		const { templateData, html } = await ejs.renderMail(contentTemplate, data, userLanguage);
+
+		// const _to = config.env === "production" ? to : config.email_providers.mailgun.proxyEmail;
+		const _to = to;
+
+		const emailData = {
+			from: "Zelf <noreply@mg.zelf.world>",
+			to: _to,
+			subject: templateData.subject,
+			html,
+		};
+
+		if (config.debug.sendEmail) console.log("📧 Sending email:", { to: emailData.to, subject: emailData.subject });
+
+		const response = await sendRequest(emailData);
+
+		return response;
+	} catch (exception) {
+		console.error("❌ sendCustomEmail error:", {
+			exception: exception.message || exception,
+			details: exception.response?.data || exception.details,
+			to,
+			contentTemplate,
+		});
+		return null;
+	}
+};
+
+/**
+ * Send email with Mailgun template (legacy)
+ * @param {string} to
+ * @param {string} subject
+ * @param {string} template
+ * @param {object} extraParams
+ * @returns {Promise<object|null>}
+ */
 const sendEmail = async (to, subject, template, extraParams = {}) => {
 	if (!subject || !template) {
 		return null;
 	}
 
-	const _to = config.env === "production" ? to : config.email_providers.mailgun.proxyEmail;
+	// const _to = config.env === "production" ? to : config.email_providers.mailgun.proxyEmail;
+	const _to = to;
 
-	const apiKey = config.email_providers.mailgun.apiKey;
-
-	const formData = new URLSearchParams();
-	formData.append("from", "noreply@mg.zelf.world");
-	formData.append("to", _to);
-	formData.append("subject", subject);
-	formData.append("template", template);
+	const emailData = {
+		from: "Zelf <noreply@mg.zelf.world>",
+		to: _to,
+		subject,
+		template,
+	};
 
 	// Handle recipient variables if provided
 	if (extraParams["recipient-variables"]) {
@@ -30,35 +101,26 @@ const sendEmail = async (to, subject, template, extraParams = {}) => {
 			}
 		}
 
-		formData.append("recipient-variables", JSON.stringify(extraParams["recipient-variables"]));
+		emailData["recipient-variables"] = JSON.stringify(extraParams["recipient-variables"]);
 	}
 
 	try {
-		if (config.debug.sendEmail) console.log("Email data:", formData.toString());
+		if (config.debug.sendEmail) console.log("📧 Sending template email:", emailData);
 
-		const response = await axios.post(`https://api.mailgun.net/v3/${domain}/messages`, formData, {
-			auth: {
-				username: "api",
-				password: apiKey,
-			},
-			headers: {
-				"Content-Type": "application/x-www-form-urlencoded",
-			},
-		});
+		const response = await sendRequest(emailData);
 
-		if (config.debug.sendEmail) console.log("Email response:", response.data);
-
-		return response.data;
+		return response;
 	} catch (exception) {
-		console.error({
-			emailException: exception,
-			emailData: formData.toString(),
+		console.error("❌ sendEmail error:", {
+			exception: exception.message || exception,
+			details: exception.response?.data || exception.details,
+			emailData,
 		});
-
 		return null;
 	}
 };
 
 module.exports = {
 	sendEmail,
+	sendCustomEmail,
 };

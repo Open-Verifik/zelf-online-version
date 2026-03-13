@@ -1,6 +1,8 @@
 const config = require("../../../Core/config");
 const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
+const ETHERSCAN_V2 = process.env.ETHERSCAN_V2_API || "https://api.etherscan.io/v2/api";
+const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY || config.etherscan.apiKey;
 
 /**
  * @param {*} params

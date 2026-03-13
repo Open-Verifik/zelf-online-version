@@ -1,4 +1,3 @@
-const fs = require("fs");
 let armoredPublicKey = null;
 let secretKey = "your-secret-key";
 let passphrase = "something-seom";
@@ -39,35 +38,46 @@ const insert = async (params) => {
 		findOne: true,
 	};
 
-	if (config.env === "development") {
-		queryParams.where_identifier = params.identifier || params.clientIP;
-	} else {
-		queryParams.where_clientIP = params.clientIP;
-	}
+	queryParams.where_clientIP = params.clientIP;
 
-	const existingSession = await get(queryParams);
+	if (params.tagName) queryParams["?where_tagName"] = params.tagName;
+	if (params.identifier) queryParams["?where_identifier"] = params.identifier;
+
+	let existingSession = await get(queryParams);
 
 	if (existingSession) {
-		return {
-			token: jwt.sign(
-				{
-					session: existingSession._id,
-					identifier: existingSession.identifier,
-					ip: existingSession.clientIP,
-				},
-				config.JWT_SECRET
-			),
-			activatedAt: moment(existingSession.activatedAt).utc().unix(),
-			expiresAt: moment(existingSession.activatedAt).utc().add(10, "minutes").unix(),
-		};
+		if (params.killSession) {
+			await existingSession.deleteOne();
+
+			existingSession = null;
+		} else {
+			return {
+				token: jwt.sign(
+					{
+						domain: existingSession.domain,
+						ethAddress: existingSession.ethAddress,
+						identifier: existingSession.identifier,
+						ip: existingSession.clientIP,
+						session: existingSession._id,
+						tagName: existingSession.tagName,
+					},
+					config.JWT_SECRET
+				),
+				activatedAt: moment(existingSession.activatedAt).utc().unix(),
+				expiresAt: moment(existingSession.activatedAt).utc().add(10, "minutes").unix(),
+			};
+		}
 	}
 
 	const session = new Model({
-		identifier: params.identifier || params.clientIP,
 		clientIP: params.clientIP,
-		type: params.type || "general",
-		status: "active",
+		domain: params.domain || "zelf",
+		ethAddress: params.ethAddress || null,
+		identifier: params.identifier || params.clientIP,
 		isWebExtension: params.isWebExtension || false,
+		status: "active",
+		tagName: params.tagName || null,
+		type: params.type || "general",
 	});
 
 	try {
@@ -78,19 +88,17 @@ const insert = async (params) => {
 			identifier: params.clientIP,
 			...session,
 		});
-		const error = new Error("session_duplication");
-
-		error.status = 409;
-
-		throw error;
 	}
 
 	return {
 		token: jwt.sign(
 			{
-				session: session._id,
+				domain: session.domain || "zelf",
+				ethAddress: params.ethAddress || null,
 				identifier: session.identifier,
 				ip: session.clientIP,
+				session: session._id,
+				tagName: session.tagName || null,
 			},
 			config.JWT_SECRET
 		),
@@ -100,7 +108,9 @@ const insert = async (params) => {
 };
 
 const extractPublicKey = async (params) => {
-	const identifier = config.env === "development" ? params.identifier : params.clientIP;
+	// Use unique identifier (wallet + device hash) for better user experience
+	// Fallback to clientIP for legacy support or if identifier not provided
+	const identifier = params.identifier || params.clientIP;
 
 	const storedKey = await PGPKeyModule.findKey(identifier); // uuid
 
@@ -175,7 +185,7 @@ const encryptContent = async (message) => {
 };
 
 const _getPrivateKey = async (authUser) => {
-	const pgpRecord = await PGPKeyModule.findKey(authUser.identifier);
+	const pgpRecord = await PGPKeyModule.findKey(null, authUser);
 
 	if (!pgpRecord) throw new Error("key_not_found");
 
@@ -187,20 +197,23 @@ const _getPrivateKey = async (authUser) => {
 const sessionDecrypt = async (content, authUser) => {
 	if (!content) return null;
 
+	let privateKey = null;
 	try {
-		const privateKey = await _getPrivateKey(authUser);
+		privateKey = await _getPrivateKey(authUser);
 
 		const decryptedContent = await PGPKeyModule.decryptContent("session", privateKey, content);
 
 		return decryptedContent;
 	} catch (exception) {
-		console.error({ exception });
-		throw new Error("decryption_failed");
+		console.error("Error during decryption:", { exception, authUser });
+		// Use the format "statusCode:message" that errorHandler expects
+		const error = new Error("412:encryption_key_didnt_match");
+
+		throw error;
 	}
 };
 
 const walletEncrypt = async (content, identifier, password = "") => {
-	// get the secretKey
 	let pgpRecord = await PGPKeyModule.findKey(identifier);
 
 	const payload = {

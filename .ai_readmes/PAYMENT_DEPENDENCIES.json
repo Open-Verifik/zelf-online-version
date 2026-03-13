@@ -1,0 +1,14 @@
+{
+	"name": "zelf-payment-dependencies",
+	"description": "Required dependencies for HTTP 402 multi-chain payment system",
+	"dependencies": {
+		"@solana/web3.js": "^1.87.6",
+		"ethers": "^6.9.0"
+	},
+	"devDependencies": {},
+	"notes": {
+		"installation": "Run: npm install @solana/web3.js ethers",
+		"solana": "@solana/web3.js is used for Solana blockchain interactions",
+		"evm_chains": "ethers v6 is used for Avalanche and Base (EVM-compatible chains)"
+	}
+}

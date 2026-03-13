@@ -1,0 +1,79 @@
+[
+	{
+		"name": "USDC",
+		"symbol": "USDC",
+		"contractAddress": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+		"decimals": 6,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png"
+	},
+	{
+		"name": "USDT",
+		"symbol": "USDT",
+		"contractAddress": "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
+		"decimals": 6,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/825.png"
+	},
+	{
+		"name": "Wrapped Ether",
+		"symbol": "WETH",
+		"contractAddress": "0x4200000000000000000000000000000000000006",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png"
+	},
+	{
+		"name": "Optimism",
+		"symbol": "OP",
+		"contractAddress": "0x4200000000000000000000000000000000000042",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/11840.png"
+	},
+	{
+		"name": "Synthetix Network Token",
+		"symbol": "SNX",
+		"contractAddress": "0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/2586.png"
+	},
+	{
+		"name": "ChainLink Token",
+		"symbol": "LINK",
+		"contractAddress": "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/1975.png"
+	},
+	{
+		"name": "Uniswap",
+		"symbol": "UNI",
+		"contractAddress": "0x6fd9d7AD17242c41f7131d257212c54A0e816691",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/7083.png"
+	},
+	{
+		"name": "Aave Token",
+		"symbol": "AAVE",
+		"contractAddress": "0x76FB31fb4af56892A25e32cFC43De717950c9278",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/7278.png"
+	},
+	{
+		"name": "Dai Stablecoin",
+		"symbol": "DAI",
+		"contractAddress": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/4943.png"
+	},
+	{
+		"name": "Liquity USD",
+		"symbol": "LUSD",
+		"contractAddress": "0xc40F949F8a4e094D1b49a23ea9241D289B7b2819",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/9571.png"
+	},
+	{
+		"name": "Synth sUSD",
+		"symbol": "sUSD",
+		"contractAddress": "0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9",
+		"decimals": 18,
+		"image": "https://s2.coinmarketcap.com/static/img/coins/64x64/2586.png"
+	}
+]

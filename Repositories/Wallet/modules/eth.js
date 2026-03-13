@@ -6,6 +6,7 @@ const createEthWallet = (mnemonic) => {
 
 		return {
 			address: wallet.address,
+			privateKey: wallet.privateKey,
 		};
 	} catch (exception) {
 		const error = new Error("invalid_seed_phrase");

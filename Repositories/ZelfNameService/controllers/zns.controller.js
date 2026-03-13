@@ -298,16 +298,6 @@ const update = async (ctx) => {
 	}
 };
 
-const zelfPay = async (ctx) => {
-	try {
-		const data = await Module.zelfPay(ctx.request.query, ctx.state.user);
-
-		ctx.body = { data };
-	} catch (error) {
-		handleError(ctx, error);
-	}
-};
-
 module.exports = {
 	searchZelfName,
 	searchZelfName_v2,
@@ -326,6 +316,5 @@ module.exports = {
 	referralRewards,
 	purchaseRewards,
 	update,
-	zelfPay,
 	leaseRecovery,
 };

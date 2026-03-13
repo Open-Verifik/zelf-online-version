@@ -22,7 +22,7 @@ const getAddress = async (params) => {
 
 		const result = data.data;
 
-		const { transactions } = await getTransfers({ id: params.id }, { page: 1, show: 10 });
+		const { transactions } = await getTransfers({ id: params.id }, { page: 1, show: 20 });
 
 		const _response = {
 			address: result.account,
@@ -41,23 +41,25 @@ const getAddress = async (params) => {
 
 		if (_response) {
 			_response.fiatBalance = (_response.balance * _response.account.price).toFixed(5);
-
 			_response.account.fiatBalance = (_response.balance * _response.account.price).toFixed(5);
-
 			_response.fiatBalance = parseFloat(_response.account.fiatBalance);
 		}
 
 		_response.tokenHoldings = await getTokens({ id: params.id });
 
-		_response.tokenHoldings.tokens.unshift({
-			tokenType: "SOL",
-			fiatBalance: _response.fiatBalance,
-			symbol: "SOL",
-			name: "Solana",
-			price: _response.account.price,
-			amount: parseFloat(_response.balance),
-			image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
-		});
+		const hasSolToken = _response.tokenHoldings?.tokens?.some((token) => token.tokenType === "SOL");
+
+		if (!hasSolToken) {
+			_response.tokenHoldings.tokens.unshift({
+				tokenType: "SOL",
+				fiatBalance: _response.fiatBalance,
+				symbol: "SOL",
+				name: "Solana",
+				price: _response.account.price,
+				amount: parseFloat(_response.balance),
+				image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+			});
+		}
 
 		if (_response.tokenHoldings.fiatBalance) _response.fiatBalance += _response.tokenHoldings.fiatBalance;
 
@@ -158,6 +160,11 @@ const getTokens = async (params) => {
 	}
 };
 
+/**
+ * @param {*} params
+ * @param {*} query
+ * @returns {transactions: Array<{hash: string, block: string, date: string, age: string, from: string, method: string, traffic: string, to: string, amount: number, fiatAmount: string, from_token_account: string, to_token_account: string, status: string, asset: string}>}
+ */
 const getTransfers = async (params, query) => {
 	try {
 		const { data } = await instance.get(
@@ -185,6 +192,7 @@ const getTransfers = async (params, query) => {
 		return null;
 	}
 };
+
 const getTransfer = async (params) => {
 	return { id: params.id };
 };
@@ -201,10 +209,10 @@ function formatData(transactions) {
 }
 
 function formatTransactions(transactions, token) {
-	return transactions.map((tx) => ({
+	const formattedTransactions = transactions.map((tx) => ({
 		hash: tx.trans_id,
 		block: tx.block_id.toString(),
-		date: new Date(tx.block_time * 1000),
+		date: moment(tx.block_time * 1000).format("YYYY-MM-DD HH:mm:ss"),
 		age: moment(tx.block_time * 1000).fromNow(),
 		from: tx.from_address,
 		method: tx.activity_type === "ACTIVITY_SPL_TRANSFER" ? "transfer" : tx.activity_type,
@@ -214,10 +222,13 @@ function formatTransactions(transactions, token) {
 		fiatAmount: tx.value.toString(),
 		from_token_account: tx.from_token_account,
 		to_token_account: tx.to_token_account,
-
 		status: "Success",
 		asset: token.find((token) => token.token_address === tx.token_address).token_symbol,
+		timestamp: tx.block_time, // Keep original timestamp for sorting
 	}));
+
+	// Sort by timestamp (newest first)
+	return formattedTransactions.sort((a, b) => b.timestamp - a.timestamp);
 }
 module.exports = {
 	getAddress,

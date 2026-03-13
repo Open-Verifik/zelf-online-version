@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: zelf-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-adminpassword}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-zelf}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - zelf-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh mongodb:27017/test --username ${MONGO_ROOT_USERNAME:-admin} --password ${MONGO_ROOT_PASSWORD:-adminpassword} --authenticationDatabase admin --quiet || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    build:
+      context: . # Now we're in the zelf directory
+      dockerfile: Dockerfile
+    container_name: zelf-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-adminpassword}@mongodb:27017/${MONGO_DB_NAME:-zelf}?authSource=admin
+      BASE_URL: https://zelf.node # Updated for Nginx domain
+      CONNECTION_KEY: ${JWT_SECRET:-your-super-secret-jwt-key-change-this}
+      # Add other environment variables from your .env.example or .env.backend here
+      # Example:
+      # MAILGUN_API_KEY: ${MAILGUN_API_KEY}
+      # ZELF_PROOF_URL: ${ZELF_PROOF_URL}
+      # ...
+    networks:
+      - zelf-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: curl -f http://localhost:3003/api/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx Reverse Proxy for backend domain with HTTPS
+  nginx:
+    image: nginx:alpine
+    container_name: zelf-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.backend.https.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro # Mount SSL certificates
+    networks:
+      - zelf-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/nginx_status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  mongodb_data:
+  mongodb_config:
+  backend_logs:
+
+networks:
+  zelf-network:

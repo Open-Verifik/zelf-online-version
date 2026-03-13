@@ -1,0 +1,109 @@
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-spacing: 0 !important; border-collapse: collapse">
+	<tbody>
+		<tr>
+			<td
+				style="
+					border-collapse: collapse;
+					font-family: Arial, sans-serif;
+					font-size: 15px;
+				<div style="color: #d1d5db; font-size: inherit; line-height: inherit">
+					<div style="color: #d1d5db; font-size: inherit; line-height: inherit">
+						<p style="font-size: 16px; line-height: 175%; font-weight: bold; text-align: left; color: #ffffff" align="left"><%- greeting %></p>
+
+						<p style="line-height: 175%; text-align: left; color: #d1d5db" align="left">
+							<%= message %>
+						</p>
+
+						<br />
+
+						<h1 style="margin: 0; font-size: 24px; line-height: 175%; text-align: center" align="center">
+							<span style="color: #60a5fa"><%= otp %></span>
+						</h1>
+
+						<% if (authLink && (authLink.startsWith('http://') || authLink.startsWith('https://'))) { %>
+						<p style="text-align: center; line-height: 125%" align="left">
+							<a
+								href="<%= authLink %>"
+								style="
+									background-color: <%= buttonColor || '#ffffff' %>;
+									color: <%= buttonTxtColor || '#000000' %>;
+									padding: 14px 32px;
+									text-decoration: none;
+									font-size: 16px;
+									font-weight: bold;
+									border-radius: 50px;
+									display: inline-block;
+									box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+								"
+							>
+								<%= buttonText || 'Click Here' %>
+							</a>
+						</p>
+						<% } %>
+
+						<br />
+
+						<p style="text-align: left; line-height: 125%; color: #9ca3af" align="left">
+							<%= do_not_share %>
+							<br />
+							<br />
+							<%= did_not_request %>
+						</p>
+
+						<br />
+
+						<p style="line-height: 175%; text-align: left; color: #6b7280" align="left">
+							<%= sincerely %>
+						</p>
+
+						<h3 style="line-height: 175%; font-weight: bold; text-align: left; color: #d1d5db" align="left">
+							<%= projectName %>
+						</h3>
+
+						<% if (verifikSigned) { %>
+						<table
+							role="presentation"
+							width="100%"
+							cellpadding="0"
+							cellspacing="0"
+							style="border-spacing: 0 !important; border-collapse: collapse"
+						>
+							<tbody>
+								<tr>
+									<td
+										align="center"
+										valign="top"
+										style="
+											border-collapse: collapse;
+
+											font-family: Arial, sans-serif;
+											color: #23496d;
+											word-break: break-word;
+											text-align: center;
+											padding: 10px 20px;
+											font-size: 0px;
+										"
+									>
+										<img
+											src="https://22733348.fs1.hubspotusercontent-na1.net/hub/22733348/hubfs/PiedePagina.png?width=1120&amp;upscale=true&amp;name=PiedePagina.png"
+											style="
+												outline: none;
+												text-decoration: none;
+												-ms-interpolation-mode: bicubic;
+												max-width: 100%;
+												font-size: 16px;
+											"
+											width="600"
+											align="middle"
+										/>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						<% } %>
+					</div>
+				</div>
+			</td>
+		</tr>
+	</tbody>
+</table>

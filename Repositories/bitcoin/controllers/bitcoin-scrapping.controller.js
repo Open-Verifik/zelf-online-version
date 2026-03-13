@@ -7,10 +7,12 @@ const balance = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
+		console.error({ error });
 
-		ctx.status = error.status || 500;
-		ctx.body = { error: error.message };
+		const _exception = HttpHandler.errorHandler(error);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -20,10 +22,12 @@ const getTestnetBalance = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
+		console.error({ error });
 
-		ctx.status = error.status || 500;
-		ctx.body = { error: error.message };
+		const _exception = HttpHandler.errorHandler(error);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -36,10 +40,12 @@ const getTransactionDetail = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
+		console.error({ error });
 
-		ctx.status = error.status || 500;
-		ctx.body = { error: error.message };
+		const _exception = HttpHandler.errorHandler(error);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -49,10 +55,12 @@ const transactionsList = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
+		console.error({ error });
 
-		ctx.status = error.status || 500;
-		ctx.body = { error: error.message };
+		const _exception = HttpHandler.errorHandler(error);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -62,7 +70,7 @@ const testnetTransactionsList = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
+		console.error({ error });
 
 		ctx.status = error.status || 500;
 		ctx.body = { error: error.message };
@@ -77,8 +85,10 @@ const transactionStatus = async (ctx) => {
 	} catch (error) {
 		console.error(error);
 
-		ctx.status = error.status || 500;
-		ctx.body = { error: error.message };
+		const _exception = HttpHandler.errorHandler(error);
+
+		ctx.status = _exception.status;
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 

@@ -15,8 +15,11 @@ const SessionSchema = new Schema({
 		unique: true,
 	},
 	clientIP: requiredField(String),
+	domain: requiredField(String),
+	ethAddress: defaultField(String, ""),
 	isWebExtension: requiredField(Boolean, false),
 	status: requiredEnumField(String, ["active", "used"], "active"),
+	tagName: defaultField(String, null),
 	type: requiredEnumField(String, ["createWallet", "decryptWallet", "importWallet", "general"], "createWallet"),
 	activatedAt: {
 		type: Date,

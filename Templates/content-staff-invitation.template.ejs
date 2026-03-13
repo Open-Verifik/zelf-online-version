@@ -1,0 +1,49 @@
+<div style="padding: 20px 40px 40px 40px; text-align: center">
+    <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #ffffff; letter-spacing: -0.025em">Join <%= companyName %> on Zelf</h1>
+
+    <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #d1d5db">Hello <%= staffName %>,</p>
+
+    <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #d1d5db">
+        You have been invited by <strong style="color: #ffffff"><%= ownerName %></strong> to join the team.
+    </p>
+
+    <p style="margin: 0 0 32px; font-size: 16px; line-height: 1.6; color: #d1d5db">
+        As a <strong style="color: #ffffff"><%= role %></strong>, you'll have access to manage and collaborate on the dashboard.
+    </p>
+
+    <div style="text-align: center; margin-bottom: 32px">
+        <a
+            href="<%= inviteLink %>"
+            style="
+                display: inline-block;
+                padding: 14px 32px;
+                background-color: #ffffff;
+                color: #000000;
+                text-decoration: none;
+                border-radius: 50px;
+                font-weight: 600;
+                font-size: 15px;
+                transition: all 0.2s;
+                box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+            "
+        >
+            Accept Invitation
+        </a>
+    </div>
+
+    <p style="margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: #9ca3af">
+        This invitation will expire in 1 hour. If you didn't expect this, you can safely ignore this email.
+    </p>
+
+    <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #9ca3af">
+        Button not working? Copy and paste this link:<br />
+        <a href="<%= inviteLink %>" style="color: #ffffff; word-break: break-all; text-decoration: underline"><%= inviteLink %></a>
+    </p>
+
+    <div style="border-top: 1px solid #374151; margin-top: 32px; padding-top: 32px">
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #6b7280">
+            <%= sincerely %><br />
+            The <%= projectName %> Team
+        </p>
+    </div>
+</div>

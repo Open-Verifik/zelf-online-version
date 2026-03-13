@@ -9,6 +9,7 @@ const schema = {
 	},
 	insert: {
 		identifier: string().required(),
+		domain: string().required(),
 	},
 	decrypt: {
 		message: string().required(),
@@ -98,15 +99,17 @@ const validateJWT = async (ctx, next) => {
 		[]
 	);
 
-	if (!session || session.globalCount > config.sessions.globalLimit) {
+	if (session?.globalCount > config.sessions?.globalLimit) {
 		ctx.status = 401;
 		ctx.body = { error: "Invalid session" };
 		return;
 	}
 
-	session.globalCount += 1;
+	if (session) {
+		session.globalCount += 1;
 
-	await session.save();
+		await session.save();
+	}
 
 	await next();
 };

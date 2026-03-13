@@ -1,0 +1,784 @@
+{
+	"info": {
+		"_postman_id": "tags-api-collection",
+		"name": "Tags API - Multi-Domain System",
+		"description": "Complete API collection for the multi-domain tags system supporting .zelf, .avax, .btc, .tech, .bdag and custom domains",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"version": "1.0.0"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{jwt_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "jwt_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "domain",
+			"value": "avax",
+			"type": "string"
+		},
+		{
+			"key": "tag_name",
+			"value": "testuser",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Domain Management",
+			"item": [
+				{
+					"name": "Get All Supported Domains",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/domains",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "domains"]
+						},
+						"description": "Get all supported domains with their configurations"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Domain Configuration",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/domains/{{domain}}",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "domains", "{{domain}}"]
+						},
+						"description": "Get configuration for a specific domain"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Domain Pricing",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/domains/{{domain}}/pricing",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "domains", "{{domain}}", "pricing"]
+						},
+						"description": "Get pricing information for a specific domain"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Domain Payment Options",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/domains/{{domain}}/payment-options",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "domains", "{{domain}}", "payment-options"]
+						},
+						"description": "Get payment methods and currencies for a domain"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Tag Search & Discovery",
+			"item": [
+				{
+					"name": "Search Tag v2",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/search-v2?tagName={{tag_name}}&domain={{domain}}",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "search-v2"],
+							"query": [
+								{
+									"key": "tagName",
+									"value": "{{tag_name}}"
+								},
+								{
+									"key": "domain",
+									"value": "{{domain}}"
+								}
+							]
+						},
+						"description": "Search for a specific tag in a domain"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Tags by Domain",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/search-by-domain?domain={{domain}}&limit=10&offset=0",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "search-by-domain"],
+							"query": [
+								{
+									"key": "domain",
+									"value": "{{domain}}"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "offset",
+									"value": "0"
+								}
+							]
+						},
+						"description": "Search for all tags in a specific domain"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Tags by Storage Key",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/search-by-storage-key?storageKey=avaxName:testuser:avax",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "search-by-storage-key"],
+							"query": [
+								{
+									"key": "storageKey",
+									"value": "avaxName:testuser:avax"
+								}
+							]
+						},
+						"description": "Search for tags by storage key"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Hold Domain",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/search-hold-domain?domain={{domain}}&name={{tag_name}}",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "search-hold-domain"],
+							"query": [
+								{
+									"key": "domain",
+									"value": "{{domain}}"
+								},
+								{
+									"key": "name",
+									"value": "{{tag_name}}"
+								}
+							]
+						},
+						"description": "Search for hold domain (e.g., testuser.hold.avax)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Availability Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/availability-summary?domain={{domain}}&name={{tag_name}}",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "availability-summary"],
+							"query": [
+								{
+									"key": "domain",
+									"value": "{{domain}}"
+								},
+								{
+									"key": "name",
+									"value": "{{tag_name}}"
+								}
+							]
+						},
+						"description": "Get availability summary for a tag name in a domain"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Tag Operations",
+			"item": [
+				{
+					"name": "Lease Tag",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"duration\": \"yearly\",\n  \"paymentMethod\": \"coinbase\",\n  \"currency\": \"USD\",\n  \"faceBase64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\",\n  \"password\": \"testpassword123\",\n  \"mnemonic\": \"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about\",\n  \"referralTagName\": \"\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/lease",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "lease"]
+						},
+						"description": "Create a new tag in a specific domain"
+					},
+					"response": []
+				},
+				{
+					"name": "Decrypt Tag",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"faceBase64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\",\n  \"password\": \"testpassword123\",\n  \"addServerPassword\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/decrypt",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "decrypt"]
+						},
+						"description": "Decrypt and access a tag's private data"
+					},
+					"response": []
+				},
+				{
+					"name": "Preview Tag",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/preview?tagName={{tag_name}}&domain={{domain}}",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "preview"],
+							"query": [
+								{
+									"key": "tagName",
+									"value": "{{tag_name}}"
+								},
+								{
+									"key": "domain",
+									"value": "{{domain}}"
+								}
+							]
+						},
+						"description": "Preview a tag without decrypting it"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Tag",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"duration\": \"yearly\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/update",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "update"]
+						},
+						"description": "Update tag expiration (renewal)"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Tag",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/delete?tagName={{tag_name}}&domain={{domain}}",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "delete"],
+							"query": [
+								{
+									"key": "tagName",
+									"value": "{{tag_name}}"
+								},
+								{
+									"key": "domain",
+									"value": "{{domain}}"
+								}
+							]
+						},
+						"description": "Delete a tag from a domain"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Payment Operations",
+			"item": [
+				{
+					"name": "Calculate Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"domain\": \"{{domain}}\",\n  \"duration\": \"yearly\",\n  \"bulkDiscount\": 0.1,\n  \"earlyBirdDiscount\": 0.2\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/calculate-payment",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "calculate-payment"]
+						},
+						"description": "Calculate payment amount for a domain and duration"
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Payment Method",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"domain\": \"{{domain}}\",\n  \"paymentMethod\": \"coinbase\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/validate-payment-method",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "validate-payment-method"]
+						},
+						"description": "Validate if a payment method is supported for a domain"
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Currency",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"domain\": \"{{domain}}\",\n  \"currency\": \"USD\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/validate-currency",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "validate-currency"]
+						},
+						"description": "Validate if a currency is supported for a domain"
+					},
+					"response": []
+				},
+				{
+					"name": "Check Affordability",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"domain\": \"{{domain}}\",\n  \"duration\": \"yearly\",\n  \"userWallet\": {\n    \"balance\": 1000\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/check-affordability",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "check-affordability"]
+						},
+						"description": "Check if user can afford a tag operation"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pricing Table",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/pricing-table",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "pricing-table"]
+						},
+						"description": "Get complete pricing table for all domains"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "My Tags (User Operations)",
+			"item": [
+				{
+					"name": "Get My Tags",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/my-tags?limit=10&offset=0",
+							"host": ["{{base_url}}"],
+							"path": ["my-tags"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "offset",
+									"value": "0"
+								}
+							]
+						},
+						"description": "Get all tags owned by the authenticated user"
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Tags by Domain",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/my-tags/domain/{{domain}}?limit=10&offset=0",
+							"host": ["{{base_url}}"],
+							"path": ["my-tags", "domain", "{{domain}}"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "offset",
+									"value": "0"
+								}
+							]
+						},
+						"description": "Get user's tags in a specific domain"
+					},
+					"response": []
+				},
+				{
+					"name": "Transfer Tag",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"newOwnerEmail\": \"newowner@example.com\",\n  \"transferMessage\": \"Transferring ownership\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/my-tags/transfer",
+							"host": ["{{base_url}}"],
+							"path": ["my-tags", "transfer"]
+						},
+						"description": "Transfer ownership of a tag to another user"
+					},
+					"response": []
+				},
+				{
+					"name": "Renew Tag",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"duration\": \"yearly\",\n  \"paymentMethod\": \"coinbase\",\n  \"currency\": \"USD\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/my-tags/renew",
+							"host": ["{{base_url}}"],
+							"path": ["my-tags", "renew"]
+						},
+						"description": "Renew a tag for additional time"
+					},
+					"response": []
+				},
+				{
+					"name": "How to Renew Tag",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/my-tags/how-to-renew?tagName={{tag_name}}&domain={{domain}}",
+							"host": ["{{base_url}}"],
+							"path": ["my-tags", "how-to-renew"],
+							"query": [
+								{
+									"key": "tagName",
+									"value": "{{tag_name}}"
+								},
+								{
+									"key": "domain",
+									"value": "{{domain}}"
+								}
+							]
+						},
+						"description": "Get instructions on how to renew a tag"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "System Health & Monitoring",
+			"item": [
+				{
+					"name": "Check System Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/health",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "health"]
+						},
+						"description": "Check overall system health"
+					},
+					"response": []
+				},
+				{
+					"name": "Check Domain Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/health/domain/{{domain}}",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "health", "domain", "{{domain}}"]
+						},
+						"description": "Check health of a specific domain"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Domain Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/stats/domain/{{domain}}",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "stats", "domain", "{{domain}}"]
+						},
+						"description": "Get statistics for a specific domain"
+					},
+					"response": []
+				},
+				{
+					"name": "Get System Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/tags/stats",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "stats"]
+						},
+						"description": "Get overall system statistics"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Advanced Operations",
+			"item": [
+				{
+					"name": "Lease Offline Tag",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"zelfProof\": \"encrypted_proof_data\",\n  \"zelfProofQRCode\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/lease-offline",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "lease-offline"]
+						},
+						"description": "Create a tag using offline proof"
+					},
+					"response": []
+				},
+				{
+					"name": "Lease Confirmation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"coin\": \"BTC\",\n  \"network\": \"mainnet\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/lease-confirmation",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "lease-confirmation"]
+						},
+						"description": "Confirm payment for tag lease"
+					},
+					"response": []
+				},
+				{
+					"name": "Create ZelfPay",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"zelfProof\": \"encrypted_proof_data\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/zelfpay",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "zelfpay"]
+						},
+						"description": "Create ZelfPay for a tag"
+					},
+					"response": []
+				},
+				{
+					"name": "Preview ZelfProof",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"zelfProof\": \"encrypted_proof_data\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tags/preview-zelfproof",
+							"host": ["{{base_url}}"],
+							"path": ["tags", "preview-zelfproof"]
+						},
+						"description": "Preview ZelfProof without decrypting"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-generate test data if not set",
+					"if (!pm.variables.get('tag_name')) {",
+					"    pm.variables.set('tag_name', 'testuser' + Math.floor(Math.random() * 1000));",
+					"}",
+					"",
+					"// Set domain if not specified",
+					"if (!pm.variables.get('domain')) {",
+					"    const domains = ['zelf', 'avax', 'btc', 'tech', 'bdag'];",
+					"    pm.variables.set('domain', domains[Math.floor(Math.random() * domains.length)]);",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Log response for debugging",
+					"console.log('Response Status:', pm.response.status);",
+					"console.log('Response Body:', pm.response.text());",
+					"",
+					"// Basic response validation",
+					"pm.test('Response status is not 500', function () {",
+					"    pm.expect(pm.response.code).to.not.equal(500);",
+					"});",
+					"",
+					"// Log any errors",
+					"if (pm.response.code >= 400) {",
+					"    console.log('Error Response:', pm.response.text());",
+					"}"
+				]
+			}
+		}
+	]
+}

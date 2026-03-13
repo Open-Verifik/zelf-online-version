@@ -19,6 +19,7 @@ const PGPKeySchema = new Schema({
 	name: requiredField(String),
 	email: requiredField(String),
 	publicKey: requiredField(String),
+	lastTimeUsed: defaultField(Date, Date.now),
 });
 
 PGPKeySchema.pre("save", async (next) => {

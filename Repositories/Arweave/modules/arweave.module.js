@@ -7,12 +7,14 @@ const axios = require("axios");
 const arweaveUrl = `https://arweave.zelf.world`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 
-const owner = config.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
+const owner = config.arwave.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
 
 const graphql = `${arweaveUrl}/graphql`;
 
 const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 	const { zelfProof, hasPassword, publicData } = zelfNameObject;
+
+	const env = config.arwave.env;
 
 	/**
 	 * Generate a key from the arweave wallet.
@@ -20,14 +22,14 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 
 	const jwk = {
 		kty: "RSA",
-		n: config.env === "development" ? config.arwave.hold.n : config.arwave.n,
-		e: config.env === "development" ? config.arwave.hold.e : config.arwave.e,
-		d: config.env === "development" ? config.arwave.hold.d : config.arwave.d,
-		p: config.env === "development" ? config.arwave.hold.p : config.arwave.p,
-		q: config.env === "development" ? config.arwave.hold.q : config.arwave.q,
-		dp: config.env === "development" ? config.arwave.hold.dp : config.arwave.dp,
-		dq: config.env === "development" ? config.arwave.hold.dq : config.arwave.dq,
-		qi: config.env === "development" ? config.arwave.hold.qi : config.arwave.qi,
+		n: env === "development" ? config.arwave.hold.n : config.arwave.n,
+		e: env === "development" ? config.arwave.hold.e : config.arwave.e,
+		d: env === "development" ? config.arwave.hold.d : config.arwave.d,
+		p: env === "development" ? config.arwave.hold.p : config.arwave.p,
+		q: env === "development" ? config.arwave.hold.q : config.arwave.q,
+		dp: env === "development" ? config.arwave.hold.dp : config.arwave.dp,
+		dq: env === "development" ? config.arwave.hold.dq : config.arwave.dq,
+		qi: env === "development" ? config.arwave.hold.qi : config.arwave.qi,
 		kid: "2011-04-29",
 	};
 
@@ -101,9 +103,6 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 		};
 	}
 
-	/**
-	 * Post the temporary file to the Turbo service with metadata.
-	 */
 	const uploadResult = await turboAuthClient.uploadFile({
 		fileStreamFactory: () => fs.createReadStream(tempFilePath),
 		fileSizeFactory: () => fileSize,
@@ -189,8 +188,117 @@ const arweaveIDToBase64 = async (id) => {
 	}
 };
 
+/**
+ * Generate Arweave wallet from mnemonic
+ * @param {string} mnemonic
+ */
+// Lazy load dependencies to ensure they are available
+let bip39, crypto;
+try {
+	bip39 = require("bip39");
+	crypto = require("crypto");
+} catch (e) {
+	console.warn("Dependencies missing for Arweave wallet generation", e);
+}
+
+/**
+ * Generate Arweave wallet from mnemonic
+ * Uses deterministic RNG seeded by mnemonic to generate RSA key via node-forge
+ * @param {string} mnemonic
+ */
+const generateWalletFromMnemonic = async (mnemonic) => {
+	let forge;
+	try {
+		forge = require("node-forge");
+	} catch (e) {
+		throw new Error("node-forge dependency missing. Please install it to allow deterministic RSA generation.");
+	}
+
+	if (!bip39) throw new Error("bip39 dependency missing");
+
+	// 1. Generate Seed from Mnemonic
+	const seed = await bip39.mnemonicToSeed(mnemonic);
+
+	// 2. Setup Deterministic PRNG using node-forge
+	// Use the seed to power a sha256 hash chain that feeds the PRNG
+	let state = seed;
+
+	// Custom PRNG wrapper for Forge
+	const customPrng = {
+		getBytesSync: (size) => {
+			let res = "";
+			// We need 'size' bytes
+			while (res.length < size) {
+				const hasher = crypto.createHash("sha256");
+				hasher.update(state);
+				state = hasher.digest();
+				res += state.toString("binary");
+			}
+			return res.substring(0, size);
+		},
+	};
+
+	// 3. Generate RSA Key
+	// This is synchronous in forge and might be slow for 4096 bits.
+	// Test timeout is set to 60s which should be enough.
+	// We use 2048 bits (~2s) to meet performance requirements.
+	const keyPair = forge.pki.rsa.generateKeyPair({
+		bits: 2048,
+		prng: customPrng,
+		workers: -1, // forcing main thread to ensure our PRNG is used
+	});
+
+	// 4. Construct JWK
+	const { privateKey } = keyPair;
+
+	// Helper to convert BigInteger to Base64URL
+	const toB64Url = (bigInt) => {
+		// forge BigInt to hex
+		let hex = bigInt.toString(16);
+		if (hex.length % 2 !== 0) hex = "0" + hex;
+		const buf = Buffer.from(hex, "hex");
+		return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+	};
+
+	const n = toB64Url(privateKey.n);
+	const e = toB64Url(privateKey.e);
+	const d = toB64Url(privateKey.d);
+	const p = toB64Url(privateKey.p);
+	const q = toB64Url(privateKey.q);
+	const dp = toB64Url(privateKey.dP);
+	const dq = toB64Url(privateKey.dQ);
+	const qi = toB64Url(privateKey.qInv);
+
+	const jwk = {
+		kty: "RSA",
+		n,
+		e,
+		d,
+		p,
+		q,
+		dp,
+		dq,
+		qi,
+	};
+
+	// 5. Generate Address
+	const arweave = Arweave.init({
+		host: "arweave.net",
+		port: 443,
+		protocol: "https",
+	});
+
+	const address = await arweave.wallets.jwkToAddress(jwk);
+
+	return {
+		address,
+		privateKey: jwk, // Return the full JWK as private key
+	};
+};
+
 module.exports = {
 	zelfNameRegistration,
 	search,
 	arweaveIDToBase64,
+	generateWalletFromMnemonic,
 };

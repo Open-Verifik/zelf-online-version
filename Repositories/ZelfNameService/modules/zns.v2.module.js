@@ -518,7 +518,7 @@ const leaseOffline = async (params, authUser) => {
 
 	if (!_preview) _preview = await preview({ zelfProof });
 
-	if (!zelfName.includes(_preview.publicData.zelfName.toLowerCase())) {
+	if (!zelfName.includes(_preview.publicData?.zelfName?.toLowerCase())) {
 		const error = new Error("zelfName_does_not_match_in_zelfProof");
 		error.status = 409;
 		throw error;
@@ -673,8 +673,8 @@ const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 			solanaAddress: params.solanaAddress,
 			count: `${currentCount}`,
 		},
-		redirect_url: "https://payment.zelf.world/checkout",
-		cancel_url: "https://payment.zelf.world/checkout",
+		redirect_url: "https://zelf.world/tags/payment/checkout/coinbase",
+		cancel_url: "https://zelf.world/tags/payment/checkout/coinbase",
 	};
 
 	const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
@@ -763,8 +763,8 @@ const updateZelfPay = async (zelfPayObject, updates = {}) => {
 				solanaAddress: zelfPayObject.publicData.solanaAddress,
 				count: `${newCount}`,
 			},
-			redirect_url: "https://payment.zelf.world/checkout",
-			cancel_url: "https://payment.zelf.world/checkout",
+			redirect_url: "https://zelf.world/tags/payment/checkout/coinbase",
+			cancel_url: "https://zelf.world/tags/payment/checkout/coinbase",
 		};
 
 		const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
@@ -828,9 +828,10 @@ const _decryptParams = async (data, authUser) => {
 		};
 	}
 
-	const password = await SessionModule.sessionDecrypt(data.password || null, authUser);
-	const mnemonic = await SessionModule.sessionDecrypt(data.mnemonic || null, authUser);
-	const face = await SessionModule.sessionDecrypt(data.faceBase64 || null, authUser);
+	// Only decrypt if the values exist and are not null/undefined
+	const password = data.password ? await SessionModule.sessionDecrypt(data.password, authUser) : null;
+	const mnemonic = data.mnemonic ? await SessionModule.sessionDecrypt(data.mnemonic, authUser) : null;
+	const face = data.faceBase64 ? await SessionModule.sessionDecrypt(data.faceBase64, authUser) : null;
 
 	return { password, mnemonic, face };
 };

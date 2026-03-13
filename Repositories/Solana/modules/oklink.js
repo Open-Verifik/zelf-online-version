@@ -32,7 +32,7 @@ const getAddress = async (params) => {
 			.text()
 			.split("$")[1];
 
-		const fia = $(
+		const fiat = $(
 			"#root > main > div > div > div.single-pannel > div.index_info__kvp1Q.index_layout__2uO5I > div.index_title__064bd.index_card__GOZsN > div > div > div:nth-child(2) > div > div > div > span.index_usdValue__M2TO1 > div > div"
 		)
 			.text()
@@ -47,31 +47,38 @@ const getAddress = async (params) => {
 			type: "system_account",
 			account: {
 				asset: "SOL",
-				fiatBalance: `${parseFloat(fia) || 0}`,
+				fiatBalance: `${parseFloat(fiat) || 0}`,
 				price: price || 0,
 			},
 		};
 
-		data.tokenHoldings = await getTokens(
-			{ id: address },
-			{ page: 0, show: 10 }
-		);
+		data.tokenHoldings = await getTokens({ id: address }, { page: 0, show: 10 });
 
-		data.tokenHoldings.tokens.unshift({
-			tokenType: "SOL",
-			fiatBalance: fia,
-			symbol: "SOL",
-			name: "Solana",
-			price: data.account.price,
-			amount: data.balance,
-			image:
-				"https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
-		});
+		let hasSolToken = false;
 
-		const { transactions } = await getTransactions(
-			{ id: address },
-			{ page: 0, show: 10 }
-		);
+		for (let index = 0; index < data.tokenHoldings.tokens.length; index++) {
+			const token = data.tokenHoldings.tokens[index];
+
+			if (token.symbol === "SOL") {
+				token.tokenType = "SOL";
+
+				hasSolToken = true;
+			}
+		}
+
+		if (!hasSolToken) {
+			data.tokenHoldings.tokens.unshift({
+				amount: data.balance,
+				fiatBalance: fiat,
+				image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+				name: "Solana",
+				price: data.account.price,
+				symbol: "SOL",
+				tokenType: "SOL",
+			});
+		}
+
+		const { transactions } = await getTransactions({ id: address }, { page: 0, show: 10 });
 
 		data.transactions = transactions;
 
@@ -94,22 +101,21 @@ const getTokens = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
 		);
 
 		const tokenHoldings = {
-			total: data.data.hits.length,
-			balance: data.data.extend.valueTotal,
+			total: data.data.hits?.length || 0,
+			balance: data.data.extend?.valueTotal || 0,
 			fiatBalance: 0,
 			tokens: [],
 		};
 
 		try {
-			for (let index = 0; index < data.data.hits.length; index++) {
+			for (let index = 0; index < data.data.hits?.length || 0; index++) {
 				const token = data.data.hits[index];
 
 				tokenHoldings.fiatBalance += parseFloat(token.valueUsd) || 0;
@@ -147,17 +153,13 @@ const getTransaction = async (params, query) => {
 
 		const address = params.id;
 
-		const { data } = await axios.get(
-			`https://www.oklink.com/api/explorer/v2/sol/mainAction/${address}?chain=solana&t=${t}`,
-			{
-				httpsAgent: agent,
-				headers: {
-					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-				},
-			}
-		);
+		const { data } = await axios.get(`https://www.oklink.com/api/explorer/v2/sol/mainAction/${address}?chain=solana&t=${t}`, {
+			httpsAgent: agent,
+			headers: {
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+			},
+		});
 
 		return data.data;
 	} catch (error) {
@@ -179,8 +181,7 @@ const getTransactions = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -195,8 +196,7 @@ const getTransactions = async (params, query) => {
 					// Cookie: coookie,
 					// Devid: `${devId.replace("devId=", "")}`,
 					"X-Apikey": get_ApiKey().getApiKey(),
-					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
 					//"Ok-Verify-Token": "b30b27e7-a515-49cf-b095-96b50b0a45df",
 				},
 			}
@@ -205,16 +205,16 @@ const getTransactions = async (params, query) => {
 
 		let total = (data.data.hits.length += slp.data.data.hits.length);
 
+		// Format and sort all transactions together
+		const formattedTransactions = addTrafficParameter(formatTransactions(transactions, address), address);
+
 		return {
 			pagination: {
 				records: total.toString(),
 				pages: query.page,
 				page: query.page,
 			},
-			transactions: addTrafficParameter(
-				formatTransactions(transactions, address),
-				address
-			),
+			transactions: formattedTransactions,
 		};
 	} catch (error) {
 		return null;
@@ -223,9 +223,10 @@ const getTransactions = async (params, query) => {
 
 function formatTransactions(transfers, address) {
 	try {
-		return transfers.map((tx) => ({
+		const formattedTransactions = transfers.map((tx) => ({
 			hash: tx.signature,
 			block: tx.slot.toString(),
+			date: moment(tx.timestamp * 1000).format("YYYY-MM-DD HH:mm:ss"),
 			age: moment(tx.timestamp * 1000).fromNow(),
 			from: tx.from,
 			method: "Transfer",
@@ -235,8 +236,12 @@ function formatTransactions(transfers, address) {
 			from_token_account: tx.from,
 			to_token_account: address,
 			status: tx.status,
-			asset: tx.tokenName ? tx.tokenName : "SOL",
+			asset: tx.tokenSymbol || tx.tokenName || "SOL",
+			timestamp: tx.timestamp, // Keep original timestamp for sorting,
 		}));
+
+		// Sort by timestamp (newest first)
+		return formattedTransactions.sort((a, b) => b.timestamp - a.timestamp);
 	} catch (error) {
 		console.error({ error });
 		return [];
@@ -251,10 +256,15 @@ function addTrafficParameter(transactions, userAddress) {
 }
 
 function get_ApiKey() {
-	const API_KEY = config.oklink.apiKey;
+	const API_KEY = config.oklink?.apiKey;
 	const c = 1111111111111;
 
 	function encryptApiKey() {
+		// Handle case where API key is undefined
+		if (!API_KEY) {
+			console.warn("OKLink API key is not configured. Some features may not work.");
+			return "default_key_for_fallback";
+		}
 		let e = API_KEY.split("");
 		let n = e.splice(0, 8);
 		return e.concat(n).join("");

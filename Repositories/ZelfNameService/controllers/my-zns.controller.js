@@ -1,4 +1,5 @@
 const Module = require("../modules/my-zns.module");
+const { errorHandler } = require("../../../Core/http-handler");
 
 const transferZelfName = async (ctx) => {
 	try {
@@ -12,11 +13,11 @@ const transferZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
+		const _exception = errorHandler(error, ctx);
 
-		ctx.status = error.status || 500;
+		ctx.status = _exception.status;
 
-		ctx.body = { error: error.message };
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -26,11 +27,11 @@ const renewZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
+		const _exception = errorHandler(error, ctx);
 
-		ctx.status = error.status || 500;
+		ctx.status = _exception.status;
 
-		ctx.body = { error: error.message };
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 
@@ -40,11 +41,11 @@ const howToRenewZelfName = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error({ error });
+		const _exception = errorHandler(error, ctx);
 
-		ctx.status = error.status || 500;
+		ctx.status = _exception.status;
 
-		ctx.body = { error: error.message };
+		ctx.body = { message: _exception.message, code: _exception.code };
 	}
 };
 

@@ -1,0 +1,534 @@
+const moment = require("moment");
+const TagsPartsModule = require("./tags-parts.module");
+const TagsSearchModule = require("./tags-search.module");
+const { generateMnemonic } = require("../../Wallet/modules/helpers");
+const { createEthWallet } = require("../../Wallet/modules/eth");
+const { createSolanaWallet } = require("../../Wallet/modules/solana");
+const { createBTCWallet } = require("../../Wallet/modules/btc");
+const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
+const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module");
+const OfflineProofModule = require("../../Mina/offline-proof");
+const config = require("../../../Core/config");
+const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
+const { initTagUpdates, updateTags } = require("./sync-tag-records.module");
+
+const { generateHoldDomain } = require("./domain-registry.module");
+const { getDomainConfig } = require("../config/supported-domains");
+const TagsRegistrationModule = require("./tags-registration.module");
+const { extractZelfProofFromQR } = require("./qr-zelfproof-extractor.module");
+const SessionModule = require("../../Session/modules/session.module");
+const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
+const ArweaveModule = require("../../Arweave/modules/arweave.module");
+const { unPinFiles } = require("./tags-ipfs.module");
+const jwt = require("jsonwebtoken");
+
+/**
+ * Generate domain-specific hold domain
+ * @param {string} domain - Domain name
+ * @param {string} name - Tag name
+ * @returns {string} - Hold domain
+ */
+const generateDomainHoldDomain = (domain, name) => {
+    try {
+        return generateHoldDomain(domain, name);
+    } catch (error) {
+        return generateHoldDomain("zelf", name); // Fallback to zelf
+    }
+};
+
+/**
+ * lease tag
+ * @param {Object} params
+ * @param {Object} authUser
+ */
+const leaseTag = async (params, authUser) => {
+    const { tagName, domain, referralTagName } = params;
+    let securityType = params.securityType;
+    const domainConfig = getDomainConfig(domain);
+
+    if (!domainConfig) throw new Error(`Unsupported domain: ${domain}`);
+
+    // Get tag key using the method
+    const tagKey = domainConfig.getTagKey() || "tagName";
+
+    await _findDuplicatedTag(tagName, domain, domainConfig);
+
+    const referralTagObject = await _validateReferral(referralTagName, authUser, domainConfig);
+
+    const decryptedParams = await TagsPartsModule.decryptParams(params, authUser);
+
+    const { face, password } = decryptedParams;
+
+    if (!face) throw new Error("409:face_not_found");
+
+    if (!password && securityType !== "withoutPassword") throw new Error("409:password_not_found");
+
+    if (password && !securityType) {
+        securityType = Number(password).toString() === password && password.length === 6 ? "pin" : "password";
+    }
+
+    const { eth, btc, solana, sui, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
+        ...params,
+        mnemonic: decryptedParams.mnemonic,
+    });
+
+    const dataToEncrypt = {
+        publicData: {
+            ethAddress: eth.address,
+            solanaAddress: solana.address,
+            btcAddress: btc.address,
+            [tagKey]: tagName,
+            domain,
+        },
+        metadata: {
+            mnemonic,
+        },
+        faceBase64: face,
+        _id: tagName,
+        tolerance: params.tolerance,
+        addServerPassword: Boolean(params.addServerPassword),
+    };
+
+    // we won't assign the password if the security type is withoutPassword
+    if (securityType !== "withoutPassword") {
+        dataToEncrypt.password = password;
+    }
+
+    const tagObject = {
+        ...dataToEncrypt.publicData,
+    };
+
+    TagsPartsModule.assignProperties(
+        tagObject,
+        dataToEncrypt,
+        { eth, btc, solana, sui, arweave },
+        { ...params, password: dataToEncrypt.password, referralTagObject },
+        domainConfig
+    );
+
+    await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject);
+
+    if (tagObject.price === 0) {
+        await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, securityType, authUser);
+    } else {
+        await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, securityType, authUser);
+    }
+
+    if (!tagObject.zelfProof && tagObject.ipfs?.publicData?.zelfProof) {
+        tagObject.zelfProof = tagObject.ipfs.publicData.zelfProof;
+    }
+
+    if (!tagObject.zelfProof) {
+        tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
+    }
+
+    const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, arweave }, password);
+
+    return {
+        ipfs: [tagObject.ipfs],
+        available: false,
+        name: tagName,
+        tagName: `${tagName}.${domain}`,
+        domain,
+        arweave: tagObject.arweave ? [tagObject.arweave] : [],
+        tagObject: {
+            ...tagObject.ipfs,
+            zelfProof: tagObject.zelfProof,
+            zelfProofQRCode: tagObject.zelfProofQRCode,
+        },
+        walrus: tagObject.walrus,
+        pgp,
+        metadata:
+            config.env === "production"
+                ? undefined
+                : {
+                    // for development porposes so we can visualize the arweave private key and the mnemonic for testing.
+                    mnemonic,
+                    arweavePrivateKey: arweave.privateKey,
+                },
+    };
+};
+
+/**
+ * search tag
+ * @param {Object} params
+ * @param {Object} authUser
+ */
+const searchTag = async (params, authUser) => {
+    const { tagName, domain, key, value, environment, type, domainConfig, duration } = params;
+
+    try {
+        const _domainConfig = domainConfig || getDomainConfig(domain);
+
+        const result = await TagsSearchModule.searchTag(
+            {
+                tagName,
+                domain,
+                key,
+                value,
+                environment: environment || "all",
+                type: type || "both",
+                domainConfig: _domainConfig,
+                duration: duration || "1",
+            },
+            authUser
+        );
+
+        if (result.ipfs?.length) {
+            for (let index = 0; index < result.ipfs.length; index++) {
+                const element = result.ipfs[index];
+                delete element.zelfProof;
+                delete element.zelfProofQRCode;
+            }
+        }
+
+        return result;
+    } catch (error) {
+        console.error({ error });
+        throw error;
+    }
+};
+
+/**
+ * decrypt tag
+ * @param {Object} params
+ * @param {Object} authUser
+ */
+const decryptTag = async (params, authUser) => {
+    const { tagName, domain } = params;
+
+    const domainConfig = getDomainConfig(domain);
+
+    const searchResult = await searchTag({ tagName, domain, domainConfig, environment: "all" }, authUser);
+
+    if (searchResult.available) return searchResult;
+
+    const tagObject = searchResult.tagObject;
+
+    if (!tagObject?.zelfProof) throw new Error("404:tag_not_found");
+
+    const { face, password } = await _decryptParams(params, authUser);
+
+    const decryptedZelfProof = await decrypt({
+        addServerPassword: Boolean(params.addServerPassword),
+        faceBase64: face,
+        password,
+        zelfProof: tagObject?.zelfProof,
+        hasPassword: tagObject.publicData.hasPassword,
+    });
+
+    if (decryptedZelfProof.error) {
+        const error = new Error(decryptedZelfProof.error.code);
+
+        error.status = 409;
+
+        throw error;
+    }
+
+    const { mnemonic, zkProof, solanaSecretKey } = decryptedZelfProof.metadata;
+
+    const tagKey = domainConfig.getTagKey() || "tagName";
+
+    // Generate Arweave wallet from mnemonic for consistency
+    const arweave = await ArweaveModule.generateWalletFromMnemonic(mnemonic);
+
+    const { encryptedMessage, privateKey, tagsToAdd } = await initTagUpdates(tagObject, {
+        mnemonic,
+        zkProof,
+        solanaSecretKey,
+        arweavePrivateKey: arweave.privateKey,
+        password,
+    });
+
+    if (tagsToAdd.length) {
+        const { ipfs, arweave } = await updateTags(tagObject, tagsToAdd);
+
+        tagObject.updatedIpfs = ipfs;
+        tagObject.updatedArweave = arweave;
+
+        for (let index = 0; index < tagsToAdd.length; index++) {
+            const tag = tagsToAdd[index];
+            tagObject.publicData[tag.name] = tag.value;
+        }
+    }
+
+    return {
+        ...tagObject,
+        domain,
+        pgp: { encryptedMessage, privateKey },
+        durationToken: jwt.sign(
+            {
+                tagName: tagObject.publicData[tagKey] || tagObject.publicData.tagName || tagObject.publicData.zelfName,
+                exp: moment().add(1, "month").unix(),
+            },
+            config.JWT_SECRET
+        ),
+        metadata: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey, arweavePrivateKey: arweave.privateKey } : undefined,
+    };
+};
+
+/**
+ * preview tag
+ * @param {Object} params
+ * @param {Object} authUser
+ */
+const previewTag = async (params, authUser) => {
+    const domainConfig = getDomainConfig(params.domain);
+
+    const searchResult = await searchTag({ ...params, domainConfig, environment: "all" }, authUser);
+
+    if (searchResult.available) {
+        return searchResult;
+    }
+
+    const tagObject = searchResult.tagObject;
+
+    const zelfProof = await extractZelfProofFromQR(tagObject.zelfProofQRCode);
+
+    const previewResult = await preview({
+        zelfProof,
+        addServerPassword: Boolean(params.addServerPassword),
+    });
+
+    return { preview: previewResult, tagObject: searchResult.tagObject };
+};
+
+/**
+ * preview ZelfProof
+ * @param {Object} params
+ * @param {Object} authUser
+ */
+const previewZelfProof = async (params, authUser) => {
+    const { zelfProof } = params;
+
+    const previewResult = await preview({
+        zelfProof,
+        addServerPassword: Boolean(params.addServerPassword),
+    });
+
+    // get any key that has "Name" in the public data
+    const tagKey = Object.keys(previewResult.publicData).find((key) => key.includes("Name"));
+
+    const tagName = previewResult.publicData[tagKey];
+
+    const name = tagName.split(".")[0];
+
+    const domain = tagName.split(".")[1];
+
+    return {
+        preview: previewResult,
+        name,
+        tagKey,
+        tagName,
+        domain,
+        zelfProof,
+    };
+};
+
+/**
+ * lease confirmation
+ * @param {Object} params
+ * @param {Object} authUser
+ */
+const leaseConfirmation = async (params, authUser) => {
+    const { tagName, domain, coin, network } = params;
+    const domainConfig = getDomainConfig(domain);
+
+    const confirmation = await confirmPayUniqueAddress({
+        tagName: `${tagName}.${domain}`,
+        domain,
+        domainConfig,
+        coin,
+        network,
+    });
+
+    return {
+        tagName: `${tagName}.${domain}`,
+        domain,
+        domainConfig,
+        confirmation,
+    };
+};
+
+/**
+ * Find duplicated tag
+ * @param {string} tagName
+ * @param {string} domain
+ * @param {string} storage
+ * @param {Object} domainConfig
+ */
+const _findDuplicatedTag = async (tagName, domain, domainConfig) => {
+    const searchParams = {
+        tagName,
+        domain,
+        domainConfig,
+        environment: "all",
+    };
+
+    const result = await TagsSearchModule.searchTag(searchParams);
+
+    if (result.available === false) {
+        const error = new Error("409:tag_already_exists");
+        error.status = 409;
+        throw error;
+    }
+
+    return result;
+};
+
+/**
+ * Find tag
+ * @param {Object} params
+ * @param {string} storage
+ * @param {Object} authUser
+ */
+const _findTag = async (params, storage, authUser) => {
+    const { tagName, domain } = params;
+    const domainConfig = getDomainConfig(domain);
+
+    const searchParams = {
+        tagName,
+        domain,
+        domainConfig,
+    };
+
+    return await TagsSearchModule.searchTag(searchParams, authUser);
+};
+
+/**
+ * Validate referral
+ * @param {string} referralTagName
+ * @param {Object} authUser
+ * @param {Domain} domainConfig
+ */
+const _validateReferral = async (referralTagName, authUser, domainConfig) => {
+    if (!referralTagName) return null;
+
+    const domain = domainConfig.name;
+
+    const searchParams = {
+        tagName: referralTagName.includes(".") ? referralTagName : `${referralTagName}.${domain}`,
+        domain,
+        domainConfig,
+
+        environment: "all",
+    };
+
+    const result = await TagsSearchModule.searchTag(searchParams, authUser);
+
+    if (result.available === true) return null;
+
+    const tagObject = result.tagObject;
+
+    if (tagObject.publicData.type === "hold") {
+        tagObject.publicData[domainConfig.getTagKey()] = tagObject.publicData[domainConfig.getTagKey()].replace(".hold", "");
+    }
+
+    return tagObject;
+};
+
+/**
+ * Create wallets from phrase
+ * TODO: Add Arweave wallet generation
+ * - Add Arweave public address
+ * - Generate private key from mnemonic (12 words)
+ * @param {Object} params
+ */
+const _createWalletsFromPhrase = async (params) => {
+    const _mnemonic = params.type === "import" ? params.mnemonic : generateMnemonic(params.wordsCount);
+
+    const wordsArray = _mnemonic.split(" ");
+
+    if (wordsArray.length !== 12 && wordsArray.length !== 24) throw new Error("409:mnemonic_invalid");
+
+    const eth = await createEthWallet(_mnemonic);
+    const btc = await createBTCWallet(_mnemonic);
+    const solana = await createSolanaWallet(_mnemonic);
+    const sui = await generateSuiWalletFromMnemonic(_mnemonic);
+
+    const zkProof = await OfflineProofModule.createProof(_mnemonic);
+    const arweave = await ArweaveModule.generateWalletFromMnemonic(_mnemonic);
+
+    return {
+        eth,
+        btc,
+        solana,
+        sui,
+        zkProof,
+        mnemonic: _mnemonic,
+        arweave,
+    };
+};
+
+/**
+ * Decrypt params
+ * @param {Object} params
+ * @param {Object} authUser
+ */
+const _decryptParams = async (params, authUser) => {
+    if (params.removePGP) {
+        return {
+            password: params.password,
+            mnemonic: params.mnemonic,
+            face: params.faceBase64,
+        };
+    }
+
+    // Use session decryption for all parameters consistently
+    const password = params.password ? await SessionModule.sessionDecrypt(params.password, authUser) : null;
+    const mnemonic = params.mnemonic ? await SessionModule.sessionDecrypt(params.mnemonic, authUser) : null;
+    const face = params.faceBase64 ? await SessionModule.sessionDecrypt(params.faceBase64, authUser) : null;
+
+    return {
+        password,
+        mnemonic,
+        face,
+    };
+};
+
+const deleteTag = async (params, authUser) => {
+    const { tagName, domain, faceBase64, password } = params;
+
+    const searchResult = await searchTag({ tagName, domain }, authUser);
+
+    const zelfProof = searchResult.tagObject.zelfProof;
+
+    const ipfsID = searchResult.tagObject.id;
+
+    const decryptedZelfProof = await decrypt({
+        faceBase64,
+        password,
+        zelfProof,
+    });
+
+    if (decryptedZelfProof.error) {
+        const error = new Error(decryptedZelfProof.error.code);
+        error.status = 409;
+        throw error;
+    }
+
+    const deletedFiles = [];
+
+    if (ipfsID) {
+        deletedFiles.push(await unPinFiles([ipfsID]));
+    }
+
+    return { tagObject: searchResult.tagObject, deletedFiles };
+};
+
+module.exports = {
+    leaseTag,
+    searchTag,
+    decryptTag,
+    previewTag,
+    previewZelfProof,
+    leaseConfirmation,
+    deleteTag,
+    // Utility functions
+    getDomainConfig,
+    generateDomainHoldDomain,
+    _findDuplicatedTag,
+    _validateReferral,
+    _createWalletsFromPhrase,
+    _decryptParams,
+};

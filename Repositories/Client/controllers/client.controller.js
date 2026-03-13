@@ -1,16 +1,22 @@
 const Module = require("../modules/client.module");
+const { errorHandler } = require("../../../Core/http-handler");
 
 const get = async (ctx) => {
 	try {
 		const data = await Module.get(ctx.request.params, ctx.state.user);
 
+		if (!data) throw new Error("404:client_not_found");
+
 		ctx.body = data;
 	} catch (error) {
-		console.error({ error });
+		const _exception = errorHandler(error, ctx);
 
-		ctx.status = error.status || 500;
+		ctx.status = _exception.status || 500;
 
-		ctx.body = { error: error.message };
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
@@ -18,25 +24,35 @@ const show = async (ctx) => {
 	try {
 		const data = await Module.show(ctx.request.params, ctx.state.user);
 
-		ctx.body = data;
-	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		if (!data) throw new Error("404:client_not_found");
 
-		ctx.body = { error: error.message };
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
 const create = async (ctx) => {
 	try {
-		const data = await Module.create(ctx.request.body, ctx.state.user);
+		const data = await Module.create(ctx.request.body);
 
-		ctx.body = data;
+		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error, ctx);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
@@ -45,17 +61,21 @@ const auth = async (ctx) => {
 		const data = await Module.auth(
 			{
 				...ctx.request.body,
-				apiKey: ctx.headers["x-api-key"],
+				apiKey: ctx.headers["x-api-key"] || ctx.request.body.apiKey,
 			},
 			ctx.state.user
 		);
 
 		ctx.body = data;
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error, ctx);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
@@ -65,23 +85,48 @@ const update = async (ctx) => {
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error, ctx);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
 const destroy = async (ctx) => {
 	try {
-		const data = await Module.destroy(ctx.request.params, ctx.state.user);
+		const data = await Module.destroy(ctx.request.body, ctx.state.user);
 
 		ctx.body = { data };
 	} catch (error) {
-		console.error(error);
-		ctx.status = error.status || 500;
+		const _exception = errorHandler(error, ctx);
 
-		ctx.body = { error: error.message };
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
+	}
+};
+
+const updatePassword = async (ctx) => {
+	try {
+		const data = await Module.updatePassword(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status || 500;
+
+		ctx.body = {
+			code: _exception.code,
+			message: _exception.message,
+		};
 	}
 };
 
@@ -92,4 +137,5 @@ module.exports = {
 	update,
 	destroy,
 	auth,
+	updatePassword,
 };
