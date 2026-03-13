@@ -220,7 +220,36 @@ const deleteCollection = async (id, authdUser) => {
     // 3. Prevent malicious signatures from other users
     if (actualOwner.toLowerCase() !== authdUser.owner.toLowerCase()) throw new Error("403:unauthorized");
 
-    // 4. Securely unpin file
+    // 4. Message binding: signed message must authorize the exact id being deleted (prevents signature reuse)
+    const collMatch = authdUser.message.match(/^I authorize deleting collection (.+?)\. Timestamp: \d+$/);
+    if (!collMatch || collMatch[1] !== id) throw new Error("400:message_id_mismatch");
+
+    // 5. Securely unpin file
+    const result = await IPFS.deleteFiles([id]);
+    return { success: true, result };
+};
+
+/**
+ * Delete an NFT item from IPFS (owner-only).
+ * Use for orphaned drafts (uploaded but mint failed) to remove duplicates.
+ * @param {string} id - IPFS file ID / Pinata ID
+ * @param {Object} authdUser - { walletType, owner, signature, message } or Zelf proof
+ */
+const deleteItem = async (id, authdUser) => {
+    const existingFile = await IPFS.getFileById(id);
+    if (!existingFile || !existingFile.publicData) throw new Error("404:item_not_found");
+
+    const { owner: actualOwner } = existingFile.publicData;
+    if (!actualOwner) throw new Error("400:item_owner_undefined");
+    if (!authdUser) throw new Error("400:missing_auth_payload_body_empty");
+
+    await _validateAuth(authdUser);
+    if (actualOwner.toLowerCase() !== authdUser.owner.toLowerCase()) throw new Error("403:unauthorized");
+
+    // Message binding: signed message must authorize the exact id being deleted (prevents signature reuse)
+    const itemMatch = authdUser.message.match(/^I authorize deleting NFT metadata (.+?) from IPFS\. Timestamp: \d+$/);
+    if (!itemMatch || itemMatch[1] !== id) throw new Error("400:message_id_mismatch");
+
     const result = await IPFS.deleteFiles([id]);
     return { success: true, result };
 };
@@ -805,6 +834,7 @@ module.exports = {
     storeCollection,
     updateCollection,
     deleteCollection,
+    deleteItem,
     storeNFT,
     listCollections,
     listItems,

@@ -19,4 +19,6 @@ module.exports = (server) => {
     server.post(`${PATH}/item/mint`, Middleware.mintNFTValidation, Controller.mintNFT);
     
     server.post(`${PATH}/collection/:id/delete`, Middleware.deleteCollectionValidation, Controller.deleteCollection);
+
+    server.post(`${PATH}/item/:id/delete`, Middleware.deleteItemValidation, Controller.deleteItem);
 };
