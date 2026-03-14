@@ -21,12 +21,14 @@ const {
     sendBeneficiaryClaimable,
 } = require("../modules/email");
 
+const config = require("../../../Core/config");
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Pinata keys
+// Pinata keys (from Core/config)
 // ─────────────────────────────────────────────────────────────────────────────
-const PINATA_API_KEY = process.env._PINATA_API_KEY;
-const PINATA_SECRET_KEY = process.env._PINATA_API_SECRET;
-const PINATA_JWT = process.env._PINATA_JWT;
+const PINATA_API_KEY = config.pinata.vaultLegacy.apiKey;
+const PINATA_SECRET_KEY = config.pinata.vaultLegacy.secretKey;
+const PINATA_JWT = config.pinata.vaultLegacy.jwt;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Relayer wallet + contract ABI

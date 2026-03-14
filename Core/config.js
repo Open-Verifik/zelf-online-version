@@ -110,6 +110,18 @@ const configuration = {
         processId: process.env.ARWEAVE_PROCESS_ID,
         transactionId: process.env.ARWEAVE_TRANSACTION_ID,
     },
+    pinata: {
+        apiKey: process.env.PINATA_API_KEY,
+        secretKey: process.env.PINATA_API_SECRET,
+        jwt: process.env.PINATA_JWT,
+        gatewayUrl: process.env.PINATA_GATEWAY_URL,
+        // VaultLegacy relay uses _prefixed env vars (dev/alternate Pinata account)
+        vaultLegacy: {
+            apiKey: process.env._PINATA_API_KEY,
+            secretKey: process.env._PINATA_API_SECRET,
+            jwt: process.env._PINATA_JWT,
+        },
+    },
     arns: {
         processId: process.env.ARNS_PROCESS_ID,
         index_transaction_id: process.env.ARNS_INDEX_TRANSACTION_ID,
