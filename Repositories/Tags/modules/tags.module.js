@@ -311,9 +311,9 @@ const previewZelfProof = async (params, authUser) => {
 
     const tagName = previewResult.publicData[tagKey];
 
-    const name = tagName.split(".")[0];
+    const name = tagName?.split(".")[0];
 
-    const domain = tagName.split(".")[1];
+    const domain = tagName?.split(".")[1];
 
     return {
         preview: previewResult,

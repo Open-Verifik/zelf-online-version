@@ -169,7 +169,6 @@ const generateInvitation = async (data, authUser) => {
 		decryptedAccount = await zelfProofModule.decrypt({
 			zelfProof: accountJSON.data.zelfProof,
 			faceBase64,
-			verifierKey: config.zelfEncrypt.serverKey,
 			password: masterPassword || undefined,
 		});
 	} catch (error) {
@@ -339,7 +338,6 @@ const createFromInvitation = async (data) => {
 			identifier: invitation.lawyerEmail,
 			requireLiveness: true,
 			tolerance: "REGULAR",
-			verifierKey: config.zelfEncrypt.serverKey,
 		});
 		zelfProof = encResult.zelfProof;
 	} catch (error) {
@@ -441,7 +439,6 @@ const auth = async (data) => {
 	const decryptedAccount = await zelfProofModule.decrypt({
 		zelfProof: accountJSON.data.zelfProof,
 		faceBase64,
-		verifierKey: config.zelfEncrypt.serverKey,
 		password: masterPassword || undefined,
 	});
 
@@ -488,7 +485,6 @@ const updateProfile = async (data, authUser) => {
 	const decryptedAccount = await zelfProofModule.decrypt({
 		zelfProof: accountJSON.data.zelfProof,
 		faceBase64,
-		verifierKey: config.zelfEncrypt.serverKey,
 		password: masterPassword || undefined,
 	});
 
@@ -654,7 +650,6 @@ const remove = async (data, authUser) => {
 	const decryptedClient = await zelfProofModule.decrypt({
 		zelfProof: clientJSON.data.zelfProof,
 		faceBase64,
-		verifierKey: config.zelfEncrypt.serverKey,
 		password: masterPassword || undefined,
 	});
 
