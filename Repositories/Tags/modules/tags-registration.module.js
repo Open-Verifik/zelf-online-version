@@ -73,6 +73,7 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
         addresses: JSON.stringify({
             arweaveAddress: tagObject.arweaveAddress,
             suiAddress: tagObject.suiAddress,
+            xlmAddress: tagObject.xlmAddress,
         }),
     };
 
@@ -159,6 +160,7 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
         addresses: JSON.stringify({
             arweaveAddress: tagObject.arweaveAddress,
             suiAddress: tagObject.suiAddress,
+            xlmAddress: tagObject.xlmAddress,
         }),
     };
 

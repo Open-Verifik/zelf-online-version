@@ -100,18 +100,60 @@ const formatTransactions = async (transactions, userAddress) => {
 };
 
 /**
+ * Build empty account response for uninitiated/non-existent Stellar accounts
+ */
+const emptyAccountResponse = (address) => {
+	return {
+		address,
+		balance: 0,
+		type: "account",
+		fiatBalance: 0,
+		account: {
+			asset: "XLM",
+			fiatValue: "0.00000",
+			price: "0",
+		},
+		tokenHoldings: {
+			total: 0,
+			balance: 0,
+			fiatBalance: 0,
+			tokens: [],
+		},
+		transactions: [],
+		transactionsNext: false,
+	};
+};
+
+/**
  * Get Stellar account balance, details and transactions
+ * Returns empty account (0 balance) when account has not been initiated on Stellar yet
  * @param {Object} params - { id: account_id }
  * @param {Object} query - { limit, show, cursor } for transactions pagination
  * @returns {Object} Account data with balance, token holdings and transactions
  */
 const getAddress = async (params, query = {}) => {
 	try {
-		const { data } = await instance.get(`${HORIZON_URL}/accounts/${params.id}`, {
-			headers: {
-				"user-agent": generateRandomUserAgent(),
-			},
-		});
+		let data;
+		try {
+			const res = await instance.get(`${HORIZON_URL}/accounts/${params.id}`, {
+				headers: {
+					"user-agent": generateRandomUserAgent(),
+				},
+			});
+			data = res.data;
+		} catch (horizonError) {
+			const status = horizonError.response?.status;
+			const errorBody = horizonError.response?.data;
+			const errorMsg = typeof errorBody === "object" ? errorBody?.error || errorBody?.detail : String(errorBody || horizonError.message);
+			const isNotFound =
+				status === 404 ||
+				(errorMsg && /not found|could not be found|no data.*could be found/i.test(errorMsg));
+
+			if (isNotFound) {
+				return emptyAccountResponse(params.id);
+			}
+			throw horizonError;
+		}
 
 		let xlmBalance = 0;
 		const tokenHoldings = {

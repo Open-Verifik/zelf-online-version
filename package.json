@@ -17,7 +17,8 @@
         "test:decrypt-tag": "jest tests/integration/decryptTag-api.test.js --verbose --no-coverage",
         "test:lease-recovery": "jest tests/integration/leaseRecovery-api.test.js --verbose --no-coverage",
         "test:authentication": "jest tests/integration/authentication.test.js --verbose --no-coverage",
-        "test:license": "jest tests/integration/license.test.js --verbose --no-coverage"
+        "test:license": "jest tests/integration/license.test.js --verbose --no-coverage",
+        "test:stellar": "jest tests/integration/stellar-api.test.js --verbose --no-coverage"
     },
     "name": "zelf-wallet",
     "description": "zelf wallet backend",
@@ -79,6 +80,7 @@
         "qrcode-reader": "^1.0.4",
         "readable-stream": "^4.5.2",
         "sharp": "^0.34.5",
+        "stellar-hd-wallet": "^1.0.2",
         "stripe": "^16.6.0",
         "tiny-secp256k1": "^2.2.3",
         "web3-validator": "^2.0.6",

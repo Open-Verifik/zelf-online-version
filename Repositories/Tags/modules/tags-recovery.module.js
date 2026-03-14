@@ -39,7 +39,7 @@ const leaseRecovery = async (payload, authUser) => {
 
 	const referralTagObject = await TagsModule._validateReferral(referralTagName, authUser, domainConfig);
 
-	const { eth, btc, solana, sui, zkProof, mnemonic } = await TagsModule._createWalletsFromPhrase({
+	const { eth, btc, solana, sui, stellar, zkProof, mnemonic, arweave } = await TagsModule._createWalletsFromPhrase({
 		faceBase64: face,
 		password,
 		type: "import",
@@ -53,6 +53,7 @@ const leaseRecovery = async (payload, authUser) => {
 			ethAddress: eth.address,
 			solanaAddress: solana.address,
 			btcAddress: btc.address,
+			stellarAddress: stellar.address,
 			[tagKey]: tagName,
 			domain: domain,
 		},
@@ -74,7 +75,7 @@ const leaseRecovery = async (payload, authUser) => {
 
 	const skipZelfProof = decryptedZelfProof.publicData[tagKey] === tagName;
 
-	TagsPartsModule.assignProperties(tagObject, dataToEncrypt, { eth, btc, solana, sui }, { ...payload, password, referralTagObject }, domainConfig);
+	TagsPartsModule.assignProperties(tagObject, dataToEncrypt, { eth, btc, solana, sui, stellar, arweave }, { ...payload, password, referralTagObject }, domainConfig);
 
 	await TagsPartsModule.generateZelfProof(dataToEncrypt, tagObject, decryptedZelfProof.publicData[tagKey] === tagName, false);
 
@@ -86,7 +87,7 @@ const leaseRecovery = async (payload, authUser) => {
 		await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
 	}
 
-	const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui }, password);
+	const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, stellar, arweave }, password);
 
 	return {
 		ipfs: [tagObject.ipfs],

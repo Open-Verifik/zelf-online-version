@@ -6,6 +6,7 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
+const { createStellarWallet } = require("../../Wallet/modules/stellar");
 const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const config = require("../../../Core/config");
@@ -67,7 +68,7 @@ const leaseTag = async (params, authUser) => {
         securityType = Number(password).toString() === password && password.length === 6 ? "pin" : "password";
     }
 
-    const { eth, btc, solana, sui, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
+    const { eth, btc, solana, sui, stellar, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
         ...params,
         mnemonic: decryptedParams.mnemonic,
     });
@@ -101,7 +102,7 @@ const leaseTag = async (params, authUser) => {
     TagsPartsModule.assignProperties(
         tagObject,
         dataToEncrypt,
-        { eth, btc, solana, sui, arweave },
+        { eth, btc, solana, sui, stellar, arweave },
         { ...params, password: dataToEncrypt.password, referralTagObject },
         domainConfig
     );
@@ -122,7 +123,7 @@ const leaseTag = async (params, authUser) => {
         tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
     }
 
-    const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, arweave }, password);
+    const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, stellar, arweave }, password);
 
     return {
         ipfs: [tagObject.ipfs],
@@ -145,6 +146,7 @@ const leaseTag = async (params, authUser) => {
                     // for development porposes so we can visualize the arweave private key and the mnemonic for testing.
                     mnemonic,
                     arweavePrivateKey: arweave.privateKey,
+                    stellarSecretKey: stellar.secretKey,
                 },
     };
 };
@@ -445,6 +447,7 @@ const _createWalletsFromPhrase = async (params) => {
     const btc = await createBTCWallet(_mnemonic);
     const solana = await createSolanaWallet(_mnemonic);
     const sui = await generateSuiWalletFromMnemonic(_mnemonic);
+    const stellar = createStellarWallet(_mnemonic);
 
     const zkProof = await OfflineProofModule.createProof(_mnemonic);
     const arweave = await ArweaveModule.generateWalletFromMnemonic(_mnemonic);
@@ -454,6 +457,7 @@ const _createWalletsFromPhrase = async (params) => {
         btc,
         solana,
         sui,
+        stellar,
         zkProof,
         mnemonic: _mnemonic,
         arweave,
