@@ -35,7 +35,7 @@ const apiForAddressBalance = "https://api.bdagscan.com/v1/api/transaction/getAdd
 
 // sample response for the apiForAddressBalance
 /**
-	 * {
+     * {
     "data": {
         "firstTransaction": {
             "txnHash": "0xd21b0a14cca435a4348f719f417835b6d2c4461f21209125fd916f3230bfcf93",
@@ -49,7 +49,7 @@ const apiForAddressBalance = "https://api.bdagscan.com/v1/api/transaction/getAdd
     },
     "status": 200
 }
-	 */
+     */
 
 const apiForAddressTransactions = "https://api.bdagscan.com/v1/api/transaction/getTransactionByAddress";
 //?address=0x...&limit=10&page=1&export=false <-- those are the query parameters

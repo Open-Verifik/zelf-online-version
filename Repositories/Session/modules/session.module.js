@@ -47,7 +47,11 @@ const insert = async (params) => {
 
 	if (existingSession) {
 		if (params.killSession) {
-			await existingSession.deleteOne();
+			try {
+				await existingSession.deleteOne();
+			} catch (_) {
+				// session was already deleted by a concurrent request, which is fine
+			}
 
 			existingSession = null;
 		} else {
