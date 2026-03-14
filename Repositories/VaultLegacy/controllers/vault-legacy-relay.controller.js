@@ -21,14 +21,7 @@ const {
     sendBeneficiaryClaimable,
 } = require("../modules/email");
 
-const config = require("../../../Core/config");
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Pinata keys (from Core/config)
-// ─────────────────────────────────────────────────────────────────────────────
-const PINATA_API_KEY = config.pinata.vaultLegacy.apiKey;
-const PINATA_SECRET_KEY = config.pinata.vaultLegacy.secretKey;
-const PINATA_JWT = config.pinata.vaultLegacy.jwt;
+const IPFS = require("../../IPFS/modules/ipfs.module");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Relayer wallet + contract ABI
@@ -44,10 +37,6 @@ let iface = null;
 
 function initRelayer() {
     if (relayerWallet) return;
-
-    console.log(
-        `🔑 Pinata keys: API_KEY=${PINATA_API_KEY ? PINATA_API_KEY.slice(0, 6) + "..." : "MISSING"}, JWT=${PINATA_JWT ? "present" : "MISSING"}`
-    );
 
     if (!RELAYER_PRIVATE_KEY) {
         console.warn("⚠️  LEGACY_RELAYER_PRIVATE_KEY not set — relay/send-tx will fail");
@@ -79,35 +68,24 @@ const ipfsUpload = async (ctx) => {
     try {
         const { data, filename } = ctx.request.body;
 
-        // Prefer JWT-based auth (modern Pinata), fall back to API key pair
-        const pinataHeaders = { "Content-Type": "application/json" };
-        if (PINATA_JWT) {
-            pinataHeaders["Authorization"] = `Bearer ${PINATA_JWT}`;
-        } else {
-            pinataHeaders["pinata_api_key"] = PINATA_API_KEY;
-            pinataHeaders["pinata_secret_api_key"] = PINATA_SECRET_KEY;
-        }
+        const name = filename || "zelf-data";
+        const base64 = Buffer.from(JSON.stringify(data)).toString("base64");
+        const metadata = { name };
 
-        const response = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
-            method: "POST",
-            headers: pinataHeaders,
-            body: JSON.stringify({
-                pinataContent: data,
-                pinataMetadata: { name: filename || "zelf-data" },
-            }),
-        });
+        const result = await IPFS.insert(
+            { base64, metadata, name, pinIt: true },
+            { pro: true }
+        );
 
-        const rawText = await response.text();
-        if (!response.ok) {
-            console.error(`❌ Pinata API Error (${response.status}):`, rawText);
+        if (!result?.cid && !result?.ipfsHash) {
             ctx.status = 502;
-            ctx.body = { error: rawText };
+            ctx.body = { error: "IPFS upload failed" };
             return;
         }
 
-        const result = JSON.parse(rawText);
-        console.log(`✅ IPFS Proxy Upload: ${result.IpfsHash}`);
-        ctx.body = { ipfsHash: result.IpfsHash };
+        const ipfsHash = result.cid || result.ipfsHash;
+        console.log(`✅ IPFS Proxy Upload: ${ipfsHash}`);
+        ctx.body = { ipfsHash };
     } catch (error) {
         ctx.status = 500;
         ctx.body = { error: error.message };
