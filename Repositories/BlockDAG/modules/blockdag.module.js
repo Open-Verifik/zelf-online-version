@@ -175,8 +175,9 @@ const getAddressTransactionsFromAPI = async (address, page = 1, limit = 20, expo
             },
         });
 
-        if (response.data && response.data.status === 200 && response.data.data) {
-            return response.data.data;
+        if (response.data && response.data.status === 200) {
+            const data = response.data.data;
+            return Array.isArray(data) ? data : data || [];
         }
         throw new Error("Invalid API response");
     } catch (error) {
