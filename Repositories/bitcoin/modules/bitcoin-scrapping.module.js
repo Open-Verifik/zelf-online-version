@@ -5,19 +5,18 @@ const moment = require("moment");
 const instance = getCleanInstance(30000);
 const SATOSHI_TO_BTC = 100000000;
 
-// Función para realizar solicitudes a la API con el User-Agent generado aleatoriamente
+const MEMPOOL_BASE = "https://mempool.space/api";
+const MEMPOOL_TESTNET_BASE = "https://mempool.space/testnet/api";
+const BLOCKSTREAM_BASE = "https://blockstream.info/api";
+const BLOCKSTREAM_TESTNET_BASE = "https://blockstream.info/testnet/api";
+
 const makeApiRequest = async (url) => {
-    try {
-        const { data } = await instance.get(url, {
-            headers: {
-                "user-agent": generateRandomUserAgent(),
-            },
-        });
-        return data;
-    } catch (error) {
-        console.error("API Request Error:", error);
-        throw error;
-    }
+    const { data } = await instance.get(url, {
+        headers: {
+            "user-agent": generateRandomUserAgent(),
+        },
+    });
+    return data;
 };
 
 // Convertir valores de satoshis a BTC
@@ -49,31 +48,93 @@ const convertTransactionValues = (transactions) => {
     }));
 };
 
+// Get transactions from mempool.space (primary)
+const getTransactionsListFromMempool = async (params) => {
+    try {
+        const txsData = await makeApiRequest(`${MEMPOOL_BASE}/address/${params.id}/txs`);
+        if (!txsData || txsData.length === 0) return { transactions: [] };
+        return { transactions: extractTransactionDataFromBlockstream(txsData) };
+    } catch (error) {
+        if (error?.response?.status !== 429) console.error("mempool.space transactions error:", error?.message || error);
+        throw error;
+    }
+};
+
 // Obtener lista de transacciones
 const getTransactionsList = async (params, query = { show: "25" }) => {
-    const txsData = await makeApiRequest(
-        `https://api.blockchain.info/haskoin-store/btc/address/${params.id}/transactions?limit=${query.show}&offset=0`,
-    );
-
-    const txids = txsData.map((tx) => tx.txid).join(",");
-
-    if (!txids.length) return { transactions: [] };
-
-    const response = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/transactions?txids=${txids}`);
-    const userAddress = params.id;
-    return { transactions: await extractTransactionDataWithPrice(response, userAddress) };
+    try {
+        return await getTransactionsListFromMempool(params);
+    } catch (_primaryErr) {
+        try {
+            return await getTransactionsListFromBlockstream(params, query);
+        } catch (fallbackErr) {
+            console.error("All transaction sources failed:", fallbackErr?.message || fallbackErr);
+            return { transactions: [] };
+        }
+    }
 };
 
 // Obtener detalles de una transacción específica
 const getTransactionDetail = async (params) => {
-    const data = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/transaction/${params.id}`);
-
-    return extractTransactionData([data]);
+    try {
+        const data = await makeApiRequest(`${MEMPOOL_BASE}/tx/${params.id}`);
+        return extractTransactionDataFromBlockstream([data]);
+    } catch (_primaryErr) {
+        try {
+            const data = await makeApiRequest(`${BLOCKSTREAM_BASE}/tx/${params.id}`);
+            return extractTransactionDataFromBlockstream([data]);
+        } catch (fallbackErr) {
+            console.error("Transaction detail fetch failed:", fallbackErr?.message || fallbackErr);
+            throw fallbackErr;
+        }
+    }
 };
 
 // Detect if address is testnet
 const isTestnetAddress = (address) => {
     return address && (address.startsWith("tb1") || address.startsWith("2M") || address.startsWith("n1") || address.startsWith("m1"));
+};
+
+// Build a standardized balance response from parsed values
+const buildBalanceResponse = (address, formatBTC, price, transactions) => ({
+    address,
+    balance: formatBTC.toString(),
+    fiatBalance: formatBTC * price,
+    fullName: "BTC",
+    account: {
+        asset: "BTC",
+        fiatBalance: (formatBTC * price).toString(),
+        price,
+    },
+    tokenHoldings: {
+        balance: formatBTC,
+        total: formatBTC,
+        tokens: [
+            {
+                address,
+                amount: formatBTC.toString(),
+                decimals: 8,
+                fiatBalance: formatBTC * price,
+                image: "https://static.okx.com/cdn/wallet/logo/BTC.png",
+                name: "Bitcoin",
+                network: "Bitcoin",
+                price,
+                symbol: "BTC",
+                tokenType: "BTC",
+            },
+        ],
+    },
+    transactions,
+});
+
+// Get balance from mempool.space (primary)
+const getBalanceFromMempool = async (params) => {
+    const data = await makeApiRequest(`${MEMPOOL_BASE}/address/${params.id}`);
+    const { price } = await getTickerPrice({ symbol: "BTC" });
+    const balanceSatoshi = (data.chain_stats?.funded_txo_sum || 0) - (data.chain_stats?.spent_txo_sum || 0);
+    const formatBTC = convertSatoshiToBTC(balanceSatoshi);
+    const { transactions } = await getTransactionsListFromMempool({ id: params.id });
+    return buildBalanceResponse(params.id, formatBTC, price, transactions);
 };
 
 // Obtener balance de una dirección
@@ -84,51 +145,14 @@ const getBalance = async (params) => {
     }
 
     try {
-        // Try mainnet with Blockchain.info
-        const data = await makeApiRequest(`https://api.blockchain.info/haskoin-store/btc/address/${params.id}/balance`);
-
-        const { price } = await getTickerPrice({ symbol: "BTC" });
-        const formatBTC = convertSatoshiToBTC(data.confirmed);
-
-        const { transactions } = await getTransactionsList({ id: params.id });
-
-        return {
-            address: params.id,
-            balance: formatBTC.toString(),
-            fiatBalance: formatBTC * price,
-            fullName: "BTC",
-            account: {
-                asset: "BTC",
-                fiatBalance: (formatBTC * price).toString(),
-                price: price,
-            },
-            tokenHoldings: {
-                balance: formatBTC,
-                total: formatBTC,
-                tokens: [
-                    {
-                        address: params.id,
-                        amount: formatBTC.toString(),
-                        decimals: 8,
-                        fiatBalance: formatBTC * price,
-                        image: "https://static.okx.com/cdn/wallet/logo/BTC.png",
-                        name: "Bitcoin",
-                        network: "Bitcoin",
-                        price: price,
-                        symbol: "BTC",
-                        tokenType: "BTC",
-                    },
-                ],
-            },
-            transactions,
-        };
-    } catch (e) {
-        console.error({ e });
+        return await getBalanceFromMempool(params);
+    } catch (primaryErr) {
+        if (primaryErr?.response?.status !== 429) console.error("mempool.space balance error:", primaryErr?.message || primaryErr);
 
         try {
             return await getBalanceFromBlockstream(params);
         } catch (fallbackError) {
-            console.error("All API sources failed:", fallbackError);
+            console.error("All Bitcoin API sources failed:", fallbackError?.message || fallbackError);
             const error = new Error("not_found");
             error.status = 404;
             throw error;
@@ -163,16 +187,14 @@ function extractTransactionData(transactions) {
     });
 }
 
-// Get transactions from Blockstream mainnet API
+// Get transactions from Blockstream mainnet API (fallback)
 const getTransactionsListFromBlockstream = async (params, query = { show: "25" }) => {
     try {
-        const txsData = await makeApiRequest(`https://blockstream.info/api/address/${params.id}/txs`);
-
+        const txsData = await makeApiRequest(`${BLOCKSTREAM_BASE}/address/${params.id}/txs`);
         if (!txsData || txsData.length === 0) return { transactions: [] };
-
         return { transactions: extractTransactionDataFromBlockstream(txsData) };
     } catch (error) {
-        console.error("Blockstream transactions error:", error);
+        if (error?.response?.status !== 429) console.error("Blockstream transactions error:", error?.message || error);
         return { transactions: [] };
     }
 };
@@ -210,71 +232,42 @@ function extractTransactionDataFromBlockstream(transactions) {
 }
 
 const getTestnetTransactionsList = async (params, query = { show: "25" }) => {
-    const txsData = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}/txs`);
-
-    const txids = txsData.map((tx) => tx.txid).join(",");
-
-    if (!txids.length) return { transactions: [] };
-
-    return { transactions: extractTransactionData(txsData) };
+    try {
+        const txsData = await makeApiRequest(`${MEMPOOL_TESTNET_BASE}/address/${params.id}/txs`);
+        if (!txsData || txsData.length === 0) return { transactions: [] };
+        return { transactions: extractTransactionDataFromBlockstream(txsData) };
+    } catch (_primaryErr) {
+        try {
+            const txsData = await makeApiRequest(`${BLOCKSTREAM_TESTNET_BASE}/address/${params.id}/txs`);
+            if (!txsData || txsData.length === 0) return { transactions: [] };
+            return { transactions: extractTransactionDataFromBlockstream(txsData) };
+        } catch (fallbackErr) {
+            console.error("Testnet transactions fetch failed:", fallbackErr?.message || fallbackErr);
+            return { transactions: [] };
+        }
+    }
 };
 
-// Get balance from Blockstream API (alternative to Blockchain.info)
+// Get balance from Blockstream API (fallback)
 const getBalanceFromBlockstream = async (params) => {
-    try {
-        const data = await makeApiRequest(`https://blockstream.info/api/address/${params.id}`);
-
-        const { price } = await getTickerPrice({ symbol: "BTC" });
-
-        // Blockstream API structure: chain_stats.funded_txo_sum
-        const balanceSatoshi = data.chain_stats?.funded_txo_sum - (data.chain_stats?.spent_txo_sum || 0);
-        const formatBTC = convertSatoshiToBTC(balanceSatoshi);
-
-        // Get transactions using Blockstream
-        const { transactions } = await getTransactionsListFromBlockstream({ id: params.id });
-
-        return {
-            address: params.id,
-            balance: formatBTC.toString(),
-            fiatBalance: formatBTC * price,
-            fullName: "BTC",
-            account: {
-                asset: "BTC",
-                fiatBalance: (formatBTC * price).toString(),
-                price: price,
-            },
-            tokenHoldings: {
-                balance: formatBTC,
-                total: formatBTC,
-                tokens: [
-                    {
-                        address: params.id,
-                        amount: formatBTC.toString(),
-                        decimals: 8,
-                        fiatBalance: formatBTC * price,
-                        image: "https://static.okx.com/cdn/wallet/logo/BTC.png",
-                        name: "Bitcoin",
-                        network: "Bitcoin",
-                        price: price,
-                        symbol: "BTC",
-                        tokenType: "BTC",
-                    },
-                ],
-            },
-            transactions,
-        };
-    } catch (e) {
-        console.error("Blockstream API error:", e);
-        throw e;
-    }
+    const data = await makeApiRequest(`${BLOCKSTREAM_BASE}/address/${params.id}`);
+    const { price } = await getTickerPrice({ symbol: "BTC" });
+    const balanceSatoshi = (data.chain_stats?.funded_txo_sum || 0) - (data.chain_stats?.spent_txo_sum || 0);
+    const formatBTC = convertSatoshiToBTC(balanceSatoshi);
+    const { transactions } = await getTransactionsListFromBlockstream({ id: params.id });
+    return buildBalanceResponse(params.id, formatBTC, price, transactions);
 };
 
 const getTestnetBalance = async (params) => {
     try {
-        const data = await makeApiRequest(`https://blockstream.info/testnet/api/address/${params.id}`);
+        let data;
+        try {
+            data = await makeApiRequest(`${MEMPOOL_TESTNET_BASE}/address/${params.id}`);
+        } catch (_primaryErr) {
+            data = await makeApiRequest(`${BLOCKSTREAM_TESTNET_BASE}/address/${params.id}`);
+        }
 
         const { price } = await getTickerPrice({ symbol: "BTC" });
-        // Calculate actual balance: funded - spent
         const balanceSatoshi = (data.chain_stats?.funded_txo_sum || 0) - (data.chain_stats?.spent_txo_sum || 0);
         const formatBTC = convertSatoshiToBTC(balanceSatoshi);
 
