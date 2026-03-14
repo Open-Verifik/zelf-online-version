@@ -169,6 +169,7 @@ const generateInvitation = async (data, authUser) => {
 		decryptedAccount = await zelfProofModule.decrypt({
 			zelfProof: accountJSON.data.zelfProof,
 			faceBase64,
+			verifierKey: config.zelfEncrypt.serverKey,
 			password: masterPassword || undefined,
 		});
 	} catch (error) {
