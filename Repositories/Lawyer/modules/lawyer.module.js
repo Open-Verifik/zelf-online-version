@@ -320,23 +320,20 @@ const createFromInvitation = async (data) => {
 	const mnemonic = generateMnemonic(12);
 
 	let zelfProof;
+
+	const eth = createEthWallet(mnemonic);
+	const solana = await createSolanaWallet(mnemonic);
+
 	try {
 		const encResult = await zelfProofModule.encrypt({
 			publicData: {
-				email: invitation.lawyerEmail,
-				phone: invitation.lawyerPhone,
-				countryCode: invitation.lawyerCountryCode,
-				company: invitation.ownerCompany,
 				role: "lawyer",
-				domain: invitation.domain,
+				ethAddress: eth.address,
+				solanaAddress: solana.address,
 			},
 			faceBase64,
 			metadata: {
-				apiKey: invitation.apiKey,
-				zkProof: invitation.zkProof,
 				mnemonic,
-				ownerEmail: invitation.ownerEmail,
-				lawyerDomain: invitation.domain,
 			},
 			password: masterPassword,
 			identifier: invitation.lawyerEmail,
@@ -350,8 +347,6 @@ const createFromInvitation = async (data) => {
 		throw error;
 	}
 
-	const eth = createEthWallet(mnemonic);
-	const solana = await createSolanaWallet(mnemonic);
 
 	const lawyerData = {
 		email: invitation.lawyerEmail,
@@ -483,6 +478,7 @@ const updateProfile = async (data, authUser) => {
 		data;
 
 	const records = await IPFSModule.get({ key: "lawyerEmail", value: authUser.email });
+
 	const lawyerAccount = records.find((r) => r.publicData?.accountType === LAWYER_ACCOUNT_TYPE);
 
 	if (!lawyerAccount) throw new Error("404:lawyer_not_found");
