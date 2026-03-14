@@ -11,16 +11,16 @@ const ZELFPROOF =
 /**
  * Computes optimal QR pixel size based on ZelfProof byte length.
  * Denser QRs (more data) need larger images so each module has enough pixels for reliable scanning.
- * Formula: estimate QR version from byte capacity (H level), then size = modules × 2.5 px/module.
+ * Formula: estimate QR version from byte capacity (H level), then size = modules × 3.125 px/module.
  * @param {number} byteCount - Length of ZelfProof binary (Buffer.from(zelfProof, 'base64').length)
- * @returns {number} - Recommended pixel width/height (256–512)
+ * @returns {number} - Recommended pixel width/height (320–640)
  */
 function getOptimalQRSize(byteCount) {
 	// H-level byte capacity per version (approx): v10~119, v20~382, v30~742, v40~1273
 	const version = Math.max(1, Math.min(40, Math.ceil(byteCount / 32)));
 	const modules = 17 + 4 * version;
-	const PIXELS_PER_MODULE = 2.5; // Min for reliable smartphone scanning (denser = need more)
-	return Math.max(256, Math.min(512, Math.ceil(modules * PIXELS_PER_MODULE)));
+	const PIXELS_PER_MODULE = 3.125; // 25% larger for better Android scan reliability
+	return Math.max(320, Math.min(640, Math.ceil(modules * PIXELS_PER_MODULE)));
 }
 
 async function generateQRFromZelfProof(zelfProof, options = {}) {

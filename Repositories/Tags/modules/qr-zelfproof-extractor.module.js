@@ -257,10 +257,10 @@ async function extractZelfProofFromQR(base64Image) {
 /**
  * Computes optimal QR pixel size based on ZelfProof binary byte length.
  * Larger ZelfProofs produce denser QR codes that require more pixels per module
- * to remain reliably scannable on mobile devices (≥2.5 px/module recommended).
+ * to remain reliably scannable on mobile devices (≥3.125 px/module recommended).
  *
  * Formula: estimate QR version from byte count (H-level capacity ≈ byteCount/32),
- * then size = modules × 2.5, clamped to [256, 512].
+ * then size = modules × 3.125, clamped to [320, 640].
  *
  * @param {number} byteCount - Length of the raw ZelfProof buffer
  * @returns {number} - Recommended pixel width/height
@@ -268,7 +268,7 @@ async function extractZelfProofFromQR(base64Image) {
 function getOptimalQRSize(byteCount) {
 	const version = Math.max(1, Math.min(40, Math.ceil(byteCount / 32)));
 	const modules = 17 + 4 * version;
-	return Math.max(256, Math.min(512, Math.ceil(modules * 2.5)));
+	return Math.max(320, Math.min(640, Math.ceil(modules * 3.125)));
 }
 
 /**
