@@ -150,14 +150,19 @@ const urlToBase64 = async (url) => {
 
         const contentType = response.headers.get("content-type") || "";
 
-        if (!contentType.startsWith("image/png") && !contentType.startsWith("application/octet-stream")) {
-            console.warn(`urlToBase64: expected image/png, got ${contentType} for ${url}`);
+        if (
+            !contentType.startsWith("image/png") &&
+            !contentType.startsWith("image/jpeg") &&
+            !contentType.startsWith("application/octet-stream")
+        ) {
+            console.warn(`urlToBase64: expected image/png or image/jpeg, got ${contentType} for ${url}`);
             return null;
         }
 
         const buffer = await response.arrayBuffer();
         const base64 = Buffer.from(buffer).toString("base64");
-        return `data:image/png;base64,${base64}`;
+        const outputMimeType = contentType.startsWith("image/jpeg") ? "image/jpeg" : "image/png";
+        return `data:${outputMimeType};base64,${base64}`;
     } catch (error) {
         console.error("Error converting URL to base64:", error);
         return null;
