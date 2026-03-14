@@ -233,6 +233,7 @@ const configuration = {
     blockdag: {
         defaultCollectionAddress: process.env.BLOCKDAG_DEFAULT_COLLECTION_ADDRESS || null,
         factoryAddress: process.env.BLOCKDAG_FACTORY_ADDRESS || "0x7c6a168455C94092f8d51aBC515B73f4Ed9813a6",
+        mainRpcUrl: process.env.BLOCKDAG_MAIN_RPC_URL || "https://dapps-rpc.bdagscan.com",
         rpcUrl: process.env.BLOCKDAG_RPC_URL || "https://rpc.bdagscan.com",
         chainId: 1404,
         nowNodesAPIKey: process.env.BLOCKDAG_NOW_NODES_API_KEY,

@@ -24,9 +24,13 @@ const generateRandomUserAgent = () => {
     return userAgents[Math.floor(Math.random() * userAgents.length)];
 };
 
-// BlockDAG RPC endpoint
+// BlockDAG RPC endpoints: mainRpcUrl = dedicated RPC from BlockDAG team, rpcUrl = public fallback
+const BLOCKDAG_MAIN_RPC = config.blockdag?.mainRpcUrl || "https://dapps-rpc.bdagscan.com";
 const BLOCKDAG_RPC = config.blockdag?.rpcUrl || "https://rpc.bdagscan.com";
 const NOWNODES_BLOCKDAG_RPC = "https://bdag.nownodes.io";
+
+// Process-lifetime: when mainRpcUrl fails, stop using it until process restart
+let mainRpcUrlDisabled = false;
 const BLOCKDAG_TESTNET_RPC = "https://testnet-rpc.blockdag.network"; // Keep for reference if needed
 const BLOCKDAG_EXPLORER = "https://bdagscan.com";
 const apiForAddressBalance = "https://api.bdagscan.com/v1/api/transaction/getAddressInfo?address=";
@@ -241,7 +245,25 @@ const transformApiTransaction = (tx, address) => {
 };
 
 /**
- * Centralized RPC request handler with NowNodes support and fallback
+ * Post JSON-RPC request to a given URL
+ * @param {string} url - RPC endpoint URL
+ * @param {string} method - RPC method
+ * @param {Array} params - RPC parameters
+ * @param {Object} [extraHeaders] - Optional extra headers (e.g. api-key for NowNodes)
+ * @returns {Promise<Object>} RPC response data
+ */
+const postToRpc = async (url, method, params, extraHeaders = {}) => {
+    const response = await instance.post(
+        url,
+        { jsonrpc: "2.0", method, params, id: 1 },
+        { headers: { "Content-Type": "application/json", ...extraHeaders } }
+    );
+    return response.data;
+};
+
+/**
+ * Centralized RPC request handler with NowNodes support and mainRpcUrl → rpcUrl fallback
+ * When mainRpcUrl fails, it is disabled for the process lifetime (until restart).
  * @param {string} method - RPC method
  * @param {Array} params - RPC parameters
  * @returns {Promise<Object>} RPC response data
@@ -251,46 +273,38 @@ const requestRPC = async (method, params = []) => {
 
     if (nowNodesAPIKey) {
         try {
-            const response = await instance.post(
-                NOWNODES_BLOCKDAG_RPC,
-                {
-                    jsonrpc: "2.0",
-                    method,
-                    params,
-                    id: 1,
-                },
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "api-key": nowNodesAPIKey,
-                    },
-                }
-            );
-            if (response.data && !response.data.error) {
-                return response.data;
+            const data = await postToRpc(NOWNODES_BLOCKDAG_RPC, method, params, { "api-key": nowNodesAPIKey });
+            if (data && !data.error) {
+                return data;
             }
-            if (response.data?.error) {
-                console.warn(`NowNodes RPC error for ${method}:`, response.data.error.message);
+            if (data?.error) {
+                console.warn(`NowNodes RPC error for ${method}:`, data.error.message);
             }
         } catch (error) {
             console.warn(`NowNodes RPC connection failed for ${method}:`, error.message);
         }
     }
 
-    // Fallback to default RPC
-    const response = await instance.post(
-        BLOCKDAG_RPC,
-        {
-            jsonrpc: "2.0",
-            method,
-            params,
-            id: 1,
-        },
-        {
-            headers: { "Content-Type": "application/json" },
+    // BlockDAG RPC chain: mainRpcUrl (dedicated) → rpcUrl (fallback)
+    if (!mainRpcUrlDisabled) {
+        try {
+            const data = await postToRpc(BLOCKDAG_MAIN_RPC, method, params);
+            if (data && !data.error) {
+                return data;
+            }
+            if (data?.error) {
+                console.warn(`BlockDAG mainRpcUrl RPC error for ${method}:`, data.error.message);
+            }
+            mainRpcUrlDisabled = true;
+        } catch (error) {
+            console.warn(`BlockDAG mainRpcUrl failed for ${method}:`, error.message);
+            mainRpcUrlDisabled = true;
         }
-    );
-    return response.data;
+    }
+
+    // Fallback to rpcUrl
+    const data = await postToRpc(BLOCKDAG_RPC, method, params);
+    return data;
 };
 
 /**
