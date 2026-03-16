@@ -1,6 +1,7 @@
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
 const SessionModule = require("../../Session/modules/session.module");
+const TagsPartsModule = require("./tags-parts.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const TagsIPFSModule = require("./tags-ipfs.module");
 const moment = require("moment");
@@ -34,10 +35,14 @@ const initTagUpdates = async (tagObject, secretKeys) => {
         tagsToAdd.push({ name: "btcAddress", value: btc.address, new: false });
     }
 
+    const domainConfig = getDomainConfig(tagObject.publicData.domain || "zelf");
+    const walletScopeKey = TagsPartsModule.getWalletScopeKey(tagObject.publicData, domainConfig);
+
     const { encryptedMessage, privateKey } = await SessionModule.walletEncrypt(
         { mnemonic, zkProof, solanaSecretKey, suiSecretKey: sui.secretKey, arweavePrivateKey },
-        tagObject.publicData.ethAddress,
+        walletScopeKey,
         password,
+        tagObject.publicData.ethAddress
     );
 
     return {

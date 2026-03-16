@@ -116,7 +116,7 @@ const extractPublicKey = async (params) => {
 	// Fallback to clientIP for legacy support or if identifier not provided
 	const identifier = params.identifier || params.clientIP;
 
-	const storedKey = await PGPKeyModule.findKey(identifier); // uuid
+	const storedKey = await PGPKeyModule.findSessionKey(identifier);
 
 	if (storedKey) return storedKey.publicKey;
 
@@ -189,7 +189,7 @@ const encryptContent = async (message) => {
 };
 
 const _getPrivateKey = async (authUser) => {
-	const pgpRecord = await PGPKeyModule.findKey(null, authUser);
+	const pgpRecord = await PGPKeyModule.findSessionKey(null, authUser);
 
 	if (!pgpRecord) throw new Error("key_not_found");
 
@@ -217,8 +217,9 @@ const sessionDecrypt = async (content, authUser) => {
 	}
 };
 
-const walletEncrypt = async (content, identifier, password = "") => {
-	let pgpRecord = await PGPKeyModule.findKey(identifier);
+const walletEncrypt = async (content, walletScopeKey, password = "", legacyIdentifier = null) => {
+	let pgpRecord = await PGPKeyModule.findStorageKey({ scopeKey: walletScopeKey, legacyIdentifier });
+	const shouldRotateStorageKey = Boolean(password);
 
 	const payload = {
 		publicKey: pgpRecord?.publicKey,
@@ -226,8 +227,8 @@ const walletEncrypt = async (content, identifier, password = "") => {
 		new: false,
 	};
 
-	if (!pgpRecord) {
-		await _generateNewWalletKeys(identifier, payload, password);
+	if (!pgpRecord || shouldRotateStorageKey) {
+		await _generateNewWalletKeys(walletScopeKey, payload, password, legacyIdentifier);
 	} else {
 		payload.privateKey = await PGPKeyModule.decryptKey(pgpRecord.type, pgpRecord.key);
 	}
@@ -245,23 +246,30 @@ const walletEncrypt = async (content, identifier, password = "") => {
 	return { encryptedMessage, privateKey: payload.privateKey };
 };
 
-const _generateNewWalletKeys = async (identifier, walletData, password) => {
-	const newPgpRecord = await PGPKeyModule.generateKey("storage", identifier, null, null, password);
+const _generateNewWalletKeys = async (walletScopeKey, walletData, password, legacyIdentifier = null) => {
+	const newPgpRecord = await PGPKeyModule.generateKey("storage", legacyIdentifier || walletScopeKey, null, null, password, {
+		scopeType: "wallet",
+		scopeKey: walletScopeKey,
+	});
 
 	walletData.publicKey = newPgpRecord.publicKey;
 	walletData.privateKey = newPgpRecord.privateKey;
 	walletData.new = true;
 };
 
-const walletDecrypt = async (content, identifier, password) => {
+const walletDecrypt = async (content, walletScopeKey, password, legacyIdentifier = null) => {
 	try {
-		const _privateKey = await _getPrivateKey({ identifier });
+		const pgpRecord = await PGPKeyModule.findStorageKey({ scopeKey: walletScopeKey, legacyIdentifier });
+
+		if (!pgpRecord) throw new Error("key_not_found");
+
+		const _privateKey = await PGPKeyModule.decryptKey(pgpRecord.type, pgpRecord.key);
 
 		const privateKey = await openpgp.readPrivateKey({ armoredKey: _privateKey });
 
 		const decryptedPrivateKey = await openpgp.decryptKey({
 			privateKey,
-			passphrase: config.pgp.globalPassphrase,
+			passphrase: password,
 		});
 
 		// Read the encrypted message

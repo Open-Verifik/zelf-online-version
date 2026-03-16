@@ -3,9 +3,21 @@ const config = require("../../../Core/config");
 const passphrase = config.pgp.passphrase;
 const globalPassphrase = config.pgp.globalPassphrase;
 const Model = require("../models/pgp-keys.model");
-const MongoORM = require("../../../Core/mongo-orm");
 
-const generateKey = async (type = "session", identifier, name, email, password) => {
+const buildScopedIdentifier = (type = "session", identifier, scopeKey) => {
+	if (type === "storage" && scopeKey) return `storage:${scopeKey}`;
+	if (type === "session" && identifier) return `session:${identifier}`;
+
+	return `${identifier}`;
+};
+
+const touchRecord = async (record) => {
+	if (!record?._id) return;
+
+	await Model.updateOne({ _id: record._id }, { $set: { lastTimeUsed: new Date() } }).catch(() => null);
+};
+
+const generateKey = async (type = "session", identifier, name, email, password, options = {}) => {
 	name = name || "Miguel T";
 	email = email || "miguel@zelf.world";
 
@@ -16,30 +28,37 @@ const generateKey = async (type = "session", identifier, name, email, password) 
 		passphrase: password || (type === "session" ? passphrase : globalPassphrase),
 	});
 
-	await _saveKey(type, identifier, privateKey, publicKey, { name, email });
+	await _saveKey(type, identifier, privateKey, publicKey, { name, email }, options);
 
 	return { publicKey, privateKey };
 };
 
-const _saveKey = async (type = "session", identifier, privateKey, publicKey, userIDs) => {
+const _saveKey = async (type = "session", identifier, privateKey, publicKey, userIDs, options = {}) => {
 	const encryptedPrivateKey = await encryptKey(type, privateKey);
+	const scopeType = options.scopeType || undefined;
+	const scopeKey = options.scopeKey || undefined;
+	const storedIdentifier = buildScopedIdentifier(type, identifier, scopeKey);
 
 	try {
-		const keyToStore = new Model({
+		const keyToStore = {
 			type,
 			key: encryptedPrivateKey,
 			publicKey: publicKey,
-			identifier: `${identifier}`,
+			identifier: storedIdentifier,
+			scopeType,
+			scopeKey,
 			name: userIDs.name,
 			email: userIDs.email,
-		});
+		};
+		const query = scopeKey ? { type, scopeKey } : { type, identifier: storedIdentifier };
 
-		await keyToStore.save();
+		await Model.findOneAndUpdate(query, { $set: keyToStore }, { upsert: true, setDefaultsOnInsert: true });
 	} catch (exception) {
 		console.error({
 			keyToStoreExcp: exception,
 			type,
-			identifier: `${identifier}`,
+			identifier: storedIdentifier,
+			scopeKey,
 			name: userIDs.name,
 			email: userIDs.email,
 		});
@@ -48,23 +67,60 @@ const _saveKey = async (type = "session", identifier, privateKey, publicKey, use
 	return publicKey;
 };
 
-const findKey = async (identifier, authUser) => {
-	const queryParams = {
-		findOne: true,
-	};
+const findSessionKey = async (identifier, authUser) => {
+	let query = null;
 
 	if (authUser) {
 		const identifiers = [authUser.identifier, authUser.ip].filter(Boolean);
-		if (identifiers.length) {
-			queryParams.in_identifier = identifiers;
-		}
+		if (!identifiers.length) return null;
+
+		query = {
+			type: "session",
+			$or: [
+				{ identifier: { $in: identifiers } },
+				{ identifier: { $in: identifiers.map((_identifier) => buildScopedIdentifier("session", _identifier)) } },
+			],
+		};
 	} else {
-		queryParams.where_identifier = identifier;
+		if (!identifier) return null;
+
+		query = {
+			type: "session",
+			$or: [{ identifier }, { identifier: buildScopedIdentifier("session", identifier) }],
+		};
 	}
 
-	const pgpRecord = await MongoORM.buildQuery(queryParams, Model, null, []);
+	const pgpRecord = await Model.findOne(query).sort({ lastTimeUsed: -1 });
+
+	await touchRecord(pgpRecord);
 
 	return pgpRecord;
+};
+
+const findStorageKey = async ({ scopeKey, legacyIdentifier } = {}) => {
+	const conditions = [];
+
+	if (scopeKey) {
+		conditions.push({ type: "storage", scopeKey });
+		conditions.push({ type: "storage", identifier: buildScopedIdentifier("storage", scopeKey, scopeKey) });
+		conditions.push({ type: "storage", identifier: `${scopeKey}` });
+	}
+
+	if (legacyIdentifier) {
+		conditions.push({ type: "storage", identifier: `${legacyIdentifier}` });
+	}
+
+	if (!conditions.length) return null;
+
+	const pgpRecord = await Model.findOne(conditions.length === 1 ? conditions[0] : { $or: conditions }).sort({ lastTimeUsed: -1 });
+
+	await touchRecord(pgpRecord);
+
+	return pgpRecord;
+};
+
+const findKey = async (identifier, authUser) => {
+	return await findSessionKey(identifier, authUser);
 };
 
 const encryptKey = async (type = "session", key) => {
@@ -129,6 +185,8 @@ const decryptContent = async (type = "session", privateKey, content) => {
 module.exports = {
 	generateKey,
 	findKey,
+	findSessionKey,
+	findStorageKey,
 	encryptKey,
 	decryptKey,
 	decryptContent,

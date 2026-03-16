@@ -417,10 +417,24 @@ const getTagNameFromPublicData = (tagObject, type = "full", domainConfig) => {
     }
 };
 
+const getWalletScopeKey = (publicData, domainConfig) => {
+    if (!publicData) throw new Error("Public data is required to build wallet scope key");
+
+    if (!domainConfig) domainConfig = getDomainConfig(publicData.domain);
+
+    const keyPrefix = domainConfig.getTagKey() || "tagName";
+    const tagName = publicData[keyPrefix] || publicData.tagName || publicData.zelfName;
+    const domain = publicData.domain || domainConfig.name;
+
+    return getFullTagName(tagName, domain);
+};
+
 const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
     const { eth, solana, sui, stellar, arweave } = addresses;
 
     const { mnemonic, zkProof } = dataToEncrypt.metadata;
+    const domainConfig = getDomainConfig(dataToEncrypt.publicData.domain || "zelf");
+    const walletScopeKey = getWalletScopeKey(dataToEncrypt.publicData, domainConfig);
 
     let encryptedMessage;
 
@@ -435,8 +449,9 @@ const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
             stellarSecretKey: stellar.secretKey,
             arweavePrivateKey: arweave.privateKey,
         },
-        eth.address,
-        password
+        walletScopeKey,
+        password,
+        eth.address
     );
 
     encryptedMessage = pgpKeys.encryptedMessage;
@@ -534,6 +549,7 @@ module.exports = {
     generateZelfProof: _generateZelfProof,
     getFullTagName,
     getTagNameFromPublicData,
+    getWalletScopeKey,
     generatePGPKeys,
     decryptCreditCardParams,
     decryptPasswordParams,

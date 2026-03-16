@@ -16,9 +16,9 @@
 
 ## Executive Summary
 
-Zelf Legacy brings **production-grade biometric inheritance infrastructure** to the Stellar ecosystem. It enables Stellar wallets, custodians, and financial applications to support secure, non-custodial, privacy-preserving post-mortem asset transfer without exposing private keys, storing biometric data, or relying on centralized oracle trust assumptions.
+Zelf Legacy lets Stellar wallets and apps handle inheritance without moving funds or trusting a central party. Users keep full control; beneficiaries get access only after verified inactivity and biometric proof. No private keys exposed, no biometric data stored.
 
-Unlike theoretical or architecture-stage proposals, Zelf Legacy is **already under active development** on Solana (with Light Protocol for ZK-compressed heartbeats) and Avalanche, with a working biometric SDK shipping across 3 platforms (Web Extension, iOS, Android). This grant funds the **Stellar-native adaptation** of proven infrastructure, not a from-scratch research project.
+We've built the hard part already. Our ZelfProof tech derives a private key from your face (optionally plus a password) so you can run a self-custody wallet with no seed phrases and no servers. The output is a ~350-byte encrypted packet, not a biometric template. Live face scan + liveness detection verifies; add a password and you get two factors. SDK runs on Web Extension, iOS, and Android. We tried Solana and Avalanche as proof of concept; the fit wasn't there for inheritance and payments. Stellar gets it: payments, rightful owners, leaving assets to family when you're gone. The $90k funds building Soroban contracts, heartbeat protocol, oracle integration, and tooling from scratch for Stellar. Not a port.
 
 ---
 
@@ -28,35 +28,35 @@ Unlike theoretical or architecture-stage proposals, Zelf Legacy is **already und
 
 Zelf Legacy solves the most critical unaddressed problem in crypto: **"What happens to your assets when you die?"**
 
-Unlike traditional inheritance solutions that require transferring funds to a third-party smart contract (creating custody risk, smart contract risk, and liquidity lock), Zelf Legacy focuses on **access rights inheritance**. We **do not move your funds**. We securely transmit access rights to your designated beneficiaries only upon verified inactivity and rigorous multi-factor biometric proof.
+Most inheritance schemes lock your funds in a contract. We don't. Zelf Legacy passes **access rights** to beneficiaries only after inactivity is verified and they prove who they are (face + ID). Your assets stay where they are.
 
 ### How It Works
 
 #### Step 1: Create Your Will
 
-The asset holder enables "Legacy Mode" in their Zelf Name Service App, designating beneficiaries. Each beneficiary's identity is cryptographically bound using ZelfProof biometric encryption. Their face becomes the key, but **no biometric data is ever stored anywhere**.
+You turn on Legacy Mode in the Zelf app and pick your beneficiaries. Each one is bound via ZelfProof. Their face is the key. We never store biometric data.
 
 - Legal Smart Contract Wrapper on Soroban
 - Biometric Beneficiary Designation via ZelfProof
 - Policy encrypted and stored on IPFS & Arweave (immutable, decentralized)
-- Shamir's Secret Sharing (SSS) splits the seed phrase into shares for 1 to 5 beneficiaries and the lawyer; all must collaborate to unlock the original wallet
+- Shamir's Secret Sharing (SSS) splits the seed phrase into shares. You set the rules: 2 of 3, 3 of 5, lawyer or no lawyer, 1 beneficiary or several. Threshold is configurable.
 
 #### Step 2: Heartbeat Protocol
 
-The Zelf app sends periodic cryptographic "heartbeat" signals to the Soroban inheritance contract, proving the asset holder is alive and active. Using **ZK-compressed state proofs** (adapted from our Light Protocol integration on Solana), these heartbeat signals are:
+The app pings the Soroban contract periodically to prove you're alive. ZK compression keeps it cheap and private:
 
-- **Privacy-preserving**: No one can determine if a user has an active inheritance policy
-- **Tamper-proof**: Heartbeats are cryptographically signed with liveness detection
-- **Customizable**: Users define inactivity periods (30 days to 24 months) and grace periods
-- **Cost-efficient**: ZK compression reduces on-chain storage costs by 100-1000x
+- Nobody can tell if you have a policy
+- Heartbeats are signed; liveness detection blocks spoofs
+- You set the inactivity window (30 days to 24 months) and grace period
+- ZK cuts on-chain storage by 100–1000x
 
 #### Step 3: Secure Claim
 
-After the inactivity period and grace period expire, beneficiaries can initiate a claim. The claim process enforces **triple-layer verification**:
+Once inactivity and grace period are over, beneficiaries can claim. Three checks:
 
-1. **Biometric Face Matching**: Each claimant's live face is matched against the ZelfProof registered by the original holder, without revealing any party's biometric data.
-2. **ID Document Verification**: Government-issued ID validation through Verifik's production KYC infrastructure (supporting 190+ countries). (Verifik is our web2 company)
-3. **Zero-Knowledge Unlocking**: The Soroban contract verifies the ZK proof of entitlement and releases access credentials. Private keys are never exposed.
+1. Face match: live scan against the ZelfProof the holder registered. No biometric data shared.
+2. ID check: Verifik's KYC (190+ countries). (Verifik is our web2 company)
+3. ZK proof on Soroban: contract verifies entitlement and releases credentials. Keys stay off-chain.
 
 ### Why This Is Superior to Fund-Transfer Inheritance
 
@@ -150,9 +150,9 @@ On Solana, we use Light Protocol for ZK-compressed state management. On Stellar/
 - **BLS12-381 Support**: Use Soroban's native BLS12-381 elliptic curve support for efficient ZK proof verification on-chain
 - **Compressed Proofs (optional)**: Batch multiple heartbeats into a single proof, submitted periodically to minimize transaction costs
 
-### 4. Guardian Oracle Service (Existing Architecture)
+### 4. Guardian Oracle Service (Proof of Concept)
 
-A notification service that:
+A notification service (proof of concept, to be completed) that:
 
 - Monitors inactivity time and grace period; when both expire, notifies the lawyer that the people involved in the inheritance plan can access the creator's funds
 - If the lawyer is unaware of the process or fails to notify beneficiaries, automatically notifies beneficiaries directly after an additional grace period
@@ -193,7 +193,9 @@ Zelf has **shipping products and real users**:
 
 ### Why Stellar?
 
-Stellar's architecture is uniquely suited for inheritance infrastructure:
+We care about payments, rightful owners, and passing assets to family when it matters. So does Stellar.
+
+Stellar's architecture fits inheritance well:
 
 1. **Low transaction costs**: Heartbeat signals and policy updates must be economically sustainable over years or decades. Stellar's sub-cent fees make this viable.
 2. **5-second finality**: Critical for time-sensitive claim processing
@@ -213,7 +215,7 @@ Stellar's architecture is uniquely suited for inheritance infrastructure:
 
 **Deliverable 1: Soroban Inheritance Registry Contract + ZelfProof Integration** + Demo in Testnet
 
-**Timeline:** 5 weeks
+**Timeline:** 5 weeks (April 1 – May 6, 2026)
 
 **Description:**
 
@@ -257,7 +259,7 @@ We adapt the state machine and policy rules from our live Solana build (which is
 
 **Deliverable 2: Guardian Oracle + Claim Verification Pipeline**
 
-**Timeline:** 5 weeks
+**Timeline:** 6 weeks (May 7 – June 17, 2026)
 
 **Description:**
 
@@ -286,7 +288,7 @@ Implementation of the Guardian Oracle notification service and the claim verific
 
 **Deliverable 3: Developer SDK, Wallet Integration, Documentation & Mainnet Launch**
 
-**Timeline:** 5 weeks
+**Timeline:** 6 weeks (June 18 – July 29, 2026)
 
 **Description:**
 
@@ -375,7 +377,7 @@ Solutions without existing users, wallet partnerships, or SDK users have not dem
 
 ## Soroban / Stellar Technical Adaptation Plan
 
-### What We Already Have (Portable)
+### What We Already Have (Proven Components)
 
 | Component | Current Stack | Soroban Adaptation Effort |
 |---|---|---|
@@ -384,7 +386,7 @@ Solutions without existing users, wallet partnerships, or SDK users have not dem
 | **Heartbeat Protocol** | Solana + Light Protocol (ZK compression) | **Medium**. Adapt to Soroban events and Merkle tree |
 | **Biometric SDKs** | Web, iOS, Android, Flutter, RN | **None**. Client-side, chain-agnostic |
 | **KYC/AML Verification** | Verifik Production API | **None**. Backend service, chain-agnostic |
-| **Guardian Oracle** | Node.js service | **Low**. Adapt to Soroban oracle interface |
+| **Guardian Oracle** | Proof of concept (Node.js) | **Medium**. Complete and adapt to Soroban |
 | **Arweave/IPFS Storage** | Production integration | **None**. Storage layer is chain-agnostic |
 
 ### Key Technical Differences: Soroban vs. Solana
