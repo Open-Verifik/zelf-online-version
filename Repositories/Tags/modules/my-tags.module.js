@@ -212,7 +212,7 @@ const isSolanaPaymentConfirmed = async (address, amountToPay) => {
  */
 const isAvalanchePaymentConfirmed = async (address, amountToPay) => {
     try {
-        const response = await AvalancheModule.getAddress({ id: address });
+        const response = await AvalancheModule.getBalance({ id: address });
 
         const numericBalance = Number(response?.balance ?? 0);
 

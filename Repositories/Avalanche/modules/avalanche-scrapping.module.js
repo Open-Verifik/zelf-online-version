@@ -6,14 +6,14 @@ const cheerio = require("cheerio");
 // Crear instancia axios con timeout
 const instance = axios.create({ timeout: 30000 });
 
-// Crear instancia https que ignora certificados SSL inválidos
+// Crear instancia https que ignora certificados SSL inv?lidos
 const https = require("https");
 
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 /**
- * Obtiene el balance de una dirección en Avalanche
- * @param {Object} params - Contiene el id (dirección)
+ * Obtiene el balance de una direcci?n en Avalanche
+ * @param {Object} params - Contiene el id (direcci?n)
  */
 const getBalance = async (params) => {
 	try {
@@ -65,13 +65,14 @@ const getBalance = async (params) => {
 		};
 	} catch (error) {
 		console.error({ error });
+		throw error;
 	}
 };
 
 /**
- * Obtiene los tokens ERC20 de una dirección
- * @param {Object} params - Contiene el id (dirección)
- * @param {Object} query - Parámetros adicionales
+ * Obtiene los tokens ERC20 de una direcci?n
+ * @param {Object} params - Contiene el id (direcci?n)
+ * @param {Object} query - Par?metros adicionales
  */
 const getTokens = async (params, query) => {
 	// Obtener tokens ERC20
@@ -80,14 +81,22 @@ const getTokens = async (params, query) => {
 		{ headers: { "user-agent": generateRandomUserAgent() } }
 	);
 
-	// Obtener conteo total de tokens
-	const total = await instance.get(`https://cdn.routescan.io/api/blockchain/all/address/${params.id}?ecosystem=avalanche`, {
-		headers: { "user-agent": generateRandomUserAgent() },
-	});
+	// Obtener conteo total de tokens (RouteScan is optional - fall back to Glacier count if unavailable)
+	let erc20Count = data.erc20TokenBalances.length;
+	let erc721Count = 0;
+	let erc1155Count = 0;
 
-	const erc20Count = total.data.erc20Count;
-	const erc721Count = total.data.erc721Count;
-	const erc1155Count = total.data.erc1155Count;
+	try {
+		const total = await instance.get(`https://cdn.routescan.io/api/blockchain/all/address/${params.id}?ecosystem=avalanche`, {
+			headers: { "user-agent": generateRandomUserAgent() },
+		});
+
+		erc20Count = total.data.erc20Count ?? erc20Count;
+		erc721Count = total.data.erc721Count ?? 0;
+		erc1155Count = total.data.erc1155Count ?? 0;
+	} catch (routeScanError) {
+		console.warn("RouteScan unavailable, falling back to Glacier token counts:", routeScanError?.message);
+	}
 
 	// Formatear datos de tokens
 	const formattedTokens = data.erc20TokenBalances.map((token) => ({
@@ -116,9 +125,9 @@ const getTokens = async (params, query) => {
 };
 
 /**
- * Obtiene las transacciones de una dirección
- * @param {Object} params - Contiene el id (dirección)
- * @param {Object} query - Parámetros de paginación
+ * Obtiene las transacciones de una direcci?n
+ * @param {Object} params - Contiene el id (direcci?n)
+ * @param {Object} query - Par?metros de paginaci?n
  */
 const getTransactionsList = async (params) => {
 	const t = Date.now();
@@ -158,8 +167,8 @@ const getTransactionsList = async (params) => {
 };
 
 /**
- * Obtiene detalles de una transacción específica
- * @param {Object} params - Contiene el id (hash de la transacción)
+ * Obtiene detalles de una transacci?n espec?fica
+ * @param {Object} params - Contiene el id (hash de la transacci?n)
  */
 const getTransactionDetail = async (params) => {
 	try {
