@@ -395,12 +395,47 @@ const updateItemTokenId = async (ipfsFileId, tokenId, txHash) => {
     return result;
 };
 
+/**
+ * Fetch a single page of files filtered by a keyvalue property.
+ * Returns { files: normalizedFiles[], nextPageToken: string|null }.
+ * Use this when you need cursor-based pagination with an external cache layer.
+ *
+ * @param {string} property  - Keyvalue key (e.g. "category")
+ * @param {string} value     - Exact value to match
+ * @param {object} options
+ * @param {number} [options.pageSize=100]   - Items per page (max 100)
+ * @param {string} [options.pageToken]      - Cursor from previous call
+ */
+const filterPaged = async (property, value, options = {}) => {
+    const PAGE_SIZE = Math.min(options.pageSize || 100, 100);
+    try {
+        let query;
+        if (property === "name") query = web3Instance.files.public.list().name(value);
+        else if (property === "cid") query = web3Instance.files.public.list().cid(value);
+        else query = web3Instance.files.public.list().keyvalues({ [property]: value });
+
+        query = query.limit(PAGE_SIZE);
+        if (options.pageToken && typeof query.pageToken === "function") {
+            query = query.pageToken(options.pageToken);
+        }
+
+        const response = await query;
+        const files = response.files || [];
+        const nextPageToken = response.next_page_token || null;
+        return { files: _normalizeFiles(files), nextPageToken };
+    } catch (error) {
+        console.error("Error in filterPaged:", error);
+        return { files: [], nextPageToken: null };
+    }
+};
+
 module.exports = {
     upload,
     retrieve,
     pinFile,
     pinFileWindows,
     filter,
+    filterPaged,
     unPinFiles,
     deleteFiles,
     getFileById,

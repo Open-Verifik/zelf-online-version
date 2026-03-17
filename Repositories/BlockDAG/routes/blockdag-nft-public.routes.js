@@ -7,6 +7,7 @@ module.exports = (server) => {
     const PATH = config.basePath(base);
 
     // Public: List Collections & Items
+    server.get(`${PATH}/collections/search`, Controller.searchCollections);
     server.get(`${PATH}/collections`, Controller.getCollections);
     server.get(`${PATH}/items`, Controller.getItems);
     server.get(`${PATH}/collection/:id/items`, Controller.getCollectionItems);

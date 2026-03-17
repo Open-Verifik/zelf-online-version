@@ -322,6 +322,28 @@ const deployDefaultCollection = async (ctx) => {
     }
 };
 
+/**
+ * Search collections by name substring.
+ * Uses the tiered page cache — zero Pinata calls for stable pages,
+ * at most one call per hour for the latest page.
+ * GET /api/blockdag/nft/collections/search?q=<query>
+ */
+const searchCollections = async (ctx) => {
+    try {
+        const { q } = ctx.request.query;
+        if (!q || q.trim().length < 2) {
+            ctx.status = 400;
+            ctx.body = { success: false, error: "Query must be at least 2 characters" };
+            return;
+        }
+        const result = await BlockDagNftModule.searchCollectionsByName(q.trim());
+        ctx.body = { success: true, data: result };
+    } catch (error) {
+        ctx.status = error.status || 500;
+        ctx.body = { success: false, error: error.message };
+    }
+};
+
 module.exports = {
     upload,
     createCollection,
@@ -338,4 +360,5 @@ module.exports = {
     getDefaultCollection,
     deployDefaultCollection,
     updateTokenId,
+    searchCollections,
 };

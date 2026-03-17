@@ -475,6 +475,157 @@ const _ipfsJsonCache = new NodeCache({
     useClones: false,
 });
 
+// ── Collection search index cache ────────────────────────────────────────────
+// Instead of treating Pinata pages as immutable (they are NOT — newest-first
+// pagination shifts older items across page boundaries as new collections arrive),
+// we maintain a flat in-memory index keyed by stable ipfsId/contractAddress.
+//
+// Refresh policy:
+//  HEAD refresh (newest 2 pages):  every 1h  — catches new collections
+//  DEEP refresh (all pages):       every 24h — catches anything missed
+//
+// This means at most 2 Pinata queries per hour and 1 full scan per day,
+// regardless of how many times searchCollectionsByName() is called.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _COL_INDEX_HEAD_TTL = 60 * 60 * 1000;       // 1 hour in ms
+const _COL_INDEX_DEEP_TTL = 24 * 60 * 60 * 1000;  // 24 hours in ms
+const _COL_HEAD_PAGES = 2;                          // pages to refresh hourly
+
+const _collectionIndex = {
+    /** Map<ipfsId, rawPinataItem> — stable key, no duplicates across page shifts */
+    byId: new Map(),
+    lastHeadRefreshAt: 0,
+    lastDeepRefreshAt: 0,
+    /** True while a deep refresh is in-flight (prevents concurrent deep scans) */
+    deepRefreshPromise: null,
+};
+
+/**
+ * Fetch N pages from Pinata and merge results into the in-memory index.
+ * Uses ipfsId as the primary key so items re-indexed across page boundaries
+ * do not create duplicates or disappear.
+ *
+ * @param {number} maxPages - How many pages to fetch (0 = all pages)
+ */
+const _refreshCollectionIndex = async (maxPages = 0) => {
+    const PAGE_SIZE = 100;
+    let pageCount = 0;
+    let pageToken = null;
+
+    while (true) {
+        const { files, nextPageToken } = await IPFS.filterPaged("category", "blockdag_nft_collection", {
+            pageSize: PAGE_SIZE,
+            pageToken: pageToken || undefined,
+        });
+
+        for (const item of files) {
+            const key = item.id || item.cid || (item.publicData?.contractAddress || "");
+            if (key) _collectionIndex.byId.set(key, item);
+        }
+
+        pageCount++;
+        pageToken = nextPageToken;
+
+        if (!nextPageToken || files.length === 0) break;
+        if (maxPages > 0 && pageCount >= maxPages) break;
+    }
+};
+
+/**
+ * Ensure the index is up to date, using the tiered refresh policy.
+ * - Head refresh (newest 2 pages): at most once per hour
+ * - Deep refresh (all pages):      at most once per 24 hours
+ */
+const _ensureCollectionIndexFresh = async () => {
+    const now = Date.now();
+    const headExpired = now - _collectionIndex.lastHeadRefreshAt > _COL_INDEX_HEAD_TTL;
+    const deepExpired = now - _collectionIndex.lastDeepRefreshAt > _COL_INDEX_DEEP_TTL;
+
+    if (deepExpired) {
+        // Only one deep refresh at a time to avoid thundering herd
+        if (_collectionIndex.deepRefreshPromise) {
+            await _collectionIndex.deepRefreshPromise;
+        } else {
+            _collectionIndex.deepRefreshPromise = _refreshCollectionIndex(0)
+                .then(() => {
+                    _collectionIndex.lastHeadRefreshAt = Date.now();
+                    _collectionIndex.lastDeepRefreshAt = Date.now();
+                })
+                .finally(() => {
+                    _collectionIndex.deepRefreshPromise = null;
+                });
+            await _collectionIndex.deepRefreshPromise;
+        }
+    } else if (headExpired) {
+        await _refreshCollectionIndex(_COL_HEAD_PAGES);
+        _collectionIndex.lastHeadRefreshAt = Date.now();
+    }
+    // Otherwise index is fresh — zero Pinata calls
+};
+
+/**
+ * Enrich a list of raw Pinata file objects into the same shape as listCollections().
+ * Skips the IPFS gateway JSON fetch when keyvalues already contain coverImage.
+ */
+const _enrichCollections = async (rawItems) => {
+    return Promise.all(
+        rawItems.map(async (item) => {
+            const pd = item.publicData || {};
+            if (pd.coverImage) {
+                return {
+                    name: pd.name || item.name || "",
+                    symbol: pd.symbol || "",
+                    description: pd.description || "",
+                    coverImage: pd.coverImage || "",
+                    avatarImage: pd.avatarImage || "",
+                    category: pd.collectionCategory || pd.category || "Art",
+                    owner: pd.owner || "",
+                    contractAddress: pd.contractAddress || "",
+                    walletType: pd.walletType || "",
+                    verified: false,
+                    ipfsUrl: item.url,
+                    ipfsId: item.id,
+                    cid: item.cid,
+                };
+            }
+            const metadata = await _fetchIpfsJson(item.url);
+            return {
+                ...metadata,
+                ...pd,
+                category: metadata?.category || pd.collectionCategory || "Art",
+                ipfsUrl: item.url,
+                ipfsId: item.id,
+                cid: item.cid,
+            };
+        })
+    );
+};
+
+/**
+ * Search collections by name (or symbol) substring.
+ * Uses the stable collection index cache — zero Pinata calls when the index is warm,
+ * at most 2 pages fetched per hour for the head refresh, 1 full scan per 24h for deep.
+ *
+ * @param {string} query - Case-insensitive substring to match against collection name/symbol
+ * @returns {Promise<Array>} Enriched collection objects
+ */
+const searchCollectionsByName = async (query) => {
+    const lowerQuery = query.toLowerCase().trim();
+
+    await _ensureCollectionIndexFresh();
+
+    const allRaw = Array.from(_collectionIndex.byId.values());
+    const matched = allRaw.filter((item) => {
+        const pd = item.publicData || {};
+        const name = (pd.name || item.name || "").toLowerCase();
+        const symbol = (pd.symbol || "").toLowerCase();
+        return name.includes(lowerQuery) || symbol.includes(lowerQuery);
+    });
+
+    return _enrichCollections(matched);
+};
+
 const _extractCid = (url) => {
     const m = url.match(/\/ipfs\/([^/?#]+)/);
     return m ? m[1] : null;
@@ -860,4 +1011,5 @@ module.exports = {
     updateItemTokenId,
     replaceNftItemWithNewOwner,
     updatePinKeyvalues,
+    searchCollectionsByName,
 };
