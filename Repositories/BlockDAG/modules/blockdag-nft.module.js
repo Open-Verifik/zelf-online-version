@@ -635,7 +635,10 @@ const getItemsByCollection = async (collectionAddress, options = {}) => {
  */
 const listItems = async (filterParams) => {
     const { owner, collection, limit } = filterParams;
-    const maxResults = Math.min(Number(limit) || 50, 200);
+    // When filtering by owner allow up to 1000 (full history); general browse stays capped at 200
+    const maxResults = owner
+        ? Math.min(Number(limit) || 1000, 1000)
+        : Math.min(Number(limit) || 50, 200);
 
     if (collection) {
         return getItemsByCollection(collection, { owner, limit: limit || 50 });
