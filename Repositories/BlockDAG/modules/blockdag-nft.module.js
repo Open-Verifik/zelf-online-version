@@ -386,11 +386,25 @@ const storeNFT = async (data, authdUser) => {
  * @param {string} [options.owner] - Filter by owner address
  * @param {number} [options.limit=25] - Max results (capped at 100)
  */
-const listCollections = async ({ owner, limit } = {}) => {
+const listCollections = async ({ owner, contractAddress, limit } = {}) => {
     const maxResults = Math.min(Number(limit) || 25, 100);
     let results;
 
-    if (owner) {
+    if (contractAddress) {
+        // Most specific filter: look up a single collection by its on-chain contract address
+        const addrChecksum = ethers.getAddress(contractAddress);
+        const addrLower = contractAddress.toLowerCase();
+        const queries = [IPFS.filter("contractAddress", addrChecksum, { limit: 2 })];
+        if (addrLower !== addrChecksum) queries.push(IPFS.filter("contractAddress", addrLower, { limit: 2 }));
+        const all = (await Promise.all(queries)).flat();
+        const seen = new Set();
+        results = all.filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+        });
+        results = results.filter((item) => item.publicData?.category === "blockdag_nft_collection");
+    } else if (owner) {
         const ownerChecksum = ethers.getAddress(owner);
         const ownerLower = owner.toLowerCase();
         const queries = [IPFS.filter("owner", ownerChecksum, { limit: maxResults })];
