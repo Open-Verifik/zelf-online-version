@@ -9,6 +9,7 @@ const bitcoinModule = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const ETHModule = require("../../etherscan/modules/etherscan-scrapping.module");
 const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 const AvalancheModule = require("../../Avalanche/modules/avalanche-scrapping.module");
+const BlockDAGModule = require("../../BlockDAG/modules/blockdag.module");
 const { sendCustomEmail } = require("../../../Core/mailgun");
 const { buildMetadata, storeInIPFS, storeInWalrus, storeInArweave } = require("./tags-payment.module");
 
@@ -92,6 +93,7 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
         coinbase: tokenDecoded.coinbase_hosted_url,
         CB: tokenDecoded.coinbase_hosted_url,
         AVAX: tokenDecoded.paymentAddress.avalancheAddress || tokenDecoded.paymentAddress.ethAddress,
+        BDAG: tokenDecoded.paymentAddress?.blockdagAddress || tokenDecoded.paymentAddress?.ethAddress,
     };
 
     const paymentConfirmation = await confirmPayUniqueAddress(network, addressMapping[network], amountToPay);
@@ -247,6 +249,50 @@ const isAvalanchePaymentConfirmed = async (address, amountToPay) => {
 };
 
 /**
+ * Check if BlockDAG payment is confirmed
+ * @param {string} address
+ * @param {number} amountToPay
+ * @returns {Promise<Object>}
+ */
+const isBlockDAGPaymentConfirmed = async (address, amountToPay) => {
+    try {
+        const response = await BlockDAGModule.getAddress({ address });
+
+        if (response?.error) return false;
+
+        const numericBalance = Number(response?.balance ?? 0);
+
+        if (!Number.isNaN(numericBalance) && numericBalance <= amountToPay) {
+            return {
+                confirmed: false,
+                amountReceived: 0,
+                amountToPay,
+                transactions: response?.transactions,
+                balance: response?.balance,
+                checkedFactor: "balance",
+            };
+        }
+
+        const amountReceived = (response?.transactions || [])
+            .filter((tx) => tx.traffic === "IN")
+            .reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+        return {
+            confirmed: amountReceived >= amountToPay,
+            amountReceived,
+            amountToPay,
+            transactions: response?.transactions,
+            balance: response?.balance,
+            checkedFactor: "transactions",
+        };
+    } catch (error) {
+        console.error(error);
+    }
+
+    return false;
+};
+
+/**
  * checkout BTC comparison
  * @param {String} address
  * @param {Number} amountDetected
@@ -277,6 +323,7 @@ const confirmPayUniqueAddress = async (network, address, amountToPay) => {
         SOL: isSolanaPaymentConfirmed,
         BTC: isBTCPaymentConfirmed,
         AVAX: isAvalanchePaymentConfirmed,
+        BDAG: isBlockDAGPaymentConfirmed,
         coinbase: _confirmPaymentWithCoinbase,
     };
 
