@@ -176,6 +176,20 @@ contract ZelfMarketplace is ReentrancyGuard, Ownable {
         emit OfferCanceled(nftAddress, tokenId, msg.sender);
     }
 
+    /**
+     * Owner can reject an offer on their NFT. Refunds the offerer and removes the offer.
+     * Use this when you want to decline low offers without waiting for the offerer to cancel.
+     */
+    function rejectOffer(address nftAddress, uint256 tokenId, address offerer) external nonReentrant {
+        IERC721 nft = IERC721(nftAddress);
+        require(nft.ownerOf(tokenId) == msg.sender, "Not owner");
+        uint256 amount = offers[nftAddress][tokenId][offerer];
+        require(amount > 0, "No offer");
+        delete offers[nftAddress][tokenId][offerer];
+        payable(offerer).transfer(amount);
+        emit OfferCanceled(nftAddress, tokenId, offerer);
+    }
+
     function acceptOffer(address nftAddress, uint256 tokenId, address offerer) external nonReentrant {
         IERC721 nft = IERC721(nftAddress);
         require(nft.ownerOf(tokenId) == msg.sender, "Not owner");
