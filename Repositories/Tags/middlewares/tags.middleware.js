@@ -23,7 +23,7 @@ const schemas = {
         tagName: string().required(),
         domain: string().required(),
         zelfProof: string(),
-        zelfProofQRCode: string().required(),
+        zelfProofQRCode: string().optional(),
     },
     deleteTag: {
         domain: string().required(),

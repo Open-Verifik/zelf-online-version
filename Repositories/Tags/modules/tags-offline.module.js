@@ -180,7 +180,11 @@ const leaseOfflineTag = async (params, authUser) => {
 
 	const { preview } = await previewZelfProof({ zelfProof }, authUser);
 
-	if (preview.publicData[tagKey] !== tagName) throw new Error("tag_does_not_match_in_zelfProof");
+	if (preview.publicData[tagKey] !== tagName) {
+		console.log("preview.publicData[tagKey]", preview.publicData[tagKey]);
+		console.log("tagName", tagName);
+		throw new Error("tag_does_not_match_in_zelfProof");
+	}
 
 	const findExistingTag = await searchTag({ tagName: preview.publicData[tagKey], domain, domainConfig, environment: "all" }, authUser);
 
