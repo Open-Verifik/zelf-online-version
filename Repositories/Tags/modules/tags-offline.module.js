@@ -152,8 +152,9 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
  * @param {Object} authUser
  */
 const leaseOfflineTag = async (params, authUser) => {
-	const { tagName, domain, zelfProofQRCode, referralTagName, sync, syncPassword, syncPublicData, duration } = params;
+	const { tagName, domain, referralTagName, sync, syncPassword, syncPublicData, duration } = params;
 
+	let zelfProofQRCode = params.zelfProofQRCode;
 	let zelfProof = params.zelfProof;
 
 	const domainConfig = getDomainConfig(domain);
