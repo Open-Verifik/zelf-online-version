@@ -181,13 +181,28 @@ const leaseOfflineTag = async (params, authUser) => {
 
 	const { preview } = await previewZelfProof({ zelfProof }, authUser);
 
-	if (preview.publicData[tagKey] !== tagName) {
-		console.log("preview.publicData[tagKey]", preview.publicData[tagKey], preview);
-		console.log("tagName", tagName);
+	const _normalizeTagName = (name, _domain) => {
+		if (!name) return name;
+		return name.includes(".") ? name : `${name}.${_domain}`;
+	};
+
+	const resolvedDomain = preview.publicData.domain || domain;
+
+	const tagNameFromProof = TagsPartsModule.getTagNameFromPublicData({ publicData: preview.publicData }, "full", domainConfig);
+
+	if (!tagNameFromProof) {
+		console.log("Could not resolve tag name from zelfProof publicData", preview.publicData);
+		throw new Error("tag_not_found_in_zelfProof");
+	}
+
+	const normalizedProofTagName = _normalizeTagName(tagNameFromProof, resolvedDomain);
+	const normalizedTagName = _normalizeTagName(tagName, resolvedDomain);
+
+	if (normalizedProofTagName !== normalizedTagName) {
 		throw new Error("tag_does_not_match_in_zelfProof");
 	}
 
-	const findExistingTag = await searchTag({ tagName: preview.publicData[tagKey], domain, domainConfig, environment: "all" }, authUser);
+	const findExistingTag = await searchTag({ tagName: normalizedProofTagName, domain, domainConfig, environment: "all" }, authUser);
 
 	const extraPublicData = await _getExtraPublicData(password, zelfProof, syncPublicData);
 

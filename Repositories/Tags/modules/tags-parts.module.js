@@ -408,12 +408,12 @@ const getTagNameFromPublicData = (tagObject, type = "full", domainConfig) => {
 
     switch (type) {
         case "full":
-            return tagObject.publicData[keyPrefix] || tagObject.publicData.tagName || tagObject.publicData.zelfName;
+            return tagObject.publicData[keyPrefix] || tagObject.publicData.id || tagObject.publicData.tagName || tagObject.publicData.zelfName;
         case "name":
-            const name = tagObject.publicData[keyPrefix] || tagObject.publicData.tagName || tagObject.publicData.zelfName;
+            const name = tagObject.publicData[keyPrefix] || tagObject.publicData.id || tagObject.publicData.tagName || tagObject.publicData.zelfName;
             return name ? name.split(".")[0] : "";
         default:
-            return tagObject.publicData[keyPrefix] || tagObject.publicData.tagName || tagObject.publicData.zelfName;
+            return tagObject.publicData[keyPrefix] || tagObject.publicData.id || tagObject.publicData.tagName || tagObject.publicData.zelfName;
     }
 };
 
