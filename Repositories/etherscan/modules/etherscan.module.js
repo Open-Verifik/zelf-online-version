@@ -44,7 +44,14 @@ const getTokentx = async (params) => {
 };
 
 const getGasTracker = async () => {
-	const { data } = await instance.get(`${config.etherscan.urlEtherscan}?module=gastracker&action=gasoracle&apikey=${config.etherscan.apiKey}`);
+	const { data } = await instance.get(ETHERSCAN_V2, {
+		params: {
+			chainid: 1,
+			module: "gastracker",
+			action: "gasoracle",
+			apikey: ETHERSCAN_KEY,
+		},
+	});
 
 	return data.result;
 };

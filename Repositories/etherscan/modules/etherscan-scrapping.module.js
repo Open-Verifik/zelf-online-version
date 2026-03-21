@@ -4,8 +4,9 @@ const token = process.env.MICROSERVICES_BOGOTA_TOKEN;
 const axios = require("axios");
 const moment = require("moment");
 const https = require("https");
-const cheerio = require("cheerio");
 
+const config = require("../../../Core/config");
+const { mapGasOracleToTrackerShape, weiHexToGwei, gasTrackerFromNetworkGwei } = require("./etherscan-gas-tracker.util");
 const { idAseet_ } = require("../../dataAnalytics/modules/dataAnalytics.module");
 const { getCleanInstance } = require("../../../Core/axios");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
@@ -15,16 +16,46 @@ const instance = getCleanInstance(30000);
 const agent = new https.Agent({ rejectUnauthorized: false });
 const apiKey = process.env.API_KEY_ETH;
 
-const baseUrls = {
-	bogota: "https://etherscan.io",
-	production: "https://etherscan.io",
-	development: "https://sepolia.etherscan.io",
+/** Etherscan API V2 (V1 /api deprecated as of Aug 2025) */
+const ETHERSCAN_V2_API = process.env.ETHERSCAN_V2_API || "https://api.etherscan.io/v2/api";
+
+const CHAIN_ID_BY_ENV = {
+	bogota: 1,
+	production: 1,
+	development: 11155111, // Sepolia
 };
+
+const etherscanKeyForGas = () => process.env.ETHERSCAN_API_KEY || config.etherscan.apiKey;
+
+const infuraProjectId = () => process.env.INFURA_APIKEY || config.etherscan.apiKey;
+
+const getGasTrackerFromRpc = async (isSepolia) => {
+	const pid = infuraProjectId();
+	const rpcUrl = isSepolia
+		? process.env.ETH_SEPOLIA_RPC_URL || (pid ? `https://sepolia.infura.io/v3/${pid}` : null)
+		: process.env.ETH_MAINNET_RPC_URL || (pid ? `https://mainnet.infura.io/v3/${pid}` : null);
+
+	if (!rpcUrl) {
+		throw new Error("gas_tracker_rpc_unconfigured");
+	}
+
+	const { data } = await axios.post(
+		rpcUrl,
+		{ jsonrpc: "2.0", id: 1, method: "eth_gasPrice", params: [] },
+		{ headers: { "Content-Type": "application/json" }, timeout: 30000 }
+	);
+
+	if (data.error) throw new Error(data.error.message || "eth_gasPrice_failed");
+
+	const gwei = weiHexToGwei(data.result);
+	return gasTrackerFromNetworkGwei(gwei);
+};
+
+const environment = "production";
 
 /**
  * @param {*} params
  */
-const environment = "production";
 const getAddress = async (params) => {
 	try {
 		const address = params.address;
@@ -118,101 +149,34 @@ const getAddress = async (params) => {
 };
 
 const getGasTracker = async (params) => {
-	const baseUrl = baseUrls[params.env || environment];
+	const env = params?.env || environment;
+	const chainId = CHAIN_ID_BY_ENV[env] ?? CHAIN_ID_BY_ENV.production;
+	const apiKey = etherscanKeyForGas();
+	const isSepolia = env === "development";
 
 	try {
-		let { data } = await instance.get(`${baseUrl}/gastracker`, {
-			headers: {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-				"Upgrade-Insecure-Requests": "1",
+		const { data } = await instance.get(ETHERSCAN_V2_API, {
+			params: {
+				chainid: chainId,
+				module: "gastracker",
+				action: "gasoracle",
+				apikey: apiKey,
 			},
 		});
 
-		const $ = cheerio.load(data);
-
-		data = data.split("const costTxActionData =")[1].trim();
-		data = data.split("$('#mytable3').DataTable({")[0].trim();
-
-		const lowGwei = $("#spanLowPrice").text().replace(/\n/g, "").trim();
-		const averageGwei = $("#spanAvgPrice").text().replace(/\n/g, "").trim();
-		const highGwei = $("#spanHighPrice").text().replace(/\n/g, "").trim();
-
-		const lowPriorityAndBase = $("#spanLowPriorityAndBase").text().trim();
-		const lowTime = $('span[data-bs-trigger="hover"]').first().text().replace("~ ", "").trim();
-		const priceInDollars = $("div.text-muted")
-			.text()
-			.match(/\$\d+\.\d+/)[0];
-
-		const lowNumbers = lowPriorityAndBase.match(/\d+(\.\d+)?/g);
-		const lowBase = parseFloat(lowNumbers[0]).toString();
-		const lowPriority = parseFloat(lowNumbers[1]).toString();
-
-		const avgPriorityAndBase = $("#spanProposePriorityAndBase").text().trim();
-		const averageTime = $('span[data-bs-trigger="hover"]').eq(1).text().replace("~ ", "").trim();
-		const avgPriceInDollars = $("div.text-muted")
-			.text()
-			.match(/\$\d+\.\d+/)[0];
-		const avgNumbers = avgPriorityAndBase.match(/\d+(\.\d+)?/g);
-		const avgBase = parseFloat(avgNumbers[0]).toString();
-		const avgPriority = parseFloat(avgNumbers[1]).toString();
-
-		const highPriorityAndBase = $("#spanHighPriorityAndBase").text().trim();
-		const highTime = $('span[data-bs-trigger="hover"]').eq(2).text().replace("~ ", "").trim();
-		const highPriceInDollars = $("div.text-muted")
-			.text()
-			.match(/\$\d+\.\d+/)[0];
-		const highNumbers = highPriorityAndBase.match(/\d+(\.\d+)?/g);
-		const highBase = parseFloat(highNumbers[0]).toString();
-		const highPriority = parseFloat(highNumbers[1]).toString();
-
-		const featuredActions = [];
-		$("#content > section.container-xxl.pb-16 > div.row.g-4.mb-4 > div:nth-child(2) > div > div > div:nth-child(2) > div > table tr").each(
-			(index, element) => {
-				const action = $(element).find("td span").text().trim();
-				const low = $(element).find("td").eq(1).text().replace("$", "").trim();
-				const average = $(element).find("td").eq(2).text().replace("$", "").trim();
-				const high = $(element).find("td").eq(3).text().replace("$", "").trim();
-
-				if (action) {
-					featuredActions.push({
-						action,
-						low,
-						average,
-						high,
-					});
-				}
-			}
-		);
-
-		// Formar el objeto de respuesta final.
-		const response = {
-			low: {
-				gwei: lowGwei,
-				base: lowBase,
-				priority: lowPriority,
-				cost: priceInDollars,
-				time: lowTime,
-			},
-			average: {
-				gwei: averageGwei,
-				base: avgBase,
-				priority: avgPriority,
-				cost: avgPriceInDollars,
-				time: averageTime,
-			},
-			high: {
-				gwei: highGwei,
-				base: highBase,
-				priority: highPriority,
-				cost: highPriceInDollars,
-				time: highTime,
-			},
-			featuredActions,
-		};
-
-		return response;
+		if (String(data.status) === "1" && data.result) {
+			const mapped = mapGasOracleToTrackerShape(data.result);
+			if (mapped) return mapped;
+		}
 	} catch (error) {
-		console.error({ error: error });
+		console.error({ error: error.message || error });
+	}
+
+	try {
+		return await getGasTrackerFromRpc(isSepolia);
+	} catch (rpcError) {
+		console.error({ error: rpcError.message || rpcError });
+		throw new Error("gas_tracker_unavailable");
 	}
 };
 

@@ -18,7 +18,8 @@
         "test:lease-recovery": "jest tests/integration/leaseRecovery-api.test.js --verbose --no-coverage",
         "test:authentication": "jest tests/integration/authentication.test.js --verbose --no-coverage",
         "test:license": "jest tests/integration/license.test.js --verbose --no-coverage",
-        "test:stellar": "jest tests/integration/stellar-api.test.js --verbose --no-coverage"
+        "test:stellar": "jest tests/integration/stellar-api.test.js --verbose --no-coverage",
+        "test:ethereum-gas": "jest tests/unit/etherscan-gas-tracker.util.test.js --verbose --no-coverage && jest --config jest.integration.config.js tests/integration/ethereum-gas-tracker-live.test.js --verbose --no-coverage"
     },
     "name": "zelf-wallet",
     "description": "zelf wallet backend",

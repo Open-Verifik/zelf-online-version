@@ -71,7 +71,7 @@ const configuration = {
     },
     etherscan: {
         urlEtherscan: "https://api.etherscan.io/api",
-        apiKey: process.env.INFURA_APIKEY,
+        apiKey: process.env.ETHERSCAN_API_KEY || process.env.INFURA_APIKEY,
     },
     binance: {
         urlBinance: "https://api.binance.com/",
