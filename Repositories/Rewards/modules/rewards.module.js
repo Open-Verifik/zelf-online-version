@@ -641,7 +641,10 @@ const _getTagObject = async (tagName, domain, authUser) => {
         authUser
     );
 
-    if (!tagResult.tagObject) throw new Error("404:tag_not_found");
+    if (!tagResult.tagObject) {
+        console.log({ tagName, domain });
+        throw new Error("404:tag_not_found");
+    }
 
     const tagObject = tagResult.tagObject;
 
