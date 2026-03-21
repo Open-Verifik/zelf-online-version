@@ -16,7 +16,7 @@ const schemas = {
 		insideFolder: boolean().optional().allow(false),
 		notes: string().optional().allow(""),
 		faceBase64: string().required(),
-		masterPassword: string().required(),
+		masterPassword: string().optional().allow(""),
 	},
 	zotp: {
 		username: string().required(),
@@ -25,7 +25,7 @@ const schemas = {
 		folder: string().optional().allow(""),
 		insideFolder: boolean().optional().allow(false),
 		faceBase64: string().required(),
-		masterPassword: string().required(),
+		masterPassword: string().optional().allow(""),
 	},
 	notes: {
 		title: string().min(1).max(100).required(),
@@ -33,7 +33,7 @@ const schemas = {
 		faceBase64: string().required(),
 		folder: string().optional().allow(""),
 		insideFolder: boolean().optional().allow(false),
-		masterPassword: string(),
+		masterPassword: string().optional().allow(""),
 	},
 	creditCard: {
 		cardName: string().required(),
@@ -45,7 +45,7 @@ const schemas = {
 		faceBase64: string().required(),
 		folder: string().optional().allow(""),
 		insideFolder: boolean().optional().allow(false),
-		masterPassword: string(),
+		masterPassword: string().optional().allow(""),
 	},
 	retrieve: {
 		zelfProof: string().required(),
@@ -73,7 +73,7 @@ const schemas = {
 	delete: {
 		id: string().required(),
 		faceBase64: string().required(),
-		masterPassword: string().required(),
+		masterPassword: string().optional().allow(""),
 	},
 };
 
