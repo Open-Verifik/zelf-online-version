@@ -250,6 +250,31 @@ const deleteItem = async (id, authdUser) => {
     const itemMatch = authdUser.message.match(/^I authorize deleting NFT metadata (.+?) from IPFS\. Timestamp: \d+$/);
     if (!itemMatch || itemMatch[1] !== id) throw new Error("400:message_id_mismatch");
 
+    // Minted items: require on-chain owner to match signer (Pinata owner can lag after a sale)
+    const pd = existingFile.publicData || {};
+    const collectionAddr = (pd.collection || existingFile.collection || "").trim();
+    const rawTokenId = pd.tokenId != null && pd.tokenId !== "" ? String(pd.tokenId).trim() : "";
+    const hasMintedContext =
+        rawTokenId !== "" && collectionAddr && collectionAddr.toLowerCase() !== "none";
+
+    if (hasMintedContext) {
+        try {
+            const rpcUrl = config.blockdag?.rpcUrl || "https://rpc.bdagscan.com";
+            const provider = new ethers.JsonRpcProvider(rpcUrl);
+            const contract = new ethers.Contract(collectionAddr, ERC721_ABI, provider);
+            const chainOwner = await contract.ownerOf(BigInt(rawTokenId));
+            if (!chainOwner || chainOwner.toLowerCase() !== authdUser.owner.toLowerCase()) {
+                throw new Error("403:unauthorized_not_chain_owner");
+            }
+        } catch (e) {
+            if (e && typeof e.message === "string" && e.message.startsWith("403:")) {
+                throw e;
+            }
+            console.error("[deleteItem] ownerOf verify failed", e && e.message);
+            throw new Error("503:chain_owner_verify_failed");
+        }
+    }
+
     const result = await IPFS.deleteFiles([id]);
     return { success: true, result };
 };
