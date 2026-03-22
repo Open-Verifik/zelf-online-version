@@ -18,6 +18,7 @@ const schemas = {
     searchByDomain: {
         domain: string().required(),
         storage: stringEnum(["IPFS", "Arweave", "Walrus"]).required(),
+        name: string(),
     },
     leaseOffline: {
         tagName: string().required(),
@@ -213,11 +214,12 @@ const getValidation = async (ctx, next) => {
 };
 
 const searchByDomainValidation = async (ctx, next) => {
-    const { domain, storage } = ctx.request.query;
+    const { domain, storage, name } = ctx.request.query;
 
     const valid = validate(schemas.searchByDomain, {
         domain,
         storage,
+        name,
     });
 
     if (valid.error) {

@@ -79,9 +79,9 @@ const searchTag = async (ctx) => {
  */
 const searchTagsByDomain = async (ctx) => {
     try {
-        const { domain, storage, limit, pageOffset } = ctx.request.query;
+        const { domain, storage, limit, pageOffset, name } = ctx.request.query;
 
-        let data = await TagsSearchModule.searchByDomain({ domain, storage, limit, pageOffset }, ctx.state.user);
+        let data = await TagsSearchModule.searchByDomain({ domain, storage, limit, pageOffset, name }, ctx.state.user);
 
         ctx.body = {
             data,

@@ -44,6 +44,24 @@ describe("Search By Domain API Integration Tests - Real Server", () => {
 			expect(response.body).toHaveProperty("data");
 		});
 
+		it("should accept optional name filter for IPFS pin names (suffix / LIKE-style)", async () => {
+			const searchParams = {
+				domain: "zelf",
+				storage: "IPFS",
+				name: ".zelfpay",
+			};
+
+			const response = await request(API_BASE_URL)
+				.get("/api/tags/search-by-domain")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`)
+				.query(searchParams);
+
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(Array.isArray(response.body.data)).toBe(true);
+		});
+
 		it("should search for tags in Arweave storage", async () => {
 			const searchParams = {
 				domain: "zelf",

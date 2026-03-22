@@ -210,17 +210,26 @@ const unPinFiles = async (ids = []) => {
  * @returns {Array} - Search results
  */
 const searchByDomain = async (params, authUser) => {
-	const { domain, limit, pageOffset } = params;
+	const { domain, limit, pageOffset, name } = params;
 
 	const domainConfig = getDomainConfig(domain);
 
 	if (!domainConfig) throw new Error("Domain not supported");
 
-	// Default to 50 records, support 25, 50, 100, 250, 500
+	// Default to 50 records, support 25, 50, 100, 250, 500; cap matches Core/ipfs filter SAFETY_CAP
 	const paginationOptions = {
 		limit: limit ? parseInt(limit, 10) : 50,
 		pageOffset: pageOffset ? parseInt(pageOffset, 10) : 0,
 	};
+
+	const namePattern = typeof name === "string" ? name.trim() : "";
+
+	if (namePattern) {
+		const records = await IPFS.filter("name", namePattern, paginationOptions);
+		const formatted = _formatSearchResults(records);
+		const domainLower = String(domain).toLowerCase();
+		return formatted.filter((row) => String(row.publicData?.domain || "").toLowerCase() === domainLower);
+	}
 
 	const records = await IPFS.filter("domain", domain, paginationOptions);
 
