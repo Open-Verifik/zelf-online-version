@@ -1001,4 +1001,5 @@ module.exports = {
     getPortfolioSummary,
     getLatestBlock,
     fetchBDAGPrice,
+    fetchBdagBalance,
 };

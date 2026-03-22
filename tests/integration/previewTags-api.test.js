@@ -224,4 +224,33 @@ describe("Preview Tags API Integration Tests - Real Server", () => {
 			}
 		});
 	});
+
+	describe("GET /api/tags/wallet-balances", () => {
+		it("should return 409 when no addresses are provided", async () => {
+			const response = await request(API_BASE_URL)
+				.get("/api/tags/wallet-balances")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`);
+
+			expect(response.status).toBe(409);
+			expect(response.body).toHaveProperty("validationError");
+		});
+
+		it("should return 200 with eth, btc, sol, avax, bdag keys when querying a valid ETH address", async () => {
+			const response = await request(API_BASE_URL)
+				.get("/api/tags/wallet-balances")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`)
+				.query({ ethAddress: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045" });
+
+			expect(response.status).toBe(200);
+			expect(response.body.data).toHaveProperty("eth");
+			expect(response.body.data).toHaveProperty("btc");
+			expect(response.body.data).toHaveProperty("sol");
+			expect(response.body.data).toHaveProperty("avax");
+			expect(response.body.data).toHaveProperty("bdag");
+			expect(response.body.data.eth).toHaveProperty("unit", "ETH");
+			expect(response.body.data.eth).toHaveProperty("value");
+		});
+	});
 });

@@ -20,6 +20,8 @@ module.exports = (server) => {
 
     server.get(`${PATH}/preview`, Middleware.previewValidation, Controller.previewTag); // [x]
 
+    server.get(`${PATH}/wallet-balances`, Middleware.walletBalancesValidation, Controller.getWalletBalances);
+
     server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseTag); // [x]
 
     server.post(`${PATH}/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery); // [x]

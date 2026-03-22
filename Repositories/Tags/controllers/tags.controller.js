@@ -8,6 +8,7 @@ const { getAllSupportedDomains } = require("../modules/domain-registry.module");
 const { errorHandler } = require("../../../Core/http-handler");
 const configuration = require("../../../Core/config");
 const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
+const TagWalletBalancesModule = require("../modules/tag-wallet-balances.module");
 
 /**
  * Keep full pin name (e.g. user.zelfpay) for IPFS lookup; middleware only supplies registry TLD + local name.
@@ -465,6 +466,25 @@ const getDomain = async (ctx, next) => {
     await next();
 };
 
+const getWalletBalances = async (ctx, next) => {
+    try {
+        const q = ctx.state.walletBalanceQuery || {};
+        const data = await TagWalletBalancesModule.getTagWalletBalances({
+            ethAddress: q.ethAddress,
+            btcAddress: q.btcAddress,
+            solanaAddress: q.solanaAddress,
+        });
+        ctx.body = { data };
+    } catch (error) {
+        console.error("getWalletBalances:", error);
+        ctx.status = 500;
+        ctx.body = { error: "wallet_balances_failed" };
+        return;
+    }
+
+    await next();
+};
+
 module.exports = {
     searchTag,
     searchTagsByDomain,
@@ -485,4 +505,6 @@ module.exports = {
     // domains
     getDomains,
     getDomain,
+
+    getWalletBalances,
 };

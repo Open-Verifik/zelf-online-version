@@ -92,6 +92,11 @@ const schemas = {
     update: {
         duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
     },
+    walletBalances: {
+        ethAddress: string().max(128).allow(""),
+        btcAddress: string().max(128).allow(""),
+        solanaAddress: string().max(128).allow(""),
+    },
 };
 
 /**
@@ -750,6 +755,42 @@ const updateValidation = async (ctx, next) => {
     await next();
 };
 
+/**
+ * GET /tags/wallet-balances — optional eth/btc/solana query params; at least one non-empty required.
+ */
+const walletBalancesValidation = async (ctx, next) => {
+    const q = ctx.request.query || {};
+    const ethAddress = typeof q.ethAddress === "string" ? q.ethAddress.trim() : "";
+    const btcAddress = typeof q.btcAddress === "string" ? q.btcAddress.trim() : "";
+    const solanaAddress = typeof q.solanaAddress === "string" ? q.solanaAddress.trim() : "";
+
+    if (!ethAddress && !btcAddress && !solanaAddress) {
+        ctx.status = 409;
+        ctx.body = { validationError: "missing at least one of ethAddress, btcAddress, solanaAddress\n" };
+        return;
+    }
+
+    const valid = validate(schemas.walletBalances, {
+        ethAddress: ethAddress || undefined,
+        btcAddress: btcAddress || undefined,
+        solanaAddress: solanaAddress || undefined,
+    });
+
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
+
+    ctx.state.walletBalanceQuery = {
+        ethAddress: ethAddress || undefined,
+        btcAddress: btcAddress || undefined,
+        solanaAddress: solanaAddress || undefined,
+    };
+
+    await next();
+};
+
 module.exports = {
     getValidation,
     searchByDomainValidation,
@@ -765,6 +806,7 @@ module.exports = {
     referralRewardsValidation,
     purchaseRewardsValidation,
     updateValidation,
+    walletBalancesValidation,
     // Utility functions
     extractDomainAndName,
     validateDomainAndName,
