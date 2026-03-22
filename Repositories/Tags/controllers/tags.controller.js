@@ -10,6 +10,23 @@ const configuration = require("../../../Core/config");
 const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 
 /**
+ * Keep full pin name (e.g. user.zelfpay) for IPFS lookup; middleware only supplies registry TLD + local name.
+ * @param {string|undefined} rawTagName - tagName from query/body
+ * @param {string|null|undefined} extractedName
+ * @param {string|null|undefined} extractedDomain - registry domain (zelf, bdag, …)
+ */
+const resolveFullTagNameForRequest = (rawTagName, extractedName, extractedDomain) => {
+    const raw = rawTagName != null && rawTagName !== "" ? String(rawTagName).trim() : "";
+    if (raw.includes(".")) {
+        return raw.toLowerCase();
+    }
+    if (extractedName != null && extractedName !== "" && extractedDomain) {
+        return `${extractedName}.${extractedDomain}`.toLowerCase();
+    }
+    return raw.toLowerCase();
+};
+
+/**
  * Handle old tag object updates
  * @param {Object} data - Search result data
  * @param {string} domain - Domain name
@@ -40,7 +57,7 @@ const searchTag = async (ctx) => {
         // Add domain context to request
         const requestData = {
             ...ctx.request.query,
-            tagName: extractedName ? `${extractedName}.${extractedDomain}`.toLowerCase() : ctx.request.query.tagName?.toLowerCase(),
+            tagName: resolveFullTagNameForRequest(ctx.request.query.tagName, extractedName, extractedDomain),
             domain: extractedDomain || ctx.request.query.domain,
             environment: ctx.request.query.environment,
             type: ctx.request.query.type || "both",
@@ -108,7 +125,7 @@ const leaseTag = async (ctx) => {
 
         const requestData = {
             ...ctx.request.body,
-            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            tagName: resolveFullTagNameForRequest(ctx.request.body.tagName, extractedName, extractedDomain),
             domain: extractedDomain,
         };
 
@@ -135,7 +152,7 @@ const leaseRecovery = async (ctx) => {
 
         const requestData = {
             ...ctx.request.body,
-            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            tagName: resolveFullTagNameForRequest(ctx.request.body.tagName, extractedName, extractedDomain),
             domain: extractedDomain,
         };
 
@@ -162,7 +179,7 @@ const leaseOfflineTag = async (ctx) => {
 
         const requestData = {
             ...ctx.request.body,
-            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            tagName: resolveFullTagNameForRequest(ctx.request.body.tagName, extractedName, extractedDomain),
             domain: extractedDomain,
         };
 
@@ -189,7 +206,7 @@ const leaseConfirmation = async (ctx) => {
 
         const requestData = {
             ...ctx.request.body,
-            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            tagName: resolveFullTagNameForRequest(ctx.request.body.tagName, extractedName, extractedDomain),
             domain: extractedDomain,
         };
 
@@ -214,9 +231,12 @@ const previewTag = async (ctx) => {
     try {
         const { extractedDomain, extractedName } = ctx.state;
 
+        const rawTag = ctx.request.query.tagName ?? ctx.request.body.tagName;
+
         const requestData = {
+            ...ctx.request.query,
             ...ctx.request.body,
-            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            tagName: resolveFullTagNameForRequest(rawTag, extractedName, extractedDomain),
             domain: extractedDomain,
         };
 
@@ -262,7 +282,7 @@ const decryptTag = async (ctx) => {
 
         const requestData = {
             ...ctx.request.body,
-            tagName: extractedName ? `${extractedName}.${extractedDomain}` : ctx.request.body.tagName,
+            tagName: resolveFullTagNameForRequest(ctx.request.body.tagName, extractedName, extractedDomain),
             domain: extractedDomain,
         };
 

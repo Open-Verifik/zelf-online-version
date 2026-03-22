@@ -172,5 +172,42 @@ describe("Search Tags API Integration Tests - Real Server", () => {
 			expect(response.body).toHaveProperty("validationError");
 			expect(response.body.validationError).toContain("20 characters");
 		});
+
+		it("should accept .zelfpay tagName with registry domain=zelf (not treat zelfpay as TLD)", async () => {
+			const searchParams = {
+				tagName: `zelfpaysearch${Date.now()}.zelfpay`,
+				domain: "zelf",
+				os: "DESKTOP",
+			};
+
+			const response = await request(API_BASE_URL)
+				.get("/api/tags/search")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`)
+				.query(searchParams);
+
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(response.body.data.tagName).toMatch(/\.zelfpay$/);
+			expect(response.body.data.domain).toBe("zelf");
+		});
+
+		it("should reject zelfpay as registry domain (use zelf + .zelfpay tagName)", async () => {
+			const searchParams = {
+				tagName: "foo.zelf",
+				domain: "zelfpay",
+				os: "DESKTOP",
+			};
+
+			const response = await request(API_BASE_URL)
+				.get("/api/tags/search")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${authToken}`)
+				.query(searchParams);
+
+			expect(response.status).toBe(409);
+			expect(response.body).toHaveProperty("validationError");
+			expect(String(response.body.validationError)).toMatch(/not supported|inactive/i);
+		});
 	});
 });

@@ -96,28 +96,48 @@ const schemas = {
 
 /**
  * Extract domain from tag name or use provided domain parameter
- * @param {string} tagName - Full tag name (e.g., "username.avax")
+ * Registry TLD is e.g. zelf / bdag; pin names may use .zelfpay / .bdagpay (not separate domains).
+ * @param {string} tagName - Full tag name (e.g., "username.avax", "user.zelfpay")
  * @param {string} domain - Domain parameter from request
- * @returns {Object} - { domain, name }
+ * @returns {Object} - { domain, name } — domain is always the licensed/registry TLD for validation
  */
 const extractDomainAndName = (tagName, domain) => {
     if (!tagName) return { domain: null, name: null };
 
-    // If domain is provided, use it
     if (domain) {
-        const name = tagName.replace(`.${domain}`, "");
-        return { domain: domain.toLowerCase(), name };
+        const d = String(domain).toLowerCase();
+        const t = String(tagName);
+        const tLower = t.toLowerCase();
+        const paySuffix = `.${d}pay`;
+        if (tLower.endsWith(paySuffix)) {
+            return { domain: d, name: t.slice(0, t.length - paySuffix.length) };
+        }
+        const plainSuffix = `.${d}`;
+        if (tLower.endsWith(plainSuffix)) {
+            return { domain: d, name: t.slice(0, t.length - plainSuffix.length) };
+        }
+        return { domain: d, name: t };
     }
 
-    // Extract domain from tag name
     const parts = tagName.split(".");
     if (parts.length >= 2) {
-        const extractedDomain = parts[parts.length - 1].toLowerCase();
+        const last = parts[parts.length - 1].toLowerCase();
         const name = parts.slice(0, -1).join(".");
-        return { domain: extractedDomain, name };
+
+        if (isDomainActive(last)) {
+            return { domain: last, name };
+        }
+
+        if (last.endsWith("pay") && last.length > 3) {
+            const baseDomain = last.slice(0, -3);
+            if (isDomainActive(baseDomain)) {
+                return { domain: baseDomain, name };
+            }
+        }
+
+        return { domain: last, name };
     }
 
-    // Default to zelf domain if no domain specified
     return { domain: "zelf", name: tagName };
 };
 
