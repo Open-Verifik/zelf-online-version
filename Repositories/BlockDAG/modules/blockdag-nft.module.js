@@ -1010,6 +1010,7 @@ const replaceNftItemWithNewOwner = async (ipfsFileId, tokenId, txHash, owner) =>
     const item = await getItem(ipfsFileId);
     const publicData = item.publicData || {};
     const collectionAddr = item.collection || publicData.collection || "";
+    const resolvedPinataId = item.ipfsId || item.id || ipfsFileId;
 
     let resolvedOwner = owner ?? item.owner ?? publicData.owner ?? "";
     const previousOwner = item.owner ?? publicData.owner ?? "";
@@ -1033,9 +1034,10 @@ const replaceNftItemWithNewOwner = async (ipfsFileId, tokenId, txHash, owner) =>
         mintTxHash: txHash || publicData.mintTxHash || "",
     };
 
-    const newPin = await IPFS.updateFileKeyvalues(ipfsFileId, keyvalues);
+    const newPin = await IPFS.updateFileKeyvalues(resolvedPinataId, keyvalues);
     ownerDebugLog("replaceNftItemWithNewOwner", {
         ipfsFileId,
+        resolvedPinataId,
         tokenId: String(tokenId),
         txHash: txHash || "",
         previousOwner,
