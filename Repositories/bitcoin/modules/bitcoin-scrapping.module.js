@@ -149,7 +149,10 @@ const getBalance = async (params) => {
     try {
         return await getBalanceFromMempool(params);
     } catch (primaryErr) {
-        if (primaryErr?.response?.status !== 429) console.error("mempool.space balance error:", primaryErr?.message || primaryErr);
+        const isTimeout =
+            primaryErr?.code === "ECONNABORTED" || /timeout/i.test(String(primaryErr?.message || ""));
+        const is429 = primaryErr?.response?.status === 429;
+        if (!isTimeout && !is429) console.error("mempool.space balance error:", primaryErr?.message || primaryErr);
 
         try {
             return await getBalanceFromBlockstream(params);

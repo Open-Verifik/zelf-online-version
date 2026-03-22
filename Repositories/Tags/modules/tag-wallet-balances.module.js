@@ -38,33 +38,90 @@ const parseWeiToEthString = (wei) => {
     return `${whole.toString()}.${fracStr}`;
 };
 
+const SKIPPED = Object.freeze({ __balanceSkipped: true });
+
+const rejectAfterMs = (ms, label) =>
+    new Promise((_, rej) => {
+        setTimeout(() => {
+            const e = new Error("network_timeout");
+            e.code = "NETWORK_TIMEOUT";
+            e.network = label;
+            rej(e);
+        }, ms);
+    });
+
+/**
+ * @param {Promise<unknown>} p
+ * @param {number} ms
+ * @param {string} label
+ */
+const withOptionalTimeout = (p, ms, label) => {
+    if (!ms || ms <= 0) return p;
+    return Promise.race([p, rejectAfterMs(ms, label)]);
+};
+
+const rejectionMessage = (reason) => {
+    if (!reason) return "unavailable";
+    if (reason.code === "NETWORK_TIMEOUT" || reason.message === "network_timeout") return "network_timeout";
+    return reason.message || "unavailable";
+};
+
 /**
  * Native balances for tag public addresses (ETH / BTC / SOL / AVAX C-chain / BDAG).
  * AVAX and BDAG use the same 0x address as ETH when present.
  *
  * @param {{ ethAddress?: string, btcAddress?: string, solanaAddress?: string }} params
+ * @param {{ skipNetworks?: string[], networkTimeoutMs?: number }} [options] skipNetworks: lowercase eth|btc|sol|avax|bdag. networkTimeoutMs caps each network call (audit / bulk use).
  * @returns {Promise<{ eth: object, btc: object, sol: object, avax: object, bdag: object }>}
  */
-const getTagWalletBalances = async (params) => {
+const getTagWalletBalances = async (params, options = {}) => {
     const eth = params.ethAddress?.trim() || "";
     const btc = params.btcAddress?.trim() || "";
     const sol = params.solanaAddress?.trim() || "";
 
     const evm = isEvmAddress(eth) ? eth : "";
 
+    const skip = new Set(
+        Array.isArray(options.skipNetworks) ? options.skipNetworks.map((x) => String(x).toLowerCase()) : [],
+    );
+    const networkTimeoutMs =
+        typeof options.networkTimeoutMs === "number" && options.networkTimeoutMs > 0
+            ? options.networkTimeoutMs
+            : 0;
+
     const settled = await Promise.allSettled([
         evm
-            ? etherscanModule.getBalance({ address: evm })
+            ? skip.has("eth")
+                ? Promise.resolve(SKIPPED)
+                : withOptionalTimeout(etherscanModule.getBalance({ address: evm }), networkTimeoutMs, "eth")
             : Promise.resolve(null),
-        btc ? bitcoinScrapingModule.getBalance({ id: btc }) : Promise.resolve(null),
-        sol ? solanaScrapingModule.getAddress({ id: sol }) : Promise.resolve(null),
-        evm ? avalancheScrapingModule.getBalance({ id: evm }) : Promise.resolve(null),
-        evm ? blockdagModule.fetchBdagBalance(evm) : Promise.resolve(null),
+        btc
+            ? skip.has("btc")
+                ? Promise.resolve(SKIPPED)
+                : withOptionalTimeout(bitcoinScrapingModule.getBalance({ id: btc }), networkTimeoutMs, "btc")
+            : Promise.resolve(null),
+        sol
+            ? skip.has("sol")
+                ? Promise.resolve(SKIPPED)
+                : withOptionalTimeout(solanaScrapingModule.getAddress({ id: sol }), networkTimeoutMs, "sol")
+            : Promise.resolve(null),
+        evm
+            ? skip.has("avax")
+                ? Promise.resolve(SKIPPED)
+                : withOptionalTimeout(avalancheScrapingModule.getBalance({ id: evm }), networkTimeoutMs, "avax")
+            : Promise.resolve(null),
+        evm
+            ? skip.has("bdag")
+                ? Promise.resolve(SKIPPED)
+                : withOptionalTimeout(blockdagModule.fetchBdagBalance(evm), networkTimeoutMs, "bdag")
+            : Promise.resolve(null),
     ]);
 
     let ethSlot = chainSlot(null, "ETH");
     if (!evm) {
         ethSlot = eth ? chainSlot(null, "ETH", undefined, "invalid_evm_address") : chainSlot(null, "ETH");
+    } else if (settled[0].status === "fulfilled" && settled[0].value && settled[0].value.__balanceSkipped) {
+        ethSlot = chainSlot(null, "ETH", undefined, "skipped");
     } else if (settled[0].status === "fulfilled" && settled[0].value) {
         const wei = settled[0].value.balance;
         const ethStr = parseWeiToEthString(wei);
@@ -74,24 +131,30 @@ const getTagWalletBalances = async (params) => {
             ethSlot = chainSlot(ethStr, "ETH", { wei: String(wei) });
         }
     } else {
-        const err = settled[0].status === "rejected" ? settled[0].reason?.message || "unavailable" : "unavailable";
+        const err =
+            settled[0].status === "rejected" ? rejectionMessage(settled[0].reason) : "unavailable";
         ethSlot = chainSlot(null, "ETH", undefined, err);
     }
 
     let btcSlot = chainSlot(null, "BTC");
     if (!btc) {
         btcSlot = chainSlot(null, "BTC");
+    } else if (settled[1].status === "fulfilled" && settled[1].value && settled[1].value.__balanceSkipped) {
+        btcSlot = chainSlot(null, "BTC", undefined, "skipped");
     } else if (settled[1].status === "fulfilled" && settled[1].value) {
         const b = settled[1].value.balance;
         btcSlot = chainSlot(b != null ? String(b) : null, "BTC", undefined, b == null ? "balance_unavailable" : undefined);
     } else {
-        const err = settled[1].status === "rejected" ? settled[1].reason?.message || "unavailable" : "unavailable";
+        const err =
+            settled[1].status === "rejected" ? rejectionMessage(settled[1].reason) : "unavailable";
         btcSlot = chainSlot(null, "BTC", undefined, err);
     }
 
     let solSlot = chainSlot(null, "SOL");
     if (!sol) {
         solSlot = chainSlot(null, "SOL");
+    } else if (settled[2].status === "fulfilled" && settled[2].value && settled[2].value.__balanceSkipped) {
+        solSlot = chainSlot(null, "SOL", undefined, "skipped");
     } else if (settled[2].status === "fulfilled") {
         const res = settled[2].value;
         if (res && res.balance != null && res.balance !== "") {
@@ -100,29 +163,35 @@ const getTagWalletBalances = async (params) => {
             solSlot = chainSlot(null, "SOL", undefined, "unavailable");
         }
     } else {
-        const err = settled[2].reason?.message || "unavailable";
+        const err = rejectionMessage(settled[2].reason);
         solSlot = chainSlot(null, "SOL", undefined, err);
     }
 
     let avaxSlot = chainSlot(null, "AVAX");
     if (!evm) {
         avaxSlot = chainSlot(null, "AVAX");
+    } else if (settled[3].status === "fulfilled" && settled[3].value && settled[3].value.__balanceSkipped) {
+        avaxSlot = chainSlot(null, "AVAX", undefined, "skipped");
     } else if (settled[3].status === "fulfilled" && settled[3].value) {
         const b = settled[3].value.balance;
         avaxSlot = chainSlot(b != null ? String(b) : null, "AVAX", undefined, b == null ? "balance_unavailable" : undefined);
     } else {
-        const err = settled[3].status === "rejected" ? settled[3].reason?.message || "unavailable" : "unavailable";
+        const err =
+            settled[3].status === "rejected" ? rejectionMessage(settled[3].reason) : "unavailable";
         avaxSlot = chainSlot(null, "AVAX", undefined, err);
     }
 
     let bdagSlot = chainSlot(null, "BDAG");
     if (!evm) {
         bdagSlot = chainSlot(null, "BDAG");
+    } else if (settled[4].status === "fulfilled" && settled[4].value && settled[4].value.__balanceSkipped) {
+        bdagSlot = chainSlot(null, "BDAG", undefined, "skipped");
     } else if (settled[4].status === "fulfilled" && settled[4].value) {
         const b = settled[4].value.balance;
         bdagSlot = chainSlot(b != null ? String(b) : null, "BDAG", undefined, b == null ? "balance_unavailable" : undefined);
     } else {
-        const err = settled[4].status === "rejected" ? settled[4].reason?.message || "unavailable" : "unavailable";
+        const err =
+            settled[4].status === "rejected" ? rejectionMessage(settled[4].reason) : "unavailable";
         bdagSlot = chainSlot(null, "BDAG", undefined, err);
     }
 

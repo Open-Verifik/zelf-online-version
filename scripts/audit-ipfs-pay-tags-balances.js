@@ -24,6 +24,8 @@
  *   --out=PATH              Output JSON file (default: ./ipfs-pay-tags-balances-audit.json)
  *   --concurrency=N         Parallel balance lookups (default: 2)
  *   --delayMs=N             Pause between batches in ms (default: 250)
+ *   --networkTimeoutMs=N    Per-network HTTP cap in ms (default: 18000). Use 0 for no cap (can wait ~30s+ on BTC).
+ *   --skipNetworks=a,b      Skip balance sources: eth,btc,sol,avax,bdag (e.g. skip slow BTC: --skipNetworks=btc)
  */
 
 require("dotenv").config();
@@ -47,6 +49,8 @@ function parseArgs(argv) {
         outFile: path.join(process.cwd(), "ipfs-pay-tags-balances-audit.json"),
         concurrency: 2,
         delayMs: 250,
+        networkTimeoutMs: 18000,
+        skipNetworks: [],
     };
     for (const arg of argv.slice(2)) {
         if (arg.startsWith("--domains=")) {
@@ -65,6 +69,15 @@ function parseArgs(argv) {
             out.concurrency = Math.max(1, parseInt(arg.slice("--concurrency=".length), 10) || 2);
         } else if (arg.startsWith("--delayMs=")) {
             out.delayMs = Math.max(0, parseInt(arg.slice("--delayMs=".length), 10) || 0);
+        } else if (arg.startsWith("--networkTimeoutMs=")) {
+            const v = parseInt(arg.slice("--networkTimeoutMs=".length), 10);
+            out.networkTimeoutMs = Number.isFinite(v) && v >= 0 ? v : 18000;
+        } else if (arg.startsWith("--skipNetworks=")) {
+            out.skipNetworks = arg
+                .slice("--skipNetworks=".length)
+                .split(",")
+                .map((s) => s.trim().toLowerCase())
+                .filter(Boolean);
         } else if (arg === "--help" || arg === "-h") {
             out.help = true;
         }
@@ -81,24 +94,29 @@ function defaultNamePattern(domain) {
 /** @param {{ value?: string|null, unit?: string, error?: string }|null|undefined} slot */
 function interpretSlot(slot) {
     if (!slot) {
-        return { hasBalance: false, unknown: true, display: null, error: "missing_slot" };
+        return { hasBalance: false, unknown: true, display: null, error: "missing_slot", skipped: false };
+    }
+    if (slot.error === "skipped") {
+        return { hasBalance: false, unknown: false, display: null, error: "skipped", skipped: true };
     }
     if (slot.error) {
-        return { hasBalance: false, unknown: true, display: null, error: slot.error };
+        const unknown = true;
+        return { hasBalance: false, unknown, display: null, error: slot.error, skipped: false };
     }
     if (slot.value === null || slot.value === undefined || slot.value === "") {
-        return { hasBalance: false, unknown: false, display: null, error: null };
+        return { hasBalance: false, unknown: false, display: null, error: null, skipped: false };
     }
     const raw = String(slot.value).replace(/,/g, "").trim();
     const n = parseFloat(raw);
     if (Number.isNaN(n)) {
-        return { hasBalance: false, unknown: true, display: raw, error: "unparseable_value" };
+        return { hasBalance: false, unknown: true, display: raw, error: "unparseable_value", skipped: false };
     }
     return {
         hasBalance: n > 0,
         unknown: false,
         display: `${raw} ${slot.unit}`,
         error: null,
+        skipped: false,
     };
 }
 
@@ -164,6 +182,9 @@ async function main() {
         }
     }
     console.error(`[audit] registry ready (${available.length} domains): ${available.join(", ")}`);
+    console.error(
+        `[audit] balance fetch: networkTimeoutMs=${opts.networkTimeoutMs || "none"} skipNetworks=${opts.skipNetworks.length ? opts.skipNetworks.join(",") : "(none)"}`,
+    );
 
     const generatedAt = new Date().toISOString();
     const allRecords = [];
@@ -215,11 +236,17 @@ async function main() {
             }
 
             try {
-                const balances = await getTagWalletBalances({
-                    ethAddress: w.ethAddress || undefined,
-                    btcAddress: w.btcAddress || undefined,
-                    solanaAddress: w.solanaAddress || undefined,
-                });
+                const balances = await getTagWalletBalances(
+                    {
+                        ethAddress: w.ethAddress || undefined,
+                        btcAddress: w.btcAddress || undefined,
+                        solanaAddress: w.solanaAddress || undefined,
+                    },
+                    {
+                        skipNetworks: opts.skipNetworks,
+                        networkTimeoutMs: opts.networkTimeoutMs > 0 ? opts.networkTimeoutMs : 0,
+                    },
+                );
 
                 for (const key of ["eth", "btc", "sol", "avax", "bdag"]) {
                     const slot = balances[key];
@@ -229,6 +256,7 @@ async function main() {
                         unit: slot?.unit ?? key.toUpperCase(),
                         hasBalance: info.hasBalance,
                         unknown: info.unknown,
+                        skipped: info.skipped,
                         display: info.display,
                         error: slot?.error || info.error,
                     };
@@ -278,6 +306,8 @@ async function main() {
             maxPins: opts.maxPins,
             concurrency: opts.concurrency,
             delayMs: opts.delayMs,
+            networkTimeoutMs: opts.networkTimeoutMs,
+            skipNetworks: opts.skipNetworks,
         },
         domainFetch: byDomainStats,
         summary,
