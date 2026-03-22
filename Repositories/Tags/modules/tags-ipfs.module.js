@@ -124,6 +124,26 @@ const _formatSearchResults = (result) => {
 };
 
 /**
+ * True if a pin belongs to the licensed domain. Metadata `domain` is set on many
+ * pins but `.zelfpay` / similar often omit it while `name` / zelfName carry the suffix.
+ * @param {Object} row - formatted record from _formatRecord
+ * @param {string} domainLower - e.g. "zelf", "bdag"
+ */
+const _rowBelongsToDomain = (row, domainLower) => {
+	const metaDomain = String(row.publicData?.domain || "").toLowerCase();
+	if (metaDomain === domainLower) return true;
+
+	const label = String(row.name || row.publicData?.zelfName || "").toLowerCase();
+	if (!label) return false;
+
+	if (label.endsWith(`.${domainLower}pay`)) return true;
+	if (label.endsWith(`.${domainLower}`)) return true;
+	if (label.includes(`.${domainLower}.`)) return true;
+
+	return false;
+};
+
+/**
  * Show tag file from IPFS
  * @param {Object} data - File parameters
  * @param {string} data.cid - IPFS CID
@@ -228,7 +248,7 @@ const searchByDomain = async (params, authUser) => {
 		const records = await IPFS.filter("name", namePattern, paginationOptions);
 		const formatted = _formatSearchResults(records);
 		const domainLower = String(domain).toLowerCase();
-		return formatted.filter((row) => String(row.publicData?.domain || "").toLowerCase() === domainLower);
+		return formatted.filter((row) => _rowBelongsToDomain(row, domainLower));
 	}
 
 	const records = await IPFS.filter("domain", domain, paginationOptions);
