@@ -192,9 +192,9 @@ describe("Search Tags API Integration Tests - Real Server", () => {
 			expect(response.body.data.domain).toBe("zelf");
 		});
 
-		it("should reject zelfpay as registry domain (use zelf + .zelfpay tagName)", async () => {
+		it("should normalize domain=zelfpay to registry zelf (Postman-friendly alias)", async () => {
 			const searchParams = {
-				tagName: "foo.zelf",
+				tagName: `aliaspay${Date.now()}.zelfpay`,
 				domain: "zelfpay",
 				os: "DESKTOP",
 			};
@@ -205,9 +205,10 @@ describe("Search Tags API Integration Tests - Real Server", () => {
 				.set("Authorization", `Bearer ${authToken}`)
 				.query(searchParams);
 
-			expect(response.status).toBe(409);
-			expect(response.body).toHaveProperty("validationError");
-			expect(String(response.body.validationError)).toMatch(/not supported|inactive/i);
+			expect(response.status).toBe(200);
+			expect(response.body).toHaveProperty("data");
+			expect(response.body.data.domain).toBe("zelf");
+			expect(response.body.data.tagName).toMatch(/\.zelfpay$/);
 		});
 	});
 });

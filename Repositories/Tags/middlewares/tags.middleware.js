@@ -95,6 +95,22 @@ const schemas = {
 };
 
 /**
+ * Map client/domain typos like "zelfpay" → "zelf" when the pay-suffix is not a real registry TLD.
+ * @param {string} d - lowercase domain from query/body
+ * @returns {string} - registry TLD for validation and config lookup
+ */
+const normalizeRegistryDomain = (d) => {
+    if (!d) return d;
+    const lower = String(d).toLowerCase();
+    if (isDomainActive(lower)) return lower;
+    if (lower.endsWith("pay") && lower.length > 3) {
+        const base = lower.slice(0, -3);
+        if (isDomainActive(base)) return base;
+    }
+    return lower;
+};
+
+/**
  * Extract domain from tag name or use provided domain parameter
  * Registry TLD is e.g. zelf / bdag; pin names may use .zelfpay / .bdagpay (not separate domains).
  * @param {string} tagName - Full tag name (e.g., "username.avax", "user.zelfpay")
@@ -105,18 +121,18 @@ const extractDomainAndName = (tagName, domain) => {
     if (!tagName) return { domain: null, name: null };
 
     if (domain) {
-        const d = String(domain).toLowerCase();
+        const registryDomain = normalizeRegistryDomain(String(domain).toLowerCase());
         const t = String(tagName);
         const tLower = t.toLowerCase();
-        const paySuffix = `.${d}pay`;
+        const paySuffix = `.${registryDomain}pay`;
         if (tLower.endsWith(paySuffix)) {
-            return { domain: d, name: t.slice(0, t.length - paySuffix.length) };
+            return { domain: registryDomain, name: t.slice(0, t.length - paySuffix.length) };
         }
-        const plainSuffix = `.${d}`;
+        const plainSuffix = `.${registryDomain}`;
         if (tLower.endsWith(plainSuffix)) {
-            return { domain: d, name: t.slice(0, t.length - plainSuffix.length) };
+            return { domain: registryDomain, name: t.slice(0, t.length - plainSuffix.length) };
         }
-        return { domain: d, name: t };
+        return { domain: registryDomain, name: t };
     }
 
     const parts = tagName.split(".");
