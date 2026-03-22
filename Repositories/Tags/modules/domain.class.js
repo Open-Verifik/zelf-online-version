@@ -88,6 +88,9 @@ class Domain {
 
         // Theme Settings - preserve complete themeSettings from license data
         this.themeSettings = domainData.themeSettings || {};
+
+        /** Optional second document URL (official license JSON on IPFS); not exposed in toJSON */
+        this.themeSettingsUrl = typeof domainData.themeSettingsUrl === "string" ? domainData.themeSettingsUrl : "";
     }
 
     /**

@@ -5,6 +5,7 @@ const schemas = {
 	search: {
 		domain: string().pattern(/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/),
 		withJSON: boolean().default(true),
+		includeThemeSettings: stringEnum(["1", "0", "true", "false"]).optional(),
 	},
 	getMyLicense: {
 		withJSON: boolean().default(true),
@@ -134,11 +135,12 @@ const schemas = {
 const searchValidation = async (ctx, next) => {
 	const payload = Object.assign(ctx.request.query, ctx.request.body);
 
-	const { domain, withJSON } = payload;
+	const { domain, withJSON, includeThemeSettings } = payload;
 
 	const valid = validate(schemas.search, {
 		domain,
 		withJSON,
+		includeThemeSettings,
 	});
 
 	if (valid.error) {

@@ -358,14 +358,32 @@ const deleteTag = async (ctx) => {
 
 const getDomains = async (ctx, next) => {
     try {
-        // Load licenses first to ensure we have the latest data
-        const { loadOfficialLicenses } = require("../../License/modules/license.module");
+        const {
+            loadOfficialLicenses,
+            parseIncludeThemeSettings,
+            fetchAndMergeOfficialThemeSettings,
+        } = require("../../License/modules/license.module");
 
-        const licenses = await loadOfficialLicenses();
+        const rawLicenses = await loadOfficialLicenses();
+        const includeTheme = parseIncludeThemeSettings(ctx.request.query.includeThemeSettings);
+
+        let licenses = rawLicenses;
+        if (includeTheme) {
+            const list = Array.isArray(rawLicenses) ? rawLicenses : Object.values(rawLicenses || {});
+            licenses = (
+                await Promise.all(
+                    list.map(async (lic) => {
+                        if (!lic || !lic.name) return null;
+                        const copy = JSON.parse(JSON.stringify(lic));
+                        await fetchAndMergeOfficialThemeSettings(copy);
+                        return copy;
+                    }),
+                )
+            ).filter(Boolean);
+        }
 
         const { includeNonPaid } = ctx.request.query;
 
-        // Get domains with the loaded licenses
         const domains = getAllSupportedDomains(
             licenses,
             includeNonPaid !== undefined ? !Boolean(includeNonPaid === "true") : configuration.env === "development" ? false : true,
@@ -374,7 +392,6 @@ const getDomains = async (ctx, next) => {
         ctx.body = { data: domains };
     } catch (error) {
         console.error("Error loading domains:", error);
-        // Fallback to domains without licenses
         const domains = getAllSupportedDomains();
         ctx.body = { data: domains };
     }
@@ -384,8 +401,35 @@ const getDomains = async (ctx, next) => {
 
 const getDomain = async (ctx, next) => {
     const { domain } = ctx.request.params;
+    const {
+        loadOfficialLicenses,
+        parseIncludeThemeSettings,
+        fetchAndMergeOfficialThemeSettings,
+    } = require("../../License/modules/license.module");
+    const { Domain } = require("../modules/domain.class");
 
-    const domainConfig = await Module.getDomainConfig(domain);
+    const includeTheme = parseIncludeThemeSettings(ctx.request.query.includeThemeSettings);
+
+    let domainConfig = null;
+
+    if (includeTheme) {
+        try {
+            const raw = await loadOfficialLicenses();
+            const list = Array.isArray(raw) ? raw : Object.values(raw || {});
+            const lic = list.find((l) => l && l.name && String(l.name).toLowerCase() === domain.toLowerCase());
+            if (lic) {
+                const copy = JSON.parse(JSON.stringify(lic));
+                await fetchAndMergeOfficialThemeSettings(copy);
+                domainConfig = new Domain(copy);
+            }
+        } catch (err) {
+            console.warn("[tags/domains/:domain] includeThemeSettings failed:", err.message);
+        }
+    }
+
+    if (!domainConfig) {
+        domainConfig = Module.getDomainConfig(domain);
+    }
 
     if (!domainConfig) {
         ctx.status = 404;

@@ -13,6 +13,68 @@ const { initCacheInstance } = require("../../../cache/manager");
 const licenseCache = initCacheInstance();
 
 /**
+ * @param {*} value - query param includeThemeSettings
+ * @returns {boolean}
+ */
+const parseIncludeThemeSettings = (value) => {
+    if (value === undefined || value === null || value === "") return false;
+    if (value === true) return true;
+    const s = String(value).toLowerCase();
+    return s === "1" || s === "true";
+};
+
+const _deepMergeThemeObjects = (target, source) => {
+    if (!source || typeof source !== "object" || Array.isArray(source)) return target;
+    if (!target || typeof target !== "object" || Array.isArray(target)) return { ...source };
+    const result = { ...target };
+    for (const key of Object.keys(source)) {
+        if (
+            source[key] &&
+            typeof source[key] === "object" &&
+            !Array.isArray(source[key]) &&
+            result[key] &&
+            typeof result[key] === "object" &&
+            !Array.isArray(result[key])
+        ) {
+            result[key] = _deepMergeThemeObjects(result[key], source[key]);
+        } else {
+            result[key] = source[key];
+        }
+    }
+    return result;
+};
+
+const _normalizeRemoteThemePayload = (data) => {
+    if (!data || typeof data !== "object") return {};
+    if (data.themeSettings && typeof data.themeSettings === "object" && !Array.isArray(data.themeSettings)) {
+        return data.themeSettings;
+    }
+    return data;
+};
+
+/**
+ * When official license JSON includes themeSettingsUrl, fetch that document and deep-merge into domainConfig.themeSettings.
+ * Mutates domainConfig. Does not throw on fetch failure.
+ * @param {Object} domainConfig - license JSON (same shape as IPFS domain file)
+ */
+const fetchAndMergeOfficialThemeSettings = async (domainConfig) => {
+    if (!domainConfig || typeof domainConfig !== "object") return;
+
+    const url = typeof domainConfig.themeSettingsUrl === "string" ? domainConfig.themeSettingsUrl.trim() : "";
+
+    if (!url) return;
+
+    try {
+        console.log("fetching theme settings from:", url);
+        const jsonResponse = await axios.get(url);
+        const remote = _normalizeRemoteThemePayload(jsonResponse.data);
+        domainConfig.themeSettings = _deepMergeThemeObjects(domainConfig.themeSettings || {}, remote);
+    } catch (error) {
+        console.warn("[license] Optional themeSettings fetch failed:", url, error.message);
+    }
+};
+
+/**
  * Load licenses from cache
  * @returns {Array|null} - Cached licenses or null if not found/expired
  */
@@ -52,8 +114,7 @@ const saveCache = (licenses) => {
         licenseCache.set("official-licenses", licensesMap);
 
         console.log(
-            `Official licenses cached successfully (${licenses.length} licenses, TTL: ${
-                licenseCache.getTtl("official-licenses") ? Math.round((licenseCache.getTtl("official-licenses") - Date.now()) / 1000) : "N/A"
+            `Official licenses cached successfully (${licenses.length} licenses, TTL: ${licenseCache.getTtl("official-licenses") ? Math.round((licenseCache.getTtl("official-licenses") - Date.now()) / 1000) : "N/A"
             }s)`
         );
     } catch (error) {
@@ -87,7 +148,8 @@ const getCacheStats = () => {
  * @returns {Object} - License data or null
  */
 const searchLicense = async (query, user) => {
-    const { domain, withJSON = true } = query;
+    const { domain, withJSON = true, includeThemeSettings } = query;
+    const includeTheme = parseIncludeThemeSettings(includeThemeSettings);
 
     if (domain) {
         const existingLicense = await IPFS.get({ key: "licenseDomain", value: domain });
@@ -101,6 +163,10 @@ const searchLicense = async (query, user) => {
             try {
                 const jsonResponse = await axios.get(licenseRecord.url);
                 licenseRecord.domainConfig = jsonResponse.data;
+
+                if (includeTheme && licenseRecord.domainConfig) {
+                    await fetchAndMergeOfficialThemeSettings(licenseRecord.domainConfig);
+                }
             } catch (error) {
                 console.error("Error getting license JSON from url:", error);
                 throw error;
@@ -119,6 +185,9 @@ const searchLicense = async (query, user) => {
                 const jsonResponse = await axios.get(license.url);
 
                 license.domainConfig = jsonResponse.data;
+                if (includeTheme && license.domainConfig) {
+                    await fetchAndMergeOfficialThemeSettings(license.domainConfig);
+                }
             } catch (error) {
                 console.error(`Error getting license JSON for ${license.id}:`, error);
                 // Continue with other licenses even if one fails
@@ -511,10 +580,10 @@ const saveSubscriptionRecord = async (license, paymentData) => {
     const licenseData = license
         ? await _loadLicenseJSON(license.url)
         : {
-              owner: paymentData.customerEmail,
-              name: "zelf", // Default name if license not found
-              type: "license",
-          };
+            owner: paymentData.customerEmail,
+            name: "zelf", // Default name if license not found
+            type: "license",
+        };
 
     // Use the original price from the subscription to identify the plan,
     // as the paid amount might be different due to coupons, discounts, or prorations.
@@ -597,6 +666,11 @@ const saveSubscriptionRecord = async (license, paymentData) => {
 
 module.exports = {
     searchLicense,
+    parseIncludeThemeSettings,
+    fetchAndMergeOfficialThemeSettings,
+    /** @internal exposed for unit tests — deep-merge used when merging remote theme JSON */
+    deepMergeThemeSettingsObjects: _deepMergeThemeObjects,
+    normalizeRemoteThemePayload: _normalizeRemoteThemePayload,
     getMyLicense,
     createOrUpdateLicense,
     getUserZelfProof,
