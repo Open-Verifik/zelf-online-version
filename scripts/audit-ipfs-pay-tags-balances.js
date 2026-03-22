@@ -8,6 +8,10 @@
  *   - Run from repo root: `cd /path/to/zelf`
  *   - `.env` loaded (Pinata, Etherscan, etc.), same as the API server
  *
+ * Note: Domain config is loaded from IPFS licenses (same as the API). The script awaits
+ * `loadDynamicDomains()` first; without that, `getDomainConfig('zelf')` is empty and you get
+ * "Domain not supported" because standalone Node does not run `loadOfficialLicenses` like server.js.
+ *
  * Usage:
  *   node scripts/audit-ipfs-pay-tags-balances.js
  *   node scripts/audit-ipfs-pay-tags-balances.js --domains=zelf --maxPins=2000 --out=./report.json
@@ -29,6 +33,11 @@ const path = require("path");
 
 const TagsIPFSModule = require("../Repositories/Tags/modules/tags-ipfs.module");
 const { getTagWalletBalances } = require("../Repositories/Tags/modules/tag-wallet-balances.module");
+const {
+    loadDynamicDomains,
+    getDomainConfig,
+    getSupportedDomains,
+} = require("../Repositories/Tags/config/supported-domains");
 
 function parseArgs(argv) {
     const out = {
@@ -132,6 +141,29 @@ async function main() {
         console.log(fs.readFileSync(__filename, "utf8").split("/**")[1].split("*/")[0]);
         process.exit(0);
     }
+
+    console.error("[audit] loading domain registry from IPFS (licenses)…");
+    let dynamic = await loadDynamicDomains(null, false);
+    if (!dynamic || Object.keys(dynamic).length === 0) {
+        console.error("[audit] cache empty or load failed; retrying with force=true…");
+        dynamic = await loadDynamicDomains(null, true);
+    }
+    const available = Object.keys(getSupportedDomains());
+    if (available.length === 0) {
+        console.error(
+            "[audit] No domains in registry after loadDynamicDomains. Check Pinata/IPFS license pins and env. Cannot continue.",
+        );
+        process.exit(1);
+    }
+    for (const d of opts.domains) {
+        if (!getDomainConfig(d)) {
+            console.error(
+                `[audit] Domain "${d}" is not in the loaded registry. Available keys: ${available.join(", ")}`,
+            );
+            process.exit(1);
+        }
+    }
+    console.error(`[audit] registry ready (${available.length} domains): ${available.join(", ")}`);
 
     const generatedAt = new Date().toISOString();
     const allRecords = [];
