@@ -1,0 +1,31 @@
+{
+  "generatedAt": "2026-03-22T06:20:27.689Z",
+  "options": {
+    "domains": [
+      "zelf"
+    ],
+    "nameOverride": null,
+    "maxPins": 2000,
+    "concurrency": 2,
+    "delayMs": 250
+  },
+  "domainFetch": {
+    "zelf": {
+      "error": "Domain not supported",
+      "pins": 0
+    }
+  },
+  "summary": {
+    "totalPins": 0,
+    "withAnyPositiveBalance": 0,
+    "withUnknown": 0,
+    "byNetworkPositive": {
+      "eth": 0,
+      "btc": 0,
+      "sol": 0,
+      "avax": 0,
+      "bdag": 0
+    }
+  },
+  "records": []
+}
