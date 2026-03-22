@@ -8,6 +8,16 @@ const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const { ethers } = require("ethers");
 const config = require("../../../Core/config");
 const fs = require("fs");
+const OWNER_DEBUG = process.env.BLOCKDAG_NFT_OWNER_DEBUG === "1";
+
+const ownerDebugLog = (label, payload) => {
+    if (!OWNER_DEBUG) return;
+    try {
+        console.log(`[blockdag-nft:owner-debug] ${label}`, JSON.stringify(payload));
+    } catch {
+        console.log(`[blockdag-nft:owner-debug] ${label}`, payload);
+    }
+};
 
 const FACTORY_ABI = [
     // V2: createCollection now takes royaltyBps
@@ -783,7 +793,7 @@ const getItem = async (id) => {
 
     const metadata = await _fetchIpfsJson(item.url);
 
-    return {
+    const result = {
         ...metadata,
         ...item.publicData,
         category: metadata?.category || item.publicData?.nftCategory || "Art",
@@ -791,6 +801,17 @@ const getItem = async (id) => {
         ipfsId: item.id,
         cid: item.cid,
     };
+
+    ownerDebugLog("getItem", {
+        requestId: id,
+        cid: result.cid,
+        ipfsId: result.ipfsId,
+        owner: result.owner || "",
+        tokenId: result.tokenId || "",
+        collection: result.collection || result.contractAddress || "",
+    });
+
+    return result;
 };
 
 /**
@@ -852,6 +873,18 @@ const listItems = async (filterParams) => {
             }
         });
         if (results.length > maxResults) results = results.slice(0, maxResults);
+        ownerDebugLog("listItemsByOwner", {
+            owner,
+            ownerChecksum,
+            count: results.length,
+            items: results.slice(0, 20).map((item) => ({
+                id: item.id,
+                cid: item.cid,
+                owner: item.publicData?.owner || "",
+                tokenId: item.publicData?.tokenId || "",
+                collection: item.publicData?.collection || "",
+            })),
+        });
         return _enrichItems(results);
     }
 
@@ -979,6 +1012,7 @@ const replaceNftItemWithNewOwner = async (ipfsFileId, tokenId, txHash, owner) =>
     const collectionAddr = item.collection || publicData.collection || "";
 
     let resolvedOwner = owner ?? item.owner ?? publicData.owner ?? "";
+    const previousOwner = item.owner ?? publicData.owner ?? "";
     if (collectionAddr && collectionAddr !== "none" && tokenId) {
         try {
             const rpcUrl = config.blockdag?.rpcUrl || "https://rpc.bdagscan.com";
@@ -1000,6 +1034,17 @@ const replaceNftItemWithNewOwner = async (ipfsFileId, tokenId, txHash, owner) =>
     };
 
     const newPin = await IPFS.updateFileKeyvalues(ipfsFileId, keyvalues);
+    ownerDebugLog("replaceNftItemWithNewOwner", {
+        ipfsFileId,
+        tokenId: String(tokenId),
+        txHash: txHash || "",
+        previousOwner,
+        requestedOwner: owner || "",
+        resolvedOwner,
+        collectionAddr,
+        newIpfsId: newPin.id ?? ipfsFileId,
+        newCid: newPin.cid,
+    });
 
     return {
         success: true,
