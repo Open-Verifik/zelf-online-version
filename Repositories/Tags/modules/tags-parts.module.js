@@ -170,6 +170,23 @@ const urlToBase64 = async (url) => {
 };
 
 /**
+ * Try each URL in order; return first successful data URL from urlToBase64.
+ * @param {Array<string|undefined|null>} urls
+ * @returns {Promise<string|null>}
+ */
+const urlToBase64First = async (urls) => {
+    const seen = new Set();
+    for (const raw of urls) {
+        const u = typeof raw === "string" ? raw.trim() : "";
+        if (!u || seen.has(u)) continue;
+        seen.add(u);
+        const b64 = await urlToBase64(u);
+        if (b64) return b64;
+    }
+    return null;
+};
+
+/**
  * Generate domain-specific hold domain
  * @param {string} domain - Domain name
  * @param {string} name - Tag name
@@ -540,6 +557,7 @@ module.exports = {
     previewTag,
     generateQRCode,
     urlToBase64,
+    urlToBase64First,
     generateDomainHoldDomain,
     validateDomainData,
     processDomainMetadata,

@@ -15,7 +15,7 @@ const { usdcAtomicFromUsd } = require("./tag-pay-usdc.util");
 const config = require("../../../Core/config");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const TagsArweaveModule = require("./tags-arweave.module");
-const { generateQRFromZelfProof } = require("./qr-zelfproof-extractor.module");
+const { generateQRFromZelfProof, QRZelfProofExtractor } = require("./qr-zelfproof-extractor.module");
 
 const envTruthy = (v) => {
     if (v == null || v === "") return false;
@@ -644,9 +644,30 @@ const buildMetadata = (params, tagObject, domainConfig) => {
 
 /**
  * Ensure tagObject has a data-URL QR for storage (IPFS / Walrus / Arweave).
- * Regenerates from zelfProof when missing or when gateway fetch left it null (e.g. Pinata 403).
+ * Tries Arweave then IPFS gateway URLs, then optional decode from QR image, then zelfProof regeneration.
  */
 const ensureZelfProofQRCode = async (tagObject) => {
+    if (tagObject.zelfProofQRCode && typeof tagObject.zelfProofQRCode === "string" && tagObject.zelfProofQRCode.trim() !== "") {
+        return;
+    }
+
+    const fromUrls = await TagsPartsModule.urlToBase64First([tagObject.url, tagObject.ipfsContentUrl]);
+    if (fromUrls) {
+        tagObject.zelfProofQRCode = fromUrls;
+    }
+
+    if (tagObject.zelfProofQRCode && !tagObject.zelfProof && !tagObject.publicData?.zelfProof) {
+        try {
+            const extracted = await QRZelfProofExtractor.extractZelfProof(tagObject.zelfProofQRCode);
+            if (extracted && QRZelfProofExtractor.validateZelfProof(extracted)) {
+                tagObject.zelfProof = extracted;
+                if (tagObject.publicData) tagObject.publicData.zelfProof = extracted;
+            }
+        } catch (_) {
+            /* optional: QR may still be valid for re-upload without decoded proof */
+        }
+    }
+
     if (tagObject.zelfProofQRCode && typeof tagObject.zelfProofQRCode === "string" && tagObject.zelfProofQRCode.trim() !== "") {
         return;
     }

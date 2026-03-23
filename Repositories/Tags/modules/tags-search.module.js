@@ -61,6 +61,8 @@ const searchTag = async (params, authUser) => {
             }
 
             combinedResults.tagObject.ipfsId = ipfsResults[0].id;
+            const ipfsUrl = typeof ipfsResults[0].url === "string" && ipfsResults[0].url.trim() !== "" ? ipfsResults[0].url.trim() : "";
+            if (ipfsUrl) combinedResults.tagObject.ipfsContentUrl = ipfsUrl;
         }
 
         if (combinedResults.available && domainConfig) {
@@ -71,8 +73,12 @@ const searchTag = async (params, authUser) => {
             combinedResults.tagObject.zelfProof = combinedResults.tagObject.publicData.zelfProof;
         }
 
-        if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
-            combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
+        if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode) {
+            combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64First([
+                combinedResults.tagObject.url,
+                combinedResults.tagObject.ipfsContentUrl,
+            ]);
+        }
 
         if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode && combinedResults.tagObject.zelfProof) {
             const regenerated = await generateQRFromZelfProof(combinedResults.tagObject.zelfProof);
@@ -303,6 +309,8 @@ const searchByStorageKey = async (params, authUser) => {
         // If results found, return the first one
         if (ipfsResults.length > 0) {
             combinedResults.tagObject = ipfsResults[0];
+            const ipfsUrl = typeof ipfsResults[0].url === "string" && ipfsResults[0].url.trim() !== "" ? ipfsResults[0].url.trim() : "";
+            if (ipfsUrl) combinedResults.tagObject.ipfsContentUrl = ipfsUrl;
         } else if (arweaveResults.length > 0) {
             combinedResults.tagObject = arweaveResults[0];
         }
@@ -311,8 +319,12 @@ const searchByStorageKey = async (params, authUser) => {
             combinedResults.tagObject.zelfProof = combinedResults.tagObject.publicData.zelfProof;
         }
 
-        if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
-            combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
+        if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode) {
+            combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64First([
+                combinedResults.tagObject.url,
+                combinedResults.tagObject.ipfsContentUrl,
+            ]);
+        }
 
         if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode && combinedResults.tagObject.zelfProof) {
             const regenerated = await generateQRFromZelfProof(combinedResults.tagObject.zelfProof);
