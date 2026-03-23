@@ -68,13 +68,29 @@ function compile() {
         throw new Error("solc produced no .bin file under .solc-out");
     }
 
-    const binPath = path.join(outDir, bins[0]);
-    const text = fs.readFileSync(binPath, "utf8").trim().replace(/\s+/g, "");
-    if (!/^[0-9a-fA-F]+$/.test(text)) {
-        throw new Error("Unexpected .bin contents (expected hex string)");
+    // solc may emit multiple artifacts; prefer the main contract output (name pattern) or the largest .bin.
+    const preferred =
+        bins.find((f) => /ZelfAvalanchePay.*ZelfAvalanchePay\.bin$/i.test(f)) ||
+        bins.find((f) => f.includes("ZelfAvalanchePay")) ||
+        [...bins].sort(
+            (a, b) =>
+                fs.statSync(path.join(outDir, b)).size - fs.statSync(path.join(outDir, a)).size,
+        )[0];
+
+    const binPath = path.join(outDir, preferred);
+    const buf = fs.readFileSync(binPath);
+
+    // solc often writes raw bytecode bytes; older paths assumed ASCII hex in the file.
+    const asText = buf.toString("utf8").trim().replace(/\s+/g, "");
+    if (/^[0-9a-fA-F]+$/.test(asText) && asText.length >= 2 && asText.length % 2 === 0) {
+        return "0x" + asText;
     }
 
-    return "0x" + text;
+    if (!buf.length) {
+        throw new Error(`Empty .bin file: ${preferred}`);
+    }
+
+    return "0x" + buf.toString("hex");
 }
 
 function normalizeSecret(raw) {

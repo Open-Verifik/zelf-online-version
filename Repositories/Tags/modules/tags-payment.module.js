@@ -622,6 +622,7 @@ const buildMetadata = (params, tagObject, domainConfig) => {
         addresses: JSON.stringify({
             arweaveAddress: tagObject.publicData.arweaveAddress,
             suiAddress: tagObject.publicData.suiAddress,
+            xlmAddress: tagObject.publicData.xlmAddress,
         }),
     };
 
