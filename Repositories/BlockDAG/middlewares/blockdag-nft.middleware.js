@@ -37,7 +37,7 @@ const createCollectionValidation = async (ctx, next) => {
 const createNFTValidation = async (ctx, next) => {
     const schema = Joi.object({
         name: Joi.string().required(),
-        description: Joi.string().optional().allow(""),
+        description: Joi.string().max(5000).optional().allow(""),
         image: Joi.string().required(),
         attributes: Joi.array().items(Joi.object()).optional(),
         collectionAddress: Joi.string().optional(), // Can be null if standalone or if we assume collection-less
@@ -75,8 +75,30 @@ const mintNFTValidation = async (ctx, next) => {
         faceBase64: Joi.string().optional(),
         password: Joi.string().optional(),
         // External Auth
-        signature: Joi.string().optional(),
-        message: Joi.string().optional(),
+        signature: Joi.string().required(),
+        message: Joi.string().required(),
+    });
+
+    const { error } = schema.validate(ctx.request.body);
+    if (error) {
+        ctx.status = 400;
+        ctx.body = { error: error.details[0].message };
+        return;
+    }
+    await next();
+};
+
+const updateTokenIdValidation = async (ctx, next) => {
+    const schema = Joi.object({
+        tokenId: Joi.alternatives().try(Joi.string(), Joi.number()).required(),
+        txHash: Joi.string().optional().allow(""),
+        owner: Joi.string().required(),
+        walletType: Joi.string().valid("zelf", "external").required(),
+        proof: Joi.string().optional(),
+        faceBase64: Joi.string().optional(),
+        password: Joi.string().optional(),
+        signature: Joi.string().required(),
+        message: Joi.string().required(),
     });
 
     const { error } = schema.validate(ctx.request.body);
@@ -151,11 +173,44 @@ const updateCollectionValidation = async (ctx, next) => {
     await next();
 };
 
+const updateItemMetadataValidation = async (ctx, next) => {
+    const traitSchema = Joi.object({
+        trait_type: Joi.string().allow(""),
+        traitType: Joi.string().allow(""),
+        value: Joi.string().allow(""),
+    }).unknown(true);
+
+    const schema = Joi.object({
+        name: Joi.string().max(256).optional().allow(""),
+        description: Joi.string().max(5000).optional().allow(""),
+        attributes: Joi.array().items(traitSchema).optional(),
+        walletType: Joi.string().valid("zelf", "external").required(),
+        owner: Joi.string().required(),
+        proof: Joi.string().optional(),
+        faceBase64: Joi.string().optional(),
+        password: Joi.string().optional(),
+        signature: Joi.string().required(),
+        message: Joi.string().required(),
+    })
+        .or("name", "description", "attributes")
+        .unknown(false);
+
+    const { error } = schema.validate(ctx.request.body);
+    if (error) {
+        ctx.status = 400;
+        ctx.body = { error: error.details[0].message };
+        return;
+    }
+    await next();
+};
+
 module.exports = {
     createCollectionValidation,
     createNFTValidation,
     mintNFTValidation,
+    updateTokenIdValidation,
     deleteCollectionValidation,
     deleteItemValidation,
     updateCollectionValidation,
+    updateItemMetadataValidation,
 };

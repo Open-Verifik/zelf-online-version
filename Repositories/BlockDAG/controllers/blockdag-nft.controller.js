@@ -144,6 +144,30 @@ const deleteItem = async (ctx) => {
 };
 
 /**
+ * Update NFT item display metadata (name, description, attributes). Owner-only; image cannot change.
+ */
+const updateItemMetadata = async (ctx) => {
+    try {
+        const { id } = ctx.request.params;
+        const { name, description, attributes, ...auth } = ctx.request.body;
+
+        const result = await BlockDagNftModule.updateNftItemDisplayMetadata(id, { name, description, attributes }, auth);
+
+        ctx.body = {
+            success: true,
+            data: result,
+        };
+    } catch (error) {
+        const _exception = httpHandler.errorHandler(error, ctx);
+        ctx.status = _exception.status || 500;
+        ctx.body = {
+            code: _exception.code,
+            message: _exception.message,
+        };
+    }
+};
+
+/**
  * List Collections
  */
 const getCollections = async (ctx) => {
@@ -258,7 +282,7 @@ const updateTokenId = async (ctx) => {
     try {
         const { id } = ctx.request.params;
 
-        const { tokenId, txHash, owner } = ctx.request.body;
+        const { tokenId, txHash, owner, walletType, signature, message, proof, faceBase64, password } = ctx.request.body;
 
         if (tokenId == null) {
             ctx.status = 400;
@@ -268,7 +292,15 @@ const updateTokenId = async (ctx) => {
             return;
         }
 
-        const result = await BlockDagNftModule.replaceNftItemWithNewOwner(id, tokenId, txHash, owner);
+        const result = await BlockDagNftModule.replaceNftItemWithNewOwner(id, tokenId, txHash, owner, {
+            owner,
+            walletType,
+            signature,
+            message,
+            proof,
+            faceBase64,
+            password,
+        });
 
         ctx.body = { success: true, data: result };
     } catch (error) {
@@ -287,8 +319,17 @@ const updateTokenId = async (ctx) => {
  */
 const mintNFT = async (ctx) => {
     try {
-        const { collectionAddress, recipientAddress, tokenURI } = ctx.request.body;
-        const result = await BlockDagNftModule.mintOnChain(collectionAddress, recipientAddress, tokenURI);
+        const { collectionAddress, recipientAddress, tokenURI, owner, walletType, signature, message, proof, faceBase64, password } =
+            ctx.request.body;
+        const result = await BlockDagNftModule.mintOnChain(collectionAddress, recipientAddress, tokenURI, {
+            owner,
+            walletType,
+            signature,
+            message,
+            proof,
+            faceBase64,
+            password,
+        });
         ctx.body = { success: true, data: result };
     } catch (error) {
         ctx.status = error.status || 500;
@@ -360,5 +401,6 @@ module.exports = {
     getDefaultCollection,
     deployDefaultCollection,
     updateTokenId,
+    updateItemMetadata,
     searchCollections,
 };

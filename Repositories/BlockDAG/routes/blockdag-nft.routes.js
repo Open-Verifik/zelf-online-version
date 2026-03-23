@@ -4,6 +4,11 @@ const Middleware = require("../middlewares/blockdag-nft.middleware");
 
 const base = "/blockdag/nft";
 
+/**
+ * All routes in this file are registered from Routes/protected-repositories.js — i.e. AFTER koa-jwt in server.js.
+ * Every handler therefore requires a valid JWT session (`Authorization: Bearer <token>` from POST /api/sessions).
+ * Mutating routes also require wallet proof in the body (signature + message, etc.).
+ */
 module.exports = (server) => {
     const PATH = config.basePath(base);
 
@@ -17,7 +22,10 @@ module.exports = (server) => {
     server.post(`${PATH}/item`, Middleware.createNFTValidation, Controller.createNFT);
     // Protected: Server-side mint for shared/owner-only collections (uses deployer key)
     server.post(`${PATH}/item/mint`, Middleware.mintNFTValidation, Controller.mintNFT);
-    
+    server.patch(`${PATH}/item/:id/token`, Middleware.updateTokenIdValidation, Controller.updateTokenId);
+    // JWT session required (this router is not on unprotected-repositories). Body still needs EIP-191 owner signature.
+    server.patch(`${PATH}/item/:id/metadata`, Middleware.updateItemMetadataValidation, Controller.updateItemMetadata);
+
     server.post(`${PATH}/collection/:id/delete`, Middleware.deleteCollectionValidation, Controller.deleteCollection);
 
     server.post(`${PATH}/item/:id/delete`, Middleware.deleteItemValidation, Controller.deleteItem);

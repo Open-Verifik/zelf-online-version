@@ -20,6 +20,4 @@ module.exports = (server) => {
     // Public: Get the official default Zelf Name Service collection address
     server.get(`${PATH}/default-collection`, Controller.getDefaultCollection);
 
-    // Public: Persist on-chain tokenId after frontend mint (txHash serves as proof)
-    server.patch(`${PATH}/item/:id/token`, Controller.updateTokenId);
 };

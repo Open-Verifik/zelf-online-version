@@ -89,29 +89,40 @@ describe("BlockDAG address endpoint", () => {
 });
 
 describe("isBlockDAGPaymentConfirmed logic - unit-style validation", () => {
-	// Simulate the exact logic from my-tags.module.js
-	const simulatePaymentCheck = (response, amountToPay) => {
+	const {
+		filterSessionInboundTransactions,
+		parseTagPayAmount,
+	} = require("../../Repositories/Tags/modules/tag-pay-session-tx.util");
+
+	const SESSION_T0 = 1_700_000_000;
+	const txIn = (amount, ts = SESSION_T0) => ({ traffic: "IN", amount: String(amount), timestamp: ts });
+	const txOut = (amount, ts = SESSION_T0) => ({ traffic: "OUT", amount: String(amount), timestamp: ts });
+
+	const simulatePaymentCheck = (response, amountToPay, initiatedAtUnix = SESSION_T0) => {
+		const amountNum = parseTagPayAmount(amountToPay);
+		if (amountNum == null) {
+			return { confirmed: false, amountReceived: 0, amountToPay, checkedFactor: "invalid_amount" };
+		}
 		if (response?.error) return false;
 
 		const numericBalance = Number(response?.balance ?? 0);
 
-		if (!Number.isNaN(numericBalance) && numericBalance <= amountToPay) {
+		if (!Number.isNaN(numericBalance) && numericBalance <= amountNum) {
 			return {
 				confirmed: false,
 				amountReceived: 0,
-				amountToPay,
+				amountToPay: amountNum,
 				checkedFactor: "balance",
 			};
 		}
 
-		const amountReceived = (response?.transactions || [])
-			.filter((tx) => tx.traffic === "IN")
-			.reduce((sum, tx) => sum + Number(tx.amount), 0);
+		const sessionTxs = filterSessionInboundTransactions(response?.transactions, initiatedAtUnix);
+		const amountReceived = sessionTxs.reduce((sum, tx) => sum + Number(tx.amount), 0);
 
 		return {
-			confirmed: amountReceived >= amountToPay,
+			confirmed: amountReceived >= amountNum,
 			amountReceived,
-			amountToPay,
+			amountToPay: amountNum,
 			checkedFactor: "transactions",
 		};
 	};
@@ -127,15 +138,11 @@ describe("isBlockDAGPaymentConfirmed logic - unit-style validation", () => {
 		expect(result.checkedFactor).toBe("balance");
 	});
 
-	it("sums only IN transactions correctly", () => {
+	it("sums only IN transactions correctly (session-scoped)", () => {
 		const result = simulatePaymentCheck(
 			{
 				balance: "100",
-				transactions: [
-					{ traffic: "IN", amount: "20" },
-					{ traffic: "IN", amount: "10" },
-					{ traffic: "OUT", amount: "50" }, // should be ignored
-				],
+				transactions: [txIn(20), txIn(10), txOut(50)],
 			},
 			25
 		);
@@ -148,10 +155,7 @@ describe("isBlockDAGPaymentConfirmed logic - unit-style validation", () => {
 		const result = simulatePaymentCheck(
 			{
 				balance: "100",
-				transactions: [
-					{ traffic: "IN", amount: "5" },
-					{ traffic: "OUT", amount: "95" },
-				],
+				transactions: [txIn(5), txOut(95)],
 			},
 			10
 		);
@@ -163,6 +167,19 @@ describe("isBlockDAGPaymentConfirmed logic - unit-style validation", () => {
 		const result = simulatePaymentCheck({ balance: "100" }, 10);
 		expect(result.checkedFactor).toBe("transactions");
 		expect(result.amountReceived).toBe(0);
+		expect(result.confirmed).toBe(false);
+	});
+
+	it("ignores IN transactions before payment session start (busy treasury)", () => {
+		const result = simulatePaymentCheck(
+			{
+				balance: "100",
+				transactions: [txIn(100, SESSION_T0 - 86_400), txIn(5, SESSION_T0 + 120)],
+			},
+			10,
+			SESSION_T0
+		);
+		expect(result.amountReceived).toBeCloseTo(5);
 		expect(result.confirmed).toBe(false);
 	});
 });

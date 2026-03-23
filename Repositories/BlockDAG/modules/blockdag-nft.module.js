@@ -32,6 +32,161 @@ const ERC721_ABI = [
     "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
 ];
 
+const OWNABLE_ABI = ["function owner() view returns (address)"];
+
+const _normalizeAddress = (value, errorCode = "400:invalid_address") => {
+    try {
+        return ethers.getAddress(value);
+    } catch {
+        throw new Error(errorCode);
+    }
+};
+
+const _getBlockDagProvider = () => {
+    const rpcUrl = config.blockdag?.rpcUrl || "https://rpc.bdagscan.com";
+    return new ethers.JsonRpcProvider(rpcUrl);
+};
+
+const _getCollectionOwnerOnChain = async (collectionAddress) => {
+    const contract = new ethers.Contract(collectionAddress, OWNABLE_ABI, _getBlockDagProvider());
+    const owner = await contract.owner();
+    return owner ? ethers.getAddress(owner) : null;
+};
+
+const _ensureMessageIncludesCollection = (message, collectionAddress) => {
+    if (!collectionAddress || collectionAddress === "none") return;
+    if (typeof message !== "string" || !message.includes(`collection ${collectionAddress}`)) {
+        throw new Error("400:message_collection_mismatch");
+    }
+};
+
+const _findCollectionPinsByAddress = async (collectionAddress) => {
+    const addrChecksum = _normalizeAddress(collectionAddress);
+    const addrLower = addrChecksum.toLowerCase();
+    const queries = [IPFS.filter("contractAddress", addrChecksum, { limit: 5 })];
+    if (addrLower !== addrChecksum) {
+        queries.push(IPFS.filter("contractAddress", addrLower, { limit: 5 }));
+    }
+    const all = (await Promise.all(queries)).flat();
+    const seen = new Set();
+    return all.filter((item) => {
+        if (!item || seen.has(item.id)) return false;
+        seen.add(item.id);
+        return item.publicData?.category === "blockdag_nft_collection";
+    });
+};
+
+const _resolveCollectionWriteAccess = async (collectionAddress, owner) => {
+    if (!collectionAddress || collectionAddress === "none") {
+        return {
+            normalizedCollectionAddress: collectionAddress || "none",
+            isDefaultCollection: false,
+            onChainOwner: null,
+            collectionPins: [],
+        };
+    }
+
+    const normalizedCollectionAddress = _normalizeAddress(collectionAddress, "400:invalid_collection_address");
+    const normalizedOwner = _normalizeAddress(owner, "400:invalid_owner_address");
+    const defaultCollection = await getDefaultCollection();
+    const normalizedDefault =
+        defaultCollection?.address && ethers.isAddress(defaultCollection.address) ? ethers.getAddress(defaultCollection.address) : null;
+    const isDefaultCollection = Boolean(normalizedDefault && normalizedCollectionAddress === normalizedDefault);
+
+    if (isDefaultCollection) {
+        return {
+            normalizedCollectionAddress,
+            isDefaultCollection,
+            onChainOwner: normalizedDefault,
+            collectionPins: [],
+        };
+    }
+
+    const collectionPins = await _findCollectionPinsByAddress(normalizedCollectionAddress);
+    if (collectionPins.length === 0) {
+        throw new Error("404:collection_not_found");
+    }
+
+    let onChainOwner;
+    try {
+        onChainOwner = await _getCollectionOwnerOnChain(normalizedCollectionAddress);
+    } catch (error) {
+        console.error("[blockdag-nft] failed to resolve collection owner", normalizedCollectionAddress, error?.message || error);
+        throw new Error("503:collection_owner_lookup_failed");
+    }
+
+    if (!onChainOwner) {
+        throw new Error("404:collection_owner_not_found");
+    }
+
+    if (onChainOwner.toLowerCase() !== normalizedOwner.toLowerCase()) {
+        throw new Error("403:unauthorized_collection_owner");
+    }
+
+    for (const item of collectionPins) {
+        if (item.publicData?.owner !== onChainOwner) {
+            IPFS.updateFileKeyvalues(item.id, { owner: onChainOwner }).catch(() => {});
+        }
+    }
+
+    return {
+        normalizedCollectionAddress,
+        isDefaultCollection,
+        onChainOwner,
+        collectionPins,
+    };
+};
+
+/**
+ * Authorize PATCH /item/:id/token (replaceNftItemWithNewOwner).
+ * Allows: default collection (any verified signer), collection owner, current token owner,
+ * or previous IPFS metadata owner while chain owner already moved (seller syncing after sale).
+ */
+const _authorizeReplaceNftItem = async (normalizedCollectionAddr, normalizedRequester, tokenId, previousMetaOwner) => {
+    if (!normalizedCollectionAddr || normalizedCollectionAddr === "none") return;
+
+    const defaultCollection = await getDefaultCollection();
+    const normalizedDefault =
+        defaultCollection?.address && ethers.isAddress(defaultCollection.address) ? ethers.getAddress(defaultCollection.address) : null;
+    if (normalizedDefault && normalizedCollectionAddr === normalizedDefault) return;
+
+    let collectionOwner;
+    try {
+        collectionOwner = await _getCollectionOwnerOnChain(normalizedCollectionAddr);
+    } catch (error) {
+        console.error("[blockdag-nft] replace item: collection owner lookup failed", normalizedCollectionAddr, error?.message || error);
+        throw new Error("503:collection_owner_lookup_failed");
+    }
+    if (!collectionOwner) throw new Error("404:collection_owner_not_found");
+    if (collectionOwner.toLowerCase() === normalizedRequester.toLowerCase()) return;
+
+    let chainTokenOwner;
+    try {
+        const contract = new ethers.Contract(normalizedCollectionAddr, ERC721_ABI, _getBlockDagProvider());
+        chainTokenOwner = await contract.ownerOf(BigInt(tokenId));
+    } catch (error) {
+        console.error("[blockdag-nft] replace item: ownerOf failed", normalizedCollectionAddr, tokenId, error?.message || error);
+        throw new Error("503:chain_owner_verify_failed");
+    }
+    if (chainTokenOwner.toLowerCase() === normalizedRequester.toLowerCase()) return;
+
+    if (previousMetaOwner) {
+        try {
+            const prev = _normalizeAddress(previousMetaOwner, "400:invalid_owner_address");
+            if (
+                prev.toLowerCase() === normalizedRequester.toLowerCase() &&
+                chainTokenOwner.toLowerCase() !== prev.toLowerCase()
+            ) {
+                return;
+            }
+        } catch {
+            /* ignore invalid previous owner hint */
+        }
+    }
+
+    throw new Error("403:unauthorized_collection_or_token_owner");
+};
+
 /**
  * Get the default Zelf Name Service collection address.
  * If configured via env, return immediately.
@@ -167,16 +322,19 @@ const storeCollection = async (data, authdUser) => {
     await _validateAuth({ walletType, proof, signature, message, owner, faceBase64, password });
 
     // 2. Prepare Metadata
+    const normalizedOwner = _normalizeAddress(owner, "400:invalid_owner_address");
+    const normalizedContractAddress = contractAddress ? _normalizeAddress(contractAddress, "400:invalid_collection_address") : "";
+
     const collectionData = {
         name,
         symbol,
         description,
         coverImage,
         avatarImage,
-        contractAddress,
+        contractAddress: normalizedContractAddress,
         maxSupply,
         royaltyBps,
-        owner,
+        owner: normalizedOwner,
         createdAt: new Date().toISOString(),
         verified: false, // Default
         walletType,
@@ -189,8 +347,8 @@ const storeCollection = async (data, authdUser) => {
     // Pinata allows max 9 keyvalues per pin. Only filterable fields; display content lives in JSON body.
     const ipfsMetadata = {
         category: "blockdag_nft_collection",
-        owner: ethers.getAddress(owner),
-        contractAddress: contractAddress || "",
+        owner: normalizedOwner,
+        contractAddress: normalizedContractAddress,
         name: name,
         symbol: symbol,
         walletType: walletType,
@@ -364,11 +522,15 @@ const storeNFT = async (data, authdUser) => {
 
     // 1. Validate Auth
     await _validateAuth({ walletType, proof, signature, message, owner, faceBase64, password });
+    const normalizedOwner = _normalizeAddress(owner, "400:invalid_owner_address");
+    const { normalizedCollectionAddress } = await _resolveCollectionWriteAccess(collectionAddress, normalizedOwner);
+    _ensureMessageIncludesCollection(message, normalizedCollectionAddress);
 
     // 2. Prepare Metadata — ERC-721 / OpenSea standard
+    const safeDescription = String(description ?? "").slice(0, 5000);
     const nftData = {
         name,
-        description,
+        description: safeDescription,
         image,
         external_url: "https://zelf.world",
         category: category || "Art",
@@ -387,16 +549,13 @@ const storeNFT = async (data, authdUser) => {
     // 3. Pin to IPFS (ERC-721 standard JSON metadata)
     const fileName = `nft_${name.replace(/\s+/g, "_")}_${Date.now()}.json`;
 
-    // Non-standard fields stored as searchable Pinata keyvalues only (not in the token URI JSON).
-    // image + description are included so list endpoints can skip the gateway fetch entirely.
+    // Pinata keyvalues: filterable fields only. Description and image live in the pinned ERC-721 JSON (standard NFT).
     const ipfsMetadata = {
         category: "blockdag_nft_item",
-        owner: ethers.getAddress(owner),
-        collection: collectionAddress,
+        owner: normalizedOwner,
+        collection: normalizedCollectionAddress || "",
         name: name,
         nftCategory: category || "Art",
-        image: (image || "").slice(0, 250),
-        description: (description || "").slice(0, 200),
     };
 
     const base64Data = Buffer.from(JSON.stringify(nftData)).toString("base64");
@@ -709,44 +868,54 @@ const _fetchIpfsJson = async (url) => {
     }
 };
 
-/**
- * Build a list-view item from Pinata keyvalues only (no gateway fetch).
- * Used when publicData already contains essential fields like image.
- */
-const _buildLightItem = (item) => {
-    const pd = item.publicData || {};
-    return {
-        name: pd.name || item.name || "",
-        description: pd.description || "",
-        image: pd.image || "",
-        category: pd.nftCategory || pd.collectionCategory || pd.category || "Art",
-        owner: pd.owner || "",
-        collection: pd.collection || "",
-        contractAddress: pd.contractAddress || pd.collection || "",
-        tokenId: pd.tokenId || "",
-        mintTxHash: pd.mintTxHash || "",
-        ipfsUrl: item.url,
-        ipfsId: item.id,
-        cid: item.cid,
-    };
+const _parseAttributesJson = (raw) => {
+    if (!raw || typeof raw !== "string") return null;
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+    } catch {
+        return null;
+    }
+};
+
+const _mergeItemAttributes = (metadata, publicData) => {
+    const pd = publicData || {};
+    const fromKv = _parseAttributesJson(pd.attributesJson);
+    if (fromKv) return fromKv;
+    if (Array.isArray(metadata?.attributes)) return metadata.attributes;
+    return [];
 };
 
 /**
  * Enrich raw IPFS file results with fetched JSON metadata.
- * Skips the gateway fetch when publicData already has the `image` field
- * (items stored after the keyvalue migration). Falls back to gateway
- * fetch (served from CID cache when available) for older items.
+ * Description, image, and attributes prefer the pinned ERC-721 JSON; legacy Pinata keyvalues are fallbacks only.
  */
 const _enrichItems = async (rawResults) => {
     return Promise.all(
         rawResults.map(async (item) => {
-            if (item.publicData?.image) return _buildLightItem(item);
-
             const metadata = await _fetchIpfsJson(item.url);
+            const pd = item.publicData || {};
+            const attributes = _mergeItemAttributes(metadata, pd);
+            const jsonImage =
+                metadata && metadata.image != null && String(metadata.image).trim() !== ""
+                    ? String(metadata.image).trim()
+                    : "";
             return {
+                ...pd,
                 ...metadata,
-                ...item.publicData,
-                category: metadata?.category || item.publicData?.nftCategory || "Art",
+                attributes,
+                name: pd.name || metadata?.name || item.name || "",
+                description:
+                    metadata && metadata.description !== undefined && metadata.description !== null
+                        ? metadata.description
+                        : (pd.description ?? ""),
+                image: jsonImage || pd.image || "",
+                category: metadata?.category || pd.nftCategory || pd.collectionCategory || pd.category || "Art",
+                owner: pd.owner || "",
+                collection: pd.collection || "",
+                contractAddress: pd.contractAddress || pd.collection || "",
+                tokenId: pd.tokenId || "",
+                mintTxHash: pd.mintTxHash || "",
                 ipfsUrl: item.url,
                 ipfsId: item.id,
                 cid: item.cid,
@@ -792,11 +961,26 @@ const getItem = async (id) => {
     if (!item) throw new Error("404:nft_not_found");
 
     const metadata = await _fetchIpfsJson(item.url);
+    const pd = item.publicData || {};
+    const attributes = _mergeItemAttributes(metadata, pd);
 
+    const jsonImage =
+        metadata && metadata.image != null && String(metadata.image).trim() !== ""
+            ? String(metadata.image).trim()
+            : "";
     const result = {
         ...metadata,
-        ...item.publicData,
-        category: metadata?.category || item.publicData?.nftCategory || "Art",
+        ...pd,
+        attributes,
+        name: pd.name || metadata?.name || "",
+        // Canonical description is in token JSON; ignore legacy Pinata description keyvalue when JSON has a value
+        description:
+            metadata && (metadata.description !== undefined && metadata.description !== null)
+                ? metadata.description
+                : (pd.description ?? ""),
+        // Canonical image is in token JSON; legacy pins may still have image in keyvalues
+        image: jsonImage || pd.image || "",
+        category: metadata?.category || pd.nftCategory || "Art",
         ipfsUrl: item.url,
         ipfsId: item.id,
         cid: item.cid,
@@ -936,9 +1120,17 @@ const upload = async (file) => {
  * @param {string} tokenURI           IPFS metadata URL
  * @returns {{ tokenId: number, txHash: string }}
  */
-const mintOnChain = async (collectionAddress, recipientAddress, tokenURI) => {
-    const rpcUrl = config.blockdag?.rpcUrl || "https://rpc.bdagscan.com";
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+const mintOnChain = async (collectionAddress, recipientAddress, tokenURI, authPayload = {}) => {
+    await _validateAuth(authPayload);
+    const normalizedOwner = _normalizeAddress(authPayload.owner, "400:invalid_owner_address");
+    const { normalizedCollectionAddress, isDefaultCollection } = await _resolveCollectionWriteAccess(collectionAddress, normalizedOwner);
+    _ensureMessageIncludesCollection(authPayload.message, normalizedCollectionAddress);
+    if (!isDefaultCollection) {
+        throw new Error("403:backend_mint_shared_collection_only");
+    }
+
+    const provider = _getBlockDagProvider();
+    const normalizedRecipient = _normalizeAddress(recipientAddress, "400:invalid_recipient_address");
 
     let wallet;
     if (config.blockdag?.deployerPrivateKey) {
@@ -953,8 +1145,8 @@ const mintOnChain = async (collectionAddress, recipientAddress, tokenURI) => {
         throw new Error("No deployer private key configured for on-chain minting");
     }
 
-    const collection = new ethers.Contract(collectionAddress, ERC721_ABI, wallet);
-    const tx = await collection.mint(recipientAddress, tokenURI);
+    const collection = new ethers.Contract(normalizedCollectionAddress, ERC721_ABI, wallet);
+    const tx = await collection.mint(normalizedRecipient, tokenURI);
     const receipt = await tx.wait();
 
     // tokenId is the return value of mint() — read from Transfer event
@@ -1006,30 +1198,39 @@ const updateItemTokenId = async (ipfsFileId, tokenId, txHash) => {
  * @param {string} txHash - Mint/sale tx hash
  * @param {string} [owner] - Hint; overridden by on-chain ownerOf when available.
  */
-const replaceNftItemWithNewOwner = async (ipfsFileId, tokenId, txHash, owner) => {
+const replaceNftItemWithNewOwner = async (ipfsFileId, tokenId, txHash, owner, authPayload = {}) => {
+    await _validateAuth(authPayload);
+    const normalizedRequester = _normalizeAddress(authPayload.owner, "400:invalid_owner_address");
     const item = await getItem(ipfsFileId);
     const publicData = item.publicData || {};
     const collectionAddr = item.collection || publicData.collection || "";
     const resolvedPinataId = item.ipfsId || item.id || ipfsFileId;
+    const normalizedCollectionAddr =
+        collectionAddr && collectionAddr !== "none" ? _normalizeAddress(collectionAddr, "400:invalid_collection_address") : collectionAddr;
+    const previousMetaOwner = item.owner ?? publicData.owner ?? "";
 
-    let resolvedOwner = owner ?? item.owner ?? publicData.owner ?? "";
+    if (normalizedCollectionAddr && normalizedCollectionAddr !== "none") {
+        await _authorizeReplaceNftItem(normalizedCollectionAddr, normalizedRequester, tokenId, previousMetaOwner);
+        _ensureMessageIncludesCollection(authPayload.message, normalizedCollectionAddr);
+    }
+
+    let resolvedOwner = owner ? _normalizeAddress(owner, "400:invalid_owner_address") : item.owner ?? publicData.owner ?? "";
     const previousOwner = item.owner ?? publicData.owner ?? "";
-    if (collectionAddr && collectionAddr !== "none" && tokenId) {
+    if (normalizedCollectionAddr && normalizedCollectionAddr !== "none" && tokenId) {
         try {
-            const rpcUrl = config.blockdag?.rpcUrl || "https://rpc.bdagscan.com";
-            const provider = new ethers.JsonRpcProvider(rpcUrl);
-            const contract = new ethers.Contract(collectionAddr, ERC721_ABI, provider);
+            const contract = new ethers.Contract(normalizedCollectionAddr, ERC721_ABI, _getBlockDagProvider());
             resolvedOwner = await contract.ownerOf(BigInt(tokenId));
-        } catch {
-            // Chain call failed — fall back to provided owner
+        } catch (error) {
+            console.error("[replaceNftItemWithNewOwner] ownerOf verify failed", normalizedCollectionAddr, tokenId, error?.message || error);
+            throw new Error("503:chain_owner_verify_failed");
         }
     }
 
     const keyvalues = {
         category: "blockdag_nft_item",
-        collection: item.collection || publicData.collection || "",
+        collection: normalizedCollectionAddr || item.collection || publicData.collection || "",
         name: item.name || publicData.name || "NFT",
-        owner: resolvedOwner,
+        owner: resolvedOwner ? _normalizeAddress(resolvedOwner, "400:invalid_owner_address") : "",
         tokenId: String(tokenId),
         mintTxHash: txHash || publicData.mintTxHash || "",
     };
@@ -1066,6 +1267,163 @@ const updatePinKeyvalues = async (ipfsFileId, keyvalues) => {
     return IPFS.updateFileKeyvalues(ipfsFileId, keyvalues);
 };
 
+const _sanitizeNftAttributes = (attrs) => {
+    if (!Array.isArray(attrs)) return [];
+    return attrs
+        .filter((a) => a && typeof a === "object")
+        .map((a) => ({
+            trait_type: String(a.trait_type ?? a.traitType ?? "").trim().slice(0, 64),
+            value: String(a.value ?? "").trim().slice(0, 256),
+        }))
+        .filter((a) => a.trait_type && a.value);
+};
+
+/**
+ * Update display metadata (name, description, attributes) for an existing NFT.
+ * Writes to the pinned ERC-721 JSON only (standard NFT). Does not store description or image in Pinata keyvalues.
+ * Re-pins JSON (delete + pin) so the file content updates; returns new Pinata file id / CID — clients should navigate to new id.
+ *
+ * Authorization (strict owner-only):
+ * - Minted (tokenId + collection): JsonRpcProvider ownerOf(tokenId) MUST equal EIP-191 signer address.
+ * - Draft (no token on-chain yet): Pinata keyvalue `owner` MUST equal signer address.
+ * Signed message binds ipfsFileId + collection (see _ensureMessageIncludesCollection).
+ */
+const updateNftItemDisplayMetadata = async (ipfsFileId, { name, description, attributes }, authPayload) => {
+    if (!ipfsFileId) throw new Error("400:missing_id");
+    if (!authPayload) throw new Error("400:missing_auth_payload_body_empty");
+
+    await _validateAuth(authPayload);
+    const normalizedRequester = _normalizeAddress(authPayload.owner, "400:invalid_owner_address");
+
+    const existingFile = await IPFS.getFileById(ipfsFileId);
+    if (!existingFile?.publicData || existingFile.publicData.category !== "blockdag_nft_item") {
+        throw new Error("404:item_not_found");
+    }
+
+    const pd = existingFile.publicData;
+    const collectionRaw = (pd.collection || "").trim();
+    if (!collectionRaw || collectionRaw.toLowerCase() === "none") {
+        throw new Error("400:missing_collection_on_item");
+    }
+    const normalizedCollectionAddr = _normalizeAddress(collectionRaw, "400:invalid_collection_address");
+
+    const msg = authPayload.message;
+    if (typeof msg !== "string") throw new Error("400:invalid_message");
+    const itemMatch = msg.match(/^I authorize updating NFT metadata for item (.+?) in collection .+?\. Timestamp: \d+$/);
+    if (!itemMatch || itemMatch[1] !== ipfsFileId) {
+        throw new Error("400:message_item_mismatch");
+    }
+    _ensureMessageIncludesCollection(msg, normalizedCollectionAddr);
+
+    const actualOwner = pd.owner;
+    if (!actualOwner) throw new Error("400:item_owner_undefined");
+
+    const rawTokenId = pd.tokenId != null && pd.tokenId !== "" ? String(pd.tokenId).trim() : "";
+    const hasMintedContext = rawTokenId !== "" && collectionRaw.toLowerCase() !== "none";
+
+    if (hasMintedContext) {
+        try {
+            const contract = new ethers.Contract(normalizedCollectionAddr, ERC721_ABI, _getBlockDagProvider());
+            const chainOwner = await contract.ownerOf(BigInt(rawTokenId));
+            const co = _normalizeAddress(chainOwner, "400:invalid_chain_owner");
+            if (co.toLowerCase() !== normalizedRequester.toLowerCase()) {
+                throw new Error("403:unauthorized_not_chain_owner");
+            }
+        } catch (e) {
+            if (e && typeof e.message === "string" && (e.message.startsWith("403:") || e.message.startsWith("400:"))) {
+                throw e;
+            }
+            console.error("[updateNftItemDisplayMetadata] ownerOf verify failed", e?.message || e);
+            throw new Error("503:chain_owner_verify_failed");
+        }
+    } else if (actualOwner.toLowerCase() !== normalizedRequester.toLowerCase()) {
+        throw new Error("403:unauthorized");
+    }
+
+    const metadata = await _fetchIpfsJson(existingFile.url);
+    const canonicalImage =
+        metadata && metadata.image != null && String(metadata.image).trim() !== ""
+            ? String(metadata.image).trim()
+            : String(pd.image || "").trim();
+    if (!canonicalImage) throw new Error("400:missing_canonical_image");
+
+    let nextName =
+        name !== undefined && name !== null ? String(name).trim().slice(0, 256) : String(pd.name || metadata?.name || "NFT").slice(0, 256);
+    if (!nextName) nextName = String(pd.name || metadata?.name || "NFT").slice(0, 256) || "NFT";
+    let nextDescription =
+        description !== undefined && description !== null
+            ? String(description)
+            : String(metadata?.description ?? pd.description ?? "");
+    nextDescription = nextDescription.slice(0, 5000);
+
+    let attrsSource = _mergeItemAttributes(metadata, pd);
+    if (attributes !== undefined && attributes !== null) {
+        attrsSource = attributes;
+    }
+    const sanitized = _sanitizeNftAttributes(attrsSource);
+    const attrsJson = JSON.stringify(sanitized);
+    if (attrsJson.length > 12000) throw new Error("400:attributes_too_large");
+
+    const nftData = {
+        ...(metadata && typeof metadata === "object" ? metadata : {}),
+        name: nextName,
+        description: nextDescription,
+        image: canonicalImage,
+        attributes: sanitized,
+        external_url: metadata?.external_url || "https://zelf.world",
+        category: metadata?.category || pd.nftCategory || "Art",
+        properties:
+            metadata?.properties && typeof metadata.properties === "object"
+                ? metadata.properties
+                : {
+                      files: [{ type: "image/png", uri: canonicalImage }],
+                      category: "image",
+                  },
+    };
+
+    const oldCid = _extractCid(existingFile.url);
+    if (oldCid) _ipfsJsonCache.del(oldCid);
+
+    await IPFS.deleteFiles([ipfsFileId]);
+
+    const fileName = `nft_${nextName.replace(/\s+/g, "_")}_${Date.now()}.json`;
+    const ipfsMetadata = {
+        category: "blockdag_nft_item",
+        owner: pd.owner,
+        collection: normalizedCollectionAddr || "",
+        name: nextName.slice(0, 250),
+        nftCategory: String(nftData.category || "Art").slice(0, 64),
+    };
+    if (rawTokenId) {
+        ipfsMetadata.tokenId = String(rawTokenId);
+    }
+    if (pd.mintTxHash != null && String(pd.mintTxHash).trim() !== "") {
+        ipfsMetadata.mintTxHash = String(pd.mintTxHash).slice(0, 128);
+    }
+
+    const base64Data = Buffer.from(JSON.stringify(nftData)).toString("base64");
+    const base64Json = `data:application/json;base64,${base64Data}`;
+    const ipfsResult = await IPFS.pinFile(base64Json, fileName, "application/json", ipfsMetadata);
+
+    if (!ipfsResult?.cid) throw new Error("500:metadata_repin_failed");
+
+    const newCid = ipfsResult.cid;
+    if (newCid) _ipfsJsonCache.del(newCid);
+
+    const newIpfsId = ipfsResult.id || ipfsResult.Id;
+
+    return {
+        success: true,
+        ipfsFileId: newIpfsId,
+        newIpfsId,
+        newCid,
+        ipfs: ipfsResult,
+        name: nextName,
+        description: nextDescription,
+        attributes: sanitized,
+    };
+};
+
 module.exports = {
     upload,
     getItem,
@@ -1083,5 +1441,6 @@ module.exports = {
     updateItemTokenId,
     replaceNftItemWithNewOwner,
     updatePinKeyvalues,
+    updateNftItemDisplayMetadata,
     searchCollectionsByName,
 };
