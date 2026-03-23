@@ -10,9 +10,87 @@ const moment = require("moment");
 const { searchTag } = require("./tags.module");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const jwt = require("jsonwebtoken");
+const { keccak256, solidityPacked, parseUnits, getAddress } = require("ethers");
+const { usdcAtomicFromUsd } = require("./tag-pay-usdc.util");
 const config = require("../../../Core/config");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const TagsArweaveModule = require("./tags-arweave.module");
+const { generateQRFromZelfProof } = require("./qr-zelfproof-extractor.module");
+
+const envTruthy = (v) => {
+    if (v == null || v === "") return false;
+    const s = String(v).toLowerCase();
+    return s === "1" || s === "true" || s === "yes";
+};
+
+/**
+ * Bill tag crypto amounts (incl. AVAX smartContractAVAX) at a fraction of list USD for cheap testing.
+ *
+ * Applied when the server allows reduced fees AND any of:
+ * - client header `X-Zelf-Tag-Pay-Reduced-Fee: 1` only when `isTagPayReducedFeeClientHeaderHonored()` is true (see my-tags.middleware `paymentOptionsReducedFeeGate`)
+ * - development API with auto discount (TAG_PAY_DEV_AUTO_REDUCED_FEE, default on in dev)
+ * - development API with both `NEXT_PUBLIC_AVALANCHE_TAG_PAY_DEV` and `NEXT_PUBLIC_AVALANCHE_TAG_PAY_REDUCED_FEE`
+ *   set in the **zelf** `.env` (same names as landing; ignored in production)
+ *
+ * Server allows reduced fees when: NODE_ENV=development OR TAG_PAY_ALLOW_REDUCED_FEE_FROM_CLIENT=true (non-dev only with header).
+ *
+ * Disable entirely: TAG_PAY_DEV_AMOUNT_DISCOUNT=false
+ * Fraction (0–1], default 0.02: TAG_PAY_DEV_AMOUNT_FRACTION=0.02
+ * In dev, disable auto 2% without header: TAG_PAY_DEV_AUTO_REDUCED_FEE=false
+ *
+ * @param {{ reducedFeeRequested?: boolean }} [options]
+ * @returns {number|null}
+ */
+const resolveTagPayBillableFraction = (options = {}) => {
+    const { reducedFeeRequested = false } = options;
+    if (process.env.TAG_PAY_DEV_AMOUNT_DISCOUNT === "false" || process.env.TAG_PAY_DEV_AMOUNT_DISCOUNT === "0") {
+        return null;
+    }
+
+    const raw = process.env.TAG_PAY_DEV_AMOUNT_FRACTION;
+    const fraction = raw !== undefined && raw !== "" ? Number(raw) : 0.02;
+    if (!Number.isFinite(fraction) || fraction <= 0 || fraction > 1) {
+        return null;
+    }
+
+    const serverAllows =
+        config.env === "development" || process.env.TAG_PAY_ALLOW_REDUCED_FEE_FROM_CLIENT === "true";
+    if (!serverAllows) {
+        return null;
+    }
+
+    const inDev = config.env === "development";
+    const devAutoReduced =
+        inDev &&
+        process.env.TAG_PAY_DEV_AUTO_REDUCED_FEE !== "false" &&
+        process.env.TAG_PAY_DEV_AUTO_REDUCED_FEE !== "0";
+
+    const devEnvMirrorsLandingFlags =
+        inDev &&
+        envTruthy(process.env.NEXT_PUBLIC_AVALANCHE_TAG_PAY_DEV) &&
+        envTruthy(process.env.NEXT_PUBLIC_AVALANCHE_TAG_PAY_REDUCED_FEE);
+
+    if (reducedFeeRequested || devAutoReduced || devEnvMirrorsLandingFlags) {
+        return fraction;
+    }
+
+    return null;
+};
+
+/**
+ * Whether `X-Zelf-Tag-Pay-Reduced-Fee` from a client may be honored (server must opt in).
+ * - development: both `NEXT_PUBLIC_AVALANCHE_TAG_PAY_DEV` and `NEXT_PUBLIC_AVALANCHE_TAG_PAY_REDUCED_FEE` truthy
+ * - non-development: `TAG_PAY_ALLOW_REDUCED_FEE_FROM_CLIENT=true`
+ */
+const isTagPayReducedFeeClientHeaderHonored = () => {
+    if (config.env === "development") {
+        return (
+            envTruthy(process.env.NEXT_PUBLIC_AVALANCHE_TAG_PAY_DEV) &&
+            envTruthy(process.env.NEXT_PUBLIC_AVALANCHE_TAG_PAY_REDUCED_FEE)
+        );
+    }
+    return process.env.TAG_PAY_ALLOW_REDUCED_FEE_FROM_CLIENT === "true";
+};
 
 /**
  * Validate currency for domain
@@ -43,8 +121,9 @@ const validateCurrency = (domain, currency) => {
  * @param {string} domain
  * @param {string} duration
  * @param {Object} authUser
+ * @param {{ reducedFeeRequested?: boolean }} [requestOptions]
  */
-const getPaymentOptions = async (tagName, domain, duration, authUser) => {
+const getPaymentOptions = async (tagName, domain, duration, authUser, requestOptions = {}) => {
     const domainConfig = getDomainConfig(domain);
 
     // Get current tag data
@@ -55,6 +134,11 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
     const tagObject = tagData.tagObject;
 
     const priceDetails = domainConfig.getPrice(tagName, duration, tagObject.publicData.referralTagName);
+    const devAmountFraction = resolveTagPayBillableFraction({
+        reducedFeeRequested: Boolean(requestOptions.reducedFeeRequested),
+    });
+    const listPriceUsd = priceDetails.price;
+    const billableUsdPrice = devAmountFraction != null ? listPriceUsd * devAmountFraction : listPriceUsd;
 
     const zelfPayCount = tagData.ipfs?.length || tagData.arweave?.length;
 
@@ -99,7 +183,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
         oldCurrencies?.includes("ETH") ||
         (networks?.ethereum?.enabled && networks?.ethereum?.nativeCurrency?.enabled && networks?.ethereum?.nativeCurrency?.code === "ETH")
     ) {
-        prices.ETH = await calculateCryptoValue("ETH", priceDetails.price);
+        prices.ETH = await calculateCryptoValue("ETH", billableUsdPrice);
     }
 
     // SOL - Check solana network
@@ -107,7 +191,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
         oldCurrencies?.includes("SOL") ||
         (networks?.solana?.enabled && networks?.solana?.nativeCurrency?.enabled && networks?.solana?.nativeCurrency?.code === "SOL")
     ) {
-        prices.SOL = await calculateCryptoValue("SOL", priceDetails.price);
+        prices.SOL = await calculateCryptoValue("SOL", billableUsdPrice);
     }
 
     // BTC - Check bitcoin network
@@ -115,7 +199,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
         oldCurrencies?.includes("BTC") ||
         (networks?.bitcoin?.enabled && networks?.bitcoin?.nativeCurrency?.enabled && networks?.bitcoin?.nativeCurrency?.code === "BTC")
     ) {
-        prices.BTC = await calculateCryptoValue("BTC", priceDetails.price);
+        prices.BTC = await calculateCryptoValue("BTC", billableUsdPrice);
     }
 
     // AVAX - Check avalanche network
@@ -123,12 +207,12 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
         oldCurrencies?.includes("AVAX") ||
         (networks?.avalanche?.enabled && networks?.avalanche?.nativeCurrency?.enabled && networks?.avalanche?.nativeCurrency?.code === "AVAX")
     ) {
-        prices.AVAX = await calculateCryptoValue("AVAX", priceDetails.price);
+        prices.AVAX = await calculateCryptoValue("AVAX", billableUsdPrice);
     }
 
     // BDAG - Check blockdag network (new)
     if (networks?.blockdag?.enabled && networks?.blockdag?.nativeCurrency?.enabled && networks?.blockdag?.nativeCurrency?.code === "BDAG") {
-        prices.BDAG = await calculateCryptoValue("BDAG", priceDetails.price);
+        prices.BDAG = await calculateCryptoValue("BDAG", billableUsdPrice);
     }
 
     const returnData = {
@@ -152,12 +236,104 @@ const getPaymentOptions = async (tagName, domain, duration, authUser) => {
         },
     };
 
+    if (devAmountFraction != null) {
+        returnData.devPaymentAmountDiscount = {
+            fraction: devAmountFraction,
+            listPriceUsd,
+            billableUsdPrice,
+        };
+    }
+
+    if (prices.AVAX && config.avalanche.tagPayContractAddress) {
+        try {
+            const initiatedAtUnix = BigInt(returnData.initiatedAt);
+            const paymentId = keccak256(solidityPacked(["string", "string", "uint256"], ["ZELF_AVAX_PAY_v1", returnData.tagName, initiatedAtUnix]));
+            let expectedWeiBn = avaxExpectedWeiFromUsd(billableUsdPrice, prices.AVAX.tokenPriceString);
+            if (devAmountFraction != null && expectedWeiBn < 1n) {
+                expectedWeiBn = 1n;
+            }
+            if (expectedWeiBn <= 0n) {
+                throw new Error("expectedWei_non_positive");
+            }
+            const contractAddr = getAddress(config.avalanche.tagPayContractAddress);
+            returnData.smartContractAVAX = {
+                paymentId,
+                expectedWei: expectedWeiBn.toString(),
+                chainId: config.avalanche.chainId,
+                contractAddress: contractAddr,
+            };
+
+            // Only enable when the deployed ZelfAvalanchePay includes payUsdc (constructor treasury + usdc).
+            const usdcAddrRaw = (config.avalanche.tagPayUsdcAddress || "").trim();
+            if (usdcAddrRaw) {
+                try {
+                    let expectedUsdcBn = usdcAtomicFromUsd(billableUsdPrice);
+                    if (devAmountFraction != null && expectedUsdcBn < 1n) {
+                        expectedUsdcBn = 1n;
+                    }
+                    if (expectedUsdcBn <= 0n) {
+                        throw new Error("expectedUsdc_non_positive");
+                    }
+                    returnData.smartContractAVAX.usdc = {
+                        tokenAddress: getAddress(usdcAddrRaw),
+                        expectedAmount: expectedUsdcBn.toString(),
+                        decimals: 6,
+                    };
+                    const usdcHuman = Number(expectedUsdcBn) / 1e6;
+                    prices.USDC = {
+                        amountToSend: parseFloat(usdcHuman.toFixed(6)),
+                        price: billableUsdPrice,
+                        ratePriceInUSD: 1,
+                        tokenPriceString: "1",
+                    };
+                } catch (e) {
+                    console.warn("smartContractAVAX.usdc not attached:", e?.message || e);
+                }
+            }
+
+            delete returnData.paymentAddress.avalancheAddress;
+        } catch (e) {
+            console.warn("smartContractAVAX not attached:", e?.message || e);
+        }
+    }
+
     const signedDataPrice = jwt.sign(returnData, config.JWT_SECRET);
 
     return {
         ...returnData,
         signedDataPrice,
     };
+};
+
+const WAD = BigInt(10) ** BigInt(18);
+
+/**
+ * Decimal string safe for ethers.parseUnits (avoids float round-trip on exchange rates).
+ * @param {string|number} v
+ * @returns {string}
+ */
+const decimalStringForParseUnits = (v) => {
+    if (typeof v === "number" && Number.isFinite(v)) {
+        const s = v.toFixed(18).replace(/\.?0+$/, "");
+        return s === "" ? "0" : s;
+    }
+    return String(v).trim();
+};
+
+/**
+ * Canonical native AVAX wei: floor(usd_18dec * WAD / avaxUsdPerToken_18dec).
+ * Matches "amount in AVAX" conservatively (floor) for on-chain msg.value.
+ * @param {string|number} usdPrice
+ * @param {string} avaxUsdPerTokenStr — AVAX price in USD as decimal string (from API, not via float display)
+ * @returns {bigint}
+ */
+const avaxExpectedWeiFromUsd = (usdPrice, avaxUsdPerTokenStr) => {
+    const usdScaled = parseUnits(decimalStringForParseUnits(usdPrice), 18);
+    const pxScaled = parseUnits(decimalStringForParseUnits(avaxUsdPerTokenStr), 18);
+    if (pxScaled === 0n) {
+        throw new Error("avax_usd_price_zero");
+    }
+    return (usdScaled * WAD) / pxScaled;
 };
 
 const calculateCryptoValue = async (token = "ETH", price_) => {
@@ -180,11 +356,13 @@ const calculateCryptoValue = async (token = "ETH", price_) => {
         }
 
         const cryptoValue = price_ / tokenPrice;
+        const tokenPriceString = decimalStringForParseUnits(tokenPrice);
 
         return {
             amountToSend: parseFloat(cryptoValue.toFixed(7)),
             ratePriceInUSD: parseFloat(parseFloat(tokenPrice).toFixed(5)),
             price: price_,
+            tokenPriceString,
         };
     } catch (error) {
         // If token is not supported, log warning and return null
@@ -463,6 +641,34 @@ const buildMetadata = (params, tagObject, domainConfig) => {
     return { metadata, fullTagName: tagObject.fullTagName };
 };
 
+/**
+ * Ensure tagObject has a data-URL QR for storage (IPFS / Walrus / Arweave).
+ * Regenerates from zelfProof when missing or when gateway fetch left it null (e.g. Pinata 403).
+ */
+const ensureZelfProofQRCode = async (tagObject) => {
+    if (tagObject.zelfProofQRCode && typeof tagObject.zelfProofQRCode === "string" && tagObject.zelfProofQRCode.trim() !== "") {
+        return;
+    }
+
+    const zelfProof = tagObject.zelfProof || tagObject.publicData?.zelfProof;
+
+    if (!zelfProof) {
+        const err = new Error("zelf_proof_qr_unavailable");
+        err.status = 500;
+        throw err;
+    }
+
+    const qr = await generateQRFromZelfProof(zelfProof);
+
+    if (!qr || typeof qr !== "string") {
+        const err = new Error("zelf_proof_qr_regeneration_failed");
+        err.status = 500;
+        throw err;
+    }
+
+    tagObject.zelfProofQRCode = qr;
+};
+
 const storeInWalrus = async (tagObject, domainConfig, metadata) => {
     tagObject.walrus = await WalrusModule.tagRegistration(
         tagObject.zelfProofQRCode,
@@ -506,9 +712,11 @@ const storeInArweave = async (tagObject, domainConfig, metadata) => {
 
 module.exports = {
     validateCurrency,
+    isTagPayReducedFeeClientHeaderHonored,
     getPaymentOptions,
     getPricingTable,
     buildMetadata,
+    ensureZelfProofQRCode,
     storeInWalrus,
     storeInIPFS,
     storeInArweave,

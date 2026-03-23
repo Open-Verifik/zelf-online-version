@@ -234,6 +234,7 @@ const decryptTag = async (params, authUser) => {
     // Generate Arweave wallet from mnemonic for consistency
     const arweave = await ArweaveModule.generateWalletFromMnemonic(mnemonic);
 
+    // XLM address heal, addresses JSON on re-pin, and stellarSecretKey in wallet encrypt live in sync-tag-records.module (initTagUpdates / updateTags).
     const { encryptedMessage, privateKey, tagsToAdd } = await initTagUpdates(tagObject, {
         mnemonic,
         zkProof,

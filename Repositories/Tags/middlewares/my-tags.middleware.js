@@ -4,6 +4,9 @@ const moment = require("moment");
 const { extractDomainAndName, validateDomainAndName } = require("./tags.middleware");
 const jwt = require("jsonwebtoken");
 const config = require("../../../Core/config");
+const TagsPaymentModule = require("../modules/tags-payment.module");
+
+const TAG_PAY_REDUCED_FEE_HEADER = "x-zelf-tag-pay-reduced-fee";
 
 const schemas = {
     transfer: {
@@ -17,6 +20,13 @@ const schemas = {
         domain: string(),
         network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX"]).required(),
         token: string().required(),
+    },
+    smartContractPaymentConfirmation: {
+        tagName: string().required(),
+        domain: string(),
+        network: stringEnum(["AVAX_SC"]).required(),
+        token: string().required(),
+        txHash: string().required(),
     },
     paymentOptions: {
         tagName: string().required(),
@@ -114,6 +124,27 @@ const paymentOptionsValidation = async (ctx, next) => {
 };
 
 /**
+ * Honor `X-Zelf-Tag-Pay-Reduced-Fee` only when the server opts in; strip the header otherwise so it cannot be abused downstream.
+ * Sets `ctx.state.reducedFeeRequested` for the payment-options handler.
+ */
+const paymentOptionsReducedFeeGate = async (ctx, next) => {
+    const raw = String(ctx.get(TAG_PAY_REDUCED_FEE_HEADER) || "").toLowerCase();
+    const headerWantsReduced = raw === "1" || raw === "true" || raw === "yes";
+    const honored = TagsPaymentModule.isTagPayReducedFeeClientHeaderHonored();
+
+    ctx.state.reducedFeeRequested = Boolean(headerWantsReduced && honored);
+
+    if (headerWantsReduced && !honored) {
+        delete ctx.request.headers[TAG_PAY_REDUCED_FEE_HEADER];
+        if (ctx.req?.headers) {
+            delete ctx.req.headers[TAG_PAY_REDUCED_FEE_HEADER];
+        }
+    }
+
+    await next();
+};
+
+/**
  * Payment Confirmation Validation - Multi-domain support
  * @param {*} ctx - Koa context
  * @param {*} next - Next middleware
@@ -161,6 +192,81 @@ const paymentConfirmationValidation = async (ctx, next) => {
     if (!tokenDecoded.prices[network] && network !== "coinbase" && network !== "CB") {
         ctx.status = 409;
         ctx.body = { validationError: "invalid_network" };
+        return;
+    }
+
+    await next();
+};
+
+const smartContractPaymentConfirmationValidation = async (ctx, next) => {
+    const valid = validate(schemas.smartContractPaymentConfirmation, ctx.request.body);
+
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
+
+    const { tagName, domain, token } = ctx.request.body;
+
+    const domainValidation = await validateDomainAndName(domain, tagName);
+
+    if (!domainValidation.valid) {
+        ctx.status = 409;
+        ctx.body = { validationError: domainValidation.error };
+        return;
+    }
+
+    let tokenDecoded;
+
+    try {
+        tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+    } catch {
+        ctx.status = 409;
+        ctx.body = { validationError: "invalid_token" };
+        return;
+    }
+
+    if (!tokenDecoded) {
+        ctx.status = 409;
+        ctx.body = { validationError: "invalid_token" };
+        return;
+    }
+
+    const now = moment().unix();
+
+    if (tokenDecoded.ttl < now) {
+        ctx.status = 409;
+        ctx.body = { validationError: "token_expired" };
+        return;
+    }
+
+    const scA = tokenDecoded.smartContractAVAX;
+    const hasNative =
+        scA?.expectedWei != null &&
+        String(scA.expectedWei).trim() !== "" &&
+        (() => {
+            try {
+                return BigInt(scA.expectedWei) > 0n;
+            } catch {
+                return false;
+            }
+        })();
+    const hasUsdc =
+        scA?.usdc?.expectedAmount != null &&
+        String(scA.usdc.expectedAmount).trim() !== "" &&
+        scA?.usdc?.tokenAddress &&
+        (() => {
+            try {
+                return BigInt(scA.usdc.expectedAmount) > 0n;
+            } catch {
+                return false;
+            }
+        })();
+
+    if (!scA?.paymentId || (!hasNative && !hasUsdc)) {
+        ctx.status = 409;
+        ctx.body = { validationError: "smart_contract_avax_not_in_token" };
         return;
     }
 
@@ -256,7 +362,9 @@ const extendLicenseForOwnerValidation = async (ctx, next) => {
 module.exports = {
     transferValidation,
     paymentOptionsValidation,
+    paymentOptionsReducedFeeGate,
     paymentConfirmationValidation,
+    smartContractPaymentConfirmationValidation,
     receiptEmailValidation,
     referralsValidation,
     claimReferralValidation,

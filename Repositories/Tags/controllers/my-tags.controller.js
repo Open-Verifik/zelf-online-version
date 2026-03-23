@@ -52,6 +52,22 @@ const paymentConfirmation = async (ctx) => {
     }
 };
 
+const smartContractPaymentConfirmation = async (ctx) => {
+    try {
+        const { tagName, domain, token, txHash } = ctx.request.body;
+
+        const data = await Module.verifySmartContractPayment(tagName, domain, token, txHash);
+
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
+
+        ctx.status = _exception.status;
+
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
+};
+
 /**
  * Payment options
  * @param {Object} ctx - Koa context
@@ -61,7 +77,11 @@ const paymentOptions = async (ctx) => {
     try {
         const { tagName, domain, duration } = ctx.request.query;
 
-        const data = await TagsPaymentModule.getPaymentOptions(tagName, domain, duration, ctx.state.user);
+        const reducedFeeRequested = Boolean(ctx.state.reducedFeeRequested);
+
+        const data = await TagsPaymentModule.getPaymentOptions(tagName, domain, duration, ctx.state.user, {
+            reducedFeeRequested,
+        });
 
         ctx.body = { data };
     } catch (error) {
@@ -148,6 +168,7 @@ const extendLicenseForOwner = async (ctx) => {
 module.exports = {
     transferTag,
     paymentConfirmation,
+    smartContractPaymentConfirmation,
     paymentOptions,
     receiptEmail,
     referrals,

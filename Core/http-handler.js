@@ -149,6 +149,21 @@ const errorHandler = (exception, ctx = null, optionalMessage) => {
 	console.error({ exception });
 	// }
 
+	if (exception?.clientCode && typeof exception.message === "string") {
+		const statusMatch = /^(\d{3}):/.exec(exception.message.trim());
+		if (statusMatch) {
+			const status = parseInt(statusMatch[1], 10);
+			if (Number.isFinite(status) && status >= 400 && status < 600) {
+				const detail = exception.message.includes(":") ? exception.message.split(":").slice(1).join(":") : exception.message;
+				return {
+					status,
+					message: exception.clientMessage || detail.replace(/_/g, " "),
+					code: exception.clientCode,
+				};
+			}
+		}
+	}
+
 	// Handle MongoDB validation errors
 	if (exception && exception.keyPattern && MongoError.includes(exception.name)) {
 		const message = `ValidationError: ${Object.keys(exception.keyPattern).join(",")} is not valid`;

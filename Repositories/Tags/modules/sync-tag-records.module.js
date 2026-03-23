@@ -1,4 +1,5 @@
 const { createBTCWallet } = require("../../Wallet/modules/btc");
+const { healPublicDataXlm } = require("../../Wallet/modules/stellar");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
 const SessionModule = require("../../Session/modules/session.module");
 const TagsPartsModule = require("./tags-parts.module");
@@ -27,7 +28,7 @@ const initTagUpdates = async (tagObject, secretKeys) => {
         tagsToAdd.push({ name: "suiAddress", value: sui.address, new: true });
     }
 
-    if (!tagObject.publicData.btcAddress.startsWith("bc1")) {
+    if (!(tagObject.publicData.btcAddress || "").startsWith("bc1")) {
         btc = createBTCWallet(mnemonic);
 
         tagObject.publicData.btcAddress = btc.address;
@@ -35,11 +36,25 @@ const initTagUpdates = async (tagObject, secretKeys) => {
         tagsToAdd.push({ name: "btcAddress", value: btc.address, new: false });
     }
 
+    const { stellar, shouldPersistXlm, hadXlmBeforeHeal } = healPublicDataXlm(tagObject.publicData, mnemonic);
+
+    if (shouldPersistXlm) {
+        tagsToAdd.push({ name: "xlmAddress", value: tagObject.publicData.xlmAddress, new: !hadXlmBeforeHeal });
+    }
+
     const domainConfig = getDomainConfig(tagObject.publicData.domain || "zelf");
+
     const walletScopeKey = TagsPartsModule.getWalletScopeKey(tagObject.publicData, domainConfig);
 
     const { encryptedMessage, privateKey } = await SessionModule.walletEncrypt(
-        { mnemonic, zkProof, solanaSecretKey, suiSecretKey: sui.secretKey, arweavePrivateKey },
+        {
+            mnemonic,
+            zkProof,
+            solanaSecretKey,
+            suiSecretKey: sui.secretKey,
+            stellarSecretKey: stellar.secretKey,
+            arweavePrivateKey,
+        },
         walletScopeKey,
         password,
         tagObject.publicData.ethAddress
@@ -96,6 +111,18 @@ const updateTags = async (tagObject, tagsToAdd) => {
         }
 
         metadata[tag.name] = tag.value;
+    }
+
+    const addressBundle = Object.fromEntries(
+        Object.entries({
+            arweaveAddress: tagObject.publicData.arweaveAddress,
+            suiAddress: tagObject.publicData.suiAddress,
+            xlmAddress: tagObject.publicData.xlmAddress,
+        }).filter(([, v]) => typeof v === "string" && v.trim())
+    );
+
+    if (Object.keys(addressBundle).length) {
+        metadata.addresses = JSON.stringify(addressBundle);
     }
 
     metadata.extraParams = JSON.stringify(metadata.extraParams);

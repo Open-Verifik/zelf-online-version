@@ -15,10 +15,22 @@ module.exports = (server) => {
     server.post(`${PATH}/transfer`, Middleware.transferValidation, Controller.transferTag);
 
     // payment options
-    server.get(`${PATH}/payment-options`, Middleware.paymentOptionsValidation, Controller.paymentOptions);
+    server.get(
+        `${PATH}/payment-options`,
+        Middleware.paymentOptionsValidation,
+        Middleware.paymentOptionsReducedFeeGate,
+        Controller.paymentOptions,
+    );
 
     // payment confirmation
     server.post(`${PATH}/payment-confirmation`, Middleware.paymentConfirmationValidation, Controller.paymentConfirmation);
+
+    // Avalanche smart-contract payment confirmation (ZelfAvalanchePay)
+    server.post(
+        `${PATH}/smart-contract-payment-confirmation`,
+        Middleware.smartContractPaymentConfirmationValidation,
+        Controller.smartContractPaymentConfirmation
+    );
 
     // receipt email
     server.post(`${PATH}/email-receipt`, Middleware.receiptEmailValidation, Controller.receiptEmail);

@@ -1,4 +1,5 @@
 const config = require("../../../Core/config");
+const Joi = require("joi");
 
 const { string, object, array, validate, stringEnum, forbidden, stringOrNumber, minMaxNumber, number } = require("../../../Core/JoiUtils");
 
@@ -54,6 +55,7 @@ const schemas = {
 		integrator: forbidden(),
 		referrer: forbidden(),
 		slippage: minMaxNumber(0, 1).required(),
+		toAddress: Joi.string().trim().allow("").optional(),
 		toChain: string().required(),
 		toToken: string().required(),
 	},

@@ -1,4 +1,6 @@
 const config = require("../../../Core/config");
+const NodeCache = require("node-cache");
+const { JsonRpcProvider, Interface, getAddress } = require("ethers");
 const { searchTag } = require("./tags.module");
 const TagsSearchModule = require("./tags-search.module");
 const moment = require("moment");
@@ -11,13 +13,41 @@ const solanaModule = require("../../Solana/modules/solana-scrapping.module");
 const AvalancheModule = require("../../Avalanche/modules/avalanche-scrapping.module");
 const BlockDAGModule = require("../../BlockDAG/modules/blockdag.module");
 const { sendCustomEmail } = require("../../../Core/mailgun");
-const { buildMetadata, storeInIPFS, storeInWalrus, storeInArweave } = require("./tags-payment.module");
+const { buildMetadata, ensureZelfProofQRCode, storeInIPFS, storeInWalrus, storeInArweave } = require("./tags-payment.module");
+const { parseTagPayAmount, coerceInitiatedAtUnix, filterSessionInboundTransactions } = require("./tag-pay-session-tx.util");
 
 const ReferralRewardModel = require("../models/referral-rewards.model");
 const TagsTokenModule = require("./tags-token.module");
 const IPFS = require("../../../Core/ipfs");
 const TagsArweaveModule = require("./tags-arweave.module");
 const LicenseModule = require("../../License/modules/license.module");
+
+const scPayTxCache = new NodeCache({ stdTTL: 172800, maxKeys: 50000, useClones: false });
+
+const PAID_EVENT_IFACE = new Interface([
+    "event Paid(bytes32 indexed paymentId, address indexed payer, uint256 amount, string tagFull)",
+]);
+
+const TAG_PAY_TX_IFACE = new Interface([
+    "function pay(bytes32 paymentId, string tagFull) payable",
+    "function payUsdc(bytes32 paymentId, string tagFull, uint256 amount)",
+]);
+
+const _normalizeTxHash = (txHash) => {
+    if (!txHash || typeof txHash !== "string") return null;
+    const h = txHash.trim();
+    if (!/^0x[a-fA-F0-9]{64}$/.test(h)) return null;
+    return h.toLowerCase();
+};
+
+const throwPaymentConfirmationTagNotFound = (tagName, domain) => {
+    const fullTag = `${tagName}.${domain}`;
+    console.warn("[payment_confirmation] tag_not_found", { tagName, domain, fullTag });
+    const err = new Error("404:tag_not_found");
+    err.clientCode = "tag_not_found";
+    err.clientMessage = "Tag not found or not indexed";
+    throw err;
+};
 
 /**
  * Confirm payment with Coinbase
@@ -77,14 +107,20 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
     // Verify the tag belongs to the user
     if (tokenDecoded.tagName !== `${tagName}.${domain}`) throw new Error("403:tag_not_owned");
 
+    if (network === "AVAX") {
+        throw new Error("409:avax_use_smart_contract_confirmation");
+    }
+
     // Get current tag data
     const tagData = await searchTag({ tagName, domain }, {});
 
-    if (tagData.available) throw new Error("404:tag_not_found");
+    if (tagData.available) throwPaymentConfirmationTagNotFound(tagName, domain);
 
     const tagObject = tagData.tagObject;
 
     const amountToPay = tokenDecoded.prices[network]?.amountToSend;
+
+    const initiatedAtUnix = coerceInitiatedAtUnix(tokenDecoded.initiatedAt);
 
     const addressMapping = {
         ETH: tokenDecoded.paymentAddress.ethAddress,
@@ -96,7 +132,7 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
         BDAG: tokenDecoded.paymentAddress?.blockdagAddress || tokenDecoded.paymentAddress?.ethAddress,
     };
 
-    const paymentConfirmation = await confirmPayUniqueAddress(network, addressMapping[network], amountToPay);
+    const paymentConfirmation = await confirmPayUniqueAddress(network, addressMapping[network], amountToPay, { initiatedAtUnix });
 
     const initiatedAt = tokenDecoded.initiatedAt ? moment.unix(tokenDecoded.initiatedAt) : null;
 
@@ -115,7 +151,21 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
             //await getPurchaseReward(zelfNameObject.publicData.zelfName, moment(authUser.payment.registeredAt)),
         };
     }
-    // logic to extend the duration of the tag
+
+    const paymentOk =
+        paymentConfirmation && typeof paymentConfirmation === "object" && paymentConfirmation.confirmed === true;
+
+    if (!paymentOk) {
+        const _paymentConfirmation = paymentConfirmation && typeof paymentConfirmation === "object" ? paymentConfirmation : null;
+
+        return {
+            tagObject,
+            confirmed: false,
+            amountReceived: _paymentConfirmation?.amountReceived ?? 0,
+            ...(_paymentConfirmation ? { paymentConfirmation: _paymentConfirmation } : {}),
+        };
+    }
+
     await addDurationToTag(
         {
             tagName: tagObject.publicData[domainConfig.getTagKey()].split(".")[0],
@@ -129,38 +179,336 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
 
     return {
         tagObject,
-        confirmed: paymentConfirmation.confirmed,
-        amountReceived: paymentConfirmation.amountReceived,
-        // paymentConfirmation,
+        confirmed: true,
         amountReceived: paymentConfirmation.amountReceived,
     };
 };
 
-const isETHPaymentConfirmed = async (address, amountToPay) => {
+/** Years to add for renewal; align with extend-license style lifetime handling. */
+const _scLicenseExtensionYears = (durationRaw) => {
+    if (durationRaw === "lifetime" || durationRaw === 999 || durationRaw === "999") return 100;
+    const n = Number(durationRaw);
+    return Number.isFinite(n) && n > 0 ? n : 1;
+};
+
+/** Same expiry math as tags-payment `buildMetadata` extraParams.expiresAt. */
+const _computeScLicenseExtension = (currentExpiresAt, durationRaw) => {
+    const years = _scLicenseExtensionYears(durationRaw);
+    const previousExpiresAt = currentExpiresAt;
+    const newExpiresAt = moment(currentExpiresAt).add(years, "year").format("YYYY-MM-DD HH:mm:ss");
+
+    return { previousExpiresAt, newExpiresAt };
+};
+
+/**
+ * Avalanche C-Chain smart-contract payment (ZelfAvalanchePay). Verifies tx receipt + Paid event vs JWT.
+ * @param {string} tagName
+ * @param {string} domain
+ * @param {string} token - JWT signedDataPrice
+ * @param {string} txHash
+ */
+const verifySmartContractPayment = async (tagName, domain, token, txHash) => {
+    const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+    const domainConfig = getDomainConfig(domain);
+
+    if (!tokenDecoded?.tagName || !tokenDecoded?.tagPayName) throw new Error("401:tag_not_authenticated");
+
+    if (tokenDecoded.tagName !== `${tagName}.${domain}`) throw new Error("403:tag_not_owned");
+
+    const sc = tokenDecoded.smartContractAVAX;
+
+    const hasNativeWei =
+        sc?.expectedWei != null &&
+        String(sc.expectedWei).trim() !== "" &&
+        (() => {
+            try {
+                return BigInt(sc.expectedWei) > 0n;
+            } catch {
+                return false;
+            }
+        })();
+    const hasUsdcPayload =
+        sc?.usdc?.expectedAmount != null &&
+        String(sc.usdc.expectedAmount).trim() !== "" &&
+        sc?.usdc?.tokenAddress &&
+        (() => {
+            try {
+                return BigInt(sc.usdc.expectedAmount) > 0n;
+            } catch {
+                return false;
+            }
+        })();
+
+    if (!sc?.paymentId || sc?.chainId == null || (!hasNativeWei && !hasUsdcPayload)) {
+        throw new Error("409:smart_contract_avax_not_in_token");
+    }
+
+    if (!config.avalanche.tagPayContractAddress) throw new Error("500:tag_pay_contract_not_configured");
+
+    const expectedContract = getAddress(config.avalanche.tagPayContractAddress);
+
+    if (Number(sc.chainId) !== Number(config.avalanche.chainId)) throw new Error("409:chain_id_mismatch");
+
+    const normalizedHash = _normalizeTxHash(txHash);
+
+    if (!normalizedHash) throw new Error("409:invalid_tx_hash");
+
+    const cacheKey = `scpay_tx_${normalizedHash}`;
+    const cached = scPayTxCache.get(cacheKey);
+
+    if (
+        cached &&
+        cached.paymentId === sc.paymentId &&
+        cached.tagName === tokenDecoded.tagName
+    ) {
+        return cached.body;
+    }
+
+    const tagData = await searchTag({ tagName, domain }, {});
+
+    if (tagData.available) throwPaymentConfirmationTagNotFound(tagName, domain);
+
+    const tagObject = tagData.tagObject;
+
+    const initiatedAt = tokenDecoded.initiatedAt ? moment.unix(tokenDecoded.initiatedAt) : null;
+
+    const renewedAtCondition = Boolean(tagObject.publicData.renewedAt && initiatedAt && moment(tagObject.publicData.renewedAt).isAfter(initiatedAt));
+
+    const registeredAtCondition = Boolean(tokenDecoded.initiatedAt && moment(tagObject.publicData.registeredAt).isAfter(initiatedAt));
+
+    const rpcUrl = config.avalanche.rpcUrl;
+
+    if (!rpcUrl) throw new Error("500:avalanche_rpc_not_configured");
+
+    const provider = new JsonRpcProvider(rpcUrl, config.avalanche.chainId);
+    const network = await provider.getNetwork();
+
+    if (Number(network.chainId) !== Number(config.avalanche.chainId)) throw new Error("409:provider_chain_mismatch");
+
+    const receipt = await provider.getTransactionReceipt(normalizedHash);
+
+    if (!receipt || Number(receipt.status) !== 1) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "receipt_missing_or_failed" } };
+
+        return out;
+    }
+
+    const currentBlock = await provider.getBlockNumber();
+    const confs = config.avalanche.tagPayConfirmations || 1;
+
+    if (currentBlock - Number(receipt.blockNumber) + 1 < confs) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "insufficient_confirmations" } };
+
+        return out;
+    }
+
+    if (!receipt.to || getAddress(receipt.to) !== expectedContract) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "wrong_contract" } };
+
+        return out;
+    }
+
+    const tx = await provider.getTransaction(normalizedHash);
+
+    if (!tx || !tx.to || getAddress(tx.to) !== expectedContract) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "tx_missing_or_wrong_contract" } };
+
+        return out;
+    }
+
+    let payMode = null;
+
+    try {
+        const decoded = TAG_PAY_TX_IFACE.parseTransaction({ data: tx.data });
+
+        if (decoded.name === "pay" && tx.value > 0n) {
+            payMode = "NATIVE";
+        } else if (decoded.name === "payUsdc" && tx.value === 0n) {
+            payMode = "USDC";
+        }
+    } catch {
+        payMode = null;
+    }
+
+    if (!payMode) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "unknown_tag_pay_function" } };
+
+        return out;
+    }
+
+    if (payMode === "NATIVE" && !hasNativeWei) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "native_not_in_token" } };
+
+        return out;
+    }
+
+    if (payMode === "USDC" && !hasUsdcPayload) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "usdc_not_in_token" } };
+
+        return out;
+    }
+
+    if (payMode === "USDC" && (config.avalanche.tagPayUsdcAddress || "").trim()) {
+        try {
+            if (getAddress(sc.usdc.tokenAddress) !== getAddress(config.avalanche.tagPayUsdcAddress)) {
+                const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "usdc_token_mismatch" } };
+
+                return out;
+            }
+        } catch {
+            const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "usdc_token_invalid" } };
+
+            return out;
+        }
+    }
+
+    let paidLog = null;
+
+    for (const log of receipt.logs) {
+        if (!log.address || getAddress(log.address) !== expectedContract) continue;
+
+        try {
+            const parsed = PAID_EVENT_IFACE.parseLog({ topics: [...log.topics], data: log.data });
+
+            if (parsed?.name === "Paid") paidLog = parsed;
+        } catch {
+            /* not Paid */
+        }
+    }
+
+    if (!paidLog) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "paid_event_not_found" } };
+
+        return out;
+    }
+
+    const args = paidLog.args;
+    const eventPaymentId = args.paymentId;
+    const eventAmount = args.amount;
+    const eventTagFull = args.tagFull;
+
+    const jwtPaymentId = sc.paymentId;
+
+    if (typeof jwtPaymentId !== "string" || eventPaymentId.toLowerCase() !== jwtPaymentId.toLowerCase()) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "payment_id_mismatch" } };
+
+        return out;
+    }
+
+    if (eventTagFull !== tokenDecoded.tagName) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "tag_mismatch" } };
+
+        return out;
+    }
+
+    let amountToPay;
+    let expectedAtomic;
+    let amountReceivedHuman;
+
+    if (payMode === "NATIVE") {
+        amountToPay = tokenDecoded.prices?.AVAX?.amountToSend;
+        if (amountToPay == null) throw new Error("409:avax_price_missing");
+        expectedAtomic = BigInt(sc.expectedWei);
+        amountReceivedHuman = Number(eventAmount) / 1e18;
+    } else {
+        amountToPay = tokenDecoded.prices?.USDC?.amountToSend;
+        if (amountToPay == null) throw new Error("409:usdc_price_missing");
+        expectedAtomic = BigInt(sc.usdc.expectedAmount);
+        amountReceivedHuman = Number(eventAmount) / 1e6;
+    }
+
+    if (eventAmount < expectedAtomic) {
+        const out = { confirmed: false, amountReceived: "0", paymentConfirmation: { reason: "amount_below_expected" } };
+
+        return out;
+    }
+
+    // Do not require event payer === tag.ethAddress: payer may differ from .zelfpay deposit key.
+
+    const paymentConfirmation = {
+        confirmed: true,
+        amountReceived: amountReceivedHuman,
+        amountWei: eventAmount.toString(),
+        payAsset: payMode,
+        txHash: normalizedHash,
+        checkedFactor: "smart_contract_event",
+    };
+
+    if (renewedAtCondition || registeredAtCondition) {
+        const result = {
+            cache: true,
+            confirmed: true,
+            amountReceived: String(amountReceivedHuman),
+            paymentConfirmation,
+            publicData: tagObject.publicData,
+            reward: "pending_to_code",
+            licenseExtension: null,
+        };
+
+        scPayTxCache.set(cacheKey, { paymentId: sc.paymentId, tagName: tokenDecoded.tagName, body: result });
+
+        return result;
+    }
+
+    const licenseExtension = _computeScLicenseExtension(tagObject.publicData.expiresAt, tokenDecoded.duration);
+
+    await addDurationToTag(
+        {
+            tagName: tagObject.publicData[domainConfig.getTagKey()].split(".")[0],
+            price: amountToPay,
+            domain,
+            duration: tokenDecoded.duration || 1,
+            domainConfig,
+        },
+        tagObject
+    );
+
+    const result = {
+        tagObject,
+        confirmed: true,
+        amountReceived: String(amountReceivedHuman),
+        paymentConfirmation,
+        licenseExtension,
+    };
+
+    scPayTxCache.set(cacheKey, { paymentId: sc.paymentId, tagName: tokenDecoded.tagName, body: result });
+
+    return result;
+};
+
+const isETHPaymentConfirmed = async (address, amountToPay, initiatedAtUnix) => {
+    const amountNum = parseTagPayAmount(amountToPay);
+    if (amountNum == null) {
+        return {
+            confirmed: false,
+            amountReceived: 0,
+            amountToPay,
+            checkedFactor: "invalid_amount",
+        };
+    }
     try {
         const response = await ETHModule.getAddress({ address });
 
         const numericBalance = Number(response?.balance ?? 0);
 
-        if (!Number.isNaN(numericBalance) && numericBalance <= amountToPay) {
+        if (!Number.isNaN(numericBalance) && numericBalance <= amountNum) {
             return {
                 confirmed: false,
                 amountReceived: 0,
-                amountToPay,
+                amountToPay: amountNum,
                 transactions: response?.transactions,
                 balance: response?.balance,
                 checkedFactor: "balance",
             };
         }
 
-        const amountReceived = response?.transactions
-            .filter((transaction) => transaction.traffic === "IN")
-            .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+        const sessionTxs = filterSessionInboundTransactions(response?.transactions, initiatedAtUnix);
+        const amountReceived = sessionTxs.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
 
         return {
-            confirmed: amountReceived >= amountToPay,
+            confirmed: amountReceived >= amountNum,
             amountReceived,
-            amountToPay,
+            amountToPay: amountNum,
             transactions: response?.transactions,
             balance: response?.balance,
             checkedFactor: "transactions",
@@ -172,36 +520,47 @@ const isETHPaymentConfirmed = async (address, amountToPay) => {
     return false;
 };
 
-const isSolanaPaymentConfirmed = async (address, amountToPay) => {
+const isSolanaPaymentConfirmed = async (address, amountToPay, initiatedAtUnix) => {
+    const amountNum = parseTagPayAmount(amountToPay);
+
+    if (amountNum == null) {
+        return {
+            confirmed: false,
+            amountReceived: 0,
+            amountToPay,
+            checkedFactor: "invalid_amount",
+        };
+    }
+
     try {
         const response = await solanaModule.getAddress({ id: address });
 
         const numericBalance = Number(response?.balance ?? 0);
 
-        if (!Number.isNaN(numericBalance) && numericBalance <= amountToPay) {
+        if (!Number.isNaN(numericBalance) && numericBalance <= amountNum) {
             return {
                 confirmed: false,
                 amountReceived: 0,
-                amountToPay,
+                amountToPay: amountNum,
                 transactions: response?.transactions,
                 balance: response?.balance,
                 checkedFactor: "balance",
             };
         }
 
-        const amountReceived = response?.transactions
-            .filter((transaction) => transaction.traffic === "IN")
-            .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+        const sessionTxs = filterSessionInboundTransactions(response?.transactions, initiatedAtUnix);
+
+        const amountReceived = sessionTxs.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
 
         return {
-            confirmed: amountReceived >= amountToPay,
+            confirmed: amountReceived >= amountNum,
             amountReceived,
-            amountToPay,
+            amountToPay: amountNum,
             transactions: response?.transactions,
             balance: response?.balance,
             checkedFactor: "transactions",
         };
-    } catch (error) {}
+    } catch (error) { }
 
     return false;
 };
@@ -212,31 +571,39 @@ const isSolanaPaymentConfirmed = async (address, amountToPay) => {
  * @param {number} amountToPay
  * @returns {Promise<Object>}
  */
-const isAvalanchePaymentConfirmed = async (address, amountToPay) => {
+const isAvalanchePaymentConfirmed = async (address, amountToPay, initiatedAtUnix) => {
+    const amountNum = parseTagPayAmount(amountToPay);
+    if (amountNum == null) {
+        return {
+            confirmed: false,
+            amountReceived: 0,
+            amountToPay,
+            checkedFactor: "invalid_amount",
+        };
+    }
     try {
         const response = await AvalancheModule.getBalance({ id: address });
 
         const numericBalance = Number(response?.balance ?? 0);
 
-        if (!Number.isNaN(numericBalance) && numericBalance <= amountToPay) {
+        if (!Number.isNaN(numericBalance) && numericBalance <= amountNum) {
             return {
                 confirmed: false,
                 amountReceived: 0,
-                amountToPay,
+                amountToPay: amountNum,
                 transactions: response?.transactions,
                 balance: response?.balance,
                 checkedFactor: "balance",
             };
         }
 
-        const amountReceived = response?.transactions
-            .filter((transaction) => transaction.traffic === "IN")
-            .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+        const sessionTxs = filterSessionInboundTransactions(response?.transactions, initiatedAtUnix);
+        const amountReceived = sessionTxs.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
 
         return {
-            confirmed: amountReceived >= amountToPay,
+            confirmed: amountReceived >= amountNum,
             amountReceived,
-            amountToPay,
+            amountToPay: amountNum,
             transactions: response?.transactions,
             balance: response?.balance,
             checkedFactor: "transactions",
@@ -254,7 +621,16 @@ const isAvalanchePaymentConfirmed = async (address, amountToPay) => {
  * @param {number} amountToPay
  * @returns {Promise<Object>}
  */
-const isBlockDAGPaymentConfirmed = async (address, amountToPay) => {
+const isBlockDAGPaymentConfirmed = async (address, amountToPay, initiatedAtUnix) => {
+    const amountNum = parseTagPayAmount(amountToPay);
+    if (amountNum == null) {
+        return {
+            confirmed: false,
+            amountReceived: 0,
+            amountToPay,
+            checkedFactor: "invalid_amount",
+        };
+    }
     try {
         const response = await BlockDAGModule.getAddress({ address });
 
@@ -262,25 +638,24 @@ const isBlockDAGPaymentConfirmed = async (address, amountToPay) => {
 
         const numericBalance = Number(response?.balance ?? 0);
 
-        if (!Number.isNaN(numericBalance) && numericBalance <= amountToPay) {
+        if (!Number.isNaN(numericBalance) && numericBalance <= amountNum) {
             return {
                 confirmed: false,
                 amountReceived: 0,
-                amountToPay,
+                amountToPay: amountNum,
                 transactions: response?.transactions,
                 balance: response?.balance,
                 checkedFactor: "balance",
             };
         }
 
-        const amountReceived = (response?.transactions || [])
-            .filter((tx) => tx.traffic === "IN")
-            .reduce((sum, tx) => sum + Number(tx.amount), 0);
+        const sessionTxs = filterSessionInboundTransactions(response?.transactions, initiatedAtUnix);
+        const amountReceived = sessionTxs.reduce((sum, tx) => sum + Number(tx.amount), 0);
 
         return {
-            confirmed: amountReceived >= amountToPay,
+            confirmed: amountReceived >= amountNum,
             amountReceived,
-            amountToPay,
+            amountToPay: amountNum,
             transactions: response?.transactions,
             balance: response?.balance,
             checkedFactor: "transactions",
@@ -299,6 +674,15 @@ const isBlockDAGPaymentConfirmed = async (address, amountToPay) => {
  * @returns Boolean
  */
 const isBTCPaymentConfirmed = async (address, zelfNamePrice) => {
+    const priceNum = parseTagPayAmount(zelfNamePrice);
+    if (priceNum == null) {
+        return {
+            amountReceived: "0",
+            confirmed: false,
+            zelfNamePrice,
+            checkedFactor: "invalid_amount",
+        };
+    }
     try {
         const response = await bitcoinModule.getBalance({
             id: address,
@@ -309,15 +693,16 @@ const isBTCPaymentConfirmed = async (address, zelfNamePrice) => {
 
         return {
             amountReceived,
-            confirmed: !Number.isNaN(numericReceived) && numericReceived === Number(zelfNamePrice),
-            zelfNamePrice,
+            confirmed: !Number.isNaN(numericReceived) && numericReceived === priceNum,
+            zelfNamePrice: priceNum,
         };
-    } catch (error) {}
+    } catch (error) { }
 
     return false;
 };
 
-const confirmPayUniqueAddress = async (network, address, amountToPay) => {
+const confirmPayUniqueAddress = async (network, address, amountToPay, options = {}) => {
+    const { initiatedAtUnix } = options;
     const map = {
         ETH: isETHPaymentConfirmed,
         SOL: isSolanaPaymentConfirmed,
@@ -325,14 +710,28 @@ const confirmPayUniqueAddress = async (network, address, amountToPay) => {
         AVAX: isAvalanchePaymentConfirmed,
         BDAG: isBlockDAGPaymentConfirmed,
         coinbase: _confirmPaymentWithCoinbase,
+        CB: _confirmPaymentWithCoinbase,
     };
 
     try {
-        const confirmation = await map[network](address, amountToPay);
+        const fn = map[network];
+        if (!fn) {
+            throw new Error("409:unsupported_payment_network");
+        }
+        if (network === "coinbase" || network === "CB") {
+            return await fn(address);
+        }
+        if (network === "BTC") {
+            return await fn(address, amountToPay);
+        }
+        const confirmation = await fn(address, amountToPay, initiatedAtUnix);
 
         return confirmation;
     } catch (exception) {
         console.error(exception);
+        if (exception?.message && /^\d{3}:/.test(String(exception.message))) {
+            throw exception;
+        }
 
         const error = new Error("payment_confirmation_failed");
         error.status = 500;
@@ -371,6 +770,8 @@ const addDurationToTag = async (params, tagObject) => {
     const domainConfig = params.domainConfig || getDomainConfig(domain || "zelf");
 
     const { metadata } = buildMetadata(params, tagObject, domainConfig);
+
+    await ensureZelfProofQRCode(tagObject);
 
     if (domainConfig.isWalrusEnabled()) {
         await storeInWalrus(tagObject, domainConfig, metadata);
@@ -1042,6 +1443,7 @@ const extendLicenseForOwner = async (tagName, domain, duration, ownershipCredent
 
 module.exports = {
     verifyPaymentConfirmation,
+    verifySmartContractPayment,
     transferMyTag,
     updateOldTagObject,
     addDurationToTag,

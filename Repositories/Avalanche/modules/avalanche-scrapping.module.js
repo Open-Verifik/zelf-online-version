@@ -184,7 +184,7 @@ const getTransactionDetail = async (params) => {
 		});
 
 		const $ = cheerio.load(data);
-		const tokensTransferred = [];
+		let tokensTransferred = [];
 		const transactionType = $("#wrapperContent > div > div > span:nth-child(1)").text() || "Swap";
 
 		try {
@@ -246,6 +246,37 @@ const getTransactionDetail = async (params) => {
 		const to_div = cheerio.load(to_a);
 
 		const to = to_div("a.js-clipboard").attr("data-clipboard-text");
+
+		// Wallet-centric order: first row = first ERC-20 out from tx initiator, last row = last ERC-20 in to same.
+		// Helps LiFi-style multi-hop where DOM order ends on an intermediate (e.g. USDt) instead of final receive.
+		const normAddr = (a) => (a && String(a).toLowerCase().trim()) || "";
+		const user = normAddr(from);
+
+		if (user && tokensTransferred.length >= 2 && /swap|call/i.test(String(transactionType))) {
+			let idxFirstOut = -1;
+			let idxLastIn = -1;
+
+			tokensTransferred.forEach((t, i) => {
+				if (idxFirstOut < 0 && normAddr(t.from) === user) {
+					idxFirstOut = i;
+				}
+			});
+
+			for (let i = tokensTransferred.length - 1; i >= 0; i--) {
+				if (normAddr(tokensTransferred[i].to) === user) {
+					idxLastIn = i;
+					break;
+				}
+			}
+
+			if (idxFirstOut >= 0 && idxLastIn >= 0 && idxFirstOut !== idxLastIn) {
+				const rowOut = tokensTransferred[idxFirstOut];
+				const rowIn = tokensTransferred[idxLastIn];
+				const middle = tokensTransferred.filter((_, i) => i !== idxFirstOut && i !== idxLastIn);
+
+				tokensTransferred = [rowOut, ...middle, rowIn];
+			}
+		}
 
 		const valueNetwork = $("#ContentPlaceHolder1_spanValue > div > ")
 			.text()

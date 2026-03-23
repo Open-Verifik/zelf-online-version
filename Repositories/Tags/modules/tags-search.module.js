@@ -2,7 +2,7 @@ const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const { getDomainConfiguration, isDomainActive } = require("./domain-registry.module");
 const TagsPartsModule = require("./tags-parts.module");
-const { QRZelfProofExtractor } = require("./qr-zelfproof-extractor.module");
+const { QRZelfProofExtractor, generateQRFromZelfProof } = require("./qr-zelfproof-extractor.module");
 
 /**
  * Tags Search Module
@@ -48,7 +48,17 @@ const searchTag = async (params, authUser) => {
         }
 
         if (ipfsResults.length > 0) {
-            if (!combinedResults.tagObject) combinedResults.tagObject = { ...ipfsResults[0] };
+            if (!combinedResults.tagObject) {
+                combinedResults.tagObject = { ...ipfsResults[0] };
+            } else if (arweaveResults.length > 0) {
+                const arPd = combinedResults.tagObject.publicData || {};
+                const ipfsPd = ipfsResults[0].publicData || {};
+
+                combinedResults.tagObject = {
+                    ...combinedResults.tagObject,
+                    publicData: { ...arPd, ...ipfsPd },
+                };
+            }
 
             combinedResults.tagObject.ipfsId = ipfsResults[0].id;
         }
@@ -63,6 +73,12 @@ const searchTag = async (params, authUser) => {
 
         if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
             combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
+
+        if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode && combinedResults.tagObject.zelfProof) {
+            const regenerated = await generateQRFromZelfProof(combinedResults.tagObject.zelfProof);
+
+            if (regenerated) combinedResults.tagObject.zelfProofQRCode = regenerated;
+        }
 
         if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
             try {
@@ -297,6 +313,12 @@ const searchByStorageKey = async (params, authUser) => {
 
         if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode)
             combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64(combinedResults.tagObject.url);
+
+        if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode && combinedResults.tagObject.zelfProof) {
+            const regenerated = await generateQRFromZelfProof(combinedResults.tagObject.zelfProof);
+
+            if (regenerated) combinedResults.tagObject.zelfProofQRCode = regenerated;
+        }
 
         if (combinedResults.tagObject && combinedResults.tagObject.zelfProofQRCode && !combinedResults.tagObject.zelfProof) {
             const extractedZelfProof = await QRZelfProofExtractor.extractZelfProof(combinedResults.tagObject.zelfProofQRCode);

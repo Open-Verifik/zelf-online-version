@@ -212,11 +212,16 @@ const configuration = {
     },
     avalanche: {
         contractAddress: process.env.AVALANCHE_CONTRACT_ADDRESS || "0x6C995090C530756d59E6eEa5a3bA209863e0E167",
+        /** ZelfAvalanchePay.sol — native AVAX + USDC tag checkout */
+        tagPayContractAddress: (process.env.AVALANCHE_TAG_PAY_CONTRACT_ADDRESS || "").trim(),
+        /** ERC-20 USDC on same chain as tag pay (constructor arg; used for payUsdc + JWT) */
+        tagPayUsdcAddress: (process.env.AVALANCHE_TAG_PAY_USDC_ADDRESS || "").trim(),
+        tagPayConfirmations: Math.max(1, Number(process.env.AVALANCHE_TAG_PAY_CONFIRMATIONS) || 1),
         createNFT: process.env.AVALANCHE_CREATE_NFT === "true",
         rpcUrl:
             process.env.AVALANCHE_RPC_URL ||
             "https://wild-bitter-meadow.avalanche-mainnet.quiknode.pro/e2565749ca44c2873fe2a0a747f5ac68ae7eb14f/ext/bc/C/rpc/",
-        chainId: 43114, // Avalanche C-Chain mainnet
+        chainId: Number(process.env.AVALANCHE_CHAIN_ID) || 43114, // Avalanche C-Chain mainnet; use 43113 for Fuji
         privateKey: process.env.WALRUS_PRIVATE_KEY,
     },
     erc8004: {

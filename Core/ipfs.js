@@ -120,6 +120,12 @@ const web3Instance = new pinataWeb3.PinataSDK({
 });
 
 const upload = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
+    if (base64Image == null || typeof base64Image !== "string" || base64Image.trim() === "") {
+        const err = new Error("ipfs_upload_missing_base64");
+        err.status = 400;
+        throw err;
+    }
+
     try {
         // Use the new Pinata SDK v2.5.0 with JWT authentication
         const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
@@ -178,6 +184,12 @@ const retrieve = async (cid, expires = 1800) => {
  * @returns ipfs file
  */
 const pinFile = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
+    if (base64Image == null || typeof base64Image !== "string" || base64Image.trim() === "") {
+        const err = new Error("ipfs_pin_missing_base64");
+        err.status = 400;
+        throw err;
+    }
+
     if (os === "Win") return await pinFileWindows(base64Image, filename, mimeType, metadata);
 
     try {
@@ -214,6 +226,12 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 };
 
 const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
+    if (base64Image == null || typeof base64Image !== "string" || base64Image.trim() === "") {
+        const err = new Error("ipfs_pin_missing_base64");
+        err.status = 400;
+        throw err;
+    }
+
     const PINATA_API_KEY = process.env[`${prefix}PINATA_API_KEY`];
     const PINATA_SECRET_API_KEY = process.env[`${prefix}PINATA_API_SECRET`];
 
