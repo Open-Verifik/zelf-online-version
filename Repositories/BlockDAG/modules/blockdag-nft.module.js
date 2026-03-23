@@ -125,7 +125,7 @@ const _resolveCollectionWriteAccess = async (collectionAddress, owner) => {
 
     for (const item of collectionPins) {
         if (item.publicData?.owner !== onChainOwner) {
-            IPFS.updateFileKeyvalues(item.id, { owner: onChainOwner }).catch(() => {});
+            IPFS.updateFileKeyvalues(item.id, { owner: onChainOwner }).catch(() => { });
         }
     }
 
@@ -613,7 +613,7 @@ const listCollections = async ({ owner, contractAddress, limit } = {}) => {
         results = results.filter((item) => item.publicData?.category === "blockdag_nft_collection");
         results.forEach((item) => {
             if (item.publicData?.owner && item.publicData.owner !== ownerChecksum) {
-                IPFS.updateFileKeyvalues(item.id, { owner: ownerChecksum }).catch(() => {});
+                IPFS.updateFileKeyvalues(item.id, { owner: ownerChecksum }).catch(() => { });
             }
         });
     } else {
@@ -1053,7 +1053,7 @@ const listItems = async (filterParams) => {
         });
         results.forEach((item) => {
             if (item.publicData?.owner && item.publicData.owner !== ownerChecksum) {
-                IPFS.updateFileKeyvalues(item.id, { owner: ownerChecksum }).catch(() => {});
+                IPFS.updateFileKeyvalues(item.id, { owner: ownerChecksum }).catch(() => { });
             }
         });
         if (results.length > maxResults) results = results.slice(0, maxResults);
@@ -1161,7 +1161,7 @@ const mintOnChain = async (collectionAddress, recipientAddress, tokenURI, authPa
                 tokenId = (parsed.args[2] || parsed.args.tokenId).toString();
                 break;
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     return { tokenId, txHash: receipt.hash };
@@ -1376,9 +1376,9 @@ const updateNftItemDisplayMetadata = async (ipfsFileId, { name, description, att
             metadata?.properties && typeof metadata.properties === "object"
                 ? metadata.properties
                 : {
-                      files: [{ type: "image/png", uri: canonicalImage }],
-                      category: "image",
-                  },
+                    files: [{ type: "image/png", uri: canonicalImage }],
+                    category: "image",
+                },
     };
 
     const oldCid = _extractCid(existingFile.url);
@@ -1394,6 +1394,7 @@ const updateNftItemDisplayMetadata = async (ipfsFileId, { name, description, att
         name: nextName.slice(0, 250),
         nftCategory: String(nftData.category || "Art").slice(0, 64),
     };
+
     if (rawTokenId) {
         ipfsMetadata.tokenId = String(rawTokenId);
     }
