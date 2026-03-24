@@ -513,7 +513,7 @@ const getReward = async (tagName, domain, authUser) => {
 
 	const domainConfig = getDomainConfig(domain);
 
-	const updatedTagObject = await MyTagsModule.addDurationToTag(
+	const { tagObject: updatedTagObject } = await MyTagsModule.addDurationToTag(
 		{
 			tagName,
 			duration: 1,

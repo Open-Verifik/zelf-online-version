@@ -28,10 +28,12 @@ const searchTag = async (params, authUser) => {
 
     try {
         // Search in both IPFS and Arweave
-        const [ipfsResults, arweaveResults] = await Promise.all([
+        const [ipfsRaw, arweaveResults] = await Promise.all([
             ["ipfs", "all"].includes(environment) ? searchWithTimeout(searchIPFS(params, authUser), 12000, "IPFS") : [],
             ["arweave", "all"].includes(environment) && ["both", "mainnet"].includes(type) ? searchArweave(params, authUser) : [],
         ]);
+
+        const ipfsResults = TagsIPFSModule.sortDedupeIpfsSearchResults(ipfsRaw);
 
         // Combine results
         const combinedResults = {

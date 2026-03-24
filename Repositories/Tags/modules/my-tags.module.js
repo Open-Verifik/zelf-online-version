@@ -442,7 +442,7 @@ const updateOldTagObject = async (tagObject, domain = "zelf") => {
  * Add duration to tag (for RevenueCat webhook)
  * @param {Object} params - Parameters including tagName, domain, duration, eventID, eventPrice
  * @param {Object} preview - Tag preview object
- * @returns {Object} - Updated tag records
+ * @returns {Promise<{ tagObject: Object, expiresAt: string|null, ipfsId: string|null, arweaveId: string|null, masterIPFSRecord: Object, masterArweaveRecord: Object|null, arweaveSkipped: boolean, warnings: string[] }>}
  */
 const addDurationToTag = async (params, tagObject) => {
     const { tagName, domain, duration, price } = params;
@@ -465,7 +465,35 @@ const addDurationToTag = async (params, tagObject) => {
         await storeInArweave(tagObject, domainConfig, metadata);
     }
 
-    return tagObject;
+    let expiresAt = null;
+    try {
+        if (metadata?.extraParams && typeof metadata.extraParams === "string") {
+            const parsed = JSON.parse(metadata.extraParams);
+            expiresAt = parsed.expiresAt || null;
+        }
+    } catch (_) {
+        /* optional */
+    }
+
+    const arweaveSkipped = Boolean(tagObject.arweave?.skipped);
+    const warnings = [];
+    if (arweaveSkipped && domainConfig.isArweaveEnabled()) {
+        warnings.push("arweave_upload_skipped_file_too_large");
+    }
+
+    const ipfsRec = tagObject.ipfs;
+    const arwRec = tagObject.arweave;
+
+    return {
+        tagObject,
+        expiresAt,
+        ipfsId: ipfsRec?.id ?? tagObject.ipfsId ?? null,
+        arweaveId: arweaveSkipped ? null : arwRec?.id ?? null,
+        masterIPFSRecord: ipfsRec,
+        masterArweaveRecord: arweaveSkipped ? null : arwRec,
+        arweaveSkipped,
+        warnings,
+    };
 };
 
 const sendEmailReceipt = async (tagName, domain, network, email, token) => {
@@ -1101,7 +1129,7 @@ const extendLicenseForOwner = async (tagName, domain, duration, ownershipCredent
     const tagObject = tagData.tagObject;
 
     // 4. Extend the duration (price: 0 since owner is not paying)
-    await addDurationToTag(
+    const renewal = await addDurationToTag(
         {
             tagName: tagObject.publicData[domainConfig.getTagKey()].split(".")[0],
             price: 0,
@@ -1118,6 +1146,11 @@ const extendLicenseForOwner = async (tagName, domain, duration, ownershipCredent
         domain,
         duration,
         message: "License extended successfully",
+        expiresAt: renewal.expiresAt,
+        ipfsId: renewal.ipfsId,
+        arweaveId: renewal.arweaveId,
+        arweaveSkipped: renewal.arweaveSkipped,
+        warnings: renewal.warnings,
     };
 };
 

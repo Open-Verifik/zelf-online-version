@@ -3,14 +3,47 @@ const Arweave = require("arweave");
 const { Readable } = require("stream");
 const config = require("../../../Core/config");
 const axios = require("axios");
-const { getDomainConfiguration, generateStorageKey } = require("./domain-registry.module");
+const { getDomainConfiguration } = require("./domain-registry.module");
 
 const arweaveUrl = `https://arweave.zelf.world`;
+const fallbackArweaveUrl = `https://arweave.net`;
 const explorerUrl = `https://viewblock.io/arweave/tx`;
 
 const owner = config.arwave.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
 
-const graphql = `${arweaveUrl}/graphql`;
+/** Max wait for Arweave GraphQL / gateway HTTP (axios), in ms */
+const ARWEAVE_HTTP_TIMEOUT_MS = 10_000;
+
+/** After primary GraphQL fails, prefer public arweave.net/graphql first for this long (ms) */
+const STICKY_FALLBACK_MS = 5 * 60 * 1000;
+
+let stickyPublicGraphqlUntil = 0;
+
+/**
+ * POST a single GraphQL query to an Arweave gateway.
+ * @param {string} graphqlUrl - Full URL e.g. https://arweave.zelf.world/graphql
+ * @param {string} queryString
+ * @returns {Promise<Array|undefined>} transactions.edges
+ */
+const postArweaveGraphql = async (graphqlUrl, queryString) => {
+	const result = await axios.post(
+		graphqlUrl,
+		{ query: queryString },
+		{
+			headers: { "Content-Type": "application/json" },
+			timeout: ARWEAVE_HTTP_TIMEOUT_MS,
+		}
+	);
+
+	if (result.data?.errors?.length) {
+		const msg = result.data.errors.map((e) => e.message).join("; ");
+		const err = new Error(msg);
+		err.graphqlErrors = result.data.errors;
+		throw err;
+	}
+
+	return result.data?.data?.transactions?.edges;
+};
 
 /**
  * Register tag on Arweave
@@ -217,8 +250,42 @@ const searchInArweave = async (key, value) => {
 
 	const tagsToSearch = `[{ name: "${key}", values: "${value}" }]`;
 
-	const query = {
-		query: `
+	const primaryGql = `${arweaveUrl}/graphql`;
+	const publicGql = `${fallbackArweaveUrl}/graphql`;
+
+	const advancedQuery = `
+		{
+			 transactions(
+				tags: ${tagsToSearch},
+				owners: ["${owner}"],
+				sort: HEIGHT_DESC,
+				first: 100
+			) {
+				edges {
+					node {
+						id
+						owner {
+							address
+						}
+						block {
+							height
+							id
+						}
+						data {
+							size
+							type
+						}
+						tags {
+							name
+							value
+						}
+					}
+				}
+			}
+		}
+	  `;
+
+	const legacyQuery = `
 		{
 			 transactions(
 				tags: ${tagsToSearch},
@@ -242,18 +309,101 @@ const searchInArweave = async (key, value) => {
 				}
 			}
 		}
-	  `,
+	  `;
+
+	const advancedThenLegacyOnUrl = async (graphqlUrl) => {
+		try {
+			const edges = await postArweaveGraphql(graphqlUrl, advancedQuery);
+			return edges || [];
+		} catch (eAdv) {
+			console.warn("Arweave GraphQL (sorted) failed, retrying legacy query:", graphqlUrl, eAdv?.message || eAdv);
+			const edges = await postArweaveGraphql(graphqlUrl, legacyQuery);
+			return edges || [];
+		}
 	};
 
-	const result = await axios.post(graphql, query, {
-		headers: { "Content-Type": "application/json" },
-	});
+	let searchResults;
+	const stickyActive = Date.now() < stickyPublicGraphqlUntil;
 
-	const searchResults = result.data?.data?.transactions?.edges;
+	if (stickyActive) {
+		let edgesFromPublic = null;
+		let publicError = null;
+		try {
+			edgesFromPublic = await advancedThenLegacyOnUrl(publicGql);
+		} catch (e) {
+			publicError = e;
+			console.warn("Arweave public GraphQL failed (sticky mode), trying primary:", e?.message || e);
+		}
+
+		if (edgesFromPublic?.length) {
+			searchResults = edgesFromPublic;
+		} else {
+			try {
+				searchResults = await advancedThenLegacyOnUrl(primaryGql);
+				stickyPublicGraphqlUntil = 0;
+			} catch (ePri) {
+				if (publicError) {
+					throw publicError;
+				}
+				searchResults = edgesFromPublic || [];
+			}
+		}
+	} else {
+		try {
+			searchResults = await advancedThenLegacyOnUrl(primaryGql);
+		} catch (ePri) {
+			console.warn("Arweave primary GraphQL failed, trying public:", ePri?.message || ePri);
+			try {
+				searchResults = await advancedThenLegacyOnUrl(publicGql);
+				stickyPublicGraphqlUntil = Date.now() + STICKY_FALLBACK_MS;
+			} catch (ePub) {
+				throw ePub;
+			}
+		}
+	}
 
 	if (!searchResults || !searchResults.length) return [];
 
-	return formatSearchResults(searchResults);
+	const formatted = formatSearchResults(searchResults);
+
+	return sortArweaveSearchResultsNewestFirst(formatted);
+};
+
+/**
+ * Parse lease expiry for ordering when multiple txs share the same tag key (renewals).
+ * @param {string|undefined} s
+ * @returns {number}
+ */
+const _expiresAtToMs = (s) => {
+	if (!s || typeof s !== "string") return 0;
+	const m = s.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})$/);
+	if (m) {
+		const t = Date.parse(`${m[1]}T${m[2]}Z`);
+		return Number.isFinite(t) ? t : 0;
+	}
+	const t = Date.parse(s);
+	return Number.isFinite(t) ? t : 0;
+};
+
+/**
+ * Prefer latest confirmed tx (block height), then latest expiresAt, then tx id.
+ * @param {Array<Object>} formattedResults
+ * @returns {Array<Object>}
+ */
+const sortArweaveSearchResultsNewestFirst = (formattedResults) => {
+	if (!formattedResults?.length) return formattedResults;
+
+	return [...formattedResults].sort((a, b) => {
+		const ha = a.blockHeight != null ? Number(a.blockHeight) : -1;
+		const hb = b.blockHeight != null ? Number(b.blockHeight) : -1;
+		if (hb !== ha) return hb - ha;
+
+		const ea = _expiresAtToMs(a.publicData?.expiresAt);
+		const eb = _expiresAtToMs(b.publicData?.expiresAt);
+		if (eb !== ea) return eb - ea;
+
+		return String(b.id || "").localeCompare(String(a.id || ""));
+	});
 };
 
 const formatSearchResults = (searchResults) => {
@@ -262,6 +412,8 @@ const formatSearchResults = (searchResults) => {
 	for (let index = 0; index < searchResults.length; index++) {
 		const searchResult = searchResults[index];
 
+		const blockHeight = searchResult.node.block?.height;
+
 		const formattedResult = {
 			id: searchResult.node.id,
 			owner: searchResult.node.owner.address,
@@ -269,6 +421,8 @@ const formatSearchResults = (searchResults) => {
 			explorerUrl: `${explorerUrl}/${searchResult.node.id}`,
 			publicData: {},
 			size: searchResult.node.data.size,
+			blockHeight: blockHeight != null ? Number(blockHeight) : null,
+			blockId: searchResult.node.block?.id || null,
 		};
 
 		// it should be an object with key values
@@ -300,21 +454,35 @@ const formatSearchResults = (searchResults) => {
 };
 
 const arweaveIDToBase64 = async (id) => {
-	try {
-		const encryptedResponse = await axios.get(`${arweaveUrl}/${id}`, {
+	const fetchTx = async (baseUrl) => {
+		const encryptedResponse = await axios.get(`${baseUrl}/${id}`, {
 			responseType: "arraybuffer",
+			timeout: ARWEAVE_HTTP_TIMEOUT_MS,
+			validateStatus: (s) => s >= 200 && s < 300,
 		});
-
-		if (encryptedResponse?.data) {
+		if (encryptedResponse?.data && encryptedResponse.data.byteLength > 0) {
 			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
-
 			return `data:image/png;base64,${base64Image}`;
 		}
-	} catch (exception) {
-		console.error({ VWEx: exception });
+		return null;
+	};
 
+	try {
+		const primary = await fetchTx(arweaveUrl);
+		if (primary) return primary;
+	} catch (exception) {
+		console.error({ VWEx_primary: exception });
+	}
+
+	try {
+		const fallback = await fetchTx(fallbackArweaveUrl);
+		if (fallback) return fallback;
+	} catch (exception) {
+		console.error({ VWEx_fallback: exception });
 		return exception?.message;
 	}
+
+	return null;
 };
 
 const formatCreatedRecord = (record) => {

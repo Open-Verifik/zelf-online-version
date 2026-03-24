@@ -718,6 +718,12 @@ const storeInIPFS = async (tagObject, domainConfig, metadata) => {
 
     tagObject.ipfs = TagsIpfsModule.formatRecord(tagObject.ipfs);
 
+    const ipfsRec = tagObject.ipfs;
+    if (ipfsRec?.id != null && ipfsRec.id !== "") {
+        tagObject.ipfsId = ipfsRec.id;
+        tagObject.id = ipfsRec.id;
+    }
+
     return tagObject.ipfs;
 };
 

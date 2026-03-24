@@ -421,6 +421,48 @@ const deleteFiles = async (ids = []) => {
 	return null;
 };
 
+/**
+ * Best-effort recency timestamp for a formatted IPFS pin row (newest renewals first).
+ * @param {Object} row
+ * @returns {number}
+ */
+const _ipfsRowRecencyMs = (row) => {
+	if (!row || typeof row !== "object") return 0;
+	const candidates = [row.date_pinned, row.Timestamp, row.created_at, row.updated_at];
+	for (let i = 0; i < candidates.length; i++) {
+		const c = candidates[i];
+		if (c == null || c === "") continue;
+		if (typeof c === "number" && Number.isFinite(c)) return c;
+		const n = Date.parse(String(c));
+		if (Number.isFinite(n)) return n;
+	}
+	return 0;
+};
+
+/**
+ * Sort newest-first and dedupe by pin id / CID so stale duplicates from renewals do not win.
+ * @param {Array<Object>} rows - formatted rows from get() / _formatSearchResults
+ * @returns {Array<Object>}
+ */
+const sortDedupeIpfsSearchResults = (rows) => {
+	if (!Array.isArray(rows) || rows.length === 0) return rows || [];
+
+	const sorted = [...rows].sort((a, b) => _ipfsRowRecencyMs(b) - _ipfsRowRecencyMs(a));
+	const seen = new Set();
+	const out = [];
+
+	for (let i = 0; i < sorted.length; i++) {
+		const row = sorted[i];
+		const key = String(row.ipfsHash || row.cid || row.ipfs_pin_hash || row.id || "").trim();
+		const dedupeKey = key || `__noid_${i}`;
+		if (seen.has(dedupeKey)) continue;
+		seen.add(dedupeKey);
+		out.push(row);
+	}
+
+	return out.sort((a, b) => _ipfsRowRecencyMs(b) - _ipfsRowRecencyMs(a));
+};
+
 module.exports = {
 	get,
 	show,
@@ -436,4 +478,5 @@ module.exports = {
 	formatResults: _formatSearchResults,
 	formatRecord: _formatRecord,
 	deleteFiles,
+	sortDedupeIpfsSearchResults,
 };
