@@ -1,0 +1,28 @@
+---
+description: Follow Zelf backend integration-test, auth, and real-data testing rules
+alwaysApply: true
+---
+
+# API Testing
+
+- This repo follows a strict no-mocking policy for backend tests.
+- Integration tests target a live running server and should not invent in-process shortcuts unless the existing suite already does.
+- Create a session first with `POST /api/sessions`, extract the JWT, then call protected APIs with `Authorization: Bearer <token>`.
+- Include `Origin: https://test.example.com` in integration requests that mirror production checks.
+- Prefer explicit `PORT` when running tests because the repo still contains mixed fallbacks (`3000` and `3050`).
+- Use unique identifiers with timestamps and clean up test data when the flow creates persistent records.
+- Use `config/0012589021.json` as the face sample when a biometric flow needs test input.
+- Test both success and failure paths, especially validation and unauthorized cases.
+
+## Examples
+
+```js
+// Prefer
+.set("Origin", "https://test.example.com")
+.set("Authorization", `Bearer ${token}`)
+```
+
+```js
+// Avoid
+// Mocking the session or skipping the auth bootstrap for protected API tests
+```

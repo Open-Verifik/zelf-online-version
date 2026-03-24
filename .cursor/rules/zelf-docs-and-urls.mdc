@@ -1,0 +1,26 @@
+---
+description: Keep Zelf backend API docs, URLs, and examples aligned with project standards
+alwaysApply: true
+---
+
+# Docs And URLs
+
+- Use `https://api.zelf.world` for public API documentation examples.
+- Use localhost URLs only for local testing, and prefer an explicit `PORT` over relying on repository fallbacks.
+- Public API docs belong in `zelf-documentation/docs/api/`.
+- Include the auth flow when documenting protected endpoints: session creation, JWT extraction, then authenticated API calls.
+- Document both success and error responses with real status codes and validation behavior.
+- Prefer Docusaurus tabs when documenting multiple example languages.
+- Keep language coverage aligned with the current backend standard: cURL, Node.js, Python, PHP, and Rust when the endpoint warrants full docs.
+
+## Examples
+
+```md
+<!-- Prefer -->
+https://api.zelf.world/api/tags/search
+```
+
+```md
+<!-- Avoid -->
+http://localhost:3003/api/tags/search
+```

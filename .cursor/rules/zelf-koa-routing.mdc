@@ -1,0 +1,24 @@
+---
+description: Follow Zelf backend Koa routing and repository registration conventions
+alwaysApply: true
+---
+
+# Koa Routing And Repositories
+
+- Mount new HTTP surfaces through `Routes/unprotected-repositories.js` or `Routes/protected-repositories.js`; adding a route file alone is not enough.
+- Preserve `server.js` boot order: unprotected routes before `koa-jwt`, protected routes after it.
+- Match the existing repository shape under `Repositories/<Feature>/` and keep business logic out of route declarations.
+- Prefer the backend flow `route -> controller -> module -> model/middleware`.
+- If an older script or note mentions `api.routes.js`, treat that as stale and use the `Routes/*-repositories.js` registries instead.
+
+## Examples
+
+```js
+// Prefer
+require("../Repositories/Tags/routes/tags.routes")(server);
+```
+
+```js
+// Avoid
+// Creating a route file without registering it in the protected/unprotected registries
+```
