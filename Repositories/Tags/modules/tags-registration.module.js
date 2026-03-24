@@ -48,7 +48,7 @@ const cleanExtraParamsForPinata = (extraParams) => {
  * @param {Object} domainConfig - Domain config
  * @param {Object} authUser - Authenticated user
  */
-const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUser) => {
+const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, securityType, authUser) => {
     const storageKey = domainConfig.getTagKey() || "tagName";
 
     const tagName = tagObject[storageKey] || tagObject.tagName || tagObject.zelfName;
@@ -77,6 +77,10 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
         }),
     };
 
+    if (securityType && tagObject.hasPassword == "true") {
+        metadata.extraParams.st = securityType;
+    }
+
     if (referralTagObject) {
         metadata.referral = {
             tagName: referralTagObject.publicData?.[storageKey] || referralTagObject.metadata?.[storageKey],
@@ -88,7 +92,7 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, authUs
         metadata.referral = JSON.stringify(metadata.referral);
     }
 
-    metadata.extraParams = JSON.stringify(metadata.extraParams);
+    metadata.extraParams = JSON.stringify(cleanExtraParamsForPinata(metadata.extraParams));
 
     // only add it if the domain supports it
     if (domainConfig.isWalrusEnabled()) {

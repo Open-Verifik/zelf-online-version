@@ -81,10 +81,12 @@ const leaseRecovery = async (payload, authUser) => {
 
 	tagObject.zelfProof = skipZelfProof ? zelfProof : tagObject.zelfProof;
 
+	const securityType = password ? (/^\d{6}$/.test(password) ? "pin" : "password") : null;
+
 	if (tagObject.price === 0) {
-		await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, authUser);
+		await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, securityType, authUser);
 	} else {
-		await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, authUser);
+		await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, securityType, authUser);
 	}
 
 	const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, stellar, arweave }, password);

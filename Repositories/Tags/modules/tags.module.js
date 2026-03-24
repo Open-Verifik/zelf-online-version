@@ -65,7 +65,7 @@ const leaseTag = async (params, authUser) => {
     if (!password && securityType !== "withoutPassword") throw new Error("409:password_not_found");
 
     if (password && !securityType) {
-        securityType = Number(password).toString() === password && password.length === 6 ? "pin" : "password";
+        securityType = /^\d{6}$/.test(password) ? "pin" : "password";
     }
 
     const { eth, btc, solana, sui, stellar, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
