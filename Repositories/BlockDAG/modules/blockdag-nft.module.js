@@ -1425,6 +1425,107 @@ const updateNftItemDisplayMetadata = async (ipfsFileId, { name, description, att
     };
 };
 
+/**
+ * Repair a broken IPFS gateway URL for an NFT item.
+ *
+ * Pinata dedicated gateways (*.mypinata.cloud) only serve content that is pinned
+ * to the same Pinata account. Content uploaded via the dev account cannot be served
+ * by the production gateway — Pinata returns ERR_ID:00023.
+ *
+ * This function:
+ * 1. Looks up the file by Pinata ID.
+ * 2. Verifies it is a `blockdag_nft_item` with a valid collection.
+ * 3. HEAD-checks the current ipfsUrl. If it works, returns { repaired: false }.
+ * 4. If broken, fetches the raw JSON from the public IPFS gateway (ipfs.io),
+ *    re-pins it to the production Pinata account with the same keyvalues,
+ *    deletes the old pin, and returns the new URL.
+ *
+ * @param {string} ipfsFileId - Pinata file ID (UUID) of the NFT item
+ * @returns {{ repaired: boolean, newIpfsId?: string, newUrl?: string, ipfsUrl?: string }}
+ */
+const repairGatewayUrl = async (ipfsFileId) => {
+    if (!ipfsFileId) throw new Error("400:missing_ipfs_file_id");
+
+    // 1. Fetch Pinata metadata
+    let item;
+    try {
+        item = await IPFS.getFileById(ipfsFileId);
+    } catch {
+        throw new Error("404:nft_not_found");
+    }
+
+    if (!item) throw new Error("404:nft_not_found");
+
+    const pd = item.publicData || {};
+
+    // 2. Safety guard — only repair known NFT items belonging to a collection
+    if (pd.category !== "blockdag_nft_item") throw new Error("400:not_an_nft_item");
+
+    const collectionAddr = pd.collection || "";
+    if (!collectionAddr || collectionAddr === "none" || !ethers.isAddress(collectionAddr)) {
+        throw new Error("400:missing_collection_address");
+    }
+
+    const currentUrl = item.url;
+    if (!currentUrl) throw new Error("400:missing_ipfs_url");
+
+    // 3. HEAD-check the current URL — if it works, no repair needed
+    try {
+        const check = await fetch(currentUrl, { method: "HEAD", signal: AbortSignal.timeout(8000) });
+        if (check.ok) return { repaired: false, ipfsUrl: currentUrl };
+    } catch {
+        // fall through to repair
+    }
+
+    // 4. Fetch raw JSON from the public IPFS gateway as fallback
+    const cid = item.cid;
+    if (!cid) throw new Error("400:missing_cid");
+
+    const publicUrl = `https://ipfs.io/ipfs/${cid}`;
+    let rawJson;
+    try {
+        const res = await fetch(publicUrl, { signal: AbortSignal.timeout(20000) });
+        if (!res.ok) throw new Error(`public_gateway_fetch_failed:${res.status}`);
+        rawJson = await res.json();
+    } catch (e) {
+        throw new Error(`503:cannot_fetch_content_from_public_gateway: ${e.message}`);
+    }
+
+    // 5. Re-pin to production account with the same keyvalues (preserves all metadata)
+    const fileName = item.name || `nft_repaired_${Date.now()}.json`;
+    const base64Data = Buffer.from(JSON.stringify(rawJson)).toString("base64");
+    const base64Json = `data:application/json;base64,${base64Data}`;
+
+    const repinKeyvalues = {
+        category: "blockdag_nft_item",
+        owner: pd.owner || "",
+        collection: pd.collection || "",
+        name: pd.name || rawJson.name || "",
+        nftCategory: pd.nftCategory || rawJson.category || "Art",
+        ...(pd.tokenId != null && { tokenId: String(pd.tokenId) }),
+        ...(pd.mintTxHash && { mintTxHash: pd.mintTxHash }),
+    };
+
+    const ipfsResult = await IPFS.pinFile(base64Json, fileName, "application/json", repinKeyvalues);
+
+    if (!ipfsResult) throw new Error("500:repin_failed");
+
+    // 6. Delete the old broken pin (best-effort — don't fail the repair if this errors)
+    IPFS.deleteFiles([ipfsFileId]).catch((e) =>
+        console.warn("[repairGatewayUrl] failed to delete old pin", ipfsFileId, e?.message),
+    );
+
+    // Bust the IPFS JSON cache for this CID so getItem returns fresh data
+    _ipfsJsonCache.del(cid);
+
+    return {
+        repaired: true,
+        newIpfsId: ipfsResult.id,
+        newCid: ipfsResult.cid,
+        newUrl: ipfsResult.url,
+    };
+};
+
 module.exports = {
     upload,
     getItem,
@@ -1444,4 +1545,5 @@ module.exports = {
     updatePinKeyvalues,
     updateNftItemDisplayMetadata,
     searchCollectionsByName,
+    repairGatewayUrl,
 };

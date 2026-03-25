@@ -385,6 +385,24 @@ const searchCollections = async (ctx) => {
     }
 };
 
+/**
+ * Silently repair a broken gateway URL for an NFT item.
+ * JWT-protected (session token required). No wallet signature needed — we only re-pin content
+ * that already exists and belongs to a verified blockdag_nft_item with a valid collection.
+ * POST /api/blockdag/nft/item/:id/repair-gateway
+ */
+const repairGatewayUrl = async (ctx) => {
+    try {
+        const { id } = ctx.request.params;
+        const result = await BlockDagNftModule.repairGatewayUrl(id);
+        ctx.body = { success: true, data: result };
+    } catch (error) {
+        const _exception = httpHandler.errorHandler(error, ctx);
+        ctx.status = _exception.status || 500;
+        ctx.body = { success: false, error: _exception.message };
+    }
+};
+
 module.exports = {
     upload,
     createCollection,
@@ -403,4 +421,5 @@ module.exports = {
     updateTokenId,
     updateItemMetadata,
     searchCollections,
+    repairGatewayUrl,
 };

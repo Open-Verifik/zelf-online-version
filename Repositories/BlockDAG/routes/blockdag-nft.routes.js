@@ -29,4 +29,8 @@ module.exports = (server) => {
     server.post(`${PATH}/collection/:id/delete`, Middleware.deleteCollectionValidation, Controller.deleteCollection);
 
     server.post(`${PATH}/item/:id/delete`, Middleware.deleteItemValidation, Controller.deleteItem);
+
+    // Silent background repair: re-pins content from broken dev gateway to production account.
+    // JWT session required; no wallet signature (content already validated as blockdag_nft_item).
+    server.post(`${PATH}/item/:id/repair-gateway`, Controller.repairGatewayUrl);
 };
