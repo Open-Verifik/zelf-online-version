@@ -1477,18 +1477,44 @@ const repairGatewayUrl = async (ipfsFileId) => {
         // fall through to repair
     }
 
-    // 4. Fetch raw JSON from the public IPFS gateway as fallback
+    // 4. Fetch raw JSON via a waterfall of public IPFS gateways.
+    // gateway.pinata.cloud is tried first — it serves any CID pinned to ANY Pinata account
+    // (unlike dedicated gateways which are account-scoped), so it has the highest chance of success.
     const cid = item.cid;
     if (!cid) throw new Error("400:missing_cid");
 
-    const publicUrl = `https://ipfs.io/ipfs/${cid}`;
-    let rawJson;
-    try {
-        const res = await fetch(publicUrl, { signal: AbortSignal.timeout(20000) });
-        if (!res.ok) throw new Error(`public_gateway_fetch_failed:${res.status}`);
-        rawJson = await res.json();
-    } catch (e) {
-        throw new Error(`503:cannot_fetch_content_from_public_gateway: ${e.message}`);
+    const PUBLIC_GATEWAYS = [
+        `https://gateway.pinata.cloud/ipfs/${cid}`,
+        `https://cloudflare-ipfs.com/ipfs/${cid}`,
+        `https://dweb.link/ipfs/${cid}`,
+        `https://ipfs.io/ipfs/${cid}`,
+    ];
+
+    let rawJson = null;
+    let lastError = "all_gateways_failed";
+
+    for (const gatewayUrl of PUBLIC_GATEWAYS) {
+        try {
+            const res = await fetch(gatewayUrl, { signal: AbortSignal.timeout(15000) });
+            if (!res.ok) {
+                lastError = `gateway_http_${res.status}:${gatewayUrl}`;
+                continue;
+            }
+            const contentType = res.headers.get("content-type") || "";
+            if (contentType.includes("text/html")) {
+                lastError = `gateway_returned_html:${gatewayUrl}`;
+                continue;
+            }
+            rawJson = await res.json();
+            break; // success
+        } catch (e) {
+            lastError = `${e.message}:${gatewayUrl}`;
+            // try next gateway
+        }
+    }
+
+    if (!rawJson) {
+        throw new Error(`503:cannot_fetch_content_from_public_gateway: ${lastError}`);
     }
 
     // 5. Re-pin to production account with the same keyvalues (preserves all metadata)
