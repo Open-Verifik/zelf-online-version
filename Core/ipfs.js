@@ -6,6 +6,26 @@ const prefix = process.env.NODE_ENV === "development" ? "_" : "";
 const pinataGateway = process.env[`${prefix}PINATA_GATEWAY_URL`];
 const os = process.env.ENVOS;
 
+/**
+ * Rewrite any Pinata dedicated-gateway URL to use the current configured gateway.
+ * This prevents image/metadata URLs baked into IPFS JSON at upload time (potentially
+ * under a different Pinata account/gateway) from breaking in production.
+ *
+ * Handles:
+ *  - *.mypinata.cloud dedicated gateway URLs
+ *  - Our custom domain (ipfs.zelf.world) — in case it also needs normalising
+ *
+ * @param {string} url - URL to normalise
+ * @returns {string} - URL with the current pinataGateway substituted in, or the original if not a Pinata URL
+ */
+const rewriteGatewayUrl = (url) => {
+    if (!url || typeof url !== "string" || !pinataGateway) return url;
+    // Match either *.mypinata.cloud or ipfs.zelf.world dedicated gateway patterns
+    const m = url.match(/https?:\/\/(?:[^/]+\.mypinata\.cloud|ipfs\.zelf\.world)\/ipfs\/([^/?#]+)/);
+    if (!m) return url;
+    return `https://${pinataGateway}/ipfs/${m[1]}`;
+};
+
 const pinataWeb3 = require("pinata");
 
 /**
@@ -459,4 +479,6 @@ module.exports = {
     getFileById,
     updateFileKeyvalues,
     updateItemTokenId,
+    rewriteGatewayUrl,
 };
+

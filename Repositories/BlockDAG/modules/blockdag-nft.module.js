@@ -896,10 +896,13 @@ const _enrichItems = async (rawResults) => {
             const metadata = await _fetchIpfsJson(item.url);
             const pd = item.publicData || {};
             const attributes = _mergeItemAttributes(metadata, pd);
-            const jsonImage =
+            const rawImage =
                 metadata && metadata.image != null && String(metadata.image).trim() !== ""
                     ? String(metadata.image).trim()
                     : "";
+            // Normalise any stored gateway URL to the current production gateway.
+            // Prevents images baked with a dev/old gateway from breaking at read time.
+            const jsonImage = IPFS.rewriteGatewayUrl(rawImage);
             return {
                 ...pd,
                 ...metadata,
@@ -909,14 +912,14 @@ const _enrichItems = async (rawResults) => {
                     metadata && metadata.description !== undefined && metadata.description !== null
                         ? metadata.description
                         : (pd.description ?? ""),
-                image: jsonImage || pd.image || "",
+                image: jsonImage || IPFS.rewriteGatewayUrl(pd.image) || "",
                 category: metadata?.category || pd.nftCategory || pd.collectionCategory || pd.category || "Art",
                 owner: pd.owner || "",
                 collection: pd.collection || "",
                 contractAddress: pd.contractAddress || pd.collection || "",
                 tokenId: pd.tokenId || "",
                 mintTxHash: pd.mintTxHash || "",
-                ipfsUrl: item.url,
+                ipfsUrl: IPFS.rewriteGatewayUrl(item.url),
                 ipfsId: item.id,
                 cid: item.cid,
             };
@@ -964,10 +967,12 @@ const getItem = async (id) => {
     const pd = item.publicData || {};
     const attributes = _mergeItemAttributes(metadata, pd);
 
-    const jsonImage =
+    const rawImage =
         metadata && metadata.image != null && String(metadata.image).trim() !== ""
             ? String(metadata.image).trim()
             : "";
+    // Normalise any stored gateway URL to the current production gateway.
+    const jsonImage = IPFS.rewriteGatewayUrl(rawImage);
     const result = {
         ...metadata,
         ...pd,
@@ -978,10 +983,10 @@ const getItem = async (id) => {
             metadata && (metadata.description !== undefined && metadata.description !== null)
                 ? metadata.description
                 : (pd.description ?? ""),
-        // Canonical image is in token JSON; legacy pins may still have image in keyvalues
-        image: jsonImage || pd.image || "",
+        // Always rewrite image and ipfsUrl to the current gateway
+        image: jsonImage || IPFS.rewriteGatewayUrl(pd.image) || "",
         category: metadata?.category || pd.nftCategory || "Art",
-        ipfsUrl: item.url,
+        ipfsUrl: IPFS.rewriteGatewayUrl(item.url),
         ipfsId: item.id,
         cid: item.cid,
     };
