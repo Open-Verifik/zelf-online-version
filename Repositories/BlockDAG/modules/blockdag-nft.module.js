@@ -526,12 +526,43 @@ const storeNFT = async (data, authdUser) => {
     const { normalizedCollectionAddress } = await _resolveCollectionWriteAccess(collectionAddress, normalizedOwner);
     _ensureMessageIncludesCollection(message, normalizedCollectionAddress);
 
+    // 1b. Verify the image is actually accessible before baking its URL into the NFT JSON.
+    // This prevents "ghost" NFTs with broken images from ever being minted.
+    // We normalise the URL first so the check always uses the current production gateway.
+    if (!image || typeof image !== "string" || !image.trim()) {
+        throw new Error("400:image_url_required");
+    }
+
+    const normalizedImageUrl = IPFS.rewriteGatewayUrl(image.trim());
+
+    try {
+        const imageCheck = await fetch(normalizedImageUrl, {
+            method: "HEAD",
+            signal: AbortSignal.timeout(10000),
+        });
+
+        if (!imageCheck.ok) {
+            throw new Error(`image_not_accessible:http_${imageCheck.status}`);
+        }
+
+        const contentType = imageCheck.headers.get("content-type") || "";
+        if (contentType.includes("text/html")) {
+            // Gateway returned an HTML error page (e.g. ERR_ID:00023)
+            throw new Error("image_not_accessible:gateway_returned_html");
+        }
+    } catch (e) {
+        // Re-throw our own errors unchanged; wrap fetch/timeout errors with user-friendly message
+        if (e.message.startsWith("image_not_accessible") || e.message.startsWith("400:")) throw e;
+        throw new Error(`400:image_not_accessible: The image at ${normalizedImageUrl} could not be reached (${e.message}). Make sure the image is pinned and accessible on ipfs.zelf.world before creating NFT metadata.`);
+    }
+
     // 2. Prepare Metadata — ERC-721 / OpenSea standard
+
     const safeDescription = String(description ?? "").slice(0, 5000);
     const nftData = {
         name,
         description: safeDescription,
-        image,
+        image: normalizedImageUrl,   // always use production gateway URL
         external_url: "https://zelf.world",
         category: category || "Art",
         attributes: attributes || [],
@@ -539,7 +570,7 @@ const storeNFT = async (data, authdUser) => {
             files: [
                 {
                     type: "image/png",
-                    uri: image,
+                    uri: normalizedImageUrl,  // always use production gateway URL
                 },
             ],
             category: "image",
