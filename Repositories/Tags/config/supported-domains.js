@@ -4,7 +4,7 @@ const { cache } = require("joi");
 const axios = require("../../../Core/axios").getEncryptionInstance();
 const IPFS = require("../../../Repositories/IPFS/modules/ipfs.module");
 
-// Initialize cache for dynamic domains with 1 hour TTL
+// Initialize cache for dynamic domains with 2 hour TTL (see cache/manager.js stdTTL)
 const domainsCache = initCacheInstance();
 
 /**

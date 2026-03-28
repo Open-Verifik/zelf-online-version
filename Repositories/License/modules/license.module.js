@@ -9,7 +9,7 @@ const DefaultLicenseValues = require("./default-license.values");
 const { Domain } = require("../../Tags/modules/domain.class");
 const { initCacheInstance } = require("../../../cache/manager");
 
-// Initialize cache with 1 hour TTL and check period of 10 minutes
+// Initialize cache with 2 hour TTL and check period of 10 minutes (see cache/manager.js stdTTL)
 const licenseCache = initCacheInstance();
 
 /**
@@ -518,6 +518,7 @@ const _checkIfDomainIsRegistered = async (domain, accountEmail) => {
  * Load official licenses with improved caching
  * @param {boolean} force - Force reload from IPFS, bypassing cache
  * @returns {Array} - Array of license objects
+ * @remarks Each official license JSON in IPFS should set `"status": "active"` for its `name` TLD; otherwise the Domain class defaults to inactive and tag APIs reject that domain (e.g. search validation).
  */
 const loadOfficialLicenses = async (force = false) => {
     // Try to get from cache first (unless forced)

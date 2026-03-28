@@ -13,7 +13,7 @@ module.exports = (server) => {
     const PATH = config.basePath(base);
 
     // Protected: Upload, Create Collection & Item
-    server.post(`${PATH}/upload`, Controller.upload);
+    server.post(`${PATH}/upload`, Middleware.uploadValidation, Controller.upload);
 
     server.post(`${PATH}/collection`, Middleware.createCollectionValidation, Controller.createCollection);
     

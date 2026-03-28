@@ -1,9 +1,19 @@
 const Joi = require("joi");
 
+// Mirrors the client-side SAFE_NAME_REGEX.
+// Only letters, numbers, spaces, hyphens, underscores, periods and apostrophes are allowed.
+// Special characters like / : @ # ? & = % + \ break IPFS/Pinata storage paths and Koa route segments.
+const SAFE_NAME_PATTERN = /^[a-zA-Z0-9 \-_.']+$/;
+const SAFE_SYMBOL_PATTERN = /^[A-Z0-9]{1,6}$/;
+
 const createCollectionValidation = async (ctx, next) => {
     const schema = Joi.object({
-        name: Joi.string().required(),
-        symbol: Joi.string().required(),
+        name: Joi.string().pattern(SAFE_NAME_PATTERN).required().messages({
+            "string.pattern.base": "Collection name contains invalid characters. Use only letters, numbers, spaces, hyphens, and underscores.",
+        }),
+        symbol: Joi.string().pattern(SAFE_SYMBOL_PATTERN).required().messages({
+            "string.pattern.base": "Collection symbol must be 1–6 uppercase letters/numbers (e.g. ART, NFT1).",
+        }),
         description: Joi.string().optional().allow(""),
         coverImage: Joi.string().optional(),
         avatarImage: Joi.string().optional(),
@@ -36,7 +46,9 @@ const createCollectionValidation = async (ctx, next) => {
 
 const createNFTValidation = async (ctx, next) => {
     const schema = Joi.object({
-        name: Joi.string().required(),
+        name: Joi.string().pattern(SAFE_NAME_PATTERN).required().messages({
+            "string.pattern.base": "NFT name contains invalid characters. Use only letters, numbers, spaces, hyphens, and underscores.",
+        }),
         description: Joi.string().max(5000).optional().allow(""),
         image: Joi.string().required(),
         attributes: Joi.array().items(Joi.object()).optional(),
@@ -154,7 +166,9 @@ const updateCollectionValidation = async (ctx, next) => {
     const schema = Joi.object({
         coverImage: Joi.string().optional().allow(""),
         avatarImage: Joi.string().optional().allow(""),
-        name: Joi.string().optional().allow(""),
+        name: Joi.string().pattern(SAFE_NAME_PATTERN).optional().allow("").messages({
+            "string.pattern.base": "Collection name contains invalid characters. Use only letters, numbers, spaces, hyphens, and underscores.",
+        }),
         walletType: Joi.string().valid("zelf", "external").required(),
         owner: Joi.string().required(),
         proof: Joi.string().optional(),
@@ -181,7 +195,9 @@ const updateItemMetadataValidation = async (ctx, next) => {
     }).unknown(true);
 
     const schema = Joi.object({
-        name: Joi.string().max(256).optional().allow(""),
+        name: Joi.string().max(256).pattern(SAFE_NAME_PATTERN).optional().allow("").messages({
+            "string.pattern.base": "NFT name contains invalid characters. Use only letters, numbers, spaces, hyphens, and underscores.",
+        }),
         description: Joi.string().max(5000).optional().allow(""),
         attributes: Joi.array().items(traitSchema).optional(),
         walletType: Joi.string().valid("zelf", "external").required(),
@@ -204,6 +220,42 @@ const updateItemMetadataValidation = async (ctx, next) => {
     await next();
 };
 
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+/**
+ * Validate the uploaded file:
+ *  - A file must be present
+ *  - MIME type must be an allowed image format
+ *  - The original filename must not contain special characters that break IPFS/Pinata paths or Koa routes
+ */
+const uploadValidation = async (ctx, next) => {
+    const file = ctx.request.files ? ctx.request.files.file : null;
+
+    if (!file) {
+        ctx.status = 400;
+        ctx.body = { error: "No file uploaded." };
+        return;
+    }
+
+    const mime = file.mimetype || file.type || "";
+    if (!ALLOWED_MIME_TYPES.includes(mime)) {
+        ctx.status = 415;
+        ctx.body = { error: `Unsupported file type "${mime}". Allowed: jpeg, png, gif, webp.` };
+        return;
+    }
+
+    const filename = file.originalFilename || file.name || "";
+    if (filename && SAFE_NAME_PATTERN && !SAFE_NAME_PATTERN.test(filename.replace(/\.[^.]+$/, ""))) {
+        ctx.status = 400;
+        ctx.body = {
+            error: "File name contains invalid characters. Use only letters, numbers, spaces, hyphens, and underscores.",
+        };
+        return;
+    }
+
+    await next();
+};
+
 module.exports = {
     createCollectionValidation,
     createNFTValidation,
@@ -213,4 +265,5 @@ module.exports = {
     deleteItemValidation,
     updateCollectionValidation,
     updateItemMetadataValidation,
+    uploadValidation,
 };

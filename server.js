@@ -8,6 +8,7 @@ const DatabaseModule = require("./Core/database");
 const { serverLog } = require("./Core/loggin");
 const mongoose = require("mongoose"); // Add this line
 const { loadOfficialLicenses } = require("./Repositories/License/modules/license.module");
+const { getSupportedDomains } = require("./Repositories/Tags/config/supported-domains");
 const app = new Koa();
 app.proxy = true; // Trust the proxy's X-Forwarded-For header
 app.use(
@@ -51,7 +52,8 @@ const server = app.listen(config.port, () => {
 
         serverLog(`Connected MongoDB > ${mongooseConnection.name}`);
 
-        await loadOfficialLicenses(true);
+        const officialLicenses = await loadOfficialLicenses(true);
+        getSupportedDomains(officialLicenses);
 
         // Unprotected routes
         const unprotectedRoutes = require("./Routes/unprotected");

@@ -273,6 +273,25 @@ const previewZelfProof = async (ctx) => {
 };
 
 /**
+ * Preview ZelfId QR
+ * @param {Object} ctx - Koa context
+ * @returns {Object} - Preview results
+ */
+const previewZelfIdQr = async (ctx) => {
+    try {
+        const data = await Module.previewZelfIdQr(ctx.request.body, ctx.state.user);
+
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
+
+        ctx.status = _exception.status;
+
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
+};
+
+/**
  * Decrypt tag (v2)
  * @param {Object} ctx - Koa context
  * @returns {Object} - Decrypt results
@@ -494,6 +513,7 @@ module.exports = {
     leaseConfirmation,
     previewTag,
     previewZelfProof,
+    previewZelfIdQr,
     decryptTag,
     revenueCatWebhook,
     purchaseRewards,

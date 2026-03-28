@@ -329,6 +329,23 @@ const previewZelfProof = async (params, authUser) => {
 };
 
 /**
+ * preview ZelfId QR
+ * @param {Object} params
+ * @param {Object} authUser
+ */
+const previewZelfIdQr = async (params, authUser) => {
+    const { zelfProofQRCode } = params;
+
+    const zelfProof = await extractZelfProofFromQR(zelfProofQRCode);
+
+    if (!zelfProof) {
+        throw new Error("409:incorrect_zelf_proof");
+    }
+
+    return await previewZelfProof({ ...params, zelfProof }, authUser);
+};
+
+/**
  * lease confirmation
  * @param {Object} params
  * @param {Object} authUser
@@ -527,6 +544,7 @@ module.exports = {
     decryptTag,
     previewTag,
     previewZelfProof,
+    previewZelfIdQr,
     leaseConfirmation,
     deleteTag,
     // Utility functions

@@ -75,6 +75,11 @@ const schemas = {
         os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
         captchaToken: stringOptionalEmptyAsNull().optional(),
     },
+    previewZelfIdQr: {
+        zelfProofQRCode: string().required(),
+        os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
+        captchaToken: stringOptionalEmptyAsNull().optional(),
+    },
     revenueCatWebhook: {
         event: {
             product_id: string().required(),
@@ -578,6 +583,43 @@ const previewZelfProofValidation = async (ctx, next) => {
 };
 
 /**
+ * Preview ZelfId QR Validation
+ * @param {*} ctx - Koa context
+ * @param {*} next - Next middleware
+ */
+const previewZelfIdQrValidation = async (ctx, next) => {
+    const { zelfProofQRCode, os, captchaToken } = ctx.request.body;
+
+    const valid = validate(schemas.previewZelfIdQr, {
+        zelfProofQRCode,
+        os,
+        captchaToken,
+    });
+
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
+
+    // Captcha validation
+    if (captchaToken) {
+        const captchaResult = await captchaService.verifyCaptcha(captchaToken);
+
+        if (!captchaResult.success) {
+            ctx.status = 409;
+            ctx.body = {
+                captchaScore: captchaResult.score,
+                validationError: "Captcha not acceptable",
+            };
+            return;
+        }
+    }
+
+    await next();
+};
+
+/**
  * Decrypt Validation - Multi-domain support
  * @param {*} ctx - Koa context
  * @param {*} next - Next middleware
@@ -801,6 +843,7 @@ module.exports = {
     leaseConfirmationValidation,
     previewValidation,
     previewZelfProofValidation,
+    previewZelfIdQrValidation,
     decryptValidation,
     revenueCatWebhookValidation,
     referralRewardsValidation,
