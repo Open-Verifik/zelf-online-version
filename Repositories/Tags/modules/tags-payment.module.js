@@ -11,7 +11,7 @@ const { searchTag } = require("./tags.module");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const jwt = require("jsonwebtoken");
 const { keccak256, solidityPacked, parseUnits, getAddress } = require("ethers");
-const { usdcAtomicFromUsd } = require("./tag-pay-usdc.util");
+const { usdcAtomicFromUsd, stableAtomicFromUsd } = require("./tag-pay-usdc.util");
 const config = require("../../../Core/config");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const TagsArweaveModule = require("./tags-arweave.module");
@@ -170,6 +170,9 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
         SOL: null,
         BTC: null,
         AVAX: null,
+        BNB: null,
+        POL: null,
+        BASE: null,
         BDAG: null,
     };
 
@@ -210,7 +213,32 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
         prices.AVAX = await calculateCryptoValue("AVAX", billableUsdPrice);
     }
 
-    // BDAG - Check blockdag network (new)
+    // BNB - Binance Smart Chain
+    if (
+        oldCurrencies?.includes("BNB") ||
+        (networks?.bsc?.enabled && networks?.bsc?.nativeCurrency?.enabled && networks?.bsc?.nativeCurrency?.code === "BNB")
+    ) {
+        prices.BNB = await calculateCryptoValue("BNB", billableUsdPrice);
+    }
+
+    // POL — Polygon (native token priced via Binance MATICUSDT)
+    if (
+        oldCurrencies?.includes("POL") ||
+        (networks?.polygon?.enabled && networks?.polygon?.nativeCurrency?.enabled && networks?.polygon?.nativeCurrency?.code === "POL")
+    ) {
+        prices.POL = await calculateCryptoValue("MATIC", billableUsdPrice);
+    }
+
+    // BASE — Base L2 (native ETH priced via Binance ETHUSDT; same wei math as Ethereum)
+    if (
+        oldCurrencies?.includes("BASE") ||
+        (networks?.base?.enabled && networks?.base?.nativeCurrency?.enabled && networks?.base?.nativeCurrency?.code === "BASE")
+    ) {
+        prices.BASE = await calculateCryptoValue("ETH", billableUsdPrice);
+    }
+
+    // BDAG — BlockDAG EVM (chainId in config.blockdag). Native BDAG only here.
+    // Do not add prices.BDAG_USDC / BDAG_USDT or JWT usdc/usdt for tag pay until those assets exist on BlockDAG.
     if (networks?.blockdag?.enabled && networks?.blockdag?.nativeCurrency?.enabled && networks?.blockdag?.nativeCurrency?.code === "BDAG") {
         prices.BDAG = await calculateCryptoValue("BDAG", billableUsdPrice);
     }
@@ -297,6 +325,357 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
         }
     }
 
+    if (prices.BNB && config.bsc.tagPayContractAddress) {
+        try {
+            const initiatedAtUnix = BigInt(returnData.initiatedAt);
+            const paymentId = keccak256(solidityPacked(["string", "string", "uint256"], ["ZELF_BSC_PAY_v1", returnData.tagName, initiatedAtUnix]));
+            let expectedWeiBn = bnbExpectedWeiFromUsd(billableUsdPrice, prices.BNB.tokenPriceString);
+            if (devAmountFraction != null && expectedWeiBn < 1n) {
+                expectedWeiBn = 1n;
+            }
+            if (expectedWeiBn <= 0n) {
+                throw new Error("expectedWei_bsc_non_positive");
+            }
+            const contractAddr = getAddress(config.bsc.tagPayContractAddress);
+            returnData.smartContractBSC = {
+                paymentId,
+                expectedWei: expectedWeiBn.toString(),
+                chainId: config.bsc.chainId,
+                contractAddress: contractAddr,
+            };
+
+            const usdcAddrRaw = (config.bsc.tagPayUsdcAddress || "").trim();
+            const usdtAddrRaw = (config.bsc.tagPayUsdtAddress || "").trim();
+
+            const BSC_STABLE_DECIMALS = 18;
+
+            if (usdcAddrRaw) {
+                try {
+                    let expectedUsdcBn = stableAtomicFromUsd(billableUsdPrice, BSC_STABLE_DECIMALS);
+                    if (devAmountFraction != null && expectedUsdcBn < 1n) {
+                        expectedUsdcBn = 1n;
+                    }
+                    if (expectedUsdcBn <= 0n) {
+                        throw new Error("expectedUsdc_bsc_non_positive");
+                    }
+                    returnData.smartContractBSC.usdc = {
+                        tokenAddress: getAddress(usdcAddrRaw),
+                        expectedAmount: expectedUsdcBn.toString(),
+                        decimals: BSC_STABLE_DECIMALS,
+                    };
+                    const usdcHuman = Number(expectedUsdcBn) / 10 ** BSC_STABLE_DECIMALS;
+                    prices.BSC_USDC = {
+                        amountToSend: parseFloat(usdcHuman.toFixed(8)),
+                        price: billableUsdPrice,
+                        ratePriceInUSD: 1,
+                        tokenPriceString: "1",
+                    };
+                } catch (e) {
+                    console.warn("smartContractBSC.usdc not attached:", e?.message || e);
+                }
+            }
+
+            if (usdtAddrRaw) {
+                try {
+                    let expectedUsdtBn = stableAtomicFromUsd(billableUsdPrice, BSC_STABLE_DECIMALS);
+                    if (devAmountFraction != null && expectedUsdtBn < 1n) {
+                        expectedUsdtBn = 1n;
+                    }
+                    if (expectedUsdtBn <= 0n) {
+                        throw new Error("expectedUsdt_bsc_non_positive");
+                    }
+                    returnData.smartContractBSC.usdt = {
+                        tokenAddress: getAddress(usdtAddrRaw),
+                        expectedAmount: expectedUsdtBn.toString(),
+                        decimals: BSC_STABLE_DECIMALS,
+                    };
+                    const usdtHuman = Number(expectedUsdtBn) / 10 ** BSC_STABLE_DECIMALS;
+                    prices.BSC_USDT = {
+                        amountToSend: parseFloat(usdtHuman.toFixed(8)),
+                        price: billableUsdPrice,
+                        ratePriceInUSD: 1,
+                        tokenPriceString: "1",
+                    };
+                } catch (e) {
+                    console.warn("smartContractBSC.usdt not attached:", e?.message || e);
+                }
+            }
+        } catch (e) {
+            console.warn("smartContractBSC not attached:", e?.message || e);
+        }
+    }
+
+    if (prices.ETH && config.ethereum.tagPayContractAddress) {
+        try {
+            const initiatedAtUnix = BigInt(returnData.initiatedAt);
+            const paymentId = keccak256(solidityPacked(["string", "string", "uint256"], ["ZELF_ETH_PAY_v1", returnData.tagName, initiatedAtUnix]));
+            let expectedWeiBn = ethExpectedWeiFromUsd(billableUsdPrice, prices.ETH.tokenPriceString);
+            if (devAmountFraction != null && expectedWeiBn < 1n) {
+                expectedWeiBn = 1n;
+            }
+            if (expectedWeiBn <= 0n) {
+                throw new Error("expectedWei_eth_non_positive");
+            }
+            const contractAddr = getAddress(config.ethereum.tagPayContractAddress);
+            returnData.smartContractETH = {
+                paymentId,
+                expectedWei: expectedWeiBn.toString(),
+                chainId: config.ethereum.chainId,
+                contractAddress: contractAddr,
+            };
+
+            const usdcAddrRaw = (config.ethereum.tagPayUsdcAddress || "").trim();
+            const usdtAddrRaw = (config.ethereum.tagPayUsdtAddress || "").trim();
+
+            /** Mainnet Circle USDC / Tether USDT use 6 decimals on Ethereum */
+            const ETH_STABLE_DECIMALS = 6;
+
+            if (usdcAddrRaw) {
+                try {
+                    let expectedUsdcBn = stableAtomicFromUsd(billableUsdPrice, ETH_STABLE_DECIMALS);
+                    if (devAmountFraction != null && expectedUsdcBn < 1n) {
+                        expectedUsdcBn = 1n;
+                    }
+                    if (expectedUsdcBn <= 0n) {
+                        throw new Error("expectedUsdc_eth_non_positive");
+                    }
+                    returnData.smartContractETH.usdc = {
+                        tokenAddress: getAddress(usdcAddrRaw),
+                        expectedAmount: expectedUsdcBn.toString(),
+                        decimals: ETH_STABLE_DECIMALS,
+                    };
+                    const usdcHuman = Number(expectedUsdcBn) / 10 ** ETH_STABLE_DECIMALS;
+                    prices.ETH_USDC = {
+                        amountToSend: parseFloat(usdcHuman.toFixed(6)),
+                        price: billableUsdPrice,
+                        ratePriceInUSD: 1,
+                        tokenPriceString: "1",
+                    };
+                } catch (e) {
+                    console.warn("smartContractETH.usdc not attached:", e?.message || e);
+                }
+            }
+
+            if (usdtAddrRaw) {
+                try {
+                    let expectedUsdtBn = stableAtomicFromUsd(billableUsdPrice, ETH_STABLE_DECIMALS);
+                    if (devAmountFraction != null && expectedUsdtBn < 1n) {
+                        expectedUsdtBn = 1n;
+                    }
+                    if (expectedUsdtBn <= 0n) {
+                        throw new Error("expectedUsdt_eth_non_positive");
+                    }
+                    returnData.smartContractETH.usdt = {
+                        tokenAddress: getAddress(usdtAddrRaw),
+                        expectedAmount: expectedUsdtBn.toString(),
+                        decimals: ETH_STABLE_DECIMALS,
+                    };
+                    const usdtHuman = Number(expectedUsdtBn) / 10 ** ETH_STABLE_DECIMALS;
+                    prices.ETH_USDT = {
+                        amountToSend: parseFloat(usdtHuman.toFixed(6)),
+                        price: billableUsdPrice,
+                        ratePriceInUSD: 1,
+                        tokenPriceString: "1",
+                    };
+                } catch (e) {
+                    console.warn("smartContractETH.usdt not attached:", e?.message || e);
+                }
+            }
+
+            delete returnData.paymentAddress.ethAddress;
+        } catch (e) {
+            console.warn("smartContractETH not attached:", e?.message || e);
+        }
+    }
+
+    if (prices.POL && config.polygon.tagPayContractAddress) {
+        try {
+            const initiatedAtUnix = BigInt(returnData.initiatedAt);
+            const paymentId = keccak256(solidityPacked(["string", "string", "uint256"], ["ZELF_POLYGON_PAY_v1", returnData.tagName, initiatedAtUnix]));
+            let expectedWeiBn = polExpectedWeiFromUsd(billableUsdPrice, prices.POL.tokenPriceString);
+            if (devAmountFraction != null && expectedWeiBn < 1n) {
+                expectedWeiBn = 1n;
+            }
+            if (expectedWeiBn <= 0n) {
+                throw new Error("expectedWei_pol_non_positive");
+            }
+            const contractAddr = getAddress(config.polygon.tagPayContractAddress);
+            returnData.smartContractPOLYGON = {
+                paymentId,
+                expectedWei: expectedWeiBn.toString(),
+                chainId: config.polygon.chainId,
+                contractAddress: contractAddr,
+            };
+
+            const usdcAddrRaw = (config.polygon.tagPayUsdcAddress || "").trim();
+            const usdtAddrRaw = (config.polygon.tagPayUsdtAddress || "").trim();
+
+            const POL_STABLE_DECIMALS = 6;
+
+            if (usdcAddrRaw) {
+                try {
+                    let expectedUsdcBn = stableAtomicFromUsd(billableUsdPrice, POL_STABLE_DECIMALS);
+                    if (devAmountFraction != null && expectedUsdcBn < 1n) {
+                        expectedUsdcBn = 1n;
+                    }
+                    if (expectedUsdcBn <= 0n) {
+                        throw new Error("expectedUsdc_pol_non_positive");
+                    }
+                    returnData.smartContractPOLYGON.usdc = {
+                        tokenAddress: getAddress(usdcAddrRaw),
+                        expectedAmount: expectedUsdcBn.toString(),
+                        decimals: POL_STABLE_DECIMALS,
+                    };
+                    const usdcHuman = Number(expectedUsdcBn) / 10 ** POL_STABLE_DECIMALS;
+                    prices.POL_USDC = {
+                        amountToSend: parseFloat(usdcHuman.toFixed(6)),
+                        price: billableUsdPrice,
+                        ratePriceInUSD: 1,
+                        tokenPriceString: "1",
+                    };
+                } catch (e) {
+                    console.warn("smartContractPOLYGON.usdc not attached:", e?.message || e);
+                }
+            }
+
+            if (usdtAddrRaw) {
+                try {
+                    let expectedUsdtBn = stableAtomicFromUsd(billableUsdPrice, POL_STABLE_DECIMALS);
+                    if (devAmountFraction != null && expectedUsdtBn < 1n) {
+                        expectedUsdtBn = 1n;
+                    }
+                    if (expectedUsdtBn <= 0n) {
+                        throw new Error("expectedUsdt_pol_non_positive");
+                    }
+                    returnData.smartContractPOLYGON.usdt = {
+                        tokenAddress: getAddress(usdtAddrRaw),
+                        expectedAmount: expectedUsdtBn.toString(),
+                        decimals: POL_STABLE_DECIMALS,
+                    };
+                    const usdtHuman = Number(expectedUsdtBn) / 10 ** POL_STABLE_DECIMALS;
+                    prices.POL_USDT = {
+                        amountToSend: parseFloat(usdtHuman.toFixed(6)),
+                        price: billableUsdPrice,
+                        ratePriceInUSD: 1,
+                        tokenPriceString: "1",
+                    };
+                } catch (e) {
+                    console.warn("smartContractPOLYGON.usdt not attached:", e?.message || e);
+                }
+            }
+        } catch (e) {
+            console.warn("smartContractPOLYGON not attached:", e?.message || e);
+        }
+    }
+
+    if (prices.BASE && config.base.tagPayContractAddress) {
+        try {
+            const initiatedAtUnix = BigInt(returnData.initiatedAt);
+            const paymentId = keccak256(solidityPacked(["string", "string", "uint256"], ["ZELF_BASE_PAY_v1", returnData.tagName, initiatedAtUnix]));
+            let expectedWeiBn = ethExpectedWeiFromUsd(billableUsdPrice, prices.BASE.tokenPriceString);
+            if (devAmountFraction != null && expectedWeiBn < 1n) {
+                expectedWeiBn = 1n;
+            }
+            if (expectedWeiBn <= 0n) {
+                throw new Error("expectedWei_base_non_positive");
+            }
+            const contractAddr = getAddress(config.base.tagPayContractAddress);
+            returnData.smartContractBASE = {
+                paymentId,
+                expectedWei: expectedWeiBn.toString(),
+                chainId: config.base.chainId,
+                contractAddress: contractAddr,
+            };
+
+            const usdcAddrRaw = (config.base.tagPayUsdcAddress || "").trim();
+            const usdtAddrRaw = (config.base.tagPayUsdtAddress || "").trim();
+
+            const BASE_STABLE_DECIMALS = 6;
+
+            if (usdcAddrRaw) {
+                try {
+                    let expectedUsdcBn = stableAtomicFromUsd(billableUsdPrice, BASE_STABLE_DECIMALS);
+                    if (devAmountFraction != null && expectedUsdcBn < 1n) {
+                        expectedUsdcBn = 1n;
+                    }
+                    if (expectedUsdcBn <= 0n) {
+                        throw new Error("expectedUsdc_base_non_positive");
+                    }
+                    returnData.smartContractBASE.usdc = {
+                        tokenAddress: getAddress(usdcAddrRaw),
+                        expectedAmount: expectedUsdcBn.toString(),
+                        decimals: BASE_STABLE_DECIMALS,
+                    };
+                    const usdcHuman = Number(expectedUsdcBn) / 10 ** BASE_STABLE_DECIMALS;
+                    prices.BASE_USDC = {
+                        amountToSend: parseFloat(usdcHuman.toFixed(6)),
+                        price: billableUsdPrice,
+                        ratePriceInUSD: 1,
+                        tokenPriceString: "1",
+                    };
+                } catch (e) {
+                    console.warn("smartContractBASE.usdc not attached:", e?.message || e);
+                }
+            }
+
+            if (usdtAddrRaw) {
+                try {
+                    let expectedUsdtBn = stableAtomicFromUsd(billableUsdPrice, BASE_STABLE_DECIMALS);
+                    if (devAmountFraction != null && expectedUsdtBn < 1n) {
+                        expectedUsdtBn = 1n;
+                    }
+                    if (expectedUsdtBn <= 0n) {
+                        throw new Error("expectedUsdt_base_non_positive");
+                    }
+                    returnData.smartContractBASE.usdt = {
+                        tokenAddress: getAddress(usdtAddrRaw),
+                        expectedAmount: expectedUsdtBn.toString(),
+                        decimals: BASE_STABLE_DECIMALS,
+                    };
+                    const usdtHuman = Number(expectedUsdtBn) / 10 ** BASE_STABLE_DECIMALS;
+                    prices.BASE_USDT = {
+                        amountToSend: parseFloat(usdtHuman.toFixed(6)),
+                        price: billableUsdPrice,
+                        ratePriceInUSD: 1,
+                        tokenPriceString: "1",
+                    };
+                } catch (e) {
+                    console.warn("smartContractBASE.usdt not attached:", e?.message || e);
+                }
+            }
+
+            delete returnData.paymentAddress.ethAddress;
+        } catch (e) {
+            console.warn("smartContractBASE not attached:", e?.message || e);
+        }
+    }
+
+    if (prices.BDAG && config.blockdag.tagPayContractAddress) {
+        try {
+            const initiatedAtUnix = BigInt(returnData.initiatedAt);
+            const paymentId = keccak256(
+                solidityPacked(["string", "string", "uint256"], ["ZELF_BLOCKDAG_PAY_v1", returnData.tagName, initiatedAtUnix]),
+            );
+            let expectedWeiBn = bdagExpectedWeiFromUsd(billableUsdPrice, prices.BDAG.tokenPriceString);
+            if (devAmountFraction != null && expectedWeiBn < 1n) {
+                expectedWeiBn = 1n;
+            }
+            if (expectedWeiBn <= 0n) {
+                throw new Error("expectedWei_bdag_non_positive");
+            }
+            const contractAddr = getAddress(config.blockdag.tagPayContractAddress);
+            returnData.smartContractBDAG = {
+                paymentId,
+                expectedWei: expectedWeiBn.toString(),
+                chainId: config.blockdag.chainId,
+                contractAddress: contractAddr,
+            };
+            delete returnData.paymentAddress.ethAddress;
+        } catch (e) {
+            console.warn("smartContractBDAG not attached:", e?.message || e);
+        }
+    }
+
     const signedDataPrice = jwt.sign(returnData, config.JWT_SECRET);
 
     return {
@@ -332,6 +711,66 @@ const avaxExpectedWeiFromUsd = (usdPrice, avaxUsdPerTokenStr) => {
     const pxScaled = parseUnits(decimalStringForParseUnits(avaxUsdPerTokenStr), 18);
     if (pxScaled === 0n) {
         throw new Error("avax_usd_price_zero");
+    }
+    return (usdScaled * WAD) / pxScaled;
+};
+
+/**
+ * Canonical native BNB wei: floor(usd_18dec * WAD / bnbUsdPerToken_18dec).
+ * @param {string|number} usdPrice
+ * @param {string} bnbUsdPerTokenStr
+ * @returns {bigint}
+ */
+const bnbExpectedWeiFromUsd = (usdPrice, bnbUsdPerTokenStr) => {
+    const usdScaled = parseUnits(decimalStringForParseUnits(usdPrice), 18);
+    const pxScaled = parseUnits(decimalStringForParseUnits(bnbUsdPerTokenStr), 18);
+    if (pxScaled === 0n) {
+        throw new Error("bnb_usd_price_zero");
+    }
+    return (usdScaled * WAD) / pxScaled;
+};
+
+/**
+ * Canonical native ETH wei: floor(usd_18dec * WAD / ethUsdPerToken_18dec).
+ * @param {string|number} usdPrice
+ * @param {string} ethUsdPerTokenStr
+ * @returns {bigint}
+ */
+const ethExpectedWeiFromUsd = (usdPrice, ethUsdPerTokenStr) => {
+    const usdScaled = parseUnits(decimalStringForParseUnits(usdPrice), 18);
+    const pxScaled = parseUnits(decimalStringForParseUnits(ethUsdPerTokenStr), 18);
+    if (pxScaled === 0n) {
+        throw new Error("eth_usd_price_zero");
+    }
+    return (usdScaled * WAD) / pxScaled;
+};
+
+/**
+ * Canonical native POL wei (priced from MATIC/Binance ticker): floor(usd_18dec * WAD / polUsdPerToken_18dec).
+ * @param {string|number} usdPrice
+ * @param {string} polUsdPerTokenStr — POL/MATIC price in USD as decimal string
+ * @returns {bigint}
+ */
+const polExpectedWeiFromUsd = (usdPrice, polUsdPerTokenStr) => {
+    const usdScaled = parseUnits(decimalStringForParseUnits(usdPrice), 18);
+    const pxScaled = parseUnits(decimalStringForParseUnits(polUsdPerTokenStr), 18);
+    if (pxScaled === 0n) {
+        throw new Error("pol_usd_price_zero");
+    }
+    return (usdScaled * WAD) / pxScaled;
+};
+
+/**
+ * Canonical native BDAG wei: floor(usd_18dec * WAD / bdagUsdPerToken_18dec).
+ * @param {string|number} usdPrice
+ * @param {string} bdagUsdPerTokenStr — BDAG price in USD as decimal string
+ * @returns {bigint}
+ */
+const bdagExpectedWeiFromUsd = (usdPrice, bdagUsdPerTokenStr) => {
+    const usdScaled = parseUnits(decimalStringForParseUnits(usdPrice), 18);
+    const pxScaled = parseUnits(decimalStringForParseUnits(bdagUsdPerTokenStr), 18);
+    if (pxScaled === 0n) {
+        throw new Error("bdag_usd_price_zero");
     }
     return (usdScaled * WAD) / pxScaled;
 };

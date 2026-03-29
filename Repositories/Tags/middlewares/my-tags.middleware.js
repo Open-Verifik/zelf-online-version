@@ -18,13 +18,13 @@ const schemas = {
     paymentConfirmation: {
         tagName: string().required(),
         domain: string(),
-        network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX"]).required(),
+        network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX", "BNB", "POL", "BASE", "BDAG"]).required(),
         token: string().required(),
     },
     smartContractPaymentConfirmation: {
         tagName: string().required(),
         domain: string(),
-        network: stringEnum(["AVAX_SC"]).required(),
+        network: stringEnum(["AVAX_SC", "BSC_SC", "ETH_SC", "POLYGON_SC", "BASE_SC", "BLOCKDAG_SC"]).required(),
         token: string().required(),
         txHash: string().required(),
     },
@@ -36,7 +36,7 @@ const schemas = {
     receiptEmail: {
         tagName: string().required(),
         domain: string(),
-        network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX"]).required(),
+        network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX", "BNB", "POL", "BASE", "BDAG"]).required(),
         email: string().email().required(),
         token: string().required(),
     },
@@ -238,6 +238,211 @@ const smartContractPaymentConfirmationValidation = async (ctx, next) => {
     if (tokenDecoded.ttl < now) {
         ctx.status = 409;
         ctx.body = { validationError: "token_expired" };
+        return;
+    }
+
+    const { network } = ctx.request.body;
+
+    if (network === "BLOCKDAG_SC") {
+        const scBd = tokenDecoded.smartContractBDAG;
+        const hasNative =
+            scBd?.expectedWei != null &&
+            String(scBd.expectedWei).trim() !== "" &&
+            (() => {
+                try {
+                    return BigInt(scBd.expectedWei) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+
+        if (!scBd?.paymentId || !hasNative) {
+            ctx.status = 409;
+            ctx.body = { validationError: "smart_contract_bdag_not_in_token" };
+            return;
+        }
+
+        await next();
+        return;
+    }
+
+    if (network === "ETH_SC") {
+        const scE = tokenDecoded.smartContractETH;
+        const hasNative =
+            scE?.expectedWei != null &&
+            String(scE.expectedWei).trim() !== "" &&
+            (() => {
+                try {
+                    return BigInt(scE.expectedWei) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+        const hasUsdc =
+            scE?.usdc?.expectedAmount != null &&
+            String(scE.usdc.expectedAmount).trim() !== "" &&
+            scE?.usdc?.tokenAddress &&
+            (() => {
+                try {
+                    return BigInt(scE.usdc.expectedAmount) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+        const hasUsdt =
+            scE?.usdt?.expectedAmount != null &&
+            String(scE.usdt.expectedAmount).trim() !== "" &&
+            scE?.usdt?.tokenAddress &&
+            (() => {
+                try {
+                    return BigInt(scE.usdt.expectedAmount) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+
+        if (!scE?.paymentId || (!hasNative && !hasUsdc && !hasUsdt)) {
+            ctx.status = 409;
+            ctx.body = { validationError: "smart_contract_eth_not_in_token" };
+            return;
+        }
+
+        await next();
+        return;
+    }
+
+    if (network === "POLYGON_SC") {
+        const scP = tokenDecoded.smartContractPOLYGON;
+        const hasNative =
+            scP?.expectedWei != null &&
+            String(scP.expectedWei).trim() !== "" &&
+            (() => {
+                try {
+                    return BigInt(scP.expectedWei) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+        const hasUsdc =
+            scP?.usdc?.expectedAmount != null &&
+            String(scP.usdc.expectedAmount).trim() !== "" &&
+            scP?.usdc?.tokenAddress &&
+            (() => {
+                try {
+                    return BigInt(scP.usdc.expectedAmount) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+        const hasUsdt =
+            scP?.usdt?.expectedAmount != null &&
+            String(scP.usdt.expectedAmount).trim() !== "" &&
+            scP?.usdt?.tokenAddress &&
+            (() => {
+                try {
+                    return BigInt(scP.usdt.expectedAmount) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+
+        if (!scP?.paymentId || (!hasNative && !hasUsdc && !hasUsdt)) {
+            ctx.status = 409;
+            ctx.body = { validationError: "smart_contract_polygon_not_in_token" };
+            return;
+        }
+
+        await next();
+        return;
+    }
+
+    if (network === "BASE_SC") {
+        const scBase = tokenDecoded.smartContractBASE;
+        const hasNative =
+            scBase?.expectedWei != null &&
+            String(scBase.expectedWei).trim() !== "" &&
+            (() => {
+                try {
+                    return BigInt(scBase.expectedWei) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+        const hasUsdc =
+            scBase?.usdc?.expectedAmount != null &&
+            String(scBase.usdc.expectedAmount).trim() !== "" &&
+            scBase?.usdc?.tokenAddress &&
+            (() => {
+                try {
+                    return BigInt(scBase.usdc.expectedAmount) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+        const hasUsdt =
+            scBase?.usdt?.expectedAmount != null &&
+            String(scBase.usdt.expectedAmount).trim() !== "" &&
+            scBase?.usdt?.tokenAddress &&
+            (() => {
+                try {
+                    return BigInt(scBase.usdt.expectedAmount) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+
+        if (!scBase?.paymentId || (!hasNative && !hasUsdc && !hasUsdt)) {
+            ctx.status = 409;
+            ctx.body = { validationError: "smart_contract_base_not_in_token" };
+            return;
+        }
+
+        await next();
+        return;
+    }
+
+    if (network === "BSC_SC") {
+        const scB = tokenDecoded.smartContractBSC;
+        const hasNative =
+            scB?.expectedWei != null &&
+            String(scB.expectedWei).trim() !== "" &&
+            (() => {
+                try {
+                    return BigInt(scB.expectedWei) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+        const hasUsdc =
+            scB?.usdc?.expectedAmount != null &&
+            String(scB.usdc.expectedAmount).trim() !== "" &&
+            scB?.usdc?.tokenAddress &&
+            (() => {
+                try {
+                    return BigInt(scB.usdc.expectedAmount) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+        const hasUsdt =
+            scB?.usdt?.expectedAmount != null &&
+            String(scB.usdt.expectedAmount).trim() !== "" &&
+            scB?.usdt?.tokenAddress &&
+            (() => {
+                try {
+                    return BigInt(scB.usdt.expectedAmount) > 0n;
+                } catch {
+                    return false;
+                }
+            })();
+
+        if (!scB?.paymentId || (!hasNative && !hasUsdc && !hasUsdt)) {
+            ctx.status = 409;
+            ctx.body = { validationError: "smart_contract_bsc_not_in_token" };
+            return;
+        }
+
+        await next();
         return;
     }
 

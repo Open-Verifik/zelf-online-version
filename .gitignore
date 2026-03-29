@@ -51,3 +51,6 @@ config/gemini_key.json
 
 Avalanche/artifacts/
 Avalanche/cache/
+
+# checkoutContracts deploy scripts compile output (solc)
+checkoutContracts/.solc-out-*/

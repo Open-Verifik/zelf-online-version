@@ -54,9 +54,9 @@ const paymentConfirmation = async (ctx) => {
 
 const smartContractPaymentConfirmation = async (ctx) => {
     try {
-        const { tagName, domain, token, txHash } = ctx.request.body;
+        const { tagName, domain, token, txHash, network } = ctx.request.body;
 
-        const data = await Module.verifySmartContractPayment(tagName, domain, token, txHash);
+        const data = await Module.verifySmartContractPayment(tagName, domain, token, txHash, network);
 
         ctx.body = { data };
     } catch (error) {

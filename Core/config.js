@@ -224,6 +224,42 @@ const configuration = {
         chainId: Number(process.env.AVALANCHE_CHAIN_ID) || 43114, // Avalanche C-Chain mainnet; use 43113 for Fuji
         privateKey: process.env.WALRUS_PRIVATE_KEY,
     },
+    /** ZelfBscPay.sol — native BNB + USDC + USDT tag checkout */
+    bsc: {
+        tagPayContractAddress: (process.env.BSC_TAG_PAY_CONTRACT_ADDRESS || "").trim(),
+        tagPayUsdcAddress: (process.env.BSC_TAG_PAY_USDC_ADDRESS || "").trim(),
+        tagPayUsdtAddress: (process.env.BSC_TAG_PAY_USDT_ADDRESS || "").trim(),
+        tagPayConfirmations: Math.max(1, Number(process.env.BSC_TAG_PAY_CONFIRMATIONS) || 1),
+        rpcUrl: process.env.BSC_RPC_URL || "https://bsc-dataseed.binance.org",
+        chainId: Number(process.env.BSC_CHAIN_ID) || 56,
+    },
+    /** ZelfEthPay.sol — native ETH + USDC + USDT tag checkout */
+    ethereum: {
+        tagPayContractAddress: (process.env.ETHEREUM_TAG_PAY_CONTRACT_ADDRESS || "").trim(),
+        tagPayUsdcAddress: (process.env.ETHEREUM_TAG_PAY_USDC_ADDRESS || "").trim(),
+        tagPayUsdtAddress: (process.env.ETHEREUM_TAG_PAY_USDT_ADDRESS || "").trim(),
+        tagPayConfirmations: Math.max(1, Number(process.env.ETHEREUM_TAG_PAY_CONFIRMATIONS) || 1),
+        rpcUrl: process.env.ETHEREUM_RPC_URL || "https://eth.llamarpc.com",
+        chainId: Number(process.env.ETHEREUM_CHAIN_ID) || 1,
+    },
+    /** ZelfPolygonPay.sol — native POL + USDC + USDT tag checkout */
+    polygon: {
+        tagPayContractAddress: (process.env.POLYGON_TAG_PAY_CONTRACT_ADDRESS || "").trim(),
+        tagPayUsdcAddress: (process.env.POLYGON_TAG_PAY_USDC_ADDRESS || "").trim(),
+        tagPayUsdtAddress: (process.env.POLYGON_TAG_PAY_USDT_ADDRESS || "").trim(),
+        tagPayConfirmations: Math.max(1, Number(process.env.POLYGON_TAG_PAY_CONFIRMATIONS) || 1),
+        rpcUrl: process.env.POLYGON_RPC_URL || "https://polygon-rpc.com",
+        chainId: Number(process.env.POLYGON_CHAIN_ID) || 137,
+    },
+    /** ZelfBasePay.sol — native ETH on Base + USDC + USDT tag checkout */
+    base: {
+        tagPayContractAddress: (process.env.BASE_TAG_PAY_CONTRACT_ADDRESS || "").trim(),
+        tagPayUsdcAddress: (process.env.BASE_TAG_PAY_USDC_ADDRESS || "").trim(),
+        tagPayUsdtAddress: (process.env.BASE_TAG_PAY_USDT_ADDRESS || "").trim(),
+        tagPayConfirmations: Math.max(1, Number(process.env.BASE_TAG_PAY_CONFIRMATIONS) || 1),
+        rpcUrl: process.env.BASE_RPC_URL || "https://mainnet.base.org",
+        chainId: Number(process.env.BASE_CHAIN_ID) || 8453,
+    },
     erc8004: {
         rpcUrl: process.env.ERC8004_RPC_URL || process.env.AVALANCHE_RPC_URL || "https://api.avax.network/ext/bc/C/rpc",
         chainId: Number(process.env.ERC8004_CHAIN_ID || 43114),
@@ -235,12 +271,15 @@ const configuration = {
         demoMode: process.env.CRYPTO_PAYMENTS_DEMO_MODE === "true" || false,
         demoMultiplier: 0.005, // 0.5% of original price for demo mode (max $0.049 for $9.99)
     },
+    /** ZelfBlockDagPay.sol — native BDAG tag checkout only */
     blockdag: {
         defaultCollectionAddress: process.env.BLOCKDAG_DEFAULT_COLLECTION_ADDRESS || null,
         factoryAddress: process.env.BLOCKDAG_FACTORY_ADDRESS || "0x7c6a168455C94092f8d51aBC515B73f4Ed9813a6",
         mainRpcUrl: process.env.BLOCKDAG_MAIN_RPC_URL || "https://dapps-rpc.bdagscan.com",
         rpcUrl: process.env.BLOCKDAG_RPC_URL || "https://rpc.bdagscan.com",
-        chainId: 1404,
+        chainId: Number(process.env.BLOCKDAG_CHAIN_ID) || 1404,
+        tagPayContractAddress: (process.env.BLOCKDAG_TAG_PAY_CONTRACT_ADDRESS || "").trim(),
+        tagPayConfirmations: Math.max(1, Number(process.env.BLOCKDAG_TAG_PAY_CONFIRMATIONS) || 1),
         nowNodesAPIKey: process.env.BLOCKDAG_NOW_NODES_API_KEY,
     },
 };
