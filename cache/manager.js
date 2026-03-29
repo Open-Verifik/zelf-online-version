@@ -5,7 +5,7 @@ const initCacheInstance = () => {
 	if (instance) return instance;
 
 	instance = new NodeCache({
-		stdTTL: 3600, // 1 hour default TTL
+		stdTTL: 7200, // 2 hours default TTL
 		checkperiod: 600, // Check for expired keys every 10 minutes
 		useClones: false, // Better performance for large objects
 	});
