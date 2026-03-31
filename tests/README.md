@@ -4,7 +4,7 @@ This project uses Jest with Supertest for comprehensive testing of the Zelf wall
 
 ## Database Safety
 
-**IMPORTANT**: Tests use a completely separate database (`zelf_testing`) and will NEVER interfere with your production or development databases. Multiple safety checks are in place to prevent accidental data loss.
+**IMPORTANT**: Jest resolves the MongoDB URI from environment variables (see [`tests/config/test.config.js`](config/test.config.js)): `MONGODB_URI_TEST`, then `MONGODB_URI_PROD`, then `MONGODB_URI`, then `mongodb://127.0.0.1:27017/zelf_testing` if none are set. Use a dedicated Atlas database or local `zelf_testing` for isolation. [`tests/globalTeardown.js`](../globalTeardown.js) only runs `dropDatabase()` when the connected database name is **`zelf_testing`**; other database names are not dropped (warning only).
 
 ## NO MOCKING POLICY
 
@@ -47,7 +47,7 @@ tests/
 The Jest configuration is defined in `jest.config.js` and `jest.integration.config.js` with the following features:
 
 - **Test Environment**: Node.js
-- **Database**: Dedicated `zelf_testing` database (completely isolated)
+- **Database**: URI from `.env` (see test config); local fallback `zelf_testing` on `127.0.0.1` when unset
 - **Coverage**: Enabled with HTML, LCOV, and text reports
 - **Timeout**: 30 seconds for async operations
 - **Safety Checks**: Multiple safeguards to prevent production database access
@@ -56,10 +56,9 @@ The Jest configuration is defined in `jest.config.js` and `jest.integration.conf
 
 ## Database Safety Features
 
-### 1. Dedicated Test Database
-- All tests use `mongodb://localhost:27017/zelf_testing`
-- Never connects to production or development databases
-- Automatic database cleanup after tests
+### 1. Test database URI
+- Resolved from `MONGODB_URI_TEST` → `MONGODB_URI_PROD` → `MONGODB_URI` → default `mongodb://127.0.0.1:27017/zelf_testing`
+- Teardown **drops** the database only when its name is **`zelf_testing`**; connecting to a shared dev DB (e.g. `wallet_development`) skips the drop to avoid wiping data
 
 ### 2. Safety Checks
 - Database name validation before cleanup operations

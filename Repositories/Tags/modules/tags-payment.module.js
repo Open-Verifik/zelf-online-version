@@ -116,6 +116,19 @@ const validateCurrency = (domain, currency) => {
 };
 
 /**
+ * Keep billed USD in nearest-cent precision before downstream crypto conversions.
+ * @param {number} usdAmount
+ * @returns {number}
+ */
+const roundBillableUsdPrice = (usdAmount) => {
+    if (!Number.isFinite(usdAmount)) {
+        return 0;
+    }
+
+    return Math.max(Math.round(usdAmount * 100) / 100, 0);
+};
+
+/**
  * Get payment options
  * @param {string} tagName
  * @param {string} domain
@@ -138,7 +151,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
         reducedFeeRequested: Boolean(requestOptions.reducedFeeRequested),
     });
     const listPriceUsd = priceDetails.price;
-    const billableUsdPrice = devAmountFraction != null ? listPriceUsd * devAmountFraction : listPriceUsd;
+    const billableUsdPrice = roundBillableUsdPrice(devAmountFraction != null ? listPriceUsd * devAmountFraction : listPriceUsd);
 
     const zelfPayCount = tagData.ipfs?.length || tagData.arweave?.length;
 
@@ -779,7 +792,7 @@ const calculateCryptoValue = async (token = "ETH", price_) => {
     try {
         // Special handling for tokens not available on Binance
         const FALLBACK_PRICES = {
-            BDAG: 0.05, // BlockDAG price in USD - update this manually or use another API
+            BDAG: "0.05", // string to avoid IEEE 754 noise in decimalStringForParseUnits
         };
 
         let tokenPrice;
@@ -1180,6 +1193,7 @@ const storeInArweave = async (tagObject, domainConfig, metadata) => {
 module.exports = {
     validateCurrency,
     isTagPayReducedFeeClientHeaderHonored,
+    roundBillableUsdPrice,
     getPaymentOptions,
     getPricingTable,
     buildMetadata,

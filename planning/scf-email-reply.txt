@@ -1,0 +1,51 @@
+Subject: SCF Build Award prescreening - Zelf Legacy revised scope, stronger evidence, and milestone-based delivery
+
+Dear Stellar Community Fund team,
+
+Thank you for the prescreening feedback on our Zelf Legacy submission. We appreciate the directness, and we took the comments seriously.
+
+We understand the core concerns: the budget felt too large for the level of evidence presented, the traction and validation were not explicit enough, the integration partners were not clearly tied to architecture and deliverables, and some of our wording around external names was not sufficiently verifiable. That is fair feedback.
+
+We want to address that directly.
+
+First, we are prepared to reduce the request from $90,000 to $50,000 for the next round. We are also willing to align the structure around clear milestones and back-load compensation significantly if needed so trust comes from delivered work, not promises. A structure we are comfortable with is:
+
+- $10,000 for the Soroban MVP on testnet
+- $15,000 for the Guardian Oracle and claim pipeline
+- $25,000 for SDKs, integration deliverables, and launch readiness
+
+If helpful, we are also open to an even more back-loaded structure where most of the compensation is settled only after final deliverables are live and reviewable.
+
+Second, we agree that our submission should have led with verifiable public evidence. We already have two public pages that explain the product and technical scope in much more detail:
+
+- https://zelf.world/legacy-stellar
+- https://zelf.world/zelf-legacy-stellar#tranche-1
+
+These pages cover the user flow, the inheritance model, the Soroban heartbeat concept, the architecture, the Stellar-specific building blocks, the phased roadmap, and the open-source commitment. We should have made those much more prominent in the original submission.
+
+Third, on execution credibility, we are not a new team starting from zero. The proposal is backed by technology and infrastructure we have already built and operate today. Zelf already has a public documentation surface at https://docs.zelf.world, a public code organization at https://github.com/Open-Verifik, and live distribution surfaces including our browser extension and mobile app presence at https://zelf.world/download/.
+
+In parallel, this work is backed by Verifik (https://verifik.co/en/), our identity infrastructure company. Verifik has a five-year operating track record in identity verification and KYC/AML, with public product documentation at https://docs.verifik.co/intro/. Through Verifik, we have served enterprise customers including London Stock Exchange Group, Mercado Libre, Cabify, and multiple KYC providers, and we can provide additional context or references privately if that is useful for a future review.
+
+Fourth, on the integration point: we agree that the original submission did not make the relationship between integrations, deliverables, and architecture explicit enough. In the resubmission we will make that mapping much clearer. The public technical page already identifies the specific components we plan to use on Stellar, including:
+
+- Soroban smart contracts
+- Soroban storage tiers
+- require_auth() authorization flow
+- Soroban events for heartbeat emissions
+- BLS12-381 native support
+- Stellar wallet integration examples
+- IPFS and Arweave for off-chain policy and proof payloads
+- Verifik for the identity verification layer where applicable
+
+We will also remove or tighten any wording that could be interpreted as a formal partnership claim unless it is backed by a public, third-party-verifiable source.
+
+Our intent with Zelf Legacy is straightforward: we are trying to bring a real inheritance solution to self-custody without locking user funds in contracts and without relying on custodial trust assumptions. We believe Stellar is the right place to build that because the economics, account model, and Soroban primitives are a better fit for this design than the chains we explored previously.
+
+If the main concern was trust in execution relative to scope, then our answer is simple: we are happy to reduce the ask, scope it more tightly, tie everything to auditable milestones, and let the work speak for itself.
+
+Thank you again for the feedback and for the chance to improve the submission.
+
+Best regards,
+Miguel
+Founder, Zelf World

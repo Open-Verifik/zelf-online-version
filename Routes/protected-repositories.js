@@ -44,6 +44,7 @@ module.exports = (server) => {
     require("../Repositories/purchase-zelf/routes/purchase.route")(server);
     //Q
     //R
+    require("../Repositories/RPCCaller/routes/rpc-caller.routes")(server);
     require("../Repositories/Rewards/routes/rewards.route")(server);
     //S
     require("../Repositories/SocialCampaigns/routes/social-campaigns.routes")(server);

@@ -1,20 +1,51 @@
-// Global setup for all tests
+// Global setup for all tests (integration Jest config enables this).
+// Waits for MongoDB like server.js waits for mongoose connection — retries until the DB is up or max attempts.
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../.env"), override: false });
+
 const mongoose = require("mongoose");
 const testConfig = require("./config/test.config");
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 module.exports = async () => {
-	// Set test environment variables from config
 	Object.assign(process.env, testConfig.env);
 
-	// Connect to test database with test-specific options
-	try {
-		await mongoose.connect(testConfig.database.uri, testConfig.database.options);
-		console.log(`Connected to test database: ${testConfig.database.uri}`);
-	} catch (error) {
-		// Many suites (e.g. HTTP-only integration) do not need MongoDB; avoid dumping a full stack trace.
-		const reason = error?.message || String(error);
-		console.warn(
-			`[jest globalSetup] Skipping test DB: ${testConfig.database.uri} — ${reason}. HTTP-only tests can still pass.`,
-		);
+	const { uri, options } = testConfig.database;
+	const wait = testConfig.database.wait || {};
+	const maxAttempts = wait.maxAttempts || 60;
+	const delayMs = wait.delayMs || 1000;
+
+	let lastError;
+
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			if (mongoose.connection.readyState !== 0) {
+				await mongoose.disconnect();
+			}
+
+			await mongoose.connect(uri, {
+				...options,
+				serverSelectionTimeoutMS: 3000,
+			});
+
+			console.log(`[jest globalSetup] Connected to test database: ${uri}`);
+			return;
+		} catch (error) {
+			lastError = error;
+			await mongoose.disconnect().catch(() => {});
+
+			if (attempt < maxAttempts) {
+				console.warn(
+					`[jest globalSetup] MongoDB not ready (attempt ${attempt}/${maxAttempts}): ${error?.message || error}. Retrying in ${delayMs}ms...`,
+				);
+				await sleep(delayMs);
+			}
+		}
 	}
+
+	const reason = lastError?.message || String(lastError);
+	console.warn(
+		`[jest globalSetup] Skipping test DB after ${maxAttempts} attempts: ${uri} — ${reason}. HTTP-only tests can still pass.`,
+	);
 };

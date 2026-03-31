@@ -1,6 +1,15 @@
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env"), override: true });
 
 const API_ROOT = "/api";
+const splitCsv = (value) =>
+    String(value || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+const csvOrDefault = (value, fallback) => {
+    const items = splitCsv(value);
+    return items.length ? items : fallback;
+};
 
 const configuration = {
     name: "API",
@@ -270,6 +279,94 @@ const configuration = {
     cryptoPayments: {
         demoMode: process.env.CRYPTO_PAYMENTS_DEMO_MODE === "true" || false,
         demoMultiplier: 0.005, // 0.5% of original price for demo mode (max $0.049 for $9.99)
+    },
+    rpc: {
+        timeoutMs: Number(process.env.RPC_PROXY_TIMEOUT_MS) || 15000,
+        maxParamsLength: Number(process.env.RPC_PROXY_MAX_PARAMS_LENGTH) || 25,
+        /** Protects GET/POST /api/rpc-callers/* together with JWT + X-RPC-Caller-Admin header */
+        callerAdminSecret: process.env.RPC_CALLER_ADMIN_SECRET || "",
+        /** Per-IP Mongo window buckets (UTC minutes). Swap to Redis if volume requires lower latency. */
+        rateLimit: {
+            enabled: process.env.RPC_RATE_LIMIT_ENABLED !== "false",
+            maxPerMinute: Number(process.env.RPC_RATE_LIMIT_PER_MINUTE) || 300,
+            rollingMinutes: Math.max(1, Number(process.env.RPC_RATE_LIMIT_ROLLING_MINUTES) || 5),
+            /** Max requests summed over the last `rollingMinutes` (0 = disable rolling check; per-minute only). */
+            maxInRollingWindow: Number(process.env.RPC_RATE_LIMIT_MAX_ROLLING) || 1200,
+            windowTtlMs: Number(process.env.RPC_RATE_LIMIT_WINDOW_TTL_MS) || 2 * 60 * 60 * 1000,
+        },
+        allowedMethods: csvOrDefault(process.env.RPC_PROXY_ALLOWED_METHODS, [
+            "eth_blockNumber",
+            "eth_call",
+            "eth_chainId",
+            "eth_estimateGas",
+            "eth_feeHistory",
+            "eth_gasPrice",
+            "eth_getBalance",
+            "eth_getBlockByHash",
+            "eth_getBlockByNumber",
+            "eth_getCode",
+            "eth_getStorageAt",
+            "eth_getTransactionByHash",
+            "eth_getTransactionCount",
+            "eth_getTransactionReceipt",
+            "eth_maxPriorityFeePerGas",
+            "net_version",
+            "web3_clientVersion",
+        ]),
+        blockedMethodPrefixes: csvOrDefault(process.env.RPC_PROXY_BLOCKED_PREFIXES, [
+            "admin_",
+            "debug_",
+            "engine_",
+            "miner_",
+            "ots_",
+            "personal_",
+            "trace_",
+            "txpool_",
+        ]),
+        blockedMethods: csvOrDefault(process.env.RPC_PROXY_BLOCKED_METHODS, [
+            "eth_getFilterChanges",
+            "eth_getFilterLogs",
+            "eth_getLogs",
+            "eth_newBlockFilter",
+            "eth_newFilter",
+            "eth_newPendingTransactionFilter",
+            "eth_subscribe",
+            "eth_unsubscribe",
+        ]),
+        chains: {
+            ethereum: {
+                chainId: Number(process.env.ETHEREUM_CHAIN_ID) || 1,
+                rpcUrl: process.env.RPC_PROXY_ETHEREUM_URL || process.env.ETHEREUM_RPC_URL || "https://eth.llamarpc.com",
+            },
+            avalanche: {
+                chainId: Number(process.env.AVALANCHE_CHAIN_ID) || 43114,
+                rpcUrl: process.env.RPC_PROXY_AVALANCHE_URL || process.env.AVALANCHE_RPC_URL || "https://api.avax.network/ext/bc/C/rpc",
+            },
+            polygon: {
+                chainId: Number(process.env.POLYGON_CHAIN_ID) || 137,
+                rpcUrl: process.env.RPC_PROXY_POLYGON_URL || process.env.POLYGON_RPC_URL || "https://polygon-rpc.com",
+            },
+            bsc: {
+                chainId: Number(process.env.BSC_CHAIN_ID) || 56,
+                rpcUrl: process.env.RPC_PROXY_BSC_URL || process.env.BSC_RPC_URL || "https://bsc-dataseed.binance.org",
+            },
+            arbitrum: {
+                chainId: Number(process.env.ARBITRUM_CHAIN_ID) || 42161,
+                rpcUrl: process.env.RPC_PROXY_ARBITRUM_URL || process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc",
+            },
+            optimism: {
+                chainId: Number(process.env.OPTIMISM_CHAIN_ID) || 10,
+                rpcUrl: process.env.RPC_PROXY_OPTIMISM_URL || process.env.OPTIMISM_RPC_URL || "https://mainnet.optimism.io",
+            },
+            base: {
+                chainId: Number(process.env.BASE_CHAIN_ID) || 8453,
+                rpcUrl: process.env.RPC_PROXY_BASE_URL || process.env.BASE_RPC_URL || "https://mainnet.base.org",
+            },
+            blockdag: {
+                chainId: Number(process.env.BLOCKDAG_CHAIN_ID) || 1404,
+                rpcUrl: process.env.RPC_PROXY_BLOCKDAG_URL || process.env.BLOCKDAG_MAIN_RPC_URL || process.env.BLOCKDAG_RPC_URL || "https://rpc.bdagscan.com",
+            },
+        },
     },
     /** ZelfBlockDagPay.sol — native BDAG tag checkout only */
     blockdag: {
