@@ -12,7 +12,7 @@ const zelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 
-const SOLANA_RPC = process.env.SOLANA_RPC_URL || process.env.SOLANA_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com";
+const SOLANA_RPC = config.solana.rpcUrl;
 const ZNS_TOKEN_MINT = "GfF6PSkH8bKLkws5RMFdzgASwcVbgCfhhKfp8zeoFBkx";
 const SENDER_KEY = process.env.SENDER_KEY;
 

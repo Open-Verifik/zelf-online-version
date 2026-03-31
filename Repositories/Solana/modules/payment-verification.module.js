@@ -12,7 +12,7 @@ const { Connection, PublicKey } = require("@solana/web3.js");
 
 // Solana configuration
 const SOLANA_CONFIG = {
-	rpcEndpoint: process.env.SOLANA_RPC_URL || process.env.SOLANA_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com",
+	rpcEndpoint: config.solana.rpcUrl,
 	znsTokenMint: "GfF6PSkH8bKLkws5RMFdzgASwcVbgCfhhKfp8zeoFBkx",
 	serviceWallet: process.env.SOLANA_SERVICE_WALLET || process.env.SOLANA_SENDER_PUBLIC_KEY || "", // Your service wallet address
 	confirmations: 1, // Number of confirmations required

@@ -22,6 +22,7 @@
         "test:stellar": "jest tests/integration/stellar-api.test.js --verbose --no-coverage",
         "test:ethereum-gas": "jest tests/unit/etherscan-gas-tracker.util.test.js --verbose --no-coverage && jest --config jest.integration.config.js tests/integration/ethereum-gas-tracker-live.test.js --verbose --no-coverage",
         "test:avalanche-rpc": "jest --config jest.integration.config.js tests/integration/avalanche-rpc-live.test.js --verbose --no-coverage",
+        "test:solana-transfer": "jest tests/integration/solana-token-transfer.test.js --verbose --no-coverage",
         "audit:ipfs-pay-balances": "node scripts/audit-ipfs-pay-tags-balances.js",
         "repair:blockdag-nft-index": "node scripts/reconcile-blockdag-nft-index.js",
         "deploy:checkout-avax": "node checkoutContracts/scripts/deploy-zelf-avalanche-pay.js",

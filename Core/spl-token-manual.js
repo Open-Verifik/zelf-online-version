@@ -124,11 +124,12 @@ async function getOrCreateAssociatedTokenAccount(connection, payer, mint, owner)
 		return { address, amount: Number(amount) };
 	}
 
-	// Create the account
+	// Create the account (HTTP-only confirmation to avoid WebSocket signatureSubscribe storms)
 	const createIx = createAssociatedTokenAccountInstruction(payer.publicKey, address, owner, mint);
-	const { Transaction, sendAndConfirmTransaction } = require("@solana/web3.js");
+	const { Transaction } = require("@solana/web3.js");
+	const { sendAndConfirmViaPolling } = require("./solana-tx");
 	const tx = new Transaction().add(createIx);
-	await sendAndConfirmTransaction(connection, tx, [payer], { commitment: "confirmed" });
+	await sendAndConfirmViaPolling(connection, tx, [payer], { commitment: "confirmed" });
 
 	return { address, amount: 0 };
 }

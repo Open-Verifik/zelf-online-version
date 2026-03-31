@@ -7,7 +7,7 @@ const splManual = require("../../../Core/spl-token-manual");
 const config = require("../../../Core/config");
 const moment = require("moment");
 
-const connection = new solanaWeb3.Connection(`https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}/`, "confirmed");
+const connection = new solanaWeb3.Connection(config.solana.rpcUrl, "confirmed");
 const ZNS_TOKEN_MINT = new solanaWeb3.PublicKey(config.solana.tokenMintAddress);
 
 const detectZNSTransactions = async (solanaAddress, options = {}) => {

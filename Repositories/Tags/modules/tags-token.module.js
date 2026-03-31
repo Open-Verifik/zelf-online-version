@@ -3,6 +3,7 @@ if (config.solana?.useKit) { module.exports = require("./tags-token.module.kit")
 
 const solanaWeb3 = require("@solana/web3.js");
 const splManual = require("../../../Core/spl-token-manual");
+const { sendWithRetry } = require("../../../Core/solana-tx");
 const ReferralRewardModel = require("../models/referral-rewards.model");
 const PurchaseRewardModel = require("../models/purchase-rewards.model");
 const MongoORM = require("../../../Core/mongo-orm");
@@ -12,9 +13,7 @@ let connection;
 const initConnection = async () => {
 	if (connection) return connection;
 
-	const url = `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${config.solana.nodeSecret}/`;
-
-	connection = new solanaWeb3.Connection(url);
+	connection = new solanaWeb3.Connection(config.solana.rpcUrl);
 
 	await connection.getSlot();
 };
@@ -76,8 +75,7 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 
 		const transferTransaction = new solanaWeb3.Transaction().add(computeBudgetInstruction, transferInstruction);
 
-		// Use sendWithRetry for reliable token transfer
-		const transferSignature = await sendWithRetry(transferTransaction, [senderWallet]);
+		const transferSignature = await sendWithRetry(connection, transferTransaction, [senderWallet]);
 
 		return transferSignature;
 	} catch (error) {
@@ -86,26 +84,7 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 	}
 };
 
-// Utility function for retrying transactions
-const sendWithRetry = async (transaction, signers, retries = 3) => {
-	for (let attempt = 1; attempt <= retries; attempt++) {
-		try {
-			const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-
-			transaction.recentBlockhash = blockhash;
-			transaction.lastValidBlockHeight = lastValidBlockHeight + 200;
-
-			const signature = await solanaWeb3.sendAndConfirmTransaction(connection, transaction, signers, {
-				commitment: "confirmed",
-			});
-
-			return signature; // Successful transaction
-		} catch (error) {
-			console.error(`Transaction attempt ${attempt} failed:`, error);
-			if (attempt === retries) throw error; // Rethrow if max retries reached
-		}
-	}
-};
+// sendWithRetry is imported from Core/solana-tx.js (HTTP-only polling, no WebSocket signatureSubscribe)
 
 const addReferralReward = async (tagObject, authUser, domain = "zelf") => {
 	if (!tagObject) return null;
