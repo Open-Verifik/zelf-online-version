@@ -161,12 +161,18 @@ const configuration = {
         allowedEmail: process.env.REVENUECAT_ALLOWED_EMAIL,
     },
     solana: {
+        rpcUrl:
+            process.env.SOLANA_RPC_URL ||
+            process.env.SOLANA_RPC_ENDPOINT ||
+            (process.env.SOLANA_NODE_SECRET
+                ? `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${process.env.SOLANA_NODE_SECRET}/`
+                : "https://api.mainnet-beta.solana.com"),
         senderPublicKey: process.env.SOLANA_SENDER_PUBLIC_KEY,
         sender: process.env.SENDER_KEY,
         nodeSecret: process.env.SOLANA_NODE_SECRET,
         tokenMintAddress: process.env.SOLANA_TOKEN_MINT_ADDRESS,
-        devModeTokens: process.env.SOLANA_DEV_MODE_TOKENS, // Set to "true" to divide token transfers by 10000 for testing
-        useKit: process.env.SOLANA_USE_KIT === "true", // Use .kit.js modules (Option A: @solana-program/token) for testing
+        devModeTokens: process.env.SOLANA_DEV_MODE_TOKENS,
+        useKit: process.env.SOLANA_USE_KIT === "true",
     },
     oklink: {
         apiKey: process.env.OKLINK_API_KEY,
@@ -312,6 +318,8 @@ const configuration = {
             "eth_maxPriorityFeePerGas",
             "net_version",
             "web3_clientVersion",
+            "eth_sendRawTransaction",
+            "eth_sendTransaction",
         ]),
         blockedMethodPrefixes: csvOrDefault(process.env.RPC_PROXY_BLOCKED_PREFIXES, [
             "admin_",
