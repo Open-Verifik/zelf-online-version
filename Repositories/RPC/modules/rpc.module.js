@@ -19,36 +19,57 @@ const persistRpcAudit = (payload) => {
     });
 };
 
-const chainEntries = Object.entries(config.rpc?.chains || {});
-const chainsByKey = new Map(
-    chainEntries.map(([key, value]) => [
-        key.toLowerCase(),
-        {
-            key,
-            chainId: Number(value.chainId),
-            rpcUrl: value.rpcUrl,
-        },
-    ])
-);
-const chainsById = new Map(chainEntries.map(([key, value]) => [Number(value.chainId), chainsByKey.get(key.toLowerCase())]));
+const buildChainMaps = (chainsObj) => {
+    const chainEntries = Object.entries(chainsObj || {});
+    const chainsByKey = new Map(
+        chainEntries.map(([key, value]) => [
+            key.toLowerCase(),
+            {
+                key,
+                chainId: Number(value.chainId),
+                rpcUrl: value.rpcUrl,
+            },
+        ])
+    );
+    const chainsById = new Map(chainEntries.map(([key, value]) => [Number(value.chainId), chainsByKey.get(key.toLowerCase())]));
+    return { chainsByKey, chainsById };
+};
+
+const defaultMaps = buildChainMaps(config.rpc?.chains || {});
+let extensionMapsCache = null;
+
+const getExtensionMaps = () => {
+    if (!extensionMapsCache) {
+        extensionMapsCache = buildChainMaps(config.extension?.rpc?.chains || {});
+    }
+    return extensionMapsCache;
+};
+
 const allowedMethods = new Set((config.rpc?.allowedMethods || []).map((method) => String(method).toLowerCase()));
 const blockedMethods = new Set((config.rpc?.blockedMethods || []).map((method) => String(method).toLowerCase()));
 const blockedPrefixes = (config.rpc?.blockedMethodPrefixes || []).map((prefix) => String(prefix).toLowerCase());
 
 const getChains = () =>
-    Array.from(chainsByKey.values()).map((chain) => ({
+    Array.from(defaultMaps.chainsByKey.values()).map((chain) => ({
         chain: chain.key,
         chainId: chain.chainId,
         rpcConfigured: Boolean(chain.rpcUrl),
     }));
 
-const resolveChain = ({ chain, chainId }) => {
+const getExtensionChains = () =>
+    Array.from(getExtensionMaps().chainsByKey.values()).map((chain) => ({
+        chain: chain.key,
+        chainId: chain.chainId,
+        rpcConfigured: Boolean(chain.rpcUrl),
+    }));
+
+const resolveChain = ({ chain, chainId }, maps) => {
     if (chain) {
-        return chainsByKey.get(String(chain).trim().toLowerCase()) || null;
+        return maps.chainsByKey.get(String(chain).trim().toLowerCase()) || null;
     }
 
     if (chainId !== undefined && chainId !== null && chainId !== "") {
-        return chainsById.get(Number(chainId)) || null;
+        return maps.chainsById.get(Number(chainId)) || null;
     }
 
     return null;
@@ -99,8 +120,9 @@ const resolveUpstreamMethodName = (normalized, originalMethod) => {
     return normalized;
 };
 
-const forwardRequest = async ({ chain, chainId, method, params = [], origin, purpose, rpcId }, meta = {}) => {
-    const resolvedChain = resolveChain({ chain, chainId });
+const forwardRequest = async ({ chain, chainId, method, params = [], origin, purpose, rpcId }, meta = {}, options = {}) => {
+    const maps = options.useExtensionRpc ? getExtensionMaps() : defaultMaps;
+    const resolvedChain = resolveChain({ chain, chainId }, maps);
 
     if (!resolvedChain?.rpcUrl) {
         const error = new Error("Unsupported RPC chain");
@@ -111,9 +133,16 @@ const forwardRequest = async ({ chain, chainId, method, params = [], origin, pur
     const normalizedMethod = ensureMethodAllowed(method);
     const upstreamMethod = resolveUpstreamMethodName(normalizedMethod, method);
 
-    const normalizedParams = Array.isArray(params) ? params : [];
+    const normalizedParams =
+        params == null ? [] : Array.isArray(params) || (typeof params === "object" && params !== null) ? params : [];
 
-    if (normalizedParams.length > (config.rpc?.maxParamsLength || 25)) {
+    const paramSlotCount = Array.isArray(normalizedParams)
+        ? normalizedParams.length
+        : typeof normalizedParams === "object" && normalizedParams !== null
+          ? Object.keys(normalizedParams).length
+          : 0;
+
+    if (paramSlotCount > (config.rpc?.maxParamsLength || 25)) {
         const error = new Error("Too many RPC params");
         error.status = 400;
         throw error;
@@ -124,7 +153,7 @@ const forwardRequest = async ({ chain, chainId, method, params = [], origin, pur
         chainId: resolvedChain.chainId,
         method: normalizedMethod,
         origin: origin || "wallet",
-        purpose: purpose || "unspecified",
+        purpose: purpose || (options.useExtensionRpc ? "extension-json-rpc" : "unspecified"),
         session: meta?.authUser?.session || null,
         ip: meta?.ip || null,
     };
@@ -134,7 +163,7 @@ const forwardRequest = async ({ chain, chainId, method, params = [], origin, pur
     RpcCallerModule.recordRequest(meta?.ip);
 
     if (process.env.NODE_ENV !== "production") {
-        console.info("[RPC proxy request]", logContext);
+        console.info("[RPC proxy request]", logContext, options.useExtensionRpc ? { extensionRpc: true } : {});
     }
 
     try {
@@ -193,4 +222,5 @@ const forwardRequest = async ({ chain, chainId, method, params = [], origin, pur
 module.exports = {
     forwardRequest,
     getChains,
+    getExtensionChains,
 };

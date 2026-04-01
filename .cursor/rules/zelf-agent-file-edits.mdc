@@ -1,0 +1,14 @@
+---
+description: How agents must edit source files in this repo (visible diffs, no shell patching)
+alwaysApply: true
+---
+
+# Agent File Edits (Zelf Backend)
+
+- **Edit source with Cursor/IDE tools only:** use `apply_patch` or `StrReplace` (or the editor’s inline edit flow) so changes show up in the normal diff UI and review surface.
+- **Do not** apply code changes by piping heredocs, `python -c`, `sed`, or other shell one-liners that rewrite files. Reserve the terminal for `git`, tests, and read-only inspection.
+- **Exception:** `git checkout` / `git restore` to revert is fine; that is VCS, not ad-hoc patching.
+
+## Why
+
+Shell-based rewrites bypass the usual change tracking, are harder to review in the IDE, and confuse anyone expecting to see edits in Source Control or inline diff views.

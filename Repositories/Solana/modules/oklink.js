@@ -10,6 +10,9 @@ const { getTickerPrice } = require("../../binance/modules/binance.module");
 
 const moment = require("moment");
 
+/** Wrapped SOL mint — must not be labeled native SOL alongside lamports balance */
+const WSOL_MINT = "So11111111111111111111111111111111111111112";
+
 const getAddress = async (params) => {
 	try {
 		const address = params.id;
@@ -60,9 +63,12 @@ const getAddress = async (params) => {
 			const token = data.tokenHoldings.tokens[index];
 
 			if (token.symbol === "SOL") {
-				token.tokenType = "SOL";
-
-				hasSolToken = true;
+				if (token.tokenAddress === WSOL_MINT) {
+					token.tokenType = "SPL";
+				} else {
+					token.tokenType = "SOL";
+					hasSolToken = true;
+				}
 			}
 		}
 

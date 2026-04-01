@@ -6,6 +6,7 @@ describe("rpc.module", () => {
 
         expect(Array.isArray(chains)).toBe(true);
         expect(chains.some((chain) => chain.chain === "ethereum" && chain.chainId === 1)).toBe(true);
+        expect(chains.some((chain) => chain.chain === "sui" && chain.chainId === 101)).toBe(true);
     });
 
     it("rejects blocked subscription methods", async () => {

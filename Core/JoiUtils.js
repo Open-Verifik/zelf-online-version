@@ -68,6 +68,14 @@ const _customErrors = (errors) => {
 };
 
 const array = () => Joi.array().error(_customErrors);
+/** JSON-RPC 2.0 `params` may be an array or an object; omit or null becomes []. */
+const jsonRpcParams = () =>
+    Joi.alternatives()
+        .try(Joi.array(), Joi.object())
+        .optional()
+        .allow(null)
+        .default([])
+        .error(_customErrors);
 const any = () => Joi.any().error(_customErrors);
 const boolean = () => Joi.boolean().error(_customErrors);
 const dateOfBirth = () => Joi.date().raw().format("DD/MM/YYYY").error(_customErrors);
@@ -182,6 +190,7 @@ module.exports = {
     firstName,
     forbidden,
     imageBase64WithType,
+    jsonRpcParams,
     jsonObjectWithMinKeys,
     lastName,
     line,

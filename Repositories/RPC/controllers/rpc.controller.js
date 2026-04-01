@@ -36,6 +36,16 @@ const getChains = async (ctx) => {
     }
 };
 
+const getExtensionChains = async (ctx) => {
+    try {
+        const data = Module.getExtensionChains();
+        ctx.body = { data };
+    } catch (error) {
+        ctx.status = error.status || 500;
+        ctx.body = { error: error.message };
+    }
+};
+
 const request = async (ctx) => {
     try {
         const data = await Module.forwardRequest(ctx.request.body, {
@@ -98,8 +108,49 @@ const requestJsonRpc = async (ctx) => {
     }
 };
 
+/** POST /api/protected/rpc/:chainKey — same JSON-RPC proxy as public route, but uses extension RPC URLs and requires JWT. */
+const requestExtensionJsonRpc = async (ctx) => {
+    const body = ctx.request.body;
+    const chainKey = ctx.params.chainKey;
+    const rpcId = body.id;
+
+    try {
+        const data = await Module.forwardRequest(
+            {
+                chain: chainKey,
+                method: body.method,
+                params: body.params ?? [],
+                rpcId,
+                origin: ctx.get("origin") || undefined,
+                purpose: "extension-json-rpc",
+            },
+            {
+                authUser: ctx.state.user,
+                ip: ctx.ip,
+            },
+            { useExtensionRpc: true }
+        );
+
+        ctx.status = 200;
+        ctx.body = {
+            jsonrpc: "2.0",
+            id: rpcId !== undefined ? rpcId : null,
+            result: data.result,
+        };
+    } catch (error) {
+        const status = error.status || 500;
+        if (status === 429 && error.retryAfterSeconds != null) {
+            ctx.set("Retry-After", String(error.retryAfterSeconds));
+        }
+        ctx.status = 200;
+        ctx.body = jsonRpcErrorBody(rpcId, status, error);
+    }
+};
+
 module.exports = {
     getChains,
+    getExtensionChains,
     request,
     requestJsonRpc,
+    requestExtensionJsonRpc,
 };

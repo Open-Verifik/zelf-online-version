@@ -27,10 +27,11 @@ const polygonRpcUrl = process.env.POLYGON_RPC_URL; // QuickNode only, no public 
 const POLYGONSCAN_BATCH_DELAY_MS = Number(process.env.POLYGONSCAN_BATCH_DELAY_MS || 350);
 const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 6);
 
-// Debug helper (enable by setting DEBUG_POLYGON=1)
-const _dbgPolygon = (...args) => {
+// Conditional debug logger — set DEBUG_POLYGON=1 to enable (no-op in production).
+const logPolygonDebug = (...args) => {
 	if (process.env.DEBUG_POLYGON === "1") {
 		// eslint-disable-next-line no-console
+		console.log("[polygon]", ...args);
 	}
 };
 
@@ -49,14 +50,15 @@ const {
 	COMMON_TOKEN_DECIMALS_BY_ADDRESS_POLYGON,
 	COMMON_TOKEN_METADATA_BY_ADDRESS_POLYGON,
 	isCommonPolygonToken,
-	isLikelyScamTokenName,
 	USDC_BRIDGED,
 	USDC_NATIVE,
-	USDT,
-	DAI,
-	WETH,
-	WMATIC,
 } = require("./polygon-tokens.constants");
+
+const {
+	buildPolygonPortfolioToken,
+	prioritizeAndCapCuratedMissingForRpc,
+	formatBlockscoutErc20ItemsForPortfolio,
+} = require("./polygon-portfolio-tokens.helpers");
 
 async function getCoinGeckoPricesForPolygonContracts(contractAddresses) {
 	try {
@@ -209,7 +211,7 @@ async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 
 		return hex === "0x" ? "0x0" : hex;
 	} catch (error) {
-		_dbgPolygon("rpc_balance_error", polygonRpcUrl, contractAddress, error?.message || error);
+		logPolygonDebug("rpc_balance_error", polygonRpcUrl, contractAddress, error?.message || error);
 
 		return "0x0";
 	}
@@ -272,7 +274,7 @@ async function getNativeBalanceViaRpc(userAddress) {
 
 		return Number(wei);
 	} catch (error) {
-		_dbgPolygon("rpc_native_balance_error", userAddress, error?.message || error);
+		logPolygonDebug("rpc_native_balance_error", userAddress, error?.message || error);
 
 		return 0;
 	}
@@ -320,7 +322,7 @@ async function getOklinkTransactions(address, page, show, price) {
 
 		return null;
 	} catch (error) {
-		_dbgPolygon("oklink_tx_error", error?.message || error);
+		logPolygonDebug("oklink_tx_error", error?.message || error);
 
 		return null;
 	}
@@ -370,7 +372,7 @@ async function getPolygonscanTransactions(address, page, show, price) {
 
 		return null;
 	} catch (error) {
-		_dbgPolygon("polygonscan_tx_error", error?.message || error);
+		logPolygonDebug("polygonscan_tx_error", error?.message || error);
 
 		return null;
 	}
@@ -432,7 +434,7 @@ async function getOklinkFormattedTokens(address, limit = 100) {
 
 		return formatted;
 	} catch (error) {
-		_dbgPolygon("oklink_tokens_error", error?.message || error);
+		logPolygonDebug("oklink_tokens_error", error?.message || error);
 
 		return [];
 	}
@@ -461,10 +463,10 @@ const getBalance = async (params) => {
 		} catch (_) {
 			blockscoutUp = false;
 
-			_dbgPolygon("blockscout_check_redirect_down_using_fallback", formatedAddress);
+			logPolygonDebug("blockscout_check_redirect_down_using_fallback", formatedAddress);
 		}
 
-		_dbgPolygon("formattedAddress", formatedAddress);
+		logPolygonDebug("formattedAddress", formatedAddress);
 
 		let data = {};
 
@@ -480,7 +482,7 @@ const getBalance = async (params) => {
 		} catch (_) {
 			blockscoutUp = false;
 
-			_dbgPolygon("blockscout_address_down_using_rpc_for_native");
+			logPolygonDebug("blockscout_address_down_using_rpc_for_native");
 		}
 
 		const { price: price } = await getTickerPrice({ symbol: "POL" });
@@ -494,24 +496,24 @@ const getBalance = async (params) => {
 		} catch (_) {
 			blockscoutUp = false;
 
-			_dbgPolygon("blockscout_tokens_down_try_oklink");
+			logPolygonDebug("blockscout_tokens_down_try_oklink");
 		}
 		const contractAddresses = erc20Items.map((item) => item?.token?.address).filter(Boolean);
 
-		_dbgPolygon("erc20ItemsCount", erc20Items.length);
+		logPolygonDebug("erc20ItemsCount", erc20Items.length);
 
-		_dbgPolygon(
+		logPolygonDebug(
 			"firstTokenAddresses",
 			erc20Items.slice(0, 10).map((it) => String(it?.token?.address || "").toLowerCase())
 		);
 
-		_dbgPolygon("polygonscanApiCfg", {
+		logPolygonDebug("polygonscanApiCfg", {
 			url: polygonscanApiUrl,
 			keyPresent: Boolean(polygonscanApiKey),
 			keyPreview: polygonscanApiKey ? `${polygonscanApiKey.slice(0, 4)}…${polygonscanApiKey.slice(-4)}` : null,
 		});
 
-		_dbgPolygon("blockscoutHasUSDC", {
+		logPolygonDebug("blockscoutHasUSDC", {
 			bridged: erc20Items.some((it) => String(it?.token?.address || "").toLowerCase() === USDC_BRIDGED),
 			native: erc20Items.some((it) => String(it?.token?.address || "").toLowerCase() === USDC_NATIVE),
 		});
@@ -519,7 +521,7 @@ const getBalance = async (params) => {
 		// Fetch CoinGecko prices by contract for Polygon
 		const coingeckoPriceMap = await getCoinGeckoPricesForPolygonContracts(contractAddresses);
 
-		_dbgPolygon("coingeckoPriceMap", coingeckoPriceMap.size, {
+		logPolygonDebug("coingeckoPriceMap", coingeckoPriceMap.size, {
 			bridged: coingeckoPriceMap.has(USDC_BRIDGED),
 			native: coingeckoPriceMap.has(USDC_NATIVE),
 		});
@@ -527,79 +529,25 @@ const getBalance = async (params) => {
 		// Polygonscan verification
 		const verifiedSet = await getPolygonscanVerifiedContracts(contractAddresses);
 
-		_dbgPolygon("polygonscanVerifiedCount", verifiedSet.size);
-
-		function formatTokens(tokens) {
-			return tokens
-				.reduce((acc, item) => {
-					const token = item.token || {};
-					const addr = (token.address || "").toLowerCase();
-					const decimals = parseInt(token.decimals || 18);
-					const rawAmount = item.value || 0;
-					const amount = Number(rawAmount) / Math.pow(10, decimals);
-
-					// Prefer CoinGecko price by contract; fallback to Blockscout exchange_rate
-					const cgPrice = coingeckoPriceMap.get(addr) || 0;
-					const price = cgPrice || Number(token.exchange_rate || item.token?.exchange_rate || 0) || 0;
-
-					// Visibility filters
-					const hasCgPrice = cgPrice > 0;
-					const isVerified = verifiedSet.has(addr);
-					const isCommon = isCommonPolygonToken(addr);
-					const passesNameHeuristic = !isLikelyScamTokenName(token.name, token.symbol);
-					const shouldKeep = (isCommon || hasCgPrice || isVerified) && (isCommon || passesNameHeuristic);
-
-					if (!shouldKeep) return acc;
-
-					let finalPrice = price;
-					// For curated stables, force $1.00 if price unavailable
-
-					if ((!finalPrice || finalPrice === 0) && (addr === USDC_BRIDGED || addr === USDC_NATIVE)) {
-						finalPrice = 1;
-					}
-
-					const fiatBalance = amount * finalPrice;
-					const meta = COMMON_TOKEN_METADATA_BY_ADDRESS_POLYGON.get(addr) || {};
-
-					const formattedToken = {
-						_amount: amount,
-						_fiatBalance: fiatBalance.toFixed(Math.min(decimals, 8)),
-						_price: Number(finalPrice),
-						address: token.address,
-						amount: amount.toFixed(Math.min(decimals, 12)),
-						decimals: decimals,
-						fiatBalance: fiatBalance,
-						image: token.icon_url || meta.image || "",
-						name: token.name || meta.name || "",
-						price: finalPrice,
-						symbol: token.symbol || meta.symbol || "",
-						tokenType: token.type || "ERC-20",
-					};
-
-					acc.push(formattedToken);
-
-					return acc;
-				}, [])
-				.sort((a, b) => Number(b.fiatBalance) - Number(a.fiatBalance));
-		}
+		logPolygonDebug("polygonscanVerifiedCount", verifiedSet.size);
 
 		let tokens = [];
 
 		if (erc20Items.length > 0) {
-			tokens = formatTokens(erc20Items);
+			tokens = formatBlockscoutErc20ItemsForPortfolio(erc20Items, coingeckoPriceMap, verifiedSet);
 		} else {
 			// Blockscout tokens unavailable → try OKLink
 			const okTokens = await getOklinkFormattedTokens(formatedAddress, 100);
 
 			if (okTokens.length > 0) {
 				tokens = okTokens;
-				_dbgPolygon("tokens_from_oklink", tokens.length);
+				logPolygonDebug("tokens_from_oklink", tokens.length);
 			} else {
-				_dbgPolygon("oklink_tokens_empty");
+				logPolygonDebug("oklink_tokens_empty");
 			}
 		}
 
-		_dbgPolygon(
+		logPolygonDebug(
 			"formattedTokensCount",
 			tokens.length,
 			tokens.slice(0, 10).map((t) => String(t.address || "").toLowerCase())
@@ -613,7 +561,7 @@ const getBalance = async (params) => {
 			.map((a) => (a || "").toLowerCase())
 			.filter((a) => isCommonPolygonToken(a) && !included.has(a));
 
-		_dbgPolygon("curatedPresentInItems", curatedPresentInItems);
+		logPolygonDebug("curatedPresentInItems", curatedPresentInItems);
 
 		let forcedFromItems = 0;
 
@@ -627,52 +575,53 @@ const getBalance = async (params) => {
 			const rawAmount = item.value || 0;
 			const amount = Number(rawAmount) / Math.pow(10, decimals);
 			const cgPrice = coingeckoPriceMap.get(addr) || 0;
+			const price = cgPrice || Number(token.exchange_rate || 0) || 0;
 
-			let price = cgPrice || Number(token.exchange_rate || 0) || 0;
-
-			if ((!price || price === 0) && (addr === USDC_BRIDGED || addr === USDC_NATIVE)) {
-				price = 1;
-			}
-
-			const fiatBalance = amount * price;
-			const meta = COMMON_TOKEN_METADATA_BY_ADDRESS_POLYGON.get(addr) || {};
-
-			tokens.push({
-				_amount: amount,
-				_fiatBalance: fiatBalance.toFixed(Math.min(decimals, 8)),
-				_price: Number(price),
-				address: token.address,
-				amount: amount.toFixed(Math.min(decimals, 12)),
-				decimals: decimals,
-				fiatBalance: fiatBalance,
-				image: token.icon_url || meta.image || "",
-				name: token.name || meta.name || "",
-				price: price,
-				symbol: token.symbol || meta.symbol || "",
-				tokenType: token.type || "ERC-20",
-			});
+			tokens.push(
+				buildPolygonPortfolioToken({
+					address: token.address,
+					amount,
+					decimals,
+					price,
+					image: token.icon_url || "",
+					name: token.name || "",
+					symbol: token.symbol || "",
+					tokenType: token.type || "ERC-20",
+				})
+			);
 
 			forcedFromItems++;
 		}
 
-		_dbgPolygon("forcedFromItems", forcedFromItems);
+		logPolygonDebug("forcedFromItems", forcedFromItems);
+
+		// Resolve native POL balance early so we can skip the curated RPC fallback for unfunded addresses.
+		const maticDecimals = 18;
+		let nativeRaw = Number(data?.coin_balance || 0);
+
+		if (!nativeRaw) nativeRaw = await getNativeBalanceViaRpc(formatedAddress);
+
+		logPolygonDebug("nativeRaw", nativeRaw);
 
 		// Curated tokens not present in Blockscout items → fetch balances via QuickNode RPC batch only
 		const curatedUniverse = Array.from(COMMON_TOKENS_POLYGON).map((a) => a.toLowerCase());
 
-		let curatedMissingFromItems = curatedUniverse.filter((a) => !erc20ByAddress.has(a));
-		// If Blockscout is down, restrict RPC fallback to a small prioritized subset
+		const curatedMissingRaw = curatedUniverse.filter((a) => !erc20ByAddress.has(a));
+		// When Blockscout was up, we previously issued one eth_call per curated token missing from the explorer list (~20+ per address).
+		const curatedMissingFromItems = prioritizeAndCapCuratedMissingForRpc(
+			curatedMissingRaw,
+			CURATED_RPC_FALLBACK_MAX,
+			!blockscoutUp
+		);
 
-		if (!blockscoutUp) {
-			const priority = [USDC_BRIDGED, USDC_NATIVE, USDT, DAI, WETH, WMATIC];
-			const prioritySet = new Set(priority.map((a) => a.toLowerCase()));
+		logPolygonDebug("curated_rpc_after_cap", {
+			rawMissing: curatedMissingRaw.length,
+			capped: curatedMissingFromItems.length,
+			blockscoutUp,
+			skippedDueToZeroNative: nativeRaw === 0,
+		});
 
-			curatedMissingFromItems = curatedUniverse.filter((a) => prioritySet.has(a)).slice(0, CURATED_RPC_FALLBACK_MAX);
-
-			_dbgPolygon("restricted_curated_rpc_set", curatedMissingFromItems);
-		}
-
-		if (curatedMissingFromItems.length > 0) {
+		if (curatedMissingFromItems.length > 0 && nativeRaw > 0) {
 			const rpcBalances = await getErc20BalancesViaRpcBatch(curatedMissingFromItems, formatedAddress);
 			const added = [];
 
@@ -697,30 +646,19 @@ const getBalance = async (params) => {
 					price = idPrices.get(id) || 0;
 				}
 
-				if ((!price || price === 0) && (contract === USDC_BRIDGED || contract === USDC_NATIVE)) price = 1;
-
-				const fiatBalance = amount * price;
-				const meta = COMMON_TOKEN_METADATA_BY_ADDRESS_POLYGON.get(contract) || {};
-
-				tokens.push({
-					_amount: amount,
-					_fiatBalance: fiatBalance.toFixed(Math.min(decimals, 8)),
-					_price: Number(price),
-					address: contract,
-					amount: amount.toFixed(Math.min(decimals, 12)),
-					decimals: decimals,
-					fiatBalance: fiatBalance,
-					image: meta.image || "",
-					name: meta.name || "",
-					price: price,
-					symbol: meta.symbol || "",
-					tokenType: "ERC-20",
-				});
+				tokens.push(
+					buildPolygonPortfolioToken({
+						address: contract,
+						amount,
+						decimals,
+						price,
+					})
+				);
 
 				added.push(contract);
 			}
 
-			_dbgPolygon("rpcFallbackAdded", added.length, added);
+			logPolygonDebug("rpcFallbackAdded", added.length, added);
 		}
 
 		// De-duplicate and sort again
@@ -738,24 +676,18 @@ const getBalance = async (params) => {
 			})
 			.sort((a, b) => Number(b.fiatBalance) - Number(a.fiatBalance));
 
-		_dbgPolygon("finalTokensCount", tokens.length, {
+		logPolygonDebug("finalTokensCount", tokens.length, {
 			hasUSDCBridged: tokens.some((t) => String(t.address || "").toLowerCase() === USDC_BRIDGED),
 			hasUSDCNative: tokens.some((t) => String(t.address || "").toLowerCase() === USDC_NATIVE),
 		});
 
 		const transactions = await getTransactionsList({ id: address }, { show: 10 });
 
-		// Convert native MATIC balance from wei to proper decimal format (18 decimals)
-		const maticDecimals = 18;
-
-		let nativeRaw = Number(data?.coin_balance || 0);
-
-		if (!nativeRaw) nativeRaw = await getNativeBalanceViaRpc(formatedAddress);
-
+		// nativeRaw was resolved earlier (before curated RPC fallback) to avoid redundant requests.
 		const maticAmount = Number(nativeRaw) / Math.pow(10, maticDecimals);
 		const maticFiatBalance = maticAmount * price;
 
-		_dbgPolygon("polygonscanRequests", polygonscanRequestsGlobal, polygonscanRequestBreakdown);
+		logPolygonDebug("polygonscanRequests", polygonscanRequestsGlobal, polygonscanRequestBreakdown);
 
 		const response = {
 			address,

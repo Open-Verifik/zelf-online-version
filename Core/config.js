@@ -287,7 +287,8 @@ const configuration = {
         demoMultiplier: 0.005, // 0.5% of original price for demo mode (max $0.049 for $9.99)
     },
     rpc: {
-        timeoutMs: Number(process.env.RPC_PROXY_TIMEOUT_MS) || 15000,
+        /** Upstream JSON-RPC timeout (simulateTransaction / sendTransaction can be slow on Solana). Override with RPC_PROXY_TIMEOUT_MS. */
+        timeoutMs: Number(process.env.RPC_PROXY_TIMEOUT_MS) || 45000,
         maxParamsLength: Number(process.env.RPC_PROXY_MAX_PARAMS_LENGTH) || 25,
         /** Protects GET/POST /api/rpc-callers/* together with JWT + X-RPC-Caller-Admin header */
         callerAdminSecret: process.env.RPC_CALLER_ADMIN_SECRET || "",
@@ -320,6 +321,82 @@ const configuration = {
             "web3_clientVersion",
             "eth_sendRawTransaction",
             "eth_sendTransaction",
+            // Solana JSON-RPC (wallet / extension; include if you set RPC_PROXY_ALLOWED_METHODS)
+            "getAccountInfo",
+            "getBalance",
+            "getBlock",
+            "getBlockHeight",
+            "getBlockProduction",
+            "getBlocks",
+            "getBlocksWithLimit",
+            "getEpochInfo",
+            "getFeeForMessage",
+            "getFirstAvailableBlock",
+            "getGenesisHash",
+            "getHealth",
+            "getLatestBlockhash",
+            "getMinimumBalanceForRentExemption",
+            "getMultipleAccounts",
+            "getProgramAccounts",
+            "getRecentPrioritizationFees",
+            "getSignaturesForAddress",
+            "getSignatureStatuses",
+            "getSlot",
+            "getTokenAccountBalance",
+            "getTokenAccountsByOwner",
+            "getTransaction",
+            "getVersion",
+            "isBlockhashValid",
+            "requestAirdrop",
+            "sendTransaction",
+            "simulateTransaction",
+            // Sui JSON-RPC (global allowlist; if you set RPC_PROXY_ALLOWED_METHODS, include these too)
+            "sui_getChainIdentifier",
+            "sui_getObject",
+            "sui_multiGetObjects",
+            "sui_getNormalizedMoveModule",
+            "sui_getNormalizedMoveModulesByPackage",
+            "sui_getNormalizedMoveFunction",
+            "sui_getNormalizedMoveStruct",
+            "sui_getCoinMetadata",
+            "sui_getTotalSupply",
+            "sui_getMoveFunctionArgTypes",
+            "sui_getProtocolConfig",
+            "sui_getLoadedChildObjects",
+            "sui_tryGetPastObject",
+            "sui_getDynamicFieldObject",
+            "sui_getDynamicFields",
+            "sui_getTransactionBlock",
+            "sui_multiGetTransactionBlocks",
+            "sui_getCheckpoint",
+            "sui_getCheckpoints",
+            "sui_getLatestCheckpointSequenceNumber",
+            "sui_getEvents",
+            "sui_getLatestSuiSystemState",
+            "sui_getReferenceGasPrice",
+            "suix_getStakes",
+            "suix_getValidatorsApy",
+            "suix_getCommitteeInfo",
+            "sui_queryTransactionBlocks",
+            "sui_queryEvents",
+            "sui_queryObjects",
+            "sui_resolveNameServiceNames",
+            "sui_resolveNameServiceAddress",
+            "sui_getAllBalances",
+            "sui_getBalance",
+            "sui_getCoins",
+            "sui_getAllCoins",
+            "dryRunTransactionBlock",
+            "executeTransactionBlock",
+            "devInspectTransactionBlock",
+            "unsafe_transferObject",
+            "unsafe_pay",
+            "unsafe_paySui",
+            "unsafe_payAllSui",
+            "unsafe_mergeCoins",
+            "unsafe_splitCoins",
+            "unsafe_moveCall",
+            "unsafe_batchTransaction",
         ]),
         blockedMethodPrefixes: csvOrDefault(process.env.RPC_PROXY_BLOCKED_PREFIXES, [
             "admin_",
@@ -374,6 +451,115 @@ const configuration = {
                 chainId: Number(process.env.BLOCKDAG_CHAIN_ID) || 1404,
                 rpcUrl: process.env.RPC_PROXY_BLOCKDAG_URL || process.env.BLOCKDAG_MAIN_RPC_URL || process.env.BLOCKDAG_RPC_URL || "https://rpc.bdagscan.com",
             },
+            /** Sui: chainId is a logical Zelf id for /api/rpc/chains (not an EVM chain id). */
+            sui: {
+                chainId: Number(process.env.SUI_CHAIN_ID) || 101,
+                rpcUrl:
+                    process.env.RPC_PROXY_SUI_URL ||
+                    process.env.SUI_RPC_URL ||
+                    "https://fullnode.mainnet.sui.io:443",
+            },
+        },
+    },
+    /** JWT-only RPC proxy for the wallet extension (POST /api/protected/rpc/:chainKey). Uses EXTENSION_* URLs with fallback to public chain URLs. */
+    extension: {
+        rpc: {
+            chains: {
+                ethereum: {
+                    chainId: Number(process.env.ETHEREUM_CHAIN_ID) || 1,
+                    rpcUrl:
+                        process.env.EXTENSION_ETHEREUM_RPC_URL ||
+                        process.env.RPC_PROXY_ETHEREUM_URL ||
+                        process.env.ETHEREUM_RPC_URL ||
+                        "https://eth.llamarpc.com",
+                },
+                avalanche: {
+                    chainId: Number(process.env.AVALANCHE_CHAIN_ID) || 43114,
+                    rpcUrl:
+                        process.env.EXTENSION_AVALANCHE_RPC_URL ||
+                        process.env.RPC_PROXY_AVALANCHE_URL ||
+                        process.env.AVALANCHE_RPC_URL ||
+                        "https://api.avax.network/ext/bc/C/rpc",
+                },
+                polygon: {
+                    chainId: Number(process.env.POLYGON_CHAIN_ID) || 137,
+                    rpcUrl:
+                        process.env.EXTENSION_POLYGON_RPC_URL ||
+                        process.env.RPC_PROXY_POLYGON_URL ||
+                        process.env.POLYGON_RPC_URL ||
+                        "https://polygon-rpc.com",
+                },
+                bsc: {
+                    chainId: Number(process.env.BSC_CHAIN_ID) || 56,
+                    rpcUrl:
+                        process.env.EXTENSION_BSC_RPC_URL ||
+                        process.env.RPC_PROXY_BSC_URL ||
+                        process.env.BSC_RPC_URL ||
+                        "https://bsc-dataseed.binance.org",
+                },
+                arbitrum: {
+                    chainId: Number(process.env.ARBITRUM_CHAIN_ID) || 42161,
+                    rpcUrl:
+                        process.env.EXTENSION_ARBITRUM_RPC_URL ||
+                        process.env.RPC_PROXY_ARBITRUM_URL ||
+                        process.env.ARBITRUM_RPC_URL ||
+                        "https://arb1.arbitrum.io/rpc",
+                },
+                optimism: {
+                    chainId: Number(process.env.OPTIMISM_CHAIN_ID) || 10,
+                    rpcUrl:
+                        process.env.EXTENSION_OPTIMISM_RPC_URL ||
+                        process.env.RPC_PROXY_OPTIMISM_URL ||
+                        process.env.OPTIMISM_RPC_URL ||
+                        "https://mainnet.optimism.io",
+                },
+                base: {
+                    chainId: Number(process.env.BASE_CHAIN_ID) || 8453,
+                    rpcUrl:
+                        process.env.EXTENSION_BASE_RPC_URL ||
+                        process.env.RPC_PROXY_BASE_URL ||
+                        process.env.BASE_RPC_URL ||
+                        "https://mainnet.base.org",
+                },
+                blockdag: {
+                    chainId: Number(process.env.BLOCKDAG_CHAIN_ID) || 1404,
+                    rpcUrl:
+                        process.env.EXTENSION_BLOCKDAG_RPC_URL ||
+                        process.env.RPC_PROXY_BLOCKDAG_URL ||
+                        process.env.BLOCKDAG_MAIN_RPC_URL ||
+                        process.env.BLOCKDAG_RPC_URL ||
+                        "https://rpc.bdagscan.com",
+                },
+                /** Solana: logical chainId for /api/protected/rpc/chains only (distinct from Sui 101 in public rpc). */
+                solana: {
+                    chainId: Number(process.env.SOLANA_PROXY_CHAIN_ID) || 102,
+                    rpcUrl:
+                        process.env.EXTENSION_SOLANA_RPC_URL ||
+                        process.env.SOLANA_RPC_URL ||
+                        process.env.SOLANA_RPC_ENDPOINT ||
+                        (process.env.SOLANA_NODE_SECRET
+                            ? `https://flashy-ultra-choice.solana-mainnet.quiknode.pro/${process.env.SOLANA_NODE_SECRET}/`
+                            : "https://api.mainnet-beta.solana.com"),
+                },
+            },
+            /**
+             * Full `Origin` values allowed for /api/protected/rpc/* (JWT still required).
+             * Built from PROTECTED_RPC_ALLOWED_ORIGINS (CSV of full origins) plus
+             * PROTECTED_RPC_CHROME_EXTENSION_IDS (CSV of ids → chrome-extension://<id>).
+             * Empty array = do not enforce Origin (backward compatible; set in production).
+             */
+            allowedRequestOrigins: (() => {
+                const fromFull = splitCsv(process.env.PROTECTED_RPC_ALLOWED_ORIGINS);
+                const fromIds = splitCsv(process.env.PROTECTED_RPC_CHROME_EXTENSION_IDS)
+                    .map((raw) => {
+                        const id = String(raw)
+                            .trim()
+                            .replace(/^chrome-extension:\/\//i, "");
+                        return id ? `chrome-extension://${id}` : null;
+                    })
+                    .filter(Boolean);
+                return [...new Set([...fromFull, ...fromIds])];
+            })(),
         },
     },
     /** ZelfBlockDagPay.sol — native BDAG tag checkout only */

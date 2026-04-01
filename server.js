@@ -15,6 +15,8 @@ app.use(
     koaBody({
         multipart: true,
         formLimit: '6mb',
+        jsonLimit: '10mb',
+        textLimit: '10mb',
         formidable: {
             keepExtensions: true,
             maxFileSize: 6 * 1024 * 1024,

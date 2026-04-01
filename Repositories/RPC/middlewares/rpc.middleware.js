@@ -1,4 +1,4 @@
-const { array, any, string, stringOrNumber, validate } = require("../../../Core/JoiUtils");
+const { array, any, jsonRpcParams, string, stringOrNumber, validate } = require("../../../Core/JoiUtils");
 const config = require("../../../Core/config");
 
 const RESERVED_CHAIN_PATH = new Set(["chains", "request"]);
@@ -17,7 +17,7 @@ const schemas = {
     jsonRpc: {
         jsonrpc: string().valid("2.0").optional(),
         method: string().required(),
-        params: array().optional().default([]),
+        params: jsonRpcParams(),
         id: any().optional(),
     },
 };
@@ -41,6 +41,40 @@ const requestValidation = async (ctx, next) => {
     if (valid.error) {
         ctx.status = 400;
         ctx.body = { validationError: valid.error.message };
+        return;
+    }
+
+    ctx.request.body = valid.value;
+    await next();
+};
+
+/** JWT extension proxy: uses config.extension.rpc.chains (same JSON-RPC body as public /api/rpc/:chainKey). */
+const jsonRpcValidationExtension = async (ctx, next) => {
+    if (!config.extension?.rpc?.chains || !Object.keys(config.extension.rpc.chains).length) {
+        ctx.status = 200;
+        ctx.body = {
+            jsonrpc: "2.0",
+            id: ctx.request.body?.id ?? null,
+            error: { code: -32603, message: "Extension RPC service unavailable" },
+        };
+        return;
+    }
+
+    const { chainKey } = ctx.params;
+    if (!chainKey || RESERVED_CHAIN_PATH.has(String(chainKey).toLowerCase())) {
+        ctx.status = 404;
+        ctx.body = { error: "not_found" };
+        return;
+    }
+
+    const valid = validate(schemas.jsonRpc, ctx.request.body || {});
+    if (valid.error) {
+        ctx.status = 200;
+        ctx.body = {
+            jsonrpc: "2.0",
+            id: ctx.request.body?.id ?? null,
+            error: { code: -32600, message: valid.error.message.trim() },
+        };
         return;
     }
 
@@ -84,4 +118,5 @@ const jsonRpcValidation = async (ctx, next) => {
 module.exports = {
     requestValidation,
     jsonRpcValidation,
+    jsonRpcValidationExtension,
 };
