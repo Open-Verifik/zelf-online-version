@@ -1,8 +1,5 @@
 const { JsonRpcProvider, Interface, getAddress } = require("ethers");
-
-const PAID_EVENT_IFACE = new Interface([
-    "event Paid(bytes32 indexed paymentId, address indexed payer, uint256 amount, string tagFull)",
-]);
+const { PAID_EVENT_IFACE, findPaidEventByPaymentId } = require("./tag-pay-event-scan.util");
 
 const TAG_PAY_TX_IFACE = new Interface([
     "function pay(bytes32 paymentId, string tagFull) payable",
@@ -78,7 +75,47 @@ async function verifyAvalancheZelfTagPayTx({
     const receipt = await provider.getTransactionReceipt(normalizedHash);
 
     if (!receipt || Number(receipt.status) !== 1) {
-        return { ok: false, body: failBody("receipt_missing_or_failed") };
+        const scan = await findPaidEventByPaymentId(provider, expectedContract, sc.paymentId, tagNameFull);
+        if (!scan.found) {
+            return { ok: false, body: failBody("receipt_missing_or_failed") };
+        }
+
+        const currentBlock = await provider.getBlockNumber();
+        if (currentBlock - scan.blockNumber + 1 < confirmations) {
+            return { ok: false, body: failBody("insufficient_confirmations") };
+        }
+
+        let amountToPay;
+        let expectedAtomic;
+        let amountReceivedHuman;
+        let payMode;
+
+        if (hasNativeWei) {
+            payMode = "NATIVE";
+            amountToPay = prices?.AVAX?.amountToSend;
+            if (amountToPay == null) throw new Error("409:avax_price_missing");
+            expectedAtomic = BigInt(sc.expectedWei);
+            amountReceivedHuman = Number(scan.eventAmount) / 1e18;
+        } else {
+            payMode = "USDC";
+            amountToPay = prices?.USDC?.amountToSend;
+            if (amountToPay == null) throw new Error("409:usdc_price_missing");
+            expectedAtomic = BigInt(sc.usdc.expectedAmount);
+            amountReceivedHuman = Number(scan.eventAmount) / 1e6;
+        }
+
+        if (scan.eventAmount < expectedAtomic) {
+            return { ok: false, body: failBody("amount_below_expected") };
+        }
+
+        return {
+            ok: true,
+            payMode,
+            eventAmount: scan.eventAmount,
+            amountReceivedHuman,
+            normalizedHash: scan.transactionHash,
+            amountToPay,
+        };
     }
 
     const currentBlock = await provider.getBlockNumber();
