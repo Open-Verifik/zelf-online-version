@@ -2,7 +2,6 @@ const config = require("../../../Core/config");
 const { searchTag } = require("./tags.module");
 const TagsSearchModule = require("./tags-search.module");
 const moment = require("moment");
-const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const { getDomainConfig } = require("../config/supported-domains");
 const jwt = require("jsonwebtoken");
 const bitcoinModule = require("../../bitcoin/modules/bitcoin-scrapping.module");
@@ -21,46 +20,7 @@ const IPFS = require("../../../Core/ipfs");
 const TagsArweaveModule = require("./tags-arweave.module");
 const LicenseModule = require("../../License/modules/license.module");
 
-/**
- * Confirm payment with Coinbase
- * @param {string} coinbase_hosted_url
- * @returns {Object} - Payment confirmation
- */
-const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
-    const chargeID = coinbase_hosted_url?.split("/pay/")[1];
 
-    if (!chargeID) {
-        const error = new Error("coinbase_charge_id_not_found");
-        error.status = 404;
-        throw error;
-    }
-
-    const charge = await getCoinbaseCharge(chargeID);
-
-    if (!charge) {
-        const error = new Error("coinbase_charge_not_found");
-        error.status = 404;
-        throw error;
-    }
-
-    const timeline = charge.timeline;
-
-    let confirmed = false;
-
-    for (let index = 0; index < timeline.length; index++) {
-        const _timeline = timeline[index];
-
-        if (_timeline.status === "COMPLETED") {
-            confirmed = true;
-        }
-    }
-
-    return {
-        charge,
-        confirmed: config.coinbase.forceApproval || confirmed,
-        amountReceived: config.coinbase.forceApproval || confirmed ? charge.pricing.settlement?.amount : 0,
-    };
-};
 
 /**
  * Renew my tag
@@ -98,8 +58,6 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
         ETH: tokenDecoded.paymentAddress.ethAddress,
         SOL: tokenDecoded.paymentAddress.solanaAddress,
         BTC: tokenDecoded.paymentAddress.btcAddress,
-        coinbase: tokenDecoded.coinbase_hosted_url,
-        CB: tokenDecoded.coinbase_hosted_url,
         AVAX: tokenDecoded.paymentAddress.avalancheAddress || tokenDecoded.paymentAddress.ethAddress,
         BDAG: tokenDecoded.paymentAddress?.blockdagAddress || tokenDecoded.paymentAddress?.ethAddress,
     };
@@ -389,8 +347,6 @@ const confirmPayUniqueAddress = async (network, address, amountToPay, options = 
         BTC: isBTCPaymentConfirmed,
         AVAX: isAvalanchePaymentConfirmed,
         BDAG: isBlockDAGPaymentConfirmed,
-        coinbase: _confirmPaymentWithCoinbase,
-        CB: _confirmPaymentWithCoinbase,
     };
 
     try {
@@ -398,9 +354,7 @@ const confirmPayUniqueAddress = async (network, address, amountToPay, options = 
         if (!fn) {
             throw new Error("409:unsupported_payment_network");
         }
-        if (network === "coinbase" || network === "CB") {
-            return await fn(address);
-        }
+
         if (network === "BTC") {
             return await fn(address, amountToPay);
         }
@@ -1162,7 +1116,6 @@ module.exports = {
     addDurationToTag,
     extendLicenseForOwner,
     // Utility functions
-    _confirmPaymentWithCoinbase,
     sendEmailReceipt,
     getMyReferrals,
     claimReferralReward,

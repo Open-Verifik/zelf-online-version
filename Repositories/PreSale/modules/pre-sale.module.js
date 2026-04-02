@@ -1,6 +1,6 @@
 const Stripe = require("stripe");
 const config = require("../../../Core/config");
-const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
+
 const Mailgun = require("../../../Core/mailgun");
 const IPFS = require("../../IPFS/modules/ipfs.module");
 
@@ -154,139 +154,6 @@ const createStripeSession = async ({ amount, email, zelfName, solanaAddress }) =
 };
 
 /**
- * Create a Coinbase Commerce Charge for ZNS Token Pre-Sale
- * @param {Object} params
- * @param {number} params.amount - Amount in USD
- * @param {string} params.email - Optional customer email
- * @param {string} params.zelfName - Required Zelf Name (tag) for token delivery
- * @param {string} params.solanaAddress - Optional Solana address for token delivery
- * @returns {Promise<Object>} The created charge URL and code
- */
-const createCoinbaseSession = async ({ amount, email, zelfName, solanaAddress }) => {
-    try {
-        const frontendUrl = config.landingUrl;
-
-        // Calculate tokens server-side for security
-        const { totalTokens, bonusPercentage } = calculateTokens(amount);
-
-        // price reduction to cents when it comes to development
-        //  const isDevMode = config.solana.devModeTokens === true || config.solana.devModeTokens === "true";
-        // so 50 usd becomes 50 cents
-        const price = config.coinbase.devMode ? (amount / 100).toString() : amount.toString();
-
-        const chargeData = {
-            name: "ZNS Token Pre-Sale",
-            description: `${totalTokens.toLocaleString()} ZNS Tokens (${bonusPercentage > 0 ? bonusPercentage + "% Bonus Included" : "Base Allocation"})`,
-            pricing_type: "fixed_price",
-            local_price: {
-                amount: price.toString(),
-                currency: "USD",
-            },
-            metadata: {
-                type: "zns_presale",
-                tokens: totalTokens.toString(),
-                bonus: bonusPercentage.toString(),
-                email: email || "",
-                zelfName: zelfName || "",
-                solanaAddress: solanaAddress || "",
-            },
-            redirect_url: `${frontendUrl}/presale/success`,
-            cancel_url: `${frontendUrl}/presale/checkout?canceled=true`,
-        };
-
-        const charge = await createCoinbaseCharge(chargeData);
-
-        return {
-            url: charge.hosted_url,
-            charge,
-            sessionId: charge.id, // Using id as session ID
-            calculated: {
-                amount,
-                tokens: totalTokens,
-                bonus: bonusPercentage,
-            },
-        };
-    } catch (error) {
-        console.error("Error creating Coinbase charge:", error);
-        throw error;
-    }
-};
-
-/**
- * Check Coinbase payment status by charge ID
- * @param {string} chargeId - The Coinbase charge ID
- * @returns {Promise<Object>} - Payment status with confirmed flag
- */
-const checkCoinbasePaymentStatus = async (chargeId) => {
-    try {
-        if (!chargeId) {
-            const error = new Error("charge_id_required");
-            error.status = 400;
-            throw error;
-        }
-
-        const charge = await getCoinbaseCharge(chargeId);
-
-        if (!charge) {
-            const error = new Error("coinbase_charge_not_found");
-            error.status = 404;
-            throw error;
-        }
-
-        const timeline = charge.timeline || [];
-        let confirmed = false;
-        let status = "PENDING";
-
-        // Check timeline for completion status
-        for (const event of timeline) {
-            if (event.status === "COMPLETED") {
-                confirmed = true;
-                status = "COMPLETED";
-                break;
-            } else if (event.status === "EXPIRED") {
-                status = "EXPIRED";
-            } else if (event.status === "CANCELED") {
-                status = "CANCELED";
-            }
-        }
-
-        // Allow force approval in dev mode
-        if (config.coinbase.forceApproval) {
-            confirmed = true;
-            status = "COMPLETED";
-        }
-
-        return {
-            chargeId: charge.id,
-            code: charge.code,
-            confirmed,
-            status,
-            hostedUrl: charge.hosted_url,
-            expiresAt: charge.expires_at,
-            metadata: charge.metadata,
-            timeline,
-        };
-    } catch (error) {
-        console.error("Error checking Coinbase payment status:", error);
-        throw error;
-    }
-};
-
-/**
- * Helper to fetch content from IPFS URL
- */
-const _loadIPFSJSON = async (ipfsUrl) => {
-    try {
-        const gatewayUrl = ipfsUrl.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
-        const response = await axios.get(gatewayUrl);
-        return response.data;
-    } catch (error) {
-        console.error("Error loading JSON from IPFS:", error.message);
-        return null; // Return null if fetch fails
-    }
-};
-
-/**
  * Get Payment/Session Details and Confirm Transaction
  * @param {string} sessionIdOrCode
  * @returns {Promise<Object>}
@@ -410,7 +277,7 @@ const _saveReceiptToIPFS = async (existingRecord, data) => {
             try {
                 const details = JSON.parse(keyvalues.paymentDetails);
                 alreadyReleased = details.tokensReleased === true;
-            } catch (e) {}
+            } catch (e) { }
         } else {
             alreadyReleased = keyvalues.tokensReleased === "true";
         }
@@ -615,8 +482,6 @@ const getPaymentDetails = async (sessionIdOrCode) => {
 
 module.exports = {
     createStripeSession,
-    createCoinbaseSession,
-    checkCoinbasePaymentStatus,
     calculateTokens,
     sendReceiptEmail,
     getPaymentDetails,

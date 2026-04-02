@@ -11,7 +11,6 @@ const { encrypt, decrypt, preview, encryptQR } = require("../../Wallet/modules/e
 const OfflineProofModule = require("../../Mina/offline-proof");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const moment = require("moment");
-const { createCoinbaseCharge, getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const config = require("../../../Core/config");
 const { addReferralReward, addPurchaseReward } = require("./zns-token.module");
 const jwt = require("jsonwebtoken");
@@ -194,13 +193,13 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 			return foundInArweave
 				? []
 				: zelfName && zelfName.includes(".zelf")
-				? {
+					? {
 						price,
 						reward,
 						zelfName,
 						available: true,
-				  }
-				: null;
+					}
+					: null;
 		}
 
 		const zelfNamesInIPFS = [];
@@ -229,13 +228,13 @@ const _searchInIPFS = async (environment = "both", query, authUser, foundInArwea
 		return foundInArweave
 			? []
 			: query.key === "zelfName"
-			? {
+				? {
 					price,
 					reward,
 					zelfName,
 					available: true,
-			  }
-			: null;
+				}
+				: null;
 	}
 };
 
@@ -356,29 +355,6 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 
 	const holdName = `${zelfNameObject.zelfName}.hold`;
 
-	zelfNameObject.coinbaseCharge =
-		zelfNameObject.price > 0
-			? await createCoinbaseCharge({
-					name: `${zelfNameObject.zelfName}`,
-					description: `Purchase of the Zelf Name > ${zelfNameObject.zelfName} for $${zelfNameObject.price}`,
-					pricing_type: "fixed_price",
-					local_price: {
-						amount: zelfNameObject.price,
-						currency: "USD",
-					},
-					metadata: {
-						zelfName: zelfNameObject.zelfName,
-						ethAddress: zelfNameObject.ethAddress,
-						btcAddress: zelfNameObject.btcAddress,
-						solanaAddress: zelfNameObject.solanaAddress,
-					},
-					redirect_url: "https://name.zelf.world/#/coinbase-success",
-					cancel_url: "https://name.zelf.world/#/coinbase-cancel",
-			  })
-			: {
-					free: true,
-			  };
-
 	const metadata = {
 		zelfProof: zelfNameObject.zelfProof,
 		zelfName: holdName,
@@ -389,7 +365,6 @@ const _createPaymentCharge = async (zelfNameObject, referral, authUser) => {
 		payment: {
 			price: zelfNameObject.price,
 			duration: zelfNameObject.duration || 1,
-			coinbase_hosted_url: zelfNameObject.coinbaseCharge.hosted_url,
 			expiresAt: moment().add(12, "hour").format("YYYY-MM-DD HH:mm:ss"),
 		},
 		type: "hold",
@@ -531,11 +506,6 @@ const leaseConfirmation = async (data, authUser) => {
 	let payment = false;
 
 	switch (zelfNameObject.publicData.price === 0 ? "free" : network) {
-		case "coinbase":
-		case "CB":
-			payment = await _confirmCoinbaseCharge(zelfNameObject);
-
-			break;
 		case "ETH":
 			payment = await confirmPayUniqueAddress(network, confirmationData);
 
@@ -585,39 +555,6 @@ const _confirmZelfNamePurchase = async (zelfNameObject) => {
 	};
 };
 
-// await createUnderName({ parentName: config.arwave.parentName, underName: zelfName });
-
-const _confirmCoinbaseCharge = async (zelfNameObject) => {
-	const chargeID = zelfNameObject.publicData?.coinbase_id || zelfNameObject.publicData?.coinbase_hosted_url?.split("/pay/")[1];
-
-	if (!chargeID) {
-		const error = new Error("coinbase_charge_id_not_found");
-		error.status = 404;
-		throw error;
-	}
-
-	const charge = await getCoinbaseCharge(chargeID);
-
-	if (!charge) return false;
-
-	const timeline = charge.timeline;
-
-	let confirmed = false;
-
-	for (let index = 0; index < timeline.length; index++) {
-		const _timeline = timeline[index];
-
-		if (_timeline.status === "COMPLETED") {
-			confirmed = true;
-		}
-	}
-
-	return {
-		...charge,
-		confirmed: config.coinbase.forceApproval || confirmed,
-	};
-};
-
 /**
  * clone zelf name to production
  * @param {Object} zelfNameObject
@@ -634,11 +571,10 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 		base64: zelfNameObject.zelfProofQRCode,
 		name: zelfName,
 		metadata: {
-			hasPassword: `${
-				Boolean(zelfNameObject.preview?.passwordLayer === "Password") ||
+			hasPassword: `${Boolean(zelfNameObject.preview?.passwordLayer === "Password") ||
 				Boolean(zelfNameObject.hasPassword) ||
 				zelfNameObject.publicData.hasPassword
-			}`,
+				}`,
 			zelfProof: zelfNameObject.publicData.zelfProof,
 			zelfName,
 			ethAddress: zelfNameObject.preview.publicData.ethAddress,
@@ -670,15 +606,15 @@ const _cloneZelfNameToProduction = async (zelfNameObject) => {
 
 	zelfNameObject.publicData.referralZelfName
 		? await addReferralReward({
-				ethAddress: masterIPFSRecord.metadata.ethAddress,
-				solanaAddress: masterIPFSRecord.metadata.solanaAddress,
-				zelfName: masterIPFSRecord.metadata.zelfName,
-				zelfNamePrice: zelfNameObject.publicData.price,
-				referralZelfName: zelfNameObject.publicData.referralZelfName,
-				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
-				ipfsHash: masterIPFSRecord.IpfsHash,
-				arweaveId: masterArweaveRecord.id,
-		  })
+			ethAddress: masterIPFSRecord.metadata.ethAddress,
+			solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+			zelfName: masterIPFSRecord.metadata.zelfName,
+			zelfNamePrice: zelfNameObject.publicData.price,
+			referralZelfName: zelfNameObject.publicData.referralZelfName,
+			referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
+			ipfsHash: masterIPFSRecord.IpfsHash,
+			arweaveId: masterArweaveRecord.id,
+		})
 		: "no_referral";
 
 	reward = await addPurchaseReward({
@@ -930,7 +866,7 @@ const leaseOffline = async (params, authUser) => {
 
 	try {
 		zelfNameRecords = await previewZelfName({ zelfName, environment: "both" }, authUser);
-	} catch (exception) {}
+	} catch (exception) { }
 
 	for (let index = 0; index < zelfNameRecords.length; index++) {
 		const ipfsRecord = zelfNameRecords[index];
@@ -1043,25 +979,6 @@ const update = async (params, authUser) => {
 
 	holdRecord.price = price;
 
-	holdRecord.coinbaseCharge = await createCoinbaseCharge({
-		name: `${holdRecord.zelfName}`,
-		description: `Purchase of the Zelf Name > ${holdRecord.zelfName} for $${holdRecord.price}`,
-		pricing_type: "fixed_price",
-		local_price: {
-			amount: holdRecord.price,
-			currency: "USD",
-		},
-		metadata: {
-			duration,
-			zelfName: holdRecord.zelfName,
-			ethAddress: holdRecord.preview?.ethAddress,
-			btcAddress: holdRecord.preview?.btcAddress,
-			solanaAddress: holdRecord.preview?.solanaAddress,
-		},
-		redirect_url: "https://purchase.zelf.world/#/coinbase-success",
-		cancel_url: "https://purchase.zelf.world/#/coinbase-cancel",
-	});
-
 	const updatedRecord = await IPFSModule.update(
 		ipfs_pin_hash,
 		{
@@ -1071,7 +988,6 @@ const update = async (params, authUser) => {
 				...publicData,
 				price: `${holdRecord.price}`,
 				duration,
-				coinbase_hosted_url: holdRecord.coinbaseCharge.hosted_url,
 			},
 			pinIt: true,
 		},
@@ -1088,7 +1004,6 @@ module.exports = {
 	previewZelfName,
 	previewZelfProof,
 	decryptZelfName,
-	_confirmCoinbaseCharge,
 	leaseOffline,
 	saveInProduction: _cloneZelfNameToProduction,
 	update,

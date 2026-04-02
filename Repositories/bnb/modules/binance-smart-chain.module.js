@@ -8,6 +8,10 @@ const token = process.env.MICROSERVICES_BOGOTA_TOKEN;
 const { getCleanInstance } = require("../../../Core/axios");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
+const etherscanChains = require("../../etherscan/chains.json");
+const { getVerification, setVerification } = require("../../etherscan/modules/verification-cache.module");
+
+const BSC_CHAIN_ID = (etherscanChains && etherscanChains["bsc-mainnet"]) || 56;
 
 const baseUrl = "https://bscscan.com";
 const instance = getCleanInstance(30000);
@@ -15,11 +19,18 @@ const bscscanApiKey = process.env.BSCSCAN_API_KEY;
 const bscscanApiUrl = process.env.BSCSCAN_API_URL || "https://api.bscscan.com/api";
 const bscRpcUrl = process.env.BSC_RPC_URL; // QuickNode only
 const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 6);
+const BSCSCAN_BATCH_DELAY_MS = Number(process.env.BSCSCAN_BATCH_DELAY_MS || 350);
+
+// Simple async sleep helper for batch spacing
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // Debug helper (enable by setting DEBUG_BSC=1)
 const dbgBsc = (...args) => {
 	if (process.env.DEBUG_BSC === "1") {
 		// eslint-disable-next-line no-console
+		console.log("[bsc]", ...args);
 	}
 };
 
@@ -273,7 +284,7 @@ async function getBscVerifiedContracts(contractAddresses) {
 
 		const uniqueAddresses = Array.from(new Set((contractAddresses || []).map((addr) => (addr || "").toLowerCase()))).filter(Boolean);
 
-		const concurrency = 5;
+		const concurrency = 3;
 		const verified = new Set();
 
 		for (let i = 0; i < uniqueAddresses.length; i += concurrency) {
@@ -281,13 +292,30 @@ async function getBscVerifiedContracts(contractAddresses) {
 
 			const results = await Promise.all(
 				batch.map(async (address) => {
+					// Try cache first
+					try {
+						const cached = await getVerification(BSC_CHAIN_ID, address);
+
+						if (cached && typeof cached.isVerified === "boolean") {
+							if (cached.isVerified) return address;
+
+							return null;
+						}
+					} catch (_) {}
+
 					try {
 						const url = `${bscscanApiUrl}?module=contract&action=getsourcecode&address=${address}&apikey=${bscscanApiKey}`;
 						const { data } = await instance.get(url);
 						const item = Array.isArray(data?.result) ? data.result[0] : null;
 						const abi = item?.ABI;
 
-						if (!abi || typeof abi !== "string" || abi === "Contract source code not verified") return null;
+						if (!abi || typeof abi !== "string" || abi === "Contract source code not verified") {
+							await setVerification(BSC_CHAIN_ID, address, false, "bscscan");
+
+							return null;
+						}
+
+						await setVerification(BSC_CHAIN_ID, address, true, "bscscan");
 
 						return address;
 					} catch (err) {
@@ -299,6 +327,9 @@ async function getBscVerifiedContracts(contractAddresses) {
 			);
 
 			results.filter(Boolean).forEach((addr) => verified.add(addr));
+
+			// Space batches to reduce BscScan 429 risk
+			if (i + concurrency < uniqueAddresses.length) await sleep(BSCSCAN_BATCH_DELAY_MS);
 		}
 
 		return verified;
@@ -307,6 +338,30 @@ async function getBscVerifiedContracts(contractAddresses) {
 
 		return new Set();
 	}
+}
+
+/** Stables and wrapped majors first, then the rest of the curated list; cap to `max` entries. */
+function prioritizeCuratedBscForRpc(max) {
+	if (max <= 0) return [];
+
+	const allLower = Array.from(COMMON_TOKENS_BSC).map((a) => String(a).toLowerCase());
+	const allSet = new Set(allLower);
+	const priority = [USDT, USDC, BUSD, WBNB, DAI, BTCB, ETH_PEG].map((a) => a.toLowerCase());
+	const out = [];
+
+	for (const p of priority) {
+		if (allSet.has(p) && !out.includes(p)) out.push(p);
+
+		if (out.length >= max) return out;
+	}
+
+	for (const a of allLower) {
+		if (!out.includes(a)) out.push(a);
+
+		if (out.length >= max) break;
+	}
+
+	return out;
 }
 
 const getBalance = async (params) => {
@@ -338,53 +393,58 @@ const getBalance = async (params) => {
 		}
 
 		if (!tokens || tokens.length === 0) {
-			const curated = Array.from(COMMON_TOKENS_BSC).slice(0, CURATED_RPC_FALLBACK_MAX);
-			const rpcBalances = await getBep20BalancesViaRpcBatch(curated, address);
-			const added = [];
+			// Skip curated RPC batch for empty wallets — no point spamming eth_call
+			if (nativeWei > 0) {
+				const prioritized = prioritizeCuratedBscForRpc(CURATED_RPC_FALLBACK_MAX);
+				const rpcBalances = await getBep20BalancesViaRpcBatch(prioritized, address);
+				const added = [];
 
-			for (const contract of curated) {
-				const raw = rpcBalances.get(contract) || "0x0";
-				const numericRaw = typeof raw === "string" && raw.startsWith("0x") ? parseInt(raw, 16) : Number(raw);
+				for (const contract of prioritized) {
+					const raw = rpcBalances.get(contract) || "0x0";
+					const numericRaw = typeof raw === "string" && raw.startsWith("0x") ? parseInt(raw, 16) : Number(raw);
 
-				if (!numericRaw) continue;
+					if (!numericRaw) continue;
 
-				const decimals = COMMON_TOKEN_DECIMALS_BY_ADDRESS_BSC.get(contract) || 18;
-				const amount = Number(numericRaw) / Math.pow(10, decimals);
+					const decimals = COMMON_TOKEN_DECIMALS_BY_ADDRESS_BSC.get(contract) || 18;
+					const amount = Number(numericRaw) / Math.pow(10, decimals);
 
-				if (amount <= 0) continue;
+					if (amount <= 0) continue;
 
-				const id = COMMON_TOKEN_ID_BY_ADDRESS_BSC.get(contract);
+					const id = COMMON_TOKEN_ID_BY_ADDRESS_BSC.get(contract);
 
-				let p = 0;
+					let p = 0;
 
-				if (id) {
-					const idPrices = await getCoinGeckoPricesForIds([id]);
+					if (id) {
+						const idPrices = await getCoinGeckoPricesForIds([id]);
 
-					p = idPrices.get(id) || 0;
+						p = idPrices.get(id) || 0;
+					}
+
+					if ((!p || p === 0) && (contract === USDT || contract === USDC || contract === BUSD)) p = 1;
+
+					const fiatBalance = amount * p;
+					const meta = COMMON_TOKEN_METADATA_BY_ADDRESS_BSC.get(contract) || {};
+
+					tokens.push({
+						_amount: amount,
+						_fiatBalance: fiatBalance.toFixed(Math.min(decimals, 8)),
+						_price: Number(p),
+						address: contract,
+						amount: amount.toFixed(Math.min(decimals, 12)),
+						decimals: decimals,
+						fiatBalance: fiatBalance,
+						image: meta.image || "",
+						name: meta.name || "",
+						price: p,
+						symbol: meta.symbol || "",
+						tokenType: "BEP-20",
+					});
+					added.push(contract);
 				}
-
-				if ((!p || p === 0) && (contract === USDT || contract === USDC || contract === BUSD)) p = 1;
-
-				const fiatBalance = amount * p;
-				const meta = COMMON_TOKEN_METADATA_BY_ADDRESS_BSC.get(contract) || {};
-
-				tokens.push({
-					_amount: amount,
-					_fiatBalance: fiatBalance.toFixed(Math.min(decimals, 8)),
-					_price: Number(p),
-					address: contract,
-					amount: amount.toFixed(Math.min(decimals, 12)),
-					decimals: decimals,
-					fiatBalance: fiatBalance,
-					image: meta.image || "",
-					name: meta.name || "",
-					price: p,
-					symbol: meta.symbol || "",
-					tokenType: "BEP-20",
-				});
-				added.push(contract);
+				dbgBsc("rpcFallbackAdded", added.length, added);
+			} else {
+				dbgBsc("skippedRpcFallback_zeroNativeBalance");
 			}
-			dbgBsc("rpcFallbackAdded", added.length, added);
 		}
 
 		const BSCValue = Number(nativeWei) / 1e18;
@@ -596,6 +656,100 @@ const getTransactionStatus = async (params) => {
 	}
 };
 
+// Fetch BSC transactions via OKLink
+async function getOklinkBscTransactions(address, page, show, price) {
+	try {
+		const t = Date.now();
+		const url = `https://www.oklink.com/api/explorer/v2/bsc/addresses/${address}/transactionsByClassfy/condition?offset=${page}&limit=${show}&address=${address}&nonzeroValue=false&t=${t}`;
+		const { data } = await instance.get(url, {
+			headers: {
+				"X-Apikey": get_ApiKey().getApiKey(),
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+			},
+		});
+
+		if ((data?.code === "0" || data?.code === 0) && data?.data?.hits) {
+			const hits = data.data.hits;
+			const transactions = hits.map((tx) => {
+				const value = Number(tx.value || 0);
+				const fiatValue = value * Number(price || 0);
+				const traffic = String(tx.from || "").toLowerCase() === String(address).toLowerCase() ? "OUT" : "IN";
+
+				return {
+					age: tx.blocktime ? new Date(tx.blocktime * 1000).toISOString() : "",
+					amount: value ? String(value) : "0",
+					asset: "BNB",
+					block: String(tx.blockHeight || ""),
+					date: tx.blocktime ? new Date(tx.blocktime * 1000).toISOString().replace("T", " ").slice(0, 19) : "",
+					fiatAmount: fiatValue.toFixed(2),
+					from: tx.from,
+					hash: tx.hash,
+					method: tx.method || "Transfer",
+					to: tx.to,
+					traffic,
+					txnFee: tx.fee ? String(Number(tx.fee)) : "0",
+				};
+			});
+
+			return { pagination: { records: String(transactions.length), pages: "1", page: String(page) }, transactions };
+		}
+
+		return null;
+	} catch (error) {
+		dbgBsc("oklink_tx_error", error?.message || error);
+
+		return null;
+	}
+}
+
+// Fetch BSC transactions via BscScan
+async function getBscscanTransactions(address, page, show, price) {
+	try {
+		if (!bscscanApiKey) return null;
+
+		const apikey = `&apikey=${bscscanApiKey}`;
+		const url = `${bscscanApiUrl}?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=${page}&offset=${show}&sort=desc${apikey}`;
+		const { data } = await instance.get(url);
+
+		if (data?.status === "1" && Array.isArray(data?.result)) {
+			const txs = data.result.map((tx) => {
+				const value = Number(tx.value || 0) / Math.pow(10, 18);
+				const fiatValue = value * Number(price || 0);
+				const traffic = String(tx.from || "").toLowerCase() === String(address).toLowerCase() ? "OUT" : "IN";
+
+				let txnFee = "0";
+				const gasUsed = Number(tx.gasUsed || 0);
+				const gasPrice = Number(tx.gasPrice || 0);
+
+				if (gasUsed && gasPrice) txnFee = ((gasUsed * gasPrice) / Math.pow(10, 18)).toFixed(8);
+
+				return {
+					age: tx.timeStamp ? new Date(Number(tx.timeStamp) * 1000).toISOString() : "",
+					amount: value ? String(value) : "0",
+					asset: "BNB",
+					block: String(tx.blockNumber || ""),
+					date: tx.timeStamp ? new Date(Number(tx.timeStamp) * 1000).toISOString().replace("T", " ").slice(0, 19) : "",
+					fiatAmount: fiatValue.toFixed(2),
+					from: tx.from,
+					hash: tx.hash,
+					method: tx.methodId ? "Contract Interaction" : "Transfer",
+					to: tx.to,
+					traffic,
+					txnFee,
+				};
+			});
+
+			return { pagination: { records: String(txs.length), pages: "1", page: String(page) }, transactions: txs };
+		}
+
+		return null;
+	} catch (error) {
+		dbgBsc("bscscan_tx_error", error?.message || error);
+
+		return null;
+	}
+}
+
 /**
  * get transactions list
  * @param {Object} params
@@ -603,26 +757,43 @@ const getTransactionStatus = async (params) => {
  */
 const getTransactionsList = async (params, query) => {
 	const address = params.id;
-	const show = query.show;
+	const page = query.page || 0;
+	const show = query.show || 10;
 
 	try {
-		const { data } = await instance.get(`${urlBase}/api/evm-tx/bsc-transactions?address=${address}&show=${show}`, {
-			headers: {
-				Authorization: `Bearer ${token}`,
-			},
-		});
+		// Get current BNB price for fiat calculation
+		let price = 0;
 
-		return {
-			pagination: { records: "0", pages: "0", page: "0" },
-			transactions: data,
-		};
+		try {
+			const p = await getTickerPrice({ symbol: "BNB" });
+
+			price = Number(p?.price || 0);
+		} catch (_) {}
+
+		// Try OKLink first
+		let resp = await getOklinkBscTransactions(address, page, show, price);
+
+		if (resp && resp.transactions && resp.transactions.length > 0) return resp;
+
+		// Fallback to BscScan
+		resp = await getBscscanTransactions(address, page, show, price);
+
+		if (resp && resp.transactions && resp.transactions.length > 0) return resp;
+
+		// Final fallback: internal Bogotá microservice
+		try {
+			const { data } = await instance.get(`${urlBase}/api/evm-tx/bsc-transactions?address=${address}&show=${show}`, {
+				headers: token ? { Authorization: `Bearer ${token}` } : {},
+			});
+
+			return { pagination: { records: String(data?.length || 0), pages: "1", page: String(page) }, transactions: data || [] };
+		} catch (_) {}
+
+		return { pagination: { records: "0", pages: "0", page: String(page) }, transactions: [] };
 	} catch (error) {
 		console.error({ error });
 
-		return {
-			pagination: { records: "0", pages: "0", page: "0" },
-			transactions: [],
-		};
+		return { pagination: { records: "0", pages: "0", page: String(page) }, transactions: [] };
 	}
 };
 

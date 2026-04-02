@@ -12,8 +12,6 @@ const { getBalance } = require("../../bitcoin/modules/bitcoin-scrapping.module")
 const jwt = require("jsonwebtoken");
 const secretKey = config.signedData.key;
 
-const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
-
 const templatesMap = {
 	es: {
 		Purchase_receipt: {
@@ -115,7 +113,6 @@ const searchZelfLease = async (zelfName) => {
 		duration: parseInt(duration),
 		expiresAt,
 		referralZelfName,
-		coinbase_hosted_url: zelfPayNameObject.publicData.coinbase_hosted_url,
 		network,
 		amountToSend,
 		referralSolanaAddress,
@@ -161,12 +158,6 @@ const pay = async (zelfName_, network, signedDataPrice) => {
 	}
 
 	const zelfPayObject = zelfNameRecords?.ipfs[0] || zelfNameRecords?.arweave[0];
-
-	if (network === "CB" || network === "coinbase") {
-		const chargeID = zelfPayObject.publicData.coinbase_hosted_url.split("/pay/")[1];
-
-		return await checkoutPayCoinbase(chargeID);
-	}
 
 	let selectedAddress = null;
 
@@ -240,14 +231,6 @@ const checkoutPayUniqueAddress = async (network, amountToSend, selectedAddress) 
 		remainingAmount: parseFloat(parseFloat(remainingAmount).toFixed(7)),
 		confirmationData: confirmationData,
 	};
-};
-
-const checkoutPayCoinbase = async (chargeID) => {
-	const charge = await getCoinbaseCharge(chargeID);
-
-	if (!charge) return false;
-
-	return { timeline: charge.timeline };
 };
 
 const checkoutETH = async (address) => {

@@ -3,48 +3,13 @@ const jwt = require("jsonwebtoken");
 const { searchZelfName, createZelfPay, updateZelfPay } = require("./zns.v2.module");
 const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-const { getCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
+
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const ZNSPartsModule = require("./zns-parts.module");
 const { addReferralReward, addPurchaseReward, getPurchaseReward } = require("./zns-token.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
-
-const _confirmPaymentWithCoinbase = async (coinbase_hosted_url) => {
-	const chargeID = coinbase_hosted_url?.split("/pay/")[1];
-
-	if (!chargeID) {
-		const error = new Error("coinbase_charge_id_not_found");
-		error.status = 404;
-		throw error;
-	}
-
-	const charge = await getCoinbaseCharge(chargeID);
-
-	if (!charge) {
-		const error = new Error("coinbase_charge_not_found");
-		error.status = 404;
-		throw error;
-	}
-
-	const timeline = charge.timeline;
-
-	let confirmed = false;
-
-	for (let index = 0; index < timeline.length; index++) {
-		const _timeline = timeline[index];
-
-		if (_timeline.status === "COMPLETED") {
-			confirmed = true;
-		}
-	}
-
-	return {
-		...charge,
-		confirmed: config.coinbase.forceApproval || confirmed,
-	};
-};
 
 const renewMyZelfName = async (params, authUser) => {
 	if (!authUser || !authUser.zelfName) {
@@ -56,10 +21,6 @@ const renewMyZelfName = async (params, authUser) => {
 	let payment;
 
 	switch (params.network) {
-		case "coinbase":
-		case "CB":
-			payment = await _confirmPaymentWithCoinbase(authUser.coinbase_hosted_url);
-			break;
 		case "ETH":
 			payment = await confirmPayUniqueAddress("ETH", authUser);
 			break;
@@ -232,15 +193,15 @@ const _addDurationToZelfName = async (authUser, preview = {}, passedZelfNameObje
 
 	zelfNameObject.publicData.referralZelfName
 		? await addReferralReward({
-				ethAddress: masterIPFSRecord.metadata.ethAddress,
-				solanaAddress: masterIPFSRecord.metadata.solanaAddress,
-				zelfName: masterIPFSRecord.metadata.zelfName,
-				zelfNamePrice: price,
-				referralZelfName: zelfNameObject.publicData.referralZelfName,
-				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
-				ipfsHash: masterIPFSRecord.IpfsHash,
-				arweaveId: masterArweaveRecord.id,
-		  })
+			ethAddress: masterIPFSRecord.metadata.ethAddress,
+			solanaAddress: masterIPFSRecord.metadata.solanaAddress,
+			zelfName: masterIPFSRecord.metadata.zelfName,
+			zelfNamePrice: price,
+			referralZelfName: zelfNameObject.publicData.referralZelfName,
+			referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
+			ipfsHash: masterIPFSRecord.IpfsHash,
+			arweaveId: masterArweaveRecord.id,
+		})
 		: "no_referral";
 
 	return {
@@ -271,13 +232,13 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 
 	zelfPayRecords = zelfPayRecords.ipfs?.length
 		? zelfPayRecords.ipfs.filter((record) => {
-				const comparisonDate = renewedAt ? moment(renewedAt) : moment(registeredAt);
-				return comparisonDate.isBefore(record.publicData.registeredAt);
-		  })
+			const comparisonDate = renewedAt ? moment(renewedAt) : moment(registeredAt);
+			return comparisonDate.isBefore(record.publicData.registeredAt);
+		})
 		: zelfPayRecords.arweave?.filter((record) => {
-				const comparisonDate = renewedAt ? moment(renewedAt) : moment(registeredAt);
-				return comparisonDate.isBefore(record.publicData.registeredAt);
-		  });
+			const comparisonDate = renewedAt ? moment(renewedAt) : moment(registeredAt);
+			return comparisonDate.isBefore(record.publicData.registeredAt);
+		});
 
 	let renewZelfPayObject = null;
 
@@ -305,14 +266,7 @@ const _fetchZelfPayRecord = async (zelfNameObject, currentCount, duration = 1) =
 		}
 	}
 
-	if (renewZelfPayObject && moment(renewZelfPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
-		const newZelfPayRecord = await updateZelfPay(renewZelfPayObject, {
-			newCoinbaseUrl: true,
-			referralZelfName,
-		});
-
-		return newZelfPayRecord.ipfs || newZelfPayRecord.arweave;
-	} else if (!renewZelfPayObject) {
+	if (!renewZelfPayObject) {
 		zelfNameObject.publicData.duration = duration || 1;
 
 		const newZelfPayRecord = await createZelfPay(zelfNameObject, currentCount + 1);
@@ -455,8 +409,6 @@ const howToRenewMyZelfName = async (params) => {
 		expiresAt: zelfNameObject.publicData.expiresAt,
 		ttl: moment().add("2", "hours").unix(),
 		duration: parseInt(duration || 1),
-		coinbase_hosted_url: renewZelfPayObject.publicData.coinbase_hosted_url,
-		coinbase_expires_at: renewZelfPayObject.publicData.coinbase_expires_at,
 		count: parseInt(renewZelfPayObject.publicData.count),
 		payment: {
 			registeredAt: renewZelfPayObject.publicData.registeredAt,
@@ -502,7 +454,7 @@ const signRecordData = (recordData) => {
 	}
 };
 
-const syncZelfNameInIPFSAndArweave = async (zelfNameObject, mnemonic) => {};
+const syncZelfNameInIPFSAndArweave = async (zelfNameObject, mnemonic) => { };
 
 module.exports = {
 	renewMyZelfName,

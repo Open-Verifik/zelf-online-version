@@ -5,7 +5,6 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
-const { createCoinbaseCharge } = require("../../coinbase/modules/coinbase_commerce.module");
 const moment = require("moment");
 const { searchTag } = require("./tags.module");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
@@ -265,8 +264,6 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
         initiatedAt: moment().unix(),
         ttl: moment().add("2", "hours").unix(),
         duration: parseInt(duration || 1),
-        coinbase_hosted_url: renewTagPayObject.publicData?.coinbase_hosted_url,
-        coinbase_expires_at: renewTagPayObject.publicData?.coinbase_expires_at,
         count: parseInt(renewTagPayObject.publicData?.count),
         publicData: renewTagPayObject.publicData,
         payment: {
@@ -847,13 +844,6 @@ const _requiresUpdate = async (tagPayObject, priceDetails, tagObject) => {
 
         return true;
     }
-
-    // now check if the coinbase_expires_at is before the current date
-    if (tagPayObject?.publicData?.coinbase_expires_at && moment(tagPayObject.publicData.coinbase_expires_at).isBefore(moment())) {
-        await TagsIpfsModule.unPinFiles([tagPayObject.ipfsId]);
-
-        return true;
-    }
 };
 
 /**
@@ -893,38 +883,7 @@ const _fetchTagPayRecord = async (tagObject, currentCount, priceDetails, domainC
     return tagPayObject;
 };
 
-/**
- * create coinbase charge
- * @param {string} tagPayName
- * @param {Object} priceDetails
- * @param {number} currentCount
- * @param {Object} domainConfig
- * @returns {Object} - Coinbase charge object
- */
-const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, { ethAddress, btcAddress, solanaAddress }) => {
-    const coinbasePayload = {
-        name: tagPayName,
-        description: `Purchase of the Zelf Name > ${tagPayName} for $${priceDetails.price}`,
-        pricing_type: "fixed_price",
-        local_price: {
-            amount: `${priceDetails.price}`,
-            currency: "USD",
-        },
-        metadata: {
-            zelfName: tagPayName,
-            ethAddress: ethAddress,
-            btcAddress: btcAddress,
-            solanaAddress: solanaAddress,
-            count: `${currentCount}`,
-        },
-        redirect_url: "https://zelf.world/tags/payment/checkout/coinbase",
-        cancel_url: "https://zelf.world/tags/payment",
-    };
 
-    const coinbaseCharge = await createCoinbaseCharge(coinbasePayload);
-
-    return coinbaseCharge;
-};
 
 /**
  * create tag pay
@@ -936,8 +895,6 @@ const _createCoinbaseCharge = async (tagPayName, priceDetails, currentCount, { e
  * @returns {Object} - Tag pay object
  */
 const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount, domainConfig) => {
-    let coinbaseCharge = null;
-
     const mnemonic = generateMnemonic(12);
     const jsonfile = require("../../../config/0012589021.json");
     const eth = createEthWallet(mnemonic);
@@ -971,14 +928,6 @@ const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount,
     tagPayObject.publicData.btcAddress = btc.address;
     tagPayObject.publicData.solanaAddress = solana.address;
 
-    if (domainConfig?.tags?.payment?.methods?.includes("coinbase")) {
-        coinbaseCharge = await _createCoinbaseCharge(tagPayObject.tagPayName, priceDetails, currentCount, {
-            ethAddress: tagPayObject.publicData.ethAddress,
-            btcAddress: tagPayObject.publicData.btcAddress,
-            solanaAddress: tagPayObject.publicData.solanaAddress,
-        });
-    }
-
     const payload = {
         base64: tagPayObject.zelfProofQRCode,
         name: tagPayObject.tagPayName,
@@ -999,13 +948,6 @@ const createTagPay = async (tagPayObject, tagObject, priceDetails, currentCount,
         },
         pinIt: true,
     };
-
-    if (coinbaseCharge) {
-        payload.metadata.coinBase = JSON.stringify({
-            hosted_url: coinbaseCharge.hosted_url,
-            expires_at: coinbaseCharge.expires_at,
-        });
-    }
 
     let ipfs = await TagsIpfsModule.insert(payload, { pro: true });
 
