@@ -240,7 +240,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"duration\": \"yearly\",\n  \"paymentMethod\": \"coinbase\",\n  \"currency\": \"USD\",\n  \"faceBase64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\",\n  \"password\": \"testpassword123\",\n  \"mnemonic\": \"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about\",\n  \"referralTagName\": \"\"\n}"
+							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"duration\": \"yearly\",\n  \"paymentMethod\": \"crypto\",\n  \"currency\": \"USD\",\n  \"faceBase64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\",\n  \"password\": \"testpassword123\",\n  \"mnemonic\": \"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about\",\n  \"referralTagName\": \"\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/tags/lease",
@@ -385,7 +385,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"domain\": \"{{domain}}\",\n  \"paymentMethod\": \"coinbase\"\n}"
+							"raw": "{\n  \"domain\": \"{{domain}}\",\n  \"paymentMethod\": \"crypto\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/tags/validate-payment-method",
@@ -544,7 +544,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"duration\": \"yearly\",\n  \"paymentMethod\": \"coinbase\",\n  \"currency\": \"USD\"\n}"
+							"raw": "{\n  \"tagName\": \"{{tag_name}}\",\n  \"domain\": \"{{domain}}\",\n  \"duration\": \"yearly\",\n  \"paymentMethod\": \"crypto\",\n  \"currency\": \"USD\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/my-tags/renew",

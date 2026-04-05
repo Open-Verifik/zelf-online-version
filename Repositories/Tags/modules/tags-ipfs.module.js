@@ -98,6 +98,7 @@ const _formatRecord = (item) => {
 		formattedResult.publicData.avalancheAddress = formattedResult.publicData.ethAddress;
 	}
 
+	// Legacy: historical IPFS payloads stored Coinbase Commerce checkout JSON as `coinBase`.
 	if (formattedResult?.publicData?.coinBase) {
 		const coinBase = JSON.parse(formattedResult.publicData.coinBase);
 

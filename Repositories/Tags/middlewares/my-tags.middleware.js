@@ -18,7 +18,7 @@ const schemas = {
     paymentConfirmation: {
         tagName: string().required(),
         domain: string(),
-        network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX", "BNB", "POL", "BASE", "BDAG"]).required(),
+        network: stringEnum(["ETH", "SOL", "BTC", "AVAX", "BNB", "POL", "BASE", "BDAG"]).required(),
         token: string().required(),
     },
     smartContractPaymentConfirmation: {
@@ -36,7 +36,7 @@ const schemas = {
     receiptEmail: {
         tagName: string().required(),
         domain: string(),
-        network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC", "AVAX", "BNB", "POL", "BASE", "BDAG"]).required(),
+        network: stringEnum(["ETH", "SOL", "BTC", "AVAX", "BNB", "POL", "BASE", "BDAG"]).required(),
         email: string().email().required(),
         token: string().required(),
     },
@@ -189,7 +189,7 @@ const paymentConfirmationValidation = async (ctx, next) => {
     }
 
     // now validate the network and coin
-    if (!tokenDecoded.prices[network] && network !== "coinbase" && network !== "CB") {
+    if (!tokenDecoded.prices[network]) {
         ctx.status = 409;
         ctx.body = { validationError: "invalid_network" };
         return;
@@ -499,7 +499,7 @@ const receiptEmailValidation = async (ctx, next) => {
     }
 
     // now validate the network and coin
-    if (!tokenDecoded.prices[network] && network !== "coinbase" && network !== "CB") {
+    if (!tokenDecoded.prices[network]) {
         ctx.status = 409;
         ctx.body = { validationError: "invalid_network" };
         return;

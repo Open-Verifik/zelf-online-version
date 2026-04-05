@@ -30,7 +30,7 @@ class Domain {
             reserved: domainData.tags?.reserved || [],
             customRules: domainData.tags?.customRules || [],
             payment: {
-                methods: domainData.tags?.payment?.methods || ["coinbase", "crypto"],
+                methods: domainData.tags?.payment?.methods || ["crypto", "stripe"],
                 currencies: domainData.tags?.payment?.currencies || ["USD"],
                 networks: domainData.tags?.payment?.networks || {},
                 discounts: domainData.tags?.payment.discounts || {

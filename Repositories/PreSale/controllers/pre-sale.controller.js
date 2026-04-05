@@ -24,24 +24,18 @@ const createSession = async (ctx) => {
             return;
         }
 
-        let sessionData;
-
         if (method === "coinbase") {
-            sessionData = await Module.createCoinbaseSession({
-                amount: parseFloat(amount),
-                email,
-                zelfName,
-                solanaAddress,
-            });
-        } else {
-            // Default to Stripe
-            sessionData = await Module.createStripeSession({
-                amount: parseFloat(amount),
-                email,
-                zelfName,
-                solanaAddress,
-            });
+            ctx.status = 400;
+            ctx.body = { error: "Coinbase payments are no longer supported" };
+            return;
         }
+
+        const sessionData = await Module.createStripeSession({
+            amount: parseFloat(amount),
+            email,
+            zelfName,
+            solanaAddress,
+        });
 
         ctx.body = {
             success: true,
@@ -103,35 +97,8 @@ const getSessionDetails = async (ctx) => {
     }
 };
 
-/**
- * Check Coinbase payment status (for polling)
- */
-const checkCoinbaseStatus = async (ctx) => {
-    try {
-        const { chargeId } = ctx.query;
-
-        if (!chargeId) {
-            ctx.status = 400;
-            ctx.body = { error: "Missing chargeId parameter" };
-            return;
-        }
-
-        const status = await Module.checkCoinbasePaymentStatus(chargeId);
-
-        ctx.body = {
-            success: true,
-            data: status,
-        };
-    } catch (error) {
-        console.error("Coinbase Status Check Error:", error);
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
-    }
-};
-
 module.exports = {
     createSession,
     sendReceipt,
     getSessionDetails,
-    checkCoinbaseStatus,
 };

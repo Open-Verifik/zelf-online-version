@@ -12,7 +12,6 @@ jest.mock("../../Repositories/Wallet/modules/eth", () => ({ createEthWallet: jes
 jest.mock("../../Repositories/Wallet/modules/btc", () => ({ createBTCWallet: jest.fn() }));
 jest.mock("../../Repositories/Wallet/modules/solana", () => ({ createSolanaWallet: jest.fn() }));
 jest.mock("../../Repositories/Wallet/modules/helpers", () => ({ generateMnemonic: jest.fn() }));
-jest.mock("../../Repositories/coinbase/modules/coinbase_commerce.module", () => ({ createCoinbaseCharge: jest.fn() }));
 jest.mock("../../Repositories/Tags/modules/tags.module", () => ({ searchTag: jest.fn() }));
 jest.mock("../../Repositories/binance/modules/binance.module", () => ({ getTickerPrice: jest.fn() }));
 jest.mock("jsonwebtoken", () => ({ sign: jest.fn(), verify: jest.fn() }));

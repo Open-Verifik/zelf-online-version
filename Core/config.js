@@ -143,11 +143,6 @@ const configuration = {
         defaultEpochs: Number(process.env.WALRUS_DEFAULT_EPOCHS) || 5,
         maxFileSize: Number(process.env.WALRUS_MAX_FILE_SIZE) || 100 * 1024, // 100KB
     },
-    coinbase: {
-        key: process.env.COINBASE_API_KEY,
-        forceApproval: Boolean(process.env.COINBASE_FORCE_APPROVAL === "true"),
-        devMode: Boolean(process.env.COINBASE_DEV_MODE === "true"),
-    },
     google: {
         captchaProjectID: process.env.CAPTCHA_PROJECT_ID,
         webSiteKey: process.env.CAPTCHA_WEB_SITE_KEY,
@@ -176,6 +171,27 @@ const configuration = {
     },
     oklink: {
         apiKey: process.env.OKLINK_API_KEY,
+    },
+    alchemy: {
+        apiKey: process.env.ALCHEMY_API_KEY,
+        timeoutMs: Number(process.env.ALCHEMY_TIMEOUT_MS) || 30000,
+        maxTokenMetadataRequests: Number(process.env.ALCHEMY_MAX_TOKEN_METADATA_REQUESTS) || 50,
+        curatedTokens: {
+            avalanche: {
+                USDC: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
+                USDT: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7",
+            },
+        },
+        networks: {
+            ethereum: process.env.ALCHEMY_ETHEREUM_URL || (process.env.ALCHEMY_API_KEY ? `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+            polygon: process.env.ALCHEMY_POLYGON_URL || (process.env.ALCHEMY_API_KEY ? `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+            arbitrum:
+                process.env.ALCHEMY_ARBITRUM_URL || (process.env.ALCHEMY_API_KEY ? `https://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+            optimism:
+                process.env.ALCHEMY_OPTIMISM_URL || (process.env.ALCHEMY_API_KEY ? `https://opt-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+            avalanche:
+                process.env.ALCHEMY_AVALANCHE_URL || (process.env.ALCHEMY_API_KEY ? `https://avax-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+        },
     },
     lifi: {
         url: process.env.LIFI_API_URL || "https://li.quest/v1",

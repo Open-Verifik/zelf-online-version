@@ -5,7 +5,7 @@
 			"domain": "zelf",
 			"tagName": "testuser",
 			"duration": "yearly",
-			"paymentMethod": "coinbase",
+			"paymentMethod": "crypto",
 			"currency": "USD",
 			"expectedPrice": 0,
 			"description": "Test creating a free tag in the zelf domain"
@@ -15,7 +15,7 @@
 			"domain": "avax",
 			"tagName": "avaxuser",
 			"duration": "yearly",
-			"paymentMethod": "coinbase",
+			"paymentMethod": "crypto",
 			"currency": "USD",
 			"expectedPrice": 85,
 			"description": "Test creating a paid tag in the avax domain ($1.00 base, 15% yearly discount)"
@@ -92,7 +92,7 @@
 	"validationTests": [
 		{
 			"domain": "avax",
-			"paymentMethod": "coinbase",
+			"paymentMethod": "crypto",
 			"expectedValid": true,
 			"description": "Test valid payment method for avax domain"
 		},
@@ -216,7 +216,7 @@
 				"tagName": "{{tag_name}}",
 				"domain": "{{domain}}",
 				"duration": "yearly",
-				"paymentMethod": "coinbase",
+				"paymentMethod": "crypto",
 				"currency": "USD",
 				"faceBase64": "{{face_base64}}",
 				"password": "{{password}}",

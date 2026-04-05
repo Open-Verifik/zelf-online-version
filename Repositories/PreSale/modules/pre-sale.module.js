@@ -168,7 +168,7 @@ const _checkIPFSRecord = async (sessionId) => {
 };
 
 /**
- * Verify payment status with Stripe or Coinbase
+ * Verify payment status with Stripe
  */
 const _verifyWithProvider = async (sessionIdOrCode) => {
     let details = {};
@@ -188,18 +188,12 @@ const _verifyWithProvider = async (sessionIdOrCode) => {
             currency: session.currency,
         };
     } else {
-        // Coinbase
-        const charge = await getCoinbaseCharge(sessionIdOrCode);
-        const isConfirmed = charge.timeline.some((t) => t.status === "COMPLETED" || t.status === "RESOLVED");
-        isPaid = isConfirmed;
-
-        details = {
-            method: "coinbase",
-            status: isConfirmed ? "paid" : "pending",
-            amount: parseFloat(charge.pricing.local.amount),
-            email: charge.metadata?.email,
-            metadata: charge.metadata,
-            currency: charge.pricing.local.currency,
+        return {
+            isPaid: false,
+            details: {
+                method: "unsupported",
+                status: "coinbase_removed",
+            },
         };
     }
 

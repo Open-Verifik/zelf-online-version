@@ -28,7 +28,7 @@
 		},
 		{
 			"key": "payment_method",
-			"value": "coinbase",
+			"value": "crypto",
 			"type": "default",
 			"enabled": true
 		},

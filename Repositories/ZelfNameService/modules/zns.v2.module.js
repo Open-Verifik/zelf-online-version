@@ -607,7 +607,6 @@ const leaseOffline = async (params, authUser) => {
 };
 
 const createZelfPay = async (zelfNameObject, currentCount = 1) => {
-	// create link for coinbase
 	const params = zelfNameObject.publicData || zelfNameObject.metadata;
 
 	const zelfName = params.zelfName.split(".hold")[0];
@@ -702,7 +701,7 @@ const createZelfPay = async (zelfNameObject, currentCount = 1) => {
 const updateZelfPay = async (zelfPayObject, updates = {}) => {
 	const params = zelfPayObject.publicData;
 
-	const { newDuration, newCoinbaseUrl } = updates;
+	const { newDuration } = updates;
 
 	const zelfName = params.zelfName.split(".hold")[0];
 
@@ -717,28 +716,6 @@ const updateZelfPay = async (zelfPayObject, updates = {}) => {
 		ZNSPartsModule.calculateZelfNamePrice(zelfName.length - 5, newDuration || zelfPayObject.publicData.duration, updates.referralZelfName).price;
 
 	const newCount = parseInt(zelfPayObject.publicData.count || 0) + 1;
-
-	if (newCoinbaseUrl) {
-		// generate new coinbase charge
-		const coinbasePayload = {
-			name: zelfName,
-			description: `Purchase of the Zelf Name > ${zelfName} for $${price}`,
-			pricing_type: "fixed_price",
-			local_price: {
-				amount: `${price}`,
-				currency: "USD",
-			},
-			metadata: {
-				zelfName: zelfName,
-				ethAddress: zelfPayObject.publicData.ethAddress,
-				btcAddress: zelfPayObject.publicData.btcAddress,
-				solanaAddress: zelfPayObject.publicData.solanaAddress,
-				count: `${newCount}`,
-			},
-			redirect_url: "https://zelf.world/tags/payment/checkout/coinbase",
-			cancel_url: "https://zelf.world/tags/payment/checkout/coinbase",
-		};
-	}
 
 	const base64 = await ZNSPartsModule.urlToBase64(zelfPayObject.url);
 
@@ -831,11 +808,9 @@ const _getZelfNameToConfirm = async (zelfName, authUser) => {
 
 	const zelfNameObject = zelfNameRecords[0];
 
-	const chargeID = zelfNameObject.publicData?.coinbase_id || zelfNameObject.publicData?.coinbase_hosted_url?.split("/pay/")[1];
-
 	let zelfPayNameObject = null;
 
-	if (!chargeID && zelfNameObject) {
+	if (zelfNameObject) {
 		// bring it from zelfPay
 		const zelfPay = `${zelfName.replace(".zelf.hold", ".zelfpay").replace(".zelf", ".zelfpay")}`;
 

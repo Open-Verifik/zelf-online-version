@@ -14,7 +14,4 @@ module.exports = (server) => {
 
     // GET /api/presale/session-details
     server.get(`${PATH}/session-details`, Controller.getSessionDetails);
-
-    // GET /api/presale/check-coinbase-status
-    server.get(`${PATH}/check-coinbase-status`, Controller.checkCoinbaseStatus);
 };

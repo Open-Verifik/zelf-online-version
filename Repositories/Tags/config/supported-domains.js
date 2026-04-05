@@ -197,7 +197,7 @@ const generateHoldDomain = (domain, name) => {
  */
 const getDomainPaymentMethods = (domain) => {
     const config = getDomainConfig(domain);
-    return config?.payment?.methods || ["coinbase", "crypto"];
+    return config?.payment?.methods || ["crypto", "stripe"];
 };
 
 /**

@@ -168,7 +168,7 @@ describe("License API Integration Tests - Real Server", () => {
 					reserved: ["www", "api", "admin", "support", "help"],
 					customRules: [],
 					payment: {
-						methods: ["coinbase", "crypto", "stripe"],
+						methods: ["crypto", "stripe"],
 						currencies: ["BTC", "ETH", "SOL", "USDT"],
 						discounts: {
 							yearly: 0.1,
@@ -265,7 +265,7 @@ describe("License API Integration Tests - Real Server", () => {
 			expect(response.body.data.tags.storage).toHaveProperty("ipfsEnabled", true);
 
 			expect(response.body.data.tags.payment).toHaveProperty("methods");
-			expect(response.body.data.tags.payment.methods).toContain("coinbase");
+			expect(response.body.data.tags.payment.methods).toContain("crypto");
 			expect(response.body.data.tags.payment).toHaveProperty("currencies");
 			expect(response.body.data.tags.payment.currencies).toContain("BTC");
 
@@ -290,7 +290,7 @@ describe("License API Integration Tests - Real Server", () => {
 				validation: { minLength: 3, maxLength: 50, allowedChars: {}, reserved: [], customRules: [] },
 				storage: { keyPrefix: "testName", ipfsEnabled: true, arweaveEnabled: false, walrusEnabled: false },
 				tagPaymentSettings: {
-					methods: ["coinbase"],
+					methods: ["crypto"],
 					currencies: ["BTC"],
 					whitelist: {},
 					pricingTable: { 1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 } },
@@ -406,7 +406,7 @@ describe("License API Integration Tests - Real Server", () => {
 					reserved: ["www", "api", "admin", "support", "help", "docs"], // Added "docs"
 					customRules: ["no-numbers-at-start"],
 					payment: {
-						methods: ["coinbase", "crypto", "stripe"],
+						methods: ["crypto", "stripe"],
 						currencies: ["BTC", "ETH", "SOL", "USDT", "BDAG"],
 						discounts: {
 							yearly: 0.15, // Changed from 0.1
@@ -504,7 +504,6 @@ describe("License API Integration Tests - Real Server", () => {
 			expect(response.body.data.tags.storage).toHaveProperty("arweaveEnabled", true);
 
 			expect(response.body.data.tags.payment).toHaveProperty("methods");
-			expect(response.body.data.tags.payment.methods).toContain("coinbase");
 			expect(response.body.data.tags.payment.methods).toContain("crypto");
 			expect(response.body.data.tags.payment.methods).toContain("stripe");
 			expect(response.body.data.tags.payment.currencies).toContain("BDAG");
@@ -807,7 +806,6 @@ describe("License API Integration Tests - Real Server", () => {
 			expect(response.body.data.tags.storage).toHaveProperty("keyPrefix", "zelfName");
 			expect(response.body.data.tags.storage).toHaveProperty("ipfsEnabled", true);
 			expect(response.body.data.tags.storage).toHaveProperty("arweaveEnabled", true);
-			expect(response.body.data.tags.payment.methods).toContain("coinbase");
 			expect(response.body.data.tags.payment.methods).toContain("crypto");
 			expect(response.body.data.tags.payment.methods).toContain("stripe");
 			expect(response.body.data.tags.payment.currencies).toContain("BTC");

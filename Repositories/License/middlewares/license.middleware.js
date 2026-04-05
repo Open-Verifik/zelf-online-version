@@ -33,7 +33,7 @@ const schemas = {
 				customRules: array().items(string()).default([]),
 				payment: object({
 					methods: array()
-						.items(stringEnum(["coinbase", "crypto", "stripe"]))
+						.items(stringEnum(["crypto", "stripe"]))
 						.required(),
 					networks: object()
 						.pattern(

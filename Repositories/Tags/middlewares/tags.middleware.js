@@ -36,7 +36,7 @@ const schemas = {
         tagName: string().required(),
         domain: string().required(),
         coin: string().required(),
-        network: stringEnum(["coinbase", "CB", "ETH", "SOL", "BTC"]).required(),
+        network: stringEnum(["ETH", "SOL", "BTC"]).required(),
     },
     lease: {
         tagName: string().required(),
