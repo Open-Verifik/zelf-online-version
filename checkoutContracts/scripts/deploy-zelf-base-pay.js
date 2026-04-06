@@ -5,12 +5,12 @@
  * Uses the same deployer secret as other tag pay deploys:
  *   - AVALANCHE_PRIVATE_KEY — hex key or BIP39 mnemonic
  *
- * Treasury defaults to the deployer wallet address.
+ * Treasury defaults to production Zelf checkout address (same as Avalanche); override with ZELF_CHECKOUT_TREASURY.
  *
  * Optional:
  *   - BASE_RPC_URL
  *   - BASE_CHAIN_ID (8453 Base mainnet, 84532 Base Sepolia)
- *   - ZELF_CHECKOUT_TREASURY — override treasury address
+ *   - ZELF_CHECKOUT_TREASURY — override treasury (defaults to production address below)
  *   - BASE_TAG_PAY_USDC_ADDRESS — USDC on Base
  *   - BASE_TAG_PAY_USDT_ADDRESS — USDT on Base
  *   - AVALANCHE_HD_PATH — same as other deploys when using mnemonic
@@ -39,6 +39,9 @@ const DEFAULT_RPC_SEPOLIA = "https://sepolia.base.org";
 const DEFAULT_USDC_MAINNET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 /** USDT on Base mainnet (6 decimals) */
 const DEFAULT_USDT_MAINNET = "0xfde4C96cE3CaFac9F2df3573Bae2D715d34B25A0";
+
+/** Production Zelf checkout treasury — matches deploy-zelf-avalanche-pay.js */
+const DEFAULT_TREASURY = "0x6d1e134efb40f25f4Fb4A63AAD0415b8C466a690";
 
 const ABI = [
     "constructor(address _treasury, address _usdc, address _usdt)",
@@ -163,8 +166,8 @@ async function main() {
     const provider = new ethers.JsonRpcProvider(rpcUrl, chainId);
     const wallet = walletFromDeploySecret(process.env.AVALANCHE_PRIVATE_KEY, provider);
 
-    const treasuryEnv = (process.env.ZELF_CHECKOUT_TREASURY || "").trim();
-    const treasury = treasuryEnv ? ethers.getAddress(treasuryEnv.toLowerCase()) : wallet.address;
+    const treasuryRaw = (process.env.ZELF_CHECKOUT_TREASURY || DEFAULT_TREASURY).trim();
+    const treasury = ethers.getAddress(treasuryRaw.toLowerCase());
 
     const usdcEnv = (process.env.BASE_TAG_PAY_USDC_ADDRESS || "").trim();
     const usdtEnv = (process.env.BASE_TAG_PAY_USDT_ADDRESS || "").trim();

@@ -5,7 +5,7 @@
  * Uses the same deployer secret as Avalanche / BSC / Ethereum tag pay:
  *   - AVALANCHE_PRIVATE_KEY — hex key or BIP39 mnemonic
  *
- * Treasury defaults to the deployer wallet address (same EVM identity on Polygon as on other chains).
+ * Treasury defaults to production Zelf checkout address (same as Avalanche); override with ZELF_CHECKOUT_TREASURY.
  *
  * Optional:
  *   - POLYGON_RPC_URL
@@ -39,6 +39,9 @@ const DEFAULT_RPC_AMOY = "https://rpc-amoy.polygon.technology";
 const DEFAULT_USDC_MAINNET = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
 /** USDT on Polygon mainnet (6 decimals) */
 const DEFAULT_USDT_MAINNET = "0xc2132D05D31c914a87C6611C10748AEb04B58e8F";
+
+/** Production Zelf checkout treasury — matches deploy-zelf-avalanche-pay.js */
+const DEFAULT_TREASURY = "0x6d1e134efb40f25f4Fb4A63AAD0415b8C466a690";
 
 const ABI = [
     "constructor(address _treasury, address _usdc, address _usdt)",
@@ -163,8 +166,8 @@ async function main() {
     const provider = new ethers.JsonRpcProvider(rpcUrl, chainId);
     const wallet = walletFromDeploySecret(process.env.AVALANCHE_PRIVATE_KEY, provider);
 
-    const treasuryEnv = (process.env.ZELF_CHECKOUT_TREASURY || "").trim();
-    const treasury = treasuryEnv ? ethers.getAddress(treasuryEnv.toLowerCase()) : wallet.address;
+    const treasuryRaw = (process.env.ZELF_CHECKOUT_TREASURY || DEFAULT_TREASURY).trim();
+    const treasury = ethers.getAddress(treasuryRaw.toLowerCase());
 
     const usdcEnv = (process.env.POLYGON_TAG_PAY_USDC_ADDRESS || "").trim();
     const usdtEnv = (process.env.POLYGON_TAG_PAY_USDT_ADDRESS || "").trim();

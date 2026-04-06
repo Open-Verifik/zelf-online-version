@@ -7,12 +7,12 @@
  * Uses the same deployer secret as other tag checkout deploys:
  *   - AVALANCHE_PRIVATE_KEY — hex key or BIP39 mnemonic
  *
- * Treasury defaults to the deployer wallet address.
+ * Treasury defaults to production Zelf checkout address (same as Avalanche); override with ZELF_CHECKOUT_TREASURY.
  *
  * Optional:
  *   - BLOCKDAG_RPC_URL (defaults to public RPC)
  *   - BLOCKDAG_CHAIN_ID (default 1404)
- *   - ZELF_CHECKOUT_TREASURY — override treasury address
+ *   - ZELF_CHECKOUT_TREASURY — override treasury (defaults to production address below)
  *   - BLOCKDAG_SOLC_EVM_VERSION — passed to solc `settings.evmVersion` (default `paris`; try `london` if needed)
  *
  * Usage (from zelf repo root):
@@ -34,6 +34,9 @@ require("dotenv").config({ path: path.join(zelfRoot, ".env"), override: true });
 const { ethers } = require("ethers");
 
 const DEFAULT_RPC = "https://rpc.bdagscan.com";
+
+/** Production Zelf checkout treasury — matches deploy-zelf-avalanche-pay.js */
+const DEFAULT_TREASURY = "0x6d1e134efb40f25f4Fb4A63AAD0415b8C466a690";
 
 const ABI = [
     "constructor(address _treasury)",
@@ -176,8 +179,8 @@ async function main() {
     const provider = new ethers.JsonRpcProvider(rpcUrl, chainId);
     const wallet = walletFromDeploySecret(process.env.AVALANCHE_PRIVATE_KEY, provider);
 
-    const treasuryEnv = (process.env.ZELF_CHECKOUT_TREASURY || "").trim();
-    const treasury = treasuryEnv ? ethers.getAddress(treasuryEnv.toLowerCase()) : wallet.address;
+    const treasuryRaw = (process.env.ZELF_CHECKOUT_TREASURY || DEFAULT_TREASURY).trim();
+    const treasury = ethers.getAddress(treasuryRaw.toLowerCase());
 
     console.log("Network:", {
         chainId,

@@ -192,6 +192,8 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
     // Support both old structure (payment.currencies) and new structure (payment.networks)
     const networks = domainConfig?.tags?.payment?.networks;
     const oldCurrencies = domainConfig?.tags?.payment?.currencies;
+    /** Dashboard may persist BSC as `binance` (legacy) or `bsc`. */
+    const bscNetwork = networks?.bsc ?? networks?.binance;
 
     // ETH - Check ethereum network
     if (
@@ -228,17 +230,20 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
     // BNB - Binance Smart Chain
     if (
         oldCurrencies?.includes("BNB") ||
-        (networks?.bsc?.enabled && networks?.bsc?.nativeCurrency?.enabled && networks?.bsc?.nativeCurrency?.code === "BNB")
+        (bscNetwork?.enabled && bscNetwork?.nativeCurrency?.enabled && bscNetwork?.nativeCurrency?.code === "BNB")
     ) {
         prices.BNB = await calculateCryptoValue("BNB", billableUsdPrice);
     }
 
-    // POL — Polygon (native token priced via Binance MATICUSDT)
+    // POL — Polygon native (spot via Binance US POLUSDT; MATIC pairs are legacy / wrong spot post-rebrand)
+    const polygonNativeCode = networks?.polygon?.nativeCurrency?.code;
     if (
         oldCurrencies?.includes("POL") ||
-        (networks?.polygon?.enabled && networks?.polygon?.nativeCurrency?.enabled && networks?.polygon?.nativeCurrency?.code === "POL")
+        (networks?.polygon?.enabled &&
+            networks?.polygon?.nativeCurrency?.enabled &&
+            (polygonNativeCode === "POL" || polygonNativeCode === "MATIC"))
     ) {
-        prices.POL = await calculateCryptoValue("MATIC", billableUsdPrice);
+        prices.POL = await calculateCryptoValue("POL", billableUsdPrice);
     }
 
     // BASE — Base L2 (native ETH priced via Binance ETHUSDT; same wei math as Ethereum)
@@ -509,6 +514,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
             if (expectedWeiBn <= 0n) {
                 throw new Error("expectedWei_pol_non_positive");
             }
+            prices.POL.amountToSend = polNativeDisplayAmountFromWei(expectedWeiBn);
             const contractAddr = getAddress(config.polygon.tagPayContractAddress);
             returnData.smartContractPOLYGON = {
                 paymentId,
@@ -576,6 +582,11 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
         } catch (e) {
             console.warn("smartContractPOLYGON not attached:", e?.message || e);
         }
+    }
+
+    if (prices.POL && !returnData.smartContractPOLYGON) {
+        const q = 10 ** POL_NATIVE_DISPLAY_DECIMALS;
+        prices.POL.amountToSend = Math.round(prices.POL.amountToSend * q) / q;
     }
 
     if (prices.BASE && config.base.tagPayContractAddress) {
@@ -756,9 +767,9 @@ const ethExpectedWeiFromUsd = (usdPrice, ethUsdPerTokenStr) => {
 };
 
 /**
- * Canonical native POL wei (priced from MATIC/Binance ticker): floor(usd_18dec * WAD / polUsdPerToken_18dec).
+ * Canonical native POL wei (priced from Binance US POLUSDT spot): floor(usd_18dec * WAD / polUsdPerToken_18dec).
  * @param {string|number} usdPrice
- * @param {string} polUsdPerTokenStr — POL/MATIC price in USD as decimal string
+ * @param {string} polUsdPerTokenStr — POL spot price in USD as decimal string
  * @returns {bigint}
  */
 const polExpectedWeiFromUsd = (usdPrice, polUsdPerTokenStr) => {
@@ -768,6 +779,15 @@ const polExpectedWeiFromUsd = (usdPrice, polUsdPerTokenStr) => {
         throw new Error("pol_usd_price_zero");
     }
     return (usdScaled * WAD) / pxScaled;
+};
+
+/** Display / API `prices.POL.amountToSend`: 7 fractional digits, integer math from wei (no IEEE noise). */
+const POL_NATIVE_DISPLAY_DECIMALS = 7;
+const POL_WEI_PER_TOKEN = 10n ** 18n;
+const polNativeDisplayAmountFromWei = (weiBn) => {
+    const scale = 10n ** BigInt(POL_NATIVE_DISPLAY_DECIMALS);
+    const quantized = (weiBn * scale) / POL_WEI_PER_TOKEN;
+    return Number(quantized) / 10 ** POL_NATIVE_DISPLAY_DECIMALS;
 };
 
 /**

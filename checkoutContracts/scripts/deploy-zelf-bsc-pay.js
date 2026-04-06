@@ -5,12 +5,12 @@
  * Uses the same deployer secret as Avalanche tag pay:
  *   - AVALANCHE_PRIVATE_KEY — hex key or BIP39 mnemonic (see deploy-zelf-avalanche-pay.js)
  *
- * Treasury defaults to the deployer wallet address (same EVM identity on BSC as on Avalanche).
+ * Treasury defaults to production Zelf checkout address (same as Avalanche); override with ZELF_CHECKOUT_TREASURY.
  *
  * Optional:
  *   - BSC_RPC_URL
  *   - BSC_CHAIN_ID (56 mainnet, 97 Chapel testnet)
- *   - ZELF_CHECKOUT_TREASURY — override treasury address (defaults to deployer address)
+ *   - ZELF_CHECKOUT_TREASURY — override treasury (defaults to production address below)
  *   - BSC_TAG_PAY_USDC_ADDRESS — USDC on BSC (default: mainnet Binance-Peg USDC)
  *   - BSC_TAG_PAY_USDT_ADDRESS — USDT on BSC (default: mainnet Binance-Peg USDT)
  *   - AVALANCHE_HD_PATH — same as Avalanche deploy when using mnemonic
@@ -36,12 +36,15 @@ const { ethers } = require("ethers");
 const DEFAULT_RPC_MAINNET = "https://bsc-dataseed.binance.org";
 const DEFAULT_RPC_CHAPEL = "https://data-seed-prebsc-1-s1.binance.org:8545";
 /** Binance-Peg USDC on BSC mainnet (18 decimals) */
-const DEFAULT_USDC_MAINNET = "0x8AC76c51cc950d9822D68b83fE1Ad97B32Cd580d";
+const DEFAULT_USDC_MAINNET = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
 /** Binance-Peg USDT on BSC mainnet (18 decimals) */
 const DEFAULT_USDT_MAINNET = "0x55d398326f99059fF775485246999027B3197955";
 /** BSC Testnet token placeholders — set BSC_TAG_PAY_USDC_ADDRESS / USDT_ADDRESS for your test tokens */
 const DEFAULT_USDC_CHAPEL = "0x64544969ed7EBf5f083679233325356EbE738930";
 const DEFAULT_USDT_CHAPEL = "0x337610d27c682E347C9cD60BD4b4b4A091A34D6D";
+
+/** Production Zelf checkout treasury — matches deploy-zelf-avalanche-pay.js */
+const DEFAULT_TREASURY = "0x6d1e134efb40f25f4Fb4A63AAD0415b8C466a690";
 
 const ABI = [
     "constructor(address _treasury, address _usdc, address _usdt)",
@@ -166,8 +169,8 @@ async function main() {
     const provider = new ethers.JsonRpcProvider(rpcUrl, chainId);
     const wallet = walletFromDeploySecret(process.env.AVALANCHE_PRIVATE_KEY, provider);
 
-    const treasuryEnv = (process.env.ZELF_CHECKOUT_TREASURY || "").trim();
-    const treasury = treasuryEnv ? ethers.getAddress(treasuryEnv.toLowerCase()) : wallet.address;
+    const treasuryRaw = (process.env.ZELF_CHECKOUT_TREASURY || DEFAULT_TREASURY).trim();
+    const treasury = ethers.getAddress(treasuryRaw.toLowerCase());
 
     const usdcEnv = (process.env.BSC_TAG_PAY_USDC_ADDRESS || "").trim();
     const usdtEnv = (process.env.BSC_TAG_PAY_USDT_ADDRESS || "").trim();

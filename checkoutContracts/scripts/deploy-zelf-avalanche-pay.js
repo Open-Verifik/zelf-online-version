@@ -162,7 +162,9 @@ async function main() {
         process.env.AVALANCHE_RPC_URL ||
         (chainId === 43113 ? DEFAULT_RPC_FUJI : DEFAULT_RPC_MAINNET);
 
-    const treasury = (process.env.ZELF_CHECKOUT_TREASURY || DEFAULT_TREASURY).trim();
+    const treasury = ethers.getAddress(
+        ((process.env.ZELF_CHECKOUT_TREASURY || DEFAULT_TREASURY).trim()).toLowerCase(),
+    );
     const usdcEnv = (process.env.AVALANCHE_TAG_PAY_USDC_ADDRESS || "").trim();
     const usdc =
         usdcEnv ||
