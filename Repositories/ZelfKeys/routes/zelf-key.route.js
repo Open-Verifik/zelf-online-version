@@ -16,6 +16,12 @@ module.exports = (server) => {
 	server.post(`${PATH}/store/notes`, Middleware.storeNotesValidation, Controller.storeNotes);
 	server.post(`${PATH}/store/credit-card`, Middleware.storeCreditCardValidation, Controller.storeCreditCard);
 
+	// add records, that don't require subscription but pay with ZNS!
+	server.post(`${PATH}/add/password`, Middleware.storePasswordValidation, Controller.storePassword);
+	server.post(`${PATH}/add/zotp`, Middleware.storeZOTPValidation, Controller.storeZOTP);
+	server.post(`${PATH}/add/notes`, Middleware.storeNotesValidation, Controller.storeNotes);
+	server.post(`${PATH}/add/credit-card`, Middleware.storeCreditCardValidation, Controller.storeCreditCard);
+
 	server.get(`${PATH}/list`, Middleware.listValidation, Controller.listData);
 	server.get(`${PATH}/list-all`, Middleware.listAllValidation, Controller.listAllData);
 	server.get(`${PATH}/dashboard/list`, Middleware.listDashboardValidation, Controller.listDataDashboard);
