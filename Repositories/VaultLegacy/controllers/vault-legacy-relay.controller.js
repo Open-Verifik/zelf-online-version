@@ -21,6 +21,7 @@ const RelayerHealth = require("../modules/vault-legacy-relayer.module");
 const { sendLawyerNewPlan, sendTestatorPlanActive } = require("../modules/email");
 
 const IPFS = require("../../IPFS/modules/ipfs.module");
+const { txWaitTimeoutMs, isTransactionWaitTimeout } = require("../legacy-timeouts");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Relayer wallet + contract ABI
@@ -183,7 +184,17 @@ const sendTx = async (ctx) => {
 
         const tx = await relayerWallet.sendTransaction({ to, data: calldata, value: value || "0x0" });
         console.log(`📤 Tx sent: ${tx.hash}`);
-        const receipt = await tx.wait();
+        let receipt;
+        try {
+            receipt = await tx.wait(1, txWaitTimeoutMs);
+        } catch (waitErr) {
+            if (isTransactionWaitTimeout(waitErr)) {
+                ctx.status = 504;
+                ctx.body = { error: "Transaction confirmation timed out", txHash: tx.hash };
+                return;
+            }
+            throw waitErr;
+        }
         console.log(`✅ Confirmed in block ${receipt.blockNumber}`);
 
         // ── Email notification hooks (fire-and-forget) ──────────────────────

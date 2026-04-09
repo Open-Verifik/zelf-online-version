@@ -8,6 +8,8 @@
 const { ethers } = require("ethers");
 const path = require("path");
 
+const { txWaitTimeoutMs, isTransactionWaitTimeout } = require("../legacy-timeouts");
+
 class AvalancheManager {
     constructor(rpcUrl, contractAddress, privateKey) {
         this.provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -30,31 +32,46 @@ class AvalancheManager {
         }
     }
 
+    async _waitReceipt(tx) {
+        try {
+            return await tx.wait(1, txWaitTimeoutMs);
+        } catch (e) {
+            if (isTransactionWaitTimeout(e)) {
+                const err = new Error("Transaction confirmation timed out");
+                err.status = 504;
+                err.txHash = tx.hash;
+                err.code = "TX_WAIT_TIMEOUT";
+                throw err;
+            }
+            throw e;
+        }
+    }
+
     /** Create a new vault (Relayed) */
     async createVault(testatorAddress, vaultId, beneficiaries, lawyer, heartbeatInterval, ipfsCid, ipfsCidValidator, threshold) {
         const tx = await this.contract.createVault(testatorAddress, vaultId, beneficiaries, lawyer, threshold, heartbeatInterval, ipfsCid, ipfsCidValidator);
-        const receipt = await tx.wait();
+        const receipt = await this._waitReceipt(tx);
         return { transactionHash: tx.hash, blockNumber: receipt.blockNumber, vaultId, owner: testatorAddress, relayer: this.relayerWallet.address };
     }
 
     /** Update heartbeat (Relayed) */
     async updateHeartbeat(testatorAddress, vaultId) {
         const tx = await this.contract.updateHeartbeat(vaultId);
-        const receipt = await tx.wait();
+        const receipt = await this._waitReceipt(tx);
         return { transactionHash: tx.hash, blockNumber: receipt.blockNumber, vaultId };
     }
 
     /** Cancel vault (Relayed) */
     async cancelVault(testatorAddress, vaultId) {
         const tx = await this.contract.cancelVault(vaultId);
-        const receipt = await tx.wait();
+        const receipt = await this._waitReceipt(tx);
         return { transactionHash: tx.hash, blockNumber: receipt.blockNumber, vaultId };
     }
 
     /** Change lawyer (Relayed) */
     async changeLawyer(testatorAddress, vaultId, newLawyer) {
         const tx = await this.contract.changeLawyer(vaultId, newLawyer);
-        const receipt = await tx.wait();
+        const receipt = await this._waitReceipt(tx);
         return { transactionHash: tx.hash, blockNumber: receipt.blockNumber, vaultId, newLawyer };
     }
 
@@ -136,7 +153,7 @@ class AvalancheManager {
         const vault = await this.contract.getVault(vaultId);
         if (vault.lawyer.toLowerCase() !== lawyerAddress.toLowerCase()) throw new Error("Unauthorized: not vault lawyer");
         const tx = await this.contract.acceptVault(vaultId);
-        const receipt = await tx.wait();
+        const receipt = await this._waitReceipt(tx);
         return { transactionHash: tx.hash, blockNumber: receipt.blockNumber, vaultId };
     }
 
@@ -145,7 +162,7 @@ class AvalancheManager {
         const vault = await this.contract.getVault(vaultId);
         if (vault.lawyer.toLowerCase() !== lawyerAddress.toLowerCase()) throw new Error("Unauthorized: not vault lawyer");
         const tx = await this.contract.rejectVault(vaultId);
-        const receipt = await tx.wait();
+        const receipt = await this._waitReceipt(tx);
         return { transactionHash: tx.hash, blockNumber: receipt.blockNumber, vaultId };
     }
 
@@ -154,7 +171,7 @@ class AvalancheManager {
         const vault = await this.contract.getVault(vaultId);
         if (vault.lawyer.toLowerCase() !== lawyerAddress.toLowerCase()) throw new Error("Unauthorized: not vault lawyer");
         const tx = await this.contract.confirmDeath(vaultId);
-        const receipt = await tx.wait();
+        const receipt = await this._waitReceipt(tx);
         return { transactionHash: tx.hash, blockNumber: receipt.blockNumber, vaultId };
     }
 
@@ -167,7 +184,7 @@ class AvalancheManager {
         if (alreadyExecuted) throw new Error("Beneficiary already accepted this vault");
 
         const tx = await this.contract.executeVault(vaultId, beneficiaryAddress);
-        const receipt = await tx.wait();
+        const receipt = await this._waitReceipt(tx);
 
         const event = receipt.logs
             .map((log) => {
