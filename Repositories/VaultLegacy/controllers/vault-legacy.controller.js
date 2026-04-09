@@ -5,6 +5,13 @@
 
 const Module = require("../modules/vault-legacy.module");
 
+const sendError = (ctx, error) => {
+    ctx.status = error.status || 500;
+    const body = { error: error.message };
+    if (error.txHash) body.txHash = error.txHash;
+    ctx.body = body;
+};
+
 // ---- Vault share endpoints ----
 
 const collectShares = async (ctx) => {
@@ -12,8 +19,7 @@ const collectShares = async (ctx) => {
         const result = await Module.collectShares(ctx.request.body);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -22,8 +28,7 @@ const getShares = async (ctx) => {
         const result = await Module.getShares(ctx.params.vaultId);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -32,8 +37,7 @@ const getManifest = async (ctx) => {
         const result = await Module.getManifest(ctx.params.cid);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -42,8 +46,7 @@ const getManifestByVault = async (ctx) => {
         const result = await Module.getManifestByVault(ctx.params.vaultId);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -54,8 +57,7 @@ const createVault = async (ctx) => {
         const result = await Module.createVault(ctx.request.body);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -64,8 +66,7 @@ const updateHeartbeat = async (ctx) => {
         const result = await Module.updateHeartbeat(ctx.request.body);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -74,8 +75,7 @@ const cancelVault = async (ctx) => {
         const result = await Module.cancelVault(ctx.request.body);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -84,8 +84,7 @@ const changeLawyer = async (ctx) => {
         const result = await Module.changeLawyer(ctx.request.body);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -94,8 +93,7 @@ const confirmDeath = async (ctx) => {
         const result = await Module.confirmDeath(ctx.request.body);
         ctx.body = { success: true, result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -104,8 +102,7 @@ const getVault = async (ctx) => {
         const result = await Module.getVault(ctx.params.vaultId);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -114,8 +111,7 @@ const getBeneficiaryVaults = async (ctx) => {
         const result = await Module.getBeneficiaryVaults(ctx.params.address);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -124,8 +120,7 @@ const getBeneficiaryVaultsData = async (ctx) => {
         const result = await Module.getBeneficiaryVaultsData(ctx.params.address);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -134,8 +129,7 @@ const getOwnerVaults = async (ctx) => {
         const result = await Module.getOwnerVaults(ctx.params.address);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -144,8 +138,7 @@ const getLawyerVaults = async (ctx) => {
         const result = await Module.getLawyerVaults(ctx.params.address);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -154,8 +147,7 @@ const executeVault = async (ctx) => {
         const result = await Module.executeVault(ctx.request.body);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -164,8 +156,7 @@ const getExecutionStatus = async (ctx) => {
         const result = await Module.getExecutionStatus(ctx.params.vaultId);
         ctx.body = { success: true, ...result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -174,8 +165,7 @@ const acceptVault = async (ctx) => {
         const result = await Module.acceptVault(ctx.request.body);
         ctx.body = { success: true, result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 
@@ -184,8 +174,7 @@ const rejectVault = async (ctx) => {
         const result = await Module.rejectVault(ctx.request.body);
         ctx.body = { success: true, result };
     } catch (error) {
-        ctx.status = error.status || 500;
-        ctx.body = { error: error.message };
+        sendError(ctx, error);
     }
 };
 

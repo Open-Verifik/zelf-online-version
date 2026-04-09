@@ -7,6 +7,8 @@
 
 const axios = require("axios");
 
+const { ipfsRequestTimeoutMs } = require("../legacy-timeouts");
+
 class IPFSManager {
     constructor(pinataApiKey, pinataSecretKey) {
         this.pinataApiKey = pinataApiKey;
@@ -21,20 +23,30 @@ class IPFSManager {
      * @returns {Promise<string>} IPFS CID
      */
     async uploadJSON(jsonData, name) {
-        const response = await axios.post(
-            this.pinataEndpoint,
-            { pinataContent: jsonData, pinataMetadata: { name } },
-            {
-                headers: {
-                    "Content-Type": "application/json",
-                    pinata_api_key: this.pinataApiKey,
-                    pinata_secret_api_key: this.pinataSecretKey,
-                },
-            }
-        );
+        try {
+            const response = await axios.post(
+                this.pinataEndpoint,
+                { pinataContent: jsonData, pinataMetadata: { name } },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        pinata_api_key: this.pinataApiKey,
+                        pinata_secret_api_key: this.pinataSecretKey,
+                    },
+                    timeout: ipfsRequestTimeoutMs,
+                }
+            );
 
-        console.log(`✅ Uploaded to IPFS: ${name} -> ${response.data.IpfsHash}`);
-        return response.data.IpfsHash;
+            console.log(`✅ Uploaded to IPFS: ${name} -> ${response.data.IpfsHash}`);
+            return response.data.IpfsHash;
+        } catch (e) {
+            if (e.code === "ECONNABORTED" || /timeout/i.test(e.message || "")) {
+                const err = new Error("IPFS request timed out");
+                err.status = 504;
+                throw err;
+            }
+            throw e;
+        }
     }
 
     /**
@@ -81,8 +93,19 @@ class IPFSManager {
      * @returns {Promise<object>}
      */
     async retrieve(cid) {
-        const response = await axios.get(`https://gateway.pinata.cloud/ipfs/${cid}`);
-        return response.data;
+        try {
+            const response = await axios.get(`https://gateway.pinata.cloud/ipfs/${cid}`, {
+                timeout: ipfsRequestTimeoutMs,
+            });
+            return response.data;
+        } catch (e) {
+            if (e.code === "ECONNABORTED" || /timeout/i.test(e.message || "")) {
+                const err = new Error("IPFS request timed out");
+                err.status = 504;
+                throw err;
+            }
+            throw e;
+        }
     }
 }
 
