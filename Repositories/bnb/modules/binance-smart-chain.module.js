@@ -6,6 +6,7 @@ const urlBase = process.env.MICROSERVICES_BOGOTA_URL;
 const token = process.env.MICROSERVICES_BOGOTA_TOKEN;
 
 const { getCleanInstance } = require("../../../Core/axios");
+const { bscBookFallbackDefaultUrl } = require("../../../Core/twnodes-naas");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 const etherscanChains = require("../../etherscan/chains.json");
@@ -18,6 +19,8 @@ const instance = getCleanInstance(30000);
 const bscscanApiKey = process.env.BSCSCAN_API_KEY;
 const bscscanApiUrl = process.env.BSCSCAN_API_URL || "https://api.bscscan.com/api";
 const bscRpcUrl = process.env.BSC_RPC_URL; // QuickNode only
+/** twnodes NaaS when BSC_RPC_URL fails or is unset — BSC_BOOK_FALLBACK_URL or TWNODES_NAAS_SESSION_ID */
+const bscBookRpcBase = () => process.env.BSC_BOOK_FALLBACK_URL || bscBookFallbackDefaultUrl();
 const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 6);
 const BSCSCAN_BATCH_DELAY_MS = Number(process.env.BSCSCAN_BATCH_DELAY_MS || 350);
 
@@ -33,6 +36,34 @@ const dbgBsc = (...args) => {
 		console.log("[bsc]", ...args);
 	}
 };
+
+/** Try BSC_RPC_URL first, then twnodes fallback */
+async function postBscRpc(payload) {
+	const primary = bscRpcUrl || null;
+	const fallback = bscBookRpcBase();
+	const candidates = [...new Set([primary, fallback].filter(Boolean))];
+
+	if (candidates.length === 0) return null;
+
+	for (const url of candidates) {
+		try {
+			const { data } = await instance.post(url, payload, {
+				headers: { "Content-Type": "application/json" },
+			});
+
+			if (data?.error) {
+				dbgBsc("bsc_rpc_jsonrpc_error", url, data.error);
+				continue;
+			}
+
+			return data;
+		} catch (e) {
+			dbgBsc("bsc_rpc_transport_error", url, e?.message || e);
+		}
+	}
+
+	return null;
+}
 
 const {
 	COMMON_TOKENS_BSC,
@@ -183,25 +214,23 @@ async function getOklinkFormattedTokens(address, limit = 100) {
 // Minimal JSON-RPC call to fetch BEP-20 balance via balanceOf(address)
 async function getBep20BalanceViaRpc(contractAddress, userAddress) {
 	try {
-		if (!bscRpcUrl) throw new Error("BSC_RPC_URL missing");
-
 		const methodId = "0x70a08231"; // balanceOf(address)
 		const addressHex = String(userAddress).toLowerCase().replace(/^0x/, "");
 		const data = methodId + "000000000000000000000000" + addressHex;
 
 		const payload = {
 			jsonrpc: "2.0",
-			id: Math.floor(Math.random() * 1e6),
+			id: 0,
 			method: "eth_call",
 			params: [{ to: contractAddress, data }, "latest"],
 		};
 
-		const { data: rpc } = await instance.post(bscRpcUrl, payload);
+		const rpc = await postBscRpc(payload);
 		const hex = rpc?.result || "0x0";
 
 		return hex === "0x" ? "0x0" : hex;
 	} catch (error) {
-		dbgBsc("rpc_balance_error", bscRpcUrl, contractAddress, error?.message || error);
+		dbgBsc("rpc_balance_error", bscRpcUrl || bscBookRpcBase(), contractAddress, error?.message || error);
 
 		return "0x0";
 	}
@@ -211,27 +240,18 @@ async function getBep20BalanceViaRpc(contractAddress, userAddress) {
 async function getBep20BalancesViaRpcBatch(contracts, userAddress) {
 	if (!Array.isArray(contracts) || contracts.length === 0) return new Map();
 
-	if (!bscRpcUrl) return new Map();
-
 	const methodId = "0x70a08231";
 	const addressHex = String(userAddress).toLowerCase().replace(/^0x/, "");
 
-	const calls = contracts.map((c) => ({
+	const calls = contracts.map((c, i) => ({
 		jsonrpc: "2.0",
-		id: Math.floor(Math.random() * 1e9),
+		id: i + 1,
 		method: "eth_call",
 		params: [{ to: c, data: methodId + "000000000000000000000000" + addressHex }, "latest"],
 	}));
 
 	try {
-		const results = await Promise.all(
-			calls.map((payload) =>
-				instance
-					.post(bscRpcUrl, payload)
-					.then((r) => r.data)
-					.catch(() => null)
-			)
-		);
+		const results = await Promise.all(calls.map((payload) => postBscRpc(payload).catch(() => null)));
 
 		const map = new Map();
 
@@ -251,18 +271,17 @@ async function getBep20BalancesViaRpcBatch(contracts, userAddress) {
 // Native balance via RPC
 async function getNativeBalanceViaRpc(userAddress) {
 	try {
-		if (!bscRpcUrl) throw new Error("BSC_RPC_URL missing");
-
 		const payload = {
 			jsonrpc: "2.0",
-			id: Math.floor(Math.random() * 1e6),
+			id: 0,
 			method: "eth_getBalance",
 			params: [userAddress, "latest"],
 		};
 
-		const { data: rpc } = await instance.post(bscRpcUrl, payload);
+		const rpc = await postBscRpc(payload);
+		if (!rpc?.result) return 0;
 
-		const hex = rpc?.result || "0x0";
+		const hex = rpc.result || "0x0";
 		const wei = hex && typeof hex === "string" && hex.startsWith("0x") ? parseInt(hex, 16) : Number(hex || 0);
 
 		return Number(wei);

@@ -1,6 +1,7 @@
 const {
 	mapGasOracleToTrackerShape,
 	weiHexToGwei,
+	weiHexToEth,
 	gasTrackerFromNetworkGwei,
 } = require("../../Repositories/etherscan/modules/etherscan-gas-tracker.util");
 
@@ -38,6 +39,18 @@ describe("etherscan-gas-tracker.util", () => {
 		it("throws on invalid input", () => {
 			expect(() => weiHexToGwei("0x0")).toThrow("invalid_eth_gasPrice");
 			expect(() => weiHexToGwei("not-hex")).toThrow("invalid_eth_gasPrice");
+		});
+	});
+
+	describe("weiHexToEth", () => {
+		it("converts hex wei to ETH", () => {
+			expect(weiHexToEth("0xde0b6b3a7640000")).toBe(1);
+			expect(weiHexToEth("0x0")).toBe(0);
+		});
+
+		it("throws on invalid input", () => {
+			expect(() => weiHexToEth("not-hex")).toThrow("invalid_eth_getBalance");
+			expect(() => weiHexToEth("123")).toThrow("invalid_eth_getBalance");
 		});
 	});
 

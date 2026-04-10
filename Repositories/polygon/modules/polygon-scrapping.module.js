@@ -4,6 +4,7 @@ const cheerio = require("cheerio");
 const moment = require("moment");
 
 const { getCleanInstance } = require("../../../Core/axios");
+const { polygonBookFallbackDefaultUrl } = require("../../../Core/twnodes-naas");
 const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
@@ -24,6 +25,10 @@ const polygonscanApiKey = process.env.POLYGONSCAN_API_KEY || process.env.ETHERSC
 const polygonscanApiUrl = process.env.POLYGONSCAN_API_URL || process.env.ETHERSCAN_V2_API || "https://api.etherscan.io/v2/api";
 
 const polygonRpcUrl = process.env.POLYGON_RPC_URL; // QuickNode only, no public RPCs
+
+/** twnodes NaaS JSON-RPC when POLYGON_RPC_URL fails or is unset — POLYGON_BOOK_FALLBACK_URL or TWNODES_NAAS_SESSION_ID */
+const polygonBookRpcBase = () => process.env.POLYGON_BOOK_FALLBACK_URL || polygonBookFallbackDefaultUrl();
+
 const POLYGONSCAN_BATCH_DELAY_MS = Number(process.env.POLYGONSCAN_BATCH_DELAY_MS || 350);
 const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 6);
 
@@ -38,6 +43,34 @@ const logPolygonDebug = (...args) => {
 // Simple async sleep helper for batch spacing
 function sleep(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Try primary POLYGON_RPC_URL first, then twnodes fallback; returns JSON-RPC response body or null */
+async function postPolygonRpc(payload) {
+	const primary = polygonRpcUrl || null;
+	const fallback = polygonBookRpcBase();
+	const candidates = [...new Set([primary, fallback].filter(Boolean))];
+
+	if (candidates.length === 0) return null;
+
+	for (const url of candidates) {
+		try {
+			const { data } = await instance.post(url, payload, {
+				headers: { "Content-Type": "application/json" },
+			});
+
+			if (data?.error) {
+				logPolygonDebug("polygon_rpc_jsonrpc_error", url, data.error);
+				continue;
+			}
+
+			return data;
+		} catch (e) {
+			logPolygonDebug("polygon_rpc_transport_error", url, e?.message || e);
+		}
+	}
+
+	return null;
 }
 
 // Global request counters for external scanner calls
@@ -193,7 +226,7 @@ async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 
 		const payload = {
 			jsonrpc: "2.0",
-			id: Math.floor(Math.random() * 1e6),
+			id: 0,
 			method: "eth_call",
 			params: [
 				{
@@ -204,14 +237,12 @@ async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 			],
 		};
 
-		if (!polygonRpcUrl) throw new Error("POLYGON_RPC_URL missing");
-
-		const { data: rpc } = await instance.post(polygonRpcUrl, payload);
+		const rpc = await postPolygonRpc(payload);
 		const hex = rpc?.result || "0x0";
 
 		return hex === "0x" ? "0x0" : hex;
 	} catch (error) {
-		logPolygonDebug("rpc_balance_error", polygonRpcUrl, contractAddress, error?.message || error);
+		logPolygonDebug("rpc_balance_error", polygonRpcUrl || polygonBookRpcBase(), contractAddress, error?.message || error);
 
 		return "0x0";
 	}
@@ -221,27 +252,18 @@ async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 async function getErc20BalancesViaRpcBatch(contracts, userAddress) {
 	if (!Array.isArray(contracts) || contracts.length === 0) return new Map();
 
-	if (!polygonRpcUrl) return new Map();
-
 	const methodId = "0x70a08231";
 	const addressHex = String(userAddress).toLowerCase().replace(/^0x/, "");
 
-	const calls = contracts.map((c) => ({
+	const calls = contracts.map((c, i) => ({
 		jsonrpc: "2.0",
-		id: Math.floor(Math.random() * 1e9),
+		id: i + 1,
 		method: "eth_call",
 		params: [{ to: c, data: methodId + "000000000000000000000000" + addressHex }, "latest"],
 	}));
 
 	try {
-		const results = await Promise.all(
-			calls.map((payload) =>
-				instance
-					.post(polygonRpcUrl, payload)
-					.then((r) => r.data)
-					.catch(() => null)
-			)
-		);
+		const results = await Promise.all(calls.map((payload) => postPolygonRpc(payload).catch(() => null)));
 
 		const map = new Map();
 
@@ -263,13 +285,15 @@ async function getNativeBalanceViaRpc(userAddress) {
 	try {
 		const payload = {
 			jsonrpc: "2.0",
-			id: Math.floor(Math.random() * 1e6),
+			id: 0,
 			method: "eth_getBalance",
 			params: [userAddress, "latest"],
 		};
 
-		const { data: rpc } = await instance.post(polygonRpcUrl, payload);
-		const hex = rpc?.result || "0x0";
+		const rpc = await postPolygonRpc(payload);
+		if (!rpc?.result) return 0;
+
+		const hex = rpc.result || "0x0";
 		const wei = hex && typeof hex === "string" && hex.startsWith("0x") ? parseInt(hex, 16) : Number(hex || 0);
 
 		return Number(wei);
