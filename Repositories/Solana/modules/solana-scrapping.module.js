@@ -3,6 +3,7 @@ const instance = getCleanInstance(30000);
 const { generateRandomUserAgent } = require("../../../Core/helpers");
 const oklink = require("./oklink");
 const solscan = require("./solscan");
+const solanaTwnodes = require("./solana-twnodes-rpc.module");
 const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 
@@ -14,6 +15,16 @@ const getAddress = async (params) => {
 	let source;
 
 	switch (params.source) {
+		case "twnodes":
+			try {
+				response = await solanaTwnodes.getAddress(params);
+				source = response ? "twnodes" : null;
+			} catch (e) {
+				console.error("solana twnodes getAddress:", e?.message || e);
+				response = null;
+				source = null;
+			}
+			break;
 		case "solscan":
 			response = await solscan.getAddress(params);
 			source = "solscan";
@@ -23,6 +34,16 @@ const getAddress = async (params) => {
 			source = "oklink";
 			break;
 		default:
+			try {
+				const tw = await solanaTwnodes.getAddress(params);
+				if (tw) {
+					response = tw;
+					source = "twnodes";
+					break;
+				}
+			} catch (e) {
+				console.error("solana twnodes getAddress:", e?.message || e);
+			}
 			const solscanResponse = await solscan.getAddress(params);
 			const oklinkResponse = await oklink.getAddress(params);
 
@@ -45,8 +66,21 @@ const getAddress = async (params) => {
  * @param {Object} params
  */
 const getTokens = async (params, query) => {
-	const response = (await solscan.getTokens(params, query)) || (await oklink.getTokens(params, query));
-	return response;
+	const source = params.source || query?.source;
+	if (source === "twnodes") {
+		try {
+			return await solanaTwnodes.getTokens(params, query);
+		} catch (e) {
+			console.error("solana twnodes getTokens:", e?.message || e);
+			return null;
+		}
+	}
+	try {
+		return await solanaTwnodes.getTokens(params, query);
+	} catch (e) {
+		console.error("solana twnodes getTokens:", e?.message || e);
+	}
+	return (await solscan.getTokens(params, query)) || (await oklink.getTokens(params, query));
 };
 
 const getTransaction = async (params, query) => {
@@ -112,8 +146,21 @@ const getTransaction = async (params, query) => {
 };
 
 const getTransactions = async (params, query) => {
-	const response = (await solscan.getTransfers(params, query)) || (await oklink.getTransactions(params, query));
-	return response;
+	const source = params.source || query?.source;
+	if (source === "twnodes") {
+		try {
+			return await solanaTwnodes.getTransactions(params, query);
+		} catch (e) {
+			console.error("solana twnodes getTransactions:", e?.message || e);
+			return null;
+		}
+	}
+	try {
+		return await solanaTwnodes.getTransactions(params, query);
+	} catch (e) {
+		console.error("solana twnodes getTransactions:", e?.message || e);
+	}
+	return (await solscan.getTransfers(params, query)) || (await oklink.getTransactions(params, query));
 };
 
 function formatSolanaTransfers(transfers) {

@@ -61,6 +61,21 @@ const weiHexToGwei = (weiHexOrDec) => {
 };
 
 /**
+ * @param {string} weiHex - JSON-RPC eth_getBalance result (e.g. "0x...")
+ * @returns {number} ETH balance as float
+ */
+const weiHexToEth = (weiHex) => {
+	if (typeof weiHex !== "string" || !weiHex.startsWith("0x")) {
+		throw new Error("invalid_eth_getBalance");
+	}
+	const wei = BigInt(weiHex);
+	const denom = 10n ** 18n;
+	const whole = wei / denom;
+	const frac = wei % denom;
+	return Number(whole) + Number(frac) / 1e18;
+};
+
+/**
  * Build legacy tracker shape from network suggested gas price (gwei).
  * @param {number} gwei - effective gas price in gwei
  */
@@ -99,5 +114,6 @@ const gasTrackerFromNetworkGwei = (gwei) => {
 module.exports = {
 	mapGasOracleToTrackerShape,
 	weiHexToGwei,
+	weiHexToEth,
 	gasTrackerFromNetworkGwei,
 };
