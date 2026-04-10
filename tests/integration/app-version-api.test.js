@@ -1,5 +1,5 @@
 // Mobile app version API — requires a live server (same PORT as other integration tests).
-// Compare assertions assume defaults or .env matching Core/config.js (e.g. minimum 1.5.0, latest 2.0.0).
+// Policy is loaded from MongoDB (singleton `MobileAppVersionPolicy`, key "default"); first request may upsert defaults (iOS 2.16.1, Android 3.16.1 for min+latest).
 const request = require("supertest");
 require("dotenv").config();
 
@@ -28,8 +28,10 @@ describe("GET /api/app/version — integration", () => {
         expect(response.body.data).toMatchObject({
             platform: "ios",
         });
-        expect(response.body.data).toHaveProperty("latestVersion");
-        expect(response.body.data).toHaveProperty("minimumVersion");
+        expect(response.body.data).toMatchObject({
+            latestVersion: "2.16.1",
+            minimumVersion: "2.16.1",
+        });
         expect(response.body.data).toHaveProperty("storeUrl");
         expect(response.body.data).not.toHaveProperty("updateAvailable");
         expect(response.body.data).not.toHaveProperty("forceUpdate");
@@ -39,7 +41,11 @@ describe("GET /api/app/version — integration", () => {
         const response = await request(API_BASE_URL).get("/api/app/version").query({ platform: "android" }).set("Origin", ORIGIN);
 
         expect(response.status).toBe(200);
-        expect(response.body.data.platform).toBe("android");
+        expect(response.body.data).toMatchObject({
+            platform: "android",
+            latestVersion: "3.16.1",
+            minimumVersion: "3.16.1",
+        });
         expect(response.body.data).not.toHaveProperty("updateAvailable");
     });
 
@@ -53,7 +59,7 @@ describe("GET /api/app/version — integration", () => {
         expect(response.body).toHaveProperty("code");
     });
 
-    it("should set forceUpdate when current is below minimum (defaults 1.5.0)", async () => {
+    it("should set forceUpdate when current is below minimum (iOS default 2.16.1)", async () => {
         const response = await request(API_BASE_URL)
             .get("/api/app/version")
             .query({ platform: "ios", current: "1.4.0" })
@@ -67,29 +73,29 @@ describe("GET /api/app/version — integration", () => {
         });
     });
 
-    it("should set updateAvailable but not force when between minimum and latest", async () => {
+    it("should set both updateAvailable and forceUpdate when min equals latest and client is older", async () => {
         const response = await request(API_BASE_URL)
             .get("/api/app/version")
-            .query({ platform: "android", current: "1.6.0" })
+            .query({ platform: "android", current: "3.10.0" })
             .set("Origin", ORIGIN);
 
         expect(response.status).toBe(200);
         expect(response.body.data).toMatchObject({
-            currentClientVersion: "1.6.0",
+            currentClientVersion: "3.10.0",
             updateAvailable: true,
-            forceUpdate: false,
+            forceUpdate: true,
         });
     });
 
-    it("should not require update at or above latest", async () => {
+    it("should not require update at or above latest (iOS)", async () => {
         const response = await request(API_BASE_URL)
             .get("/api/app/version")
-            .query({ platform: "ios", current: "2.0.0" })
+            .query({ platform: "ios", current: "2.16.1" })
             .set("Origin", ORIGIN);
 
         expect(response.status).toBe(200);
         expect(response.body.data).toMatchObject({
-            currentClientVersion: "2.0.0",
+            currentClientVersion: "2.16.1",
             updateAvailable: false,
             forceUpdate: false,
         });

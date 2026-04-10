@@ -21,9 +21,9 @@ Body shape:
 {
   "data": {
     "platform": "ios",
-    "latestVersion": "2.0.0",
-    "minimumVersion": "1.5.0",
-    "storeUrl": "https://apps.apple.com/app/id0000000000"
+    "latestVersion": "2.16.1",
+    "minimumVersion": "2.16.1",
+    "storeUrl": ""
   }
 }
 ```
@@ -34,12 +34,12 @@ When `current` is provided and valid:
 {
   "data": {
     "platform": "android",
-    "latestVersion": "2.0.0",
-    "minimumVersion": "1.5.0",
-    "storeUrl": "https://play.google.com/store/apps/details?id=com.example.zelf",
-    "currentClientVersion": "1.6.0",
+    "latestVersion": "3.16.1",
+    "minimumVersion": "3.16.1",
+    "storeUrl": "",
+    "currentClientVersion": "3.10.0",
     "updateAvailable": true,
-    "forceUpdate": false
+    "forceUpdate": true
   }
 }
 ```
@@ -56,14 +56,13 @@ When `current` is provided and valid:
 |--------|------|
 | `409` | Missing or invalid `platform` (validation); body may include `validationError`. |
 | `422` | `current` was sent but is not a valid semver string. |
-| `500` | Server misconfiguration (invalid or inconsistent `latestVersion` / `minimumVersion` in environment). |
+| `500` | Server misconfiguration (invalid or inconsistent `latestVersion` / `minimumVersion` stored for that platform). |
 
 ### Server configuration
 
-Values are set per environment (see repository root `.env.example`):
+Policy values are stored in **MongoDB** as a singleton document (model `MobileAppVersionPolicy`, `key: "default"`) with nested `ios` and `android` objects: `latestVersion`, `minimumVersion`, and `storeUrl`.
 
-- `MOBILE_IOS_LATEST_VERSION`, `MOBILE_IOS_MINIMUM_VERSION`, `MOBILE_IOS_STORE_URL`
-- `MOBILE_ANDROID_LATEST_VERSION`, `MOBILE_ANDROID_MINIMUM_VERSION`, `MOBILE_ANDROID_STORE_URL`
+If that document does not exist yet, the API **inserts defaults** on first successful read: **iOS** `latestVersion` / `minimumVersion` `2.16.1`, **Android** `3.16.1`, empty `storeUrl` each. Changing these defaults in code only affects new databases; update the MongoDB document directly to change policy on an existing deployment. Environment variables are not used for this endpoint.
 
 ---
 

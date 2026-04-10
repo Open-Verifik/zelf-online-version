@@ -3,7 +3,7 @@ const { errorHandler } = require("../../../Core/http-handler");
 
 const getVersion = async (ctx) => {
     try {
-        const data = Module.getVersionCheck(ctx.query);
+        const data = await Module.getVersionCheck(ctx.query);
         ctx.body = { data };
     } catch (error) {
         const _exception = errorHandler(error, ctx);
