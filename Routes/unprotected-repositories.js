@@ -1,5 +1,6 @@
 module.exports = (server) => {
     //A
+    require("../Repositories/AppVersion/routes/app-version.routes")(server);
     //B
     //C
     require("../Repositories/Client/routes/unprotected-client.route")(server);

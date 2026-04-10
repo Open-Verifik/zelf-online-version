@@ -155,6 +155,19 @@ const configuration = {
     revenueCat: {
         allowedEmail: process.env.REVENUECAT_ALLOWED_EMAIL,
     },
+    /** Mobile clients: set MOBILE_* env in production; defaults support local/integration checks. */
+    mobileApp: {
+        ios: {
+            latestVersion: process.env.MOBILE_IOS_LATEST_VERSION || "2.0.0",
+            minimumVersion: process.env.MOBILE_IOS_MINIMUM_VERSION || "1.5.0",
+            storeUrl: process.env.MOBILE_IOS_STORE_URL || "",
+        },
+        android: {
+            latestVersion: process.env.MOBILE_ANDROID_LATEST_VERSION || "2.0.0",
+            minimumVersion: process.env.MOBILE_ANDROID_MINIMUM_VERSION || "1.5.0",
+            storeUrl: process.env.MOBILE_ANDROID_STORE_URL || "",
+        },
+    },
     solana: {
         rpcUrl:
             process.env.SOLANA_RPC_URL ||
