@@ -143,11 +143,11 @@ const leaseTag = async (params, authUser) => {
             config.env === "production"
                 ? undefined
                 : {
-                    // for development porposes so we can visualize the arweave private key and the mnemonic for testing.
-                    mnemonic,
-                    arweavePrivateKey: arweave.privateKey,
-                    stellarSecretKey: stellar.secretKey,
-                },
+                      // for development porposes so we can visualize the arweave private key and the mnemonic for testing.
+                      mnemonic,
+                      arweavePrivateKey: arweave.privateKey,
+                      stellarSecretKey: stellar.secretKey,
+                  },
     };
 };
 
@@ -338,9 +338,7 @@ const previewZelfIdQr = async (params, authUser) => {
 
     const zelfProof = await extractZelfProofFromQR(zelfProofQRCode);
 
-    if (!zelfProof) {
-        throw new Error("409:incorrect_zelf_proof");
-    }
+    if (!zelfProof) throw new Error("409:incorrect_zelf_proof");
 
     return await previewZelfProof({ ...params, zelfProof }, authUser);
 };

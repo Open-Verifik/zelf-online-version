@@ -53,7 +53,7 @@
         "@openzeppelin/contracts": "^5.4.0",
         "@solana/web3.js": "^1.93.0",
         "@toruslabs/tss-lib": "^2.3.0",
-        "axios": "1.13.5",
+        "axios": "^1.15.0",
         "bcrypt-nodejs": "^0.0.3",
         "bip32": "5.0.0",
         "bip39": "^3.1.0",
@@ -101,7 +101,7 @@
     },
     "overrides": {
         "valibot": "1.2.0",
-        "axios": "1.13.5",
+        "axios": "^1.15.0",
         "elliptic": "6.6.1",
         "ws": "8.19.0",
         "undici": "6.23.0",
