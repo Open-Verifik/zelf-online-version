@@ -77,6 +77,8 @@ const {
 	BUSD,
 	DAI,
 	WBNB,
+	BTCB,
+	ETH_PEG,
 } = require("./bsc-tokens.constants");
 
 /**

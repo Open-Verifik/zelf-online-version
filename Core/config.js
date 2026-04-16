@@ -183,14 +183,21 @@ const configuration = {
             },
         },
         networks: {
-            ethereum: process.env.ALCHEMY_ETHEREUM_URL || (process.env.ALCHEMY_API_KEY ? `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
-            polygon: process.env.ALCHEMY_POLYGON_URL || (process.env.ALCHEMY_API_KEY ? `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+            ethereum:
+                process.env.ALCHEMY_ETHEREUM_URL ||
+                (process.env.ALCHEMY_API_KEY ? `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+            polygon:
+                process.env.ALCHEMY_POLYGON_URL ||
+                (process.env.ALCHEMY_API_KEY ? `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
             arbitrum:
-                process.env.ALCHEMY_ARBITRUM_URL || (process.env.ALCHEMY_API_KEY ? `https://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+                process.env.ALCHEMY_ARBITRUM_URL ||
+                (process.env.ALCHEMY_API_KEY ? `https://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
             optimism:
-                process.env.ALCHEMY_OPTIMISM_URL || (process.env.ALCHEMY_API_KEY ? `https://opt-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+                process.env.ALCHEMY_OPTIMISM_URL ||
+                (process.env.ALCHEMY_API_KEY ? `https://opt-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
             avalanche:
-                process.env.ALCHEMY_AVALANCHE_URL || (process.env.ALCHEMY_API_KEY ? `https://avax-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+                process.env.ALCHEMY_AVALANCHE_URL ||
+                (process.env.ALCHEMY_API_KEY ? `https://avax-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
         },
     },
     lifi: {
@@ -249,9 +256,7 @@ const configuration = {
         tagPayUsdcAddress: (process.env.AVALANCHE_TAG_PAY_USDC_ADDRESS || "").trim(),
         tagPayConfirmations: Math.max(1, Number(process.env.AVALANCHE_TAG_PAY_CONFIRMATIONS) || 1),
         createNFT: process.env.AVALANCHE_CREATE_NFT === "true",
-        rpcUrl:
-            process.env.AVALANCHE_RPC_URL ||
-            "https://wild-bitter-meadow.avalanche-mainnet.quiknode.pro/e2565749ca44c2873fe2a0a747f5ac68ae7eb14f/ext/bc/C/rpc/",
+        rpcUrl: process.env.AVALANCHE_RPC_URL,
         chainId: Number(process.env.AVALANCHE_CHAIN_ID) || 43114, // Avalanche C-Chain mainnet; use 43113 for Fuji
         privateKey: process.env.WALRUS_PRIVATE_KEY,
     },
@@ -465,15 +470,16 @@ const configuration = {
             },
             blockdag: {
                 chainId: Number(process.env.BLOCKDAG_CHAIN_ID) || 1404,
-                rpcUrl: process.env.RPC_PROXY_BLOCKDAG_URL || process.env.BLOCKDAG_MAIN_RPC_URL || process.env.BLOCKDAG_RPC_URL || "https://rpc.bdagscan.com",
+                rpcUrl:
+                    process.env.RPC_PROXY_BLOCKDAG_URL ||
+                    process.env.BLOCKDAG_MAIN_RPC_URL ||
+                    process.env.BLOCKDAG_RPC_URL ||
+                    "https://rpc.bdagscan.com",
             },
             /** Sui: chainId is a logical Zelf id for /api/rpc/chains (not an EVM chain id). */
             sui: {
                 chainId: Number(process.env.SUI_CHAIN_ID) || 101,
-                rpcUrl:
-                    process.env.RPC_PROXY_SUI_URL ||
-                    process.env.SUI_RPC_URL ||
-                    "https://fullnode.mainnet.sui.io:443",
+                rpcUrl: process.env.RPC_PROXY_SUI_URL || process.env.SUI_RPC_URL || "https://fullnode.mainnet.sui.io:443",
             },
         },
     },
