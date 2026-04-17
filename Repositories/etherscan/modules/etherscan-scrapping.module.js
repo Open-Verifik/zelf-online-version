@@ -9,7 +9,7 @@ const config = require("../../../Core/config");
 const { mapGasOracleToTrackerShape, weiHexToGwei, weiHexToEth, gasTrackerFromNetworkGwei } = require("./etherscan-gas-tracker.util");
 const { idAseet_ } = require("../../dataAnalytics/modules/dataAnalytics.module");
 const { getCleanInstance } = require("../../../Core/axios");
-const { ethereumBookFallbackDefaultUrl } = require("../../../Core/twnodes-naas");
+const { ethereumBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 

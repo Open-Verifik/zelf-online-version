@@ -3,7 +3,7 @@ const instance = getCleanInstance(30000);
 const { generateRandomUserAgent } = require("../../../Core/helpers");
 const oklink = require("./oklink");
 const solscan = require("./solscan");
-const solanaTwnodes = require("./solana-twnodes-rpc.module");
+const solanaSourceA = require("./solana-source-a-rpc.module");
 const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 
@@ -15,12 +15,12 @@ const getAddress = async (params) => {
 	let source;
 
 	switch (params.source) {
-		case "twnodes":
+		case "sourceA":
 			try {
-				response = await solanaTwnodes.getAddress(params);
-				source = response ? "twnodes" : null;
+				response = await solanaSourceA.getAddress(params);
+				source = response ? "sourceA" : null;
 			} catch (e) {
-				console.error("solana twnodes getAddress:", e?.message || e);
+				console.error("solana sourceA getAddress:", e?.message || e);
 				response = null;
 				source = null;
 			}
@@ -35,14 +35,14 @@ const getAddress = async (params) => {
 			break;
 		default:
 			try {
-				const tw = await solanaTwnodes.getAddress(params);
-				if (tw) {
-					response = tw;
-					source = "twnodes";
+				const saResult = await solanaSourceA.getAddress(params);
+				if (saResult) {
+					response = saResult;
+					source = "sourceA";
 					break;
 				}
 			} catch (e) {
-				console.error("solana twnodes getAddress:", e?.message || e);
+				console.error("solana sourceA getAddress:", e?.message || e);
 			}
 			const solscanResponse = await solscan.getAddress(params);
 			const oklinkResponse = await oklink.getAddress(params);
@@ -67,18 +67,18 @@ const getAddress = async (params) => {
  */
 const getTokens = async (params, query) => {
 	const source = params.source || query?.source;
-	if (source === "twnodes") {
+	if (source === "sourceA") {
 		try {
-			return await solanaTwnodes.getTokens(params, query);
+			return await solanaSourceA.getTokens(params, query);
 		} catch (e) {
-			console.error("solana twnodes getTokens:", e?.message || e);
+			console.error("solana sourceA getTokens:", e?.message || e);
 			return null;
 		}
 	}
 	try {
-		return await solanaTwnodes.getTokens(params, query);
+		return await solanaSourceA.getTokens(params, query);
 	} catch (e) {
-		console.error("solana twnodes getTokens:", e?.message || e);
+		console.error("solana sourceA getTokens:", e?.message || e);
 	}
 	return (await solscan.getTokens(params, query)) || (await oklink.getTokens(params, query));
 };
@@ -147,18 +147,18 @@ const getTransaction = async (params, query) => {
 
 const getTransactions = async (params, query) => {
 	const source = params.source || query?.source;
-	if (source === "twnodes") {
+	if (source === "sourceA") {
 		try {
-			return await solanaTwnodes.getTransactions(params, query);
+			return await solanaSourceA.getTransactions(params, query);
 		} catch (e) {
-			console.error("solana twnodes getTransactions:", e?.message || e);
+			console.error("solana sourceA getTransactions:", e?.message || e);
 			return null;
 		}
 	}
 	try {
-		return await solanaTwnodes.getTransactions(params, query);
+		return await solanaSourceA.getTransactions(params, query);
 	} catch (e) {
-		console.error("solana twnodes getTransactions:", e?.message || e);
+		console.error("solana sourceA getTransactions:", e?.message || e);
 	}
 	return (await solscan.getTransfers(params, query)) || (await oklink.getTransactions(params, query));
 };

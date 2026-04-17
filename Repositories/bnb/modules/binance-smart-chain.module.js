@@ -6,7 +6,7 @@ const urlBase = process.env.MICROSERVICES_BOGOTA_URL;
 const token = process.env.MICROSERVICES_BOGOTA_TOKEN;
 
 const { getCleanInstance } = require("../../../Core/axios");
-const { bscBookFallbackDefaultUrl } = require("../../../Core/twnodes-naas");
+const { bscBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 const etherscanChains = require("../../etherscan/chains.json");
@@ -19,7 +19,7 @@ const instance = getCleanInstance(30000);
 const bscscanApiKey = process.env.BSCSCAN_API_KEY;
 const bscscanApiUrl = process.env.BSCSCAN_API_URL || "https://api.bscscan.com/api";
 const bscRpcUrl = process.env.BSC_RPC_URL; // QuickNode only
-/** twnodes NaaS when BSC_RPC_URL fails or is unset — BSC_BOOK_FALLBACK_URL or TW_SESSION_ID */
+/** SourceA NaaS when BSC_RPC_URL fails or is unset — BSC_BOOK_FALLBACK_URL or SOURCE_A_SESSION_ID */
 const bscBookRpcBase = () => process.env.BSC_BOOK_FALLBACK_URL || bscBookFallbackDefaultUrl();
 const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 6);
 const BSCSCAN_BATCH_DELAY_MS = Number(process.env.BSCSCAN_BATCH_DELAY_MS || 350);
@@ -37,7 +37,7 @@ const dbgBsc = (...args) => {
 	}
 };
 
-/** Try BSC_RPC_URL first, then twnodes fallback */
+/** Try BSC_RPC_URL first, then SourceA fallback */
 async function postBscRpc(payload) {
 	const primary = bscRpcUrl || null;
 	const fallback = bscBookRpcBase();

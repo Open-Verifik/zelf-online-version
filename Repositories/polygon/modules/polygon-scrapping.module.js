@@ -4,7 +4,7 @@ const cheerio = require("cheerio");
 const moment = require("moment");
 
 const { getCleanInstance } = require("../../../Core/axios");
-const { polygonBookFallbackDefaultUrl } = require("../../../Core/twnodes-naas");
+const { polygonBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
 const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
@@ -26,7 +26,7 @@ const polygonscanApiUrl = process.env.POLYGONSCAN_API_URL || process.env.ETHERSC
 
 const polygonRpcUrl = process.env.POLYGON_RPC_URL; // QuickNode only, no public RPCs
 
-/** twnodes NaaS JSON-RPC when POLYGON_RPC_URL fails or is unset — POLYGON_BOOK_FALLBACK_URL or TW_SESSION_ID */
+/** SourceA NaaS JSON-RPC when POLYGON_RPC_URL fails or is unset — POLYGON_BOOK_FALLBACK_URL or SOURCE_A_SESSION_ID */
 const polygonBookRpcBase = () => process.env.POLYGON_BOOK_FALLBACK_URL || polygonBookFallbackDefaultUrl();
 
 const POLYGONSCAN_BATCH_DELAY_MS = Number(process.env.POLYGONSCAN_BATCH_DELAY_MS || 350);
@@ -45,7 +45,7 @@ function sleep(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Try primary POLYGON_RPC_URL first, then twnodes fallback; returns JSON-RPC response body or null */
+/** Try primary POLYGON_RPC_URL first, then SourceA fallback; returns JSON-RPC response body or null */
 async function postPolygonRpc(payload) {
 	const primary = polygonRpcUrl || null;
 	const fallback = polygonBookRpcBase();

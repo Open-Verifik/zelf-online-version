@@ -1,11 +1,11 @@
 const { getCleanInstance } = require("../../../Core/axios");
 const { generateRandomUserAgent } = require("../../../Core/helpers");
-const { btcBookFallbackDefaultUrl } = require("../../../Core/twnodes-naas");
+const { btcBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const instance = getCleanInstance(30000);
 const SATOSHI_TO_BTC = 100000000;
 
-/** Blockbook v2 (twnodes) — full URL override via BTC_BOOK_FALLBACK_URL; else TW_SESSION_ID */
+/** Blockbook v2 (SourceA) — full URL override via BTC_BOOK_FALLBACK_URL; else SOURCE_A_SESSION_ID */
 const btcBookBase = () => process.env.BTC_BOOK_FALLBACK_URL || btcBookFallbackDefaultUrl();
 
 const makeApiRequest = async (url) => {
@@ -19,8 +19,8 @@ const makeApiRequest = async (url) => {
 
 const convertSatoshiToBTC = (satoshi) => satoshi / SATOSHI_TO_BTC;
 
-// Blockbook / twnodes tx shape → standardized list item
-function extractTransactionDataFromTwnodesSingle(tx) {
+// Blockbook tx shape → standardized list item
+function extractTransactionDataFromSourceA(tx) {
     if (!tx?.txid) return null;
 
     const vouts = (tx.vout || []).filter((o) => Array.isArray(o.addresses) && o.addresses.length > 0);
@@ -83,8 +83,8 @@ const buildBalanceResponse = (address, formatBTC, price, transactions) => ({
     transactions,
 });
 
-// Get transactions from Blockbook (twnodes) — address returns txids; fetch each tx
-const getTransactionsListFromTwnodes = async (params, limit = 25) => {
+// Get transactions from Blockbook — address returns txids; fetch each tx
+const getTransactionsListFromSourceA = async (params, limit = 25) => {
     const base = btcBookBase();
     const summary = await makeApiRequest(`${base}/api/v2/address/${params.id}`);
     const txids = (summary.txids || []).slice(0, Math.min(100, Math.max(1, limit)));
@@ -92,7 +92,7 @@ const getTransactionsListFromTwnodes = async (params, limit = 25) => {
 
     const txs = await Promise.all(txids.map((txid) => makeApiRequest(`${base}/api/v2/tx/${txid}`).catch(() => null)));
 
-    const transactions = txs.map((raw) => extractTransactionDataFromTwnodesSingle(raw)).filter(Boolean);
+    const transactions = txs.map((raw) => extractTransactionDataFromSourceA(raw)).filter(Boolean);
 
     return { transactions };
 };
@@ -101,7 +101,7 @@ const getTransactionsListFromTwnodes = async (params, limit = 25) => {
 const getTransactionsList = async (params, query = { show: "25" }) => {
     const limit = Math.min(100, Math.max(1, parseInt(String(query?.show), 10) || 25));
     try {
-        return await getTransactionsListFromTwnodes(params, limit);
+        return await getTransactionsListFromSourceA(params, limit);
     } catch (err) {
         console.error("Bitcoin Blockbook transactions failed:", err?.message || err);
         return { transactions: [] };
@@ -112,26 +112,26 @@ const getTransactionsList = async (params, query = { show: "25" }) => {
 const getTransactionDetail = async (params) => {
     const base = btcBookBase();
     const data = await makeApiRequest(`${base}/api/v2/tx/${params.id}`);
-    const one = extractTransactionDataFromTwnodesSingle(data);
-    if (!one) throw new Error("invalid_twnodes_tx");
+    const one = extractTransactionDataFromSourceA(data);
+    if (!one) throw new Error("invalid_book_tx");
     return [one];
 };
 
-// Get balance from Blockbook (twnodes)
-const getBalanceFromTwnodes = async (params) => {
+// Get balance from Blockbook
+const getBalanceFromSourceA = async (params) => {
     const base = btcBookBase();
     const data = await makeApiRequest(`${base}/api/v2/address/${params.id}`);
     const { price } = await getTickerPrice({ symbol: "BTC" });
     const balanceSatoshi = Number(data.balance || 0);
     const formatBTC = convertSatoshiToBTC(balanceSatoshi);
-    const { transactions } = await getTransactionsListFromTwnodes(params, 25);
+    const { transactions } = await getTransactionsListFromSourceA(params, 25);
     return buildBalanceResponse(params.id, formatBTC, price, transactions);
 };
 
 // Obtener balance de una dirección
 const getBalance = async (params) => {
     try {
-        return await getBalanceFromTwnodes(params);
+        return await getBalanceFromSourceA(params);
     } catch (err) {
         console.error("Bitcoin Blockbook balance error:", err?.message || err);
         const error = new Error("not_found");

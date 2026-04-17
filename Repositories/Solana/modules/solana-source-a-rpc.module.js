@@ -1,12 +1,12 @@
 const { getCleanInstance } = require("../../../Core/axios");
 const { generateRandomUserAgent } = require("../../../Core/helpers");
-const { solanaBookFallbackDefaultUrl } = require("../../../Core/twnodes-naas");
+const { solanaBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
 const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 
 const instance = getCleanInstance(30000);
 
-/** twnodes NaaS JSON-RPC — SOLANA_BOOK_FALLBACK_URL overrides full URL; else TW_SESSION_ID */
+/** SourceA NaaS JSON-RPC — SOLANA_BOOK_FALLBACK_URL overrides full URL; else SOURCE_A_SESSION_ID */
 const SPL_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const WSOL_MINT = "So11111111111111111111111111111111111111112";
 

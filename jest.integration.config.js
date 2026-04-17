@@ -8,7 +8,7 @@ module.exports = {
 	testMatch: ["**/__tests__/**/*.js", "**/?(*.)+(spec|test).js"],
 
 	// Coverage configuration
-	collectCoverage: true,
+	collectCoverage: false,
 	coverageDirectory: "coverage",
 	coverageReporters: ["text", "lcov", "html"],
 	collectCoverageFrom: [
