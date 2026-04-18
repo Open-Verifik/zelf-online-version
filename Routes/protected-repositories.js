@@ -13,6 +13,7 @@ module.exports = (server) => {
     require("../Repositories/binance/routes/binance.route")(server);
     require("../Repositories/bitcoin/routes/bitcoin-scrapping.route")(server);
     require("../Repositories/base/routes/base.routes")(server);
+    require("../Repositories/Blogs/routes/blog-protected.routes")(server);
     //C
     require("../Repositories/cardano/routes/cardano-scrapping.route")(server);
     require("../Repositories/Client/routes/client.route")(server);

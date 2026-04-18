@@ -83,7 +83,7 @@ Content-Type: application/json
 ### Example: First Request (No Payment)
 
 ```bash
-curl -X POST https://api.zelf.world/api/zelf-proof/encrypt \
+curl -X POST https://v3.zelf.world/api/zelf-proof/encrypt \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -97,20 +97,20 @@ curl -X POST https://api.zelf.world/api/zelf-proof/encrypt \
 
 ```json
 {
-	"error": "Payment Required",
-	"message": "This endpoint requires payment to access",
-	"paymentDetails": {
-		"cost": 0.1,
-		"token": "ZNS",
-		"acceptedChains": ["solana", "avalanche", "base"],
-		"description": "ZelfProof Encryption Service"
-	},
-	"instructions": {
-		"step1": "Send the required amount of ZNS tokens to the service wallet",
-		"step2": "Include the transaction hash in the 'x-payment-tx' header",
-		"step3": "Include the chain name in the 'x-payment-chain' header",
-		"step4": "Include the payment proof in the 'x-payment-proof' header"
-	}
+    "error": "Payment Required",
+    "message": "This endpoint requires payment to access",
+    "paymentDetails": {
+        "cost": 0.1,
+        "token": "ZNS",
+        "acceptedChains": ["solana", "avalanche", "base"],
+        "description": "ZelfProof Encryption Service"
+    },
+    "instructions": {
+        "step1": "Send the required amount of ZNS tokens to the service wallet",
+        "step2": "Include the transaction hash in the 'x-payment-tx' header",
+        "step3": "Include the chain name in the 'x-payment-chain' header",
+        "step4": "Include the payment proof in the 'x-payment-proof' header"
+    }
 }
 ```
 
@@ -121,7 +121,7 @@ curl -X POST https://api.zelf.world/api/zelf-proof/encrypt \
 # 2. Get transaction signature
 # 3. Make request with payment headers
 
-curl -X POST https://api.zelf.world/api/zelf-proof/encrypt \
+curl -X POST https://v3.zelf.world/api/zelf-proof/encrypt \
   -H "Authorization: Bearer <token>" \
   -H "x-payment-chain: solana" \
   -H "x-payment-tx: 5KqZ..." \
@@ -138,9 +138,9 @@ curl -X POST https://api.zelf.world/api/zelf-proof/encrypt \
 
 ```json
 {
-	"success": true,
-	"zelfProof": "...",
-	"identifier": "..."
+    "success": true,
+    "zelfProof": "...",
+    "identifier": "..."
 }
 ```
 
@@ -223,36 +223,36 @@ CREATE INDEX idx_payments_tx ON payments(tx_hash, chain);
 import axios from "axios";
 
 interface PaymentDetails {
-	cost: number;
-	token: string;
-	acceptedChains: string[];
+    cost: number;
+    token: string;
+    acceptedChains: string[];
 }
 
 async function callPaidEndpoint(endpoint: string, data: any, chain: "solana" | "avalanche" | "base", txHash: string, walletAddress: string) {
-	try {
-		const response = await axios.post(endpoint, data, {
-			headers: {
-				Authorization: `Bearer ${getToken()}`,
-				"x-payment-chain": chain,
-				"x-payment-tx": txHash,
-				"x-wallet-address": walletAddress,
-			},
-		});
+    try {
+        const response = await axios.post(endpoint, data, {
+            headers: {
+                Authorization: `Bearer ${getToken()}`,
+                "x-payment-chain": chain,
+                "x-payment-tx": txHash,
+                "x-wallet-address": walletAddress,
+            },
+        });
 
-		return response.data;
-	} catch (error) {
-		if (error.response?.status === 402) {
-			const paymentDetails: PaymentDetails = error.response.data.paymentDetails;
+        return response.data;
+    } catch (error) {
+        if (error.response?.status === 402) {
+            const paymentDetails: PaymentDetails = error.response.data.paymentDetails;
 
-			// Show payment UI to user
-			await showPaymentModal(paymentDetails);
+            // Show payment UI to user
+            await showPaymentModal(paymentDetails);
 
-			// After payment, retry with transaction hash
-			return callPaidEndpoint(endpoint, data, chain, txHash, walletAddress);
-		}
+            // After payment, retry with transaction hash
+            return callPaidEndpoint(endpoint, data, chain, txHash, walletAddress);
+        }
 
-		throw error;
-	}
+        throw error;
+    }
 }
 ```
 
@@ -264,14 +264,14 @@ async function callPaidEndpoint(endpoint: string, data: any, chain: "solana" | "
 const SolanaPayment = require("./Repositories/Solana/modules/payment-verification.module");
 
 async function testPayment() {
-	const result = await SolanaPayment.verifyPayment({
-		txHash: "5KqZ...",
-		expectedAmount: 0.1,
-		userWallet: "7xKXt...",
-	});
+    const result = await SolanaPayment.verifyPayment({
+        txHash: "5KqZ...",
+        expectedAmount: 0.1,
+        userWallet: "7xKXt...",
+    });
 
-	console.log("Payment valid:", result.valid);
-	console.log("Details:", result.details);
+    console.log("Payment valid:", result.valid);
+    console.log("Details:", result.details);
 }
 ```
 
