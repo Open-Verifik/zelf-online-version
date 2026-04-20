@@ -108,6 +108,7 @@ const decrypt = async (data) => {
 
         return encryptedResponse?.data;
     } catch (exception) {
+        console.error({ exception });
         const error = _formattingError(exception.response?.data);
 
         let _error = new Error(error.message);
