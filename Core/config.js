@@ -62,7 +62,7 @@ const configuration = {
         serverKey: process.env.ZELF_ENCRYPT_SERVER_KEY,
     },
     zelfProof: {
-        url: process.env.ZELF_PROOF_URL || "https://api.zelf.world",
+        url: process.env.ZELF_PROOF_URL || "https://v3.zelf.world",
         apiKey: process.env.ZELF_PROOF_API_KEY || "password",
         skipArweave: process.env.SKIP_ARWEAVE || false,
     },

@@ -1,30 +1,44 @@
-const axios = require("../../../Core/axios").getEncryptionInstance();
-const config = require("../../../Core/config");
+const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
+
+/**
+ * Map wallet / ZNS encrypt payloads to zelf-proof.module shape (public /zelf/* URLs).
+ * @param {Object} data
+ * @returns {Object}
+ */
+const _toZelfProofPayload = (data) => ({
+    publicData: data.publicData ?? data.cleartext_data,
+    faceBase64: data.faceBase64,
+    metadata: data.metadata,
+    password: data.password,
+    identifier: data.identifier,
+    record_id: data.record_id,
+    _id: data._id,
+    requireLiveness: data.requireLiveness ?? data.require_live_face ?? true,
+    tolerance: data.tolerance,
+    verifierKey: data.verifierKey,
+    addServerPassword: data.addServerPassword,
+    os: data.os,
+    generateZelfProof: data.generateZelfProof,
+    check_live_face_before_creation: data.check_live_face_before_creation,
+});
 
 const encrypt = async (data) => {
     try {
-        const encryptedResponse = await axios.post("/vw/generate-wallet", {
-            cleartext_data: data.cleartext_data || data.publicData,
-            face_base_64: data.faceBase64,
-            metadata: data.metadata,
-            password: data.password || undefined,
-            record_id: data._id,
-            require_live_face: data.require_live_face || true,
-            tolerance: data.tolerance || "REGULAR",
-            verifiers_auth_key: data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
-        });
+        const { zelfProof } = await ZelfProofModule.encrypt(_toZelfProofPayload(data));
 
-        return encryptedResponse?.data?.zelfProof;
+        return zelfProof;
     } catch (exception) {
-        const _error = exception.response?.data;
         console.error({
-            data: _error,
+            data: exception.response?.data,
             exception,
         });
 
-        let error = new Error(_error?.code);
+        const code = exception.code || exception.response?.data?.code;
+        let error = new Error(code || exception.message);
 
-        switch (_error.code) {
+        error.code = code;
+
+        switch (code) {
             case "ERR_INVALID_IMAGE":
                 error.status = 400;
                 error.message = "Invalid ZelfProof payload";
@@ -32,6 +46,7 @@ const encrypt = async (data) => {
                 break;
 
             default:
+                error.status = exception.status ?? 500;
                 break;
         }
 
@@ -41,29 +56,13 @@ const encrypt = async (data) => {
 
 const encryptQR = async (data) => {
     try {
-        const encryptedResponse = await axios.post(
-            "/vw/generate-wallet-qr",
-            {
-                cleartext_data: data.cleartext_data || data.publicData,
-                face_base_64: data.faceBase64,
-                metadata: data.metadata,
-                password: data.password || undefined,
-                record_id: data._id || data.record_id,
-                require_live_face: data.require_live_face || true,
-                check_live_face_before_creation: data.check_live_face_before_creation || false,
-                tolerance: data.tolerance || "REGULAR",
-                verifiers_auth_key: data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
-                qr_format: "PNG",
-                os: data.os || "DESKTOP",
-            },
-            { responseType: "arraybuffer" }
-        );
+        const result = await ZelfProofModule.encryptQRCode(_toZelfProofPayload(data));
 
-        if (encryptedResponse?.data) {
-            const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
-
-            return `data:image/png;base64,${base64Image}`;
+        if (result && typeof result === "object" && result.zelfQR) {
+            return result.zelfQR;
         }
+
+        return result;
     } catch (exception) {
         console.error({ VWEx: exception });
 
@@ -71,35 +70,21 @@ const encryptQR = async (data) => {
     }
 };
 
-async function getPngAsBase64(url) {
-    try {
-        const response = await axios.get(url, { responseType: "arraybuffer" });
-        const base64Image = Buffer.from(response.data, "binary").toString("base64");
-        return base64Image;
-    } catch (error) {
-        console.error("Error fetching the PNG image:", error);
-    }
-}
-
 const decrypt = async (data) => {
-    data.zelfProof = data.zelfProof.replace(/ /g, "+");
+    const payload = {
+        ...data,
+        zelfProof: data.zelfProof.replace(/ /g, "+"),
+    };
 
     try {
-        const encryptedResponse = await axios.post("/vw/decrypt-wallet", {
-            face_base_64: data.faceBase64,
-            os: data.os || "DESKTOP",
-            password: data.password || undefined,
-            senseprint_base_64: data.zelfProof,
-            verifiers_auth_key: data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
-        });
-
-        return encryptedResponse?.data;
+        return await ZelfProofModule.decrypt(payload);
     } catch (exception) {
-        const _error = exception.response?.data;
+        const code = exception.code;
+        let error = new Error(code || exception.message);
 
-        let error = new Error(_error.code);
+        error.code = code;
 
-        switch (_error.code) {
+        switch (code) {
             case "ERR_INVALID_IMAGE":
             case "ERR_INVALID_SENSEPRINT_BYTES":
                 error.status = 400;
@@ -112,7 +97,11 @@ const decrypt = async (data) => {
 
                 error.message = "Password required";
 
+                break;
             default:
+                error.status = exception.status || 500;
+                error.message = exception.message;
+
                 break;
         }
 
@@ -122,12 +111,7 @@ const decrypt = async (data) => {
 
 const preview = async (data) => {
     try {
-        const encryptedResponse = await axios.post("/vw/preview-wallet", {
-            senseprint_base_64: data.zelfProof,
-            verifiers_auth_key: data.addServerPassword ? config.zelfEncrypt.serverKey : data.verifierKey || undefined,
-        });
-
-        return encryptedResponse.data;
+        return await ZelfProofModule.preview(data);
     } catch (exception) {
         console.error({
             exception,

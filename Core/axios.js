@@ -6,8 +6,6 @@ let _defaultAxios = null;
 
 let _azureInstance = null;
 
-let _openCVInstance = null;
-
 let _encryptionInstance = null;
 
 const getAzureInstance = () => {
@@ -53,6 +51,5 @@ module.exports = {
 	getDefaultInstance,
 	getCleanInstance,
 	getAzureInstance,
-
 	getEncryptionInstance,
 };

@@ -24,6 +24,8 @@ const encrypt = async (data) => {
 
         let error = new Error(_error?.message || "Something went wrong");
 
+        error.code = _error?.code;
+
         switch (_error.code) {
             case "ERR_INVALID_IMAGE":
                 error.status = 400;
@@ -65,8 +67,10 @@ const encryptQRCode = async (data) => {
                 password: data.password || undefined,
                 record_id: data.identifier || data.record_id || data._id,
                 require_live_face: data.requireLiveness || true,
+                check_live_face_before_creation: data.check_live_face_before_creation || false,
                 tolerance: data.tolerance || "REGULAR",
-                verifiers_auth_key: data.verifierKey || undefined,
+                verifiers_auth_key:
+                    data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
                 qr_format: "PNG",
                 os: data.os || "DESKTOP",
             },
@@ -86,8 +90,6 @@ const encryptQRCode = async (data) => {
 
         return { zelfQR, zelfProof: zelfProof || undefined };
     } catch (exception) {
-        console.error({ exception });
-
         return exception?.message;
     }
 };
@@ -108,12 +110,12 @@ const decrypt = async (data) => {
 
         return encryptedResponse?.data;
     } catch (exception) {
-        console.error({ exception });
         const error = _formattingError(exception.response?.data);
 
         let _error = new Error(error.message);
 
         _error.status = error.status;
+        _error.code = error.code;
 
         throw _error;
     }
@@ -135,12 +137,12 @@ const preview = async (data) => {
 
         return encryptedResponse?.data;
     } catch (exception) {
-        console.error({ exception, data });
         const error = _formattingError(exception.response?.data);
 
         let _error = new Error(error.message);
 
         _error.status = error.status;
+        _error.code = error.code;
 
         throw _error;
     }
@@ -152,8 +154,6 @@ const _formattingError = (error = {}) => {
     }
 
     error.message = error.message?.toUpperCase();
-
-    console.log({ error, messsage: error.message });
 
     if (error.message?.includes(config.terms.zk)) {
         error.message = error.message.replaceAll(config.terms.zk, config.terms._zk).toUpperCase();
@@ -193,9 +193,12 @@ const _formattingError = (error = {}) => {
             message.includes("INVALID IMAGE") ||
             message.includes("INVALID FORMAT") ||
             message.includes("INVALID DATA") ||
-            code === "ERR_INVALID_IMAGE"
+            code === "ERR_INVALID_IMAGE" ||
+            code === "ERR_INVALID_SENSEPRINT_BYTES"
         ) {
             error.status = 400;
+        } else if (code === "ERR_PASSWORD_REQUIRED") {
+            error.status = 409;
         }
         // Default to 500 for unknown errors
         else {
