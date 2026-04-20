@@ -151,6 +151,8 @@ const _formattingError = (error = {}) => {
 
     error.message = error.message?.toUpperCase();
 
+    console.log({ error, messsage: error.message });
+
     if (error.message?.includes(config.terms.zk)) {
         error.message = error.message.replaceAll(config.terms.zk, config.terms._zk).toUpperCase();
     }
