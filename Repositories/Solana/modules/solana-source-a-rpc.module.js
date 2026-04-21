@@ -1,40 +1,53 @@
 const { getCleanInstance } = require("../../../Core/axios");
 const { generateRandomUserAgent } = require("../../../Core/helpers");
-const { solanaBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
+const {
+	getNaasNodeUrl,
+	NAAS_CHAIN,
+	refreshNaasCatalogAfterUnauthorized,
+	isNaasNodeUnauthorizedError,
+} = require("../../../Core/naas-gateway-catalog");
 const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 
 const instance = getCleanInstance(30000);
 
-/** SourceA NaaS JSON-RPC — SOLANA_BOOK_FALLBACK_URL overrides full URL; else SOURCE_A_SESSION_ID */
+/** JSON-RPC base URL from nodes catalog gateway */
 const SPL_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const WSOL_MINT = "So11111111111111111111111111111111111111112";
 
 /** Cap SPL rows bundled into address overview (full list via GET …/token/:id with pagination). */
 const MAX_SPL_IN_ADDRESS_OVERVIEW = 200;
 
-const solanaBookBase = () => process.env.SOLANA_BOOK_FALLBACK_URL || solanaBookFallbackDefaultUrl();
+const solanaBookBase = async () => getNaasNodeUrl(NAAS_CHAIN.SOLANA);
 
 let rpcSeq = 0;
-const rpcCall = async (method, params) => {
-	const url = solanaBookBase();
+const rpcCall = async (method, params, { retried401 = false } = {}) => {
+	const url = await solanaBookBase();
 	const id = ++rpcSeq;
-	const { data } = await instance.post(
-		url,
-		{ jsonrpc: "2.0", id, method, params },
-		{
-			headers: {
-				"Content-Type": "application/json",
-				"user-agent": generateRandomUserAgent(),
+	try {
+		const { data } = await instance.post(
+			url,
+			{ jsonrpc: "2.0", id, method, params },
+			{
+				headers: {
+					"Content-Type": "application/json",
+					"user-agent": generateRandomUserAgent(),
+				},
 			},
+		);
+		if (data.error) {
+			const err = new Error(data.error.message || JSON.stringify(data.error));
+			err.rpcCode = data.error.code;
+			throw err;
 		}
-	);
-	if (data.error) {
-		const err = new Error(data.error.message || JSON.stringify(data.error));
-		err.rpcCode = data.error.code;
+		return data.result;
+	} catch (err) {
+		if (!retried401 && isNaasNodeUnauthorizedError(err)) {
+			await refreshNaasCatalogAfterUnauthorized();
+			return rpcCall(method, params, { retried401: true });
+		}
 		throw err;
 	}
-	return data.result;
 };
 
 function mapSignatureToTxRow(sig, ownerAddress) {

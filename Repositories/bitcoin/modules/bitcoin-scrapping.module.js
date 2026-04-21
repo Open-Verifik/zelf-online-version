@@ -1,20 +1,34 @@
 const { getCleanInstance } = require("../../../Core/axios");
 const { generateRandomUserAgent } = require("../../../Core/helpers");
-const { btcBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
+const {
+    getNaasNodeUrl,
+    NAAS_CHAIN,
+    refreshNaasCatalogAfterUnauthorized,
+    isNaasNodeUnauthorizedError,
+} = require("../../../Core/naas-gateway-catalog");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const instance = getCleanInstance(30000);
 const SATOSHI_TO_BTC = 100000000;
 
-/** Blockbook v2 (SourceA) — full URL override via BTC_BOOK_FALLBACK_URL; else SOURCE_A_SESSION_ID */
-const btcBookBase = () => process.env.BTC_BOOK_FALLBACK_URL || btcBookFallbackDefaultUrl();
+/** Blockbook path after base URL, e.g. `/api/v2/address/...` — retries once on NaaS 401 */
+const requestBlockbook = async (pathAfterBase, { retried401 = false } = {}) => {
+    const base = await getNaasNodeUrl(NAAS_CHAIN.BITCOIN);
 
-const makeApiRequest = async (url) => {
-    const { data } = await instance.get(url, {
-        headers: {
-            "user-agent": generateRandomUserAgent(),
-        },
-    });
-    return data;
+    const url = `${base}${pathAfterBase.startsWith("/") ? "" : "/"}${pathAfterBase}`;
+    try {
+        const { data } = await instance.get(url, {
+            headers: {
+                "user-agent": generateRandomUserAgent(),
+            },
+        });
+        return data;
+    } catch (err) {
+        if (!retried401 && isNaasNodeUnauthorizedError(err)) {
+            await refreshNaasCatalogAfterUnauthorized();
+            return requestBlockbook(pathAfterBase, { retried401: true });
+        }
+        throw err;
+    }
 };
 
 const convertSatoshiToBTC = (satoshi) => satoshi / SATOSHI_TO_BTC;
@@ -85,12 +99,11 @@ const buildBalanceResponse = (address, formatBTC, price, transactions) => ({
 
 // Get transactions from Blockbook — address returns txids; fetch each tx
 const getTransactionsListFromSourceA = async (params, limit = 25) => {
-    const base = btcBookBase();
-    const summary = await makeApiRequest(`${base}/api/v2/address/${params.id}`);
+    const summary = await requestBlockbook(`/api/v2/address/${params.id}`);
     const txids = (summary.txids || []).slice(0, Math.min(100, Math.max(1, limit)));
     if (txids.length === 0) return { transactions: [] };
 
-    const txs = await Promise.all(txids.map((txid) => makeApiRequest(`${base}/api/v2/tx/${txid}`).catch(() => null)));
+    const txs = await Promise.all(txids.map((txid) => requestBlockbook(`/api/v2/tx/${txid}`).catch(() => null)));
 
     const transactions = txs.map((raw) => extractTransactionDataFromSourceA(raw)).filter(Boolean);
 
@@ -110,8 +123,7 @@ const getTransactionsList = async (params, query = { show: "25" }) => {
 
 // Obtener detalles de una transacción específica
 const getTransactionDetail = async (params) => {
-    const base = btcBookBase();
-    const data = await makeApiRequest(`${base}/api/v2/tx/${params.id}`);
+    const data = await requestBlockbook(`/api/v2/tx/${params.id}`);
     const one = extractTransactionDataFromSourceA(data);
     if (!one) throw new Error("invalid_book_tx");
     return [one];
@@ -119,8 +131,7 @@ const getTransactionDetail = async (params) => {
 
 // Get balance from Blockbook
 const getBalanceFromSourceA = async (params) => {
-    const base = btcBookBase();
-    const data = await makeApiRequest(`${base}/api/v2/address/${params.id}`);
+    const data = await requestBlockbook(`/api/v2/address/${params.id}`);
     const { price } = await getTickerPrice({ symbol: "BTC" });
     const balanceSatoshi = Number(data.balance || 0);
     const formatBTC = convertSatoshiToBTC(balanceSatoshi);

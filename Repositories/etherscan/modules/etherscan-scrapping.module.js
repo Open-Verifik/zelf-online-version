@@ -9,7 +9,12 @@ const config = require("../../../Core/config");
 const { mapGasOracleToTrackerShape, weiHexToGwei, weiHexToEth, gasTrackerFromNetworkGwei } = require("./etherscan-gas-tracker.util");
 const { idAseet_ } = require("../../dataAnalytics/modules/dataAnalytics.module");
 const { getCleanInstance } = require("../../../Core/axios");
-const { ethereumBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
+const {
+	getNaasNodeUrl,
+	NAAS_CHAIN,
+	refreshNaasCatalogAfterUnauthorized,
+	isNaasNodeUnauthorizedError,
+} = require("../../../Core/naas-gateway-catalog");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 
@@ -59,29 +64,49 @@ const environment = "production";
  * @param {string} address
  * @returns {Promise<{ ETH: { balance: number }, tokens: [] }>}
  */
-const fetchAddressInfoViaEthRpc = async (address) => {
+const fetchAddressInfoViaEthRpc = async (address, didRefresh401 = false) => {
     const pid = infuraProjectId();
+    const ethMainnet = process.env.ETH_MAINNET_RPC_URL || null;
+    let catalogEthRpc = null;
+    try {
+        catalogEthRpc = await getNaasNodeUrl(NAAS_CHAIN.ETHEREUM);
+    } catch {
+        catalogEthRpc = null;
+    }
     const rpcUrl =
-        process.env.ETHPLORER_FALLBACK_RPC_URL ||
-        process.env.ETH_MAINNET_RPC_URL ||
-        ethereumBookFallbackDefaultUrl() ||
+        ethMainnet ||
+        catalogEthRpc ||
         (pid ? `https://mainnet.infura.io/v3/${pid}` : null);
 
     if (!rpcUrl) {
         throw new Error("ethplorer_fallback_rpc_unconfigured");
     }
 
-    const { data } = await instance.post(
-        rpcUrl,
-        { id: 0, method: "eth_getBalance", params: [address, "latest"], jsonrpc: "2.0" },
-        { headers: { "Content-Type": "application/json" } }
-    );
+    const usedNaasCatalogFallback = Boolean(!ethMainnet && catalogEthRpc && rpcUrl === catalogEthRpc);
 
-    if (data.error) {
-        throw new Error(data.error.message || "eth_getBalance_failed");
+    try {
+        const { data } = await instance.post(
+            rpcUrl,
+            { id: 0, method: "eth_getBalance", params: [address, "latest"], jsonrpc: "2.0" },
+            { headers: { "Content-Type": "application/json" } }
+        );
+
+        if (data.error) {
+            throw new Error(data.error.message || "eth_getBalance_failed");
+        }
+
+        return { ETH: { balance: weiHexToEth(data.result) }, tokens: [] };
+    } catch (err) {
+        if (
+            !didRefresh401 &&
+            usedNaasCatalogFallback &&
+            isNaasNodeUnauthorizedError(err)
+        ) {
+            await refreshNaasCatalogAfterUnauthorized();
+            return fetchAddressInfoViaEthRpc(address, true);
+        }
+        throw err;
     }
-
-    return { ETH: { balance: weiHexToEth(data.result) }, tokens: [] };
 };
 
 /**
