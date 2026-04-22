@@ -4,7 +4,14 @@ const cheerio = require("cheerio");
 const moment = require("moment");
 
 const { getCleanInstance } = require("../../../Core/axios");
-const { polygonBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
+const {
+	getNaasNodeUrl,
+	NAAS_CHAIN,
+	refreshNaasCatalogAfterUnauthorized,
+	isNaasNodeUnauthorizedError,
+	isNaasNodeInternalServerError,
+	postNaasJsonRpcWith500Retries,
+} = require("../../../Core/naas-gateway-catalog");
 const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
@@ -26,8 +33,8 @@ const polygonscanApiUrl = process.env.POLYGONSCAN_API_URL || process.env.ETHERSC
 
 const polygonRpcUrl = process.env.POLYGON_RPC_URL; // QuickNode only, no public RPCs
 
-/** SourceA NaaS JSON-RPC when POLYGON_RPC_URL fails or is unset — POLYGON_BOOK_FALLBACK_URL or SOURCE_A_SESSION_ID */
-const polygonBookRpcBase = () => process.env.POLYGON_BOOK_FALLBACK_URL || polygonBookFallbackDefaultUrl();
+/** Nodes catalog NaaS JSON-RPC when POLYGON_RPC_URL fails or is unset */
+const polygonBookRpcBase = async () => getNaasNodeUrl(NAAS_CHAIN.POLYGON);
 
 const POLYGONSCAN_BATCH_DELAY_MS = Number(process.env.POLYGONSCAN_BATCH_DELAY_MS || 350);
 const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 6);
@@ -45,19 +52,41 @@ function sleep(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Try primary POLYGON_RPC_URL first, then SourceA fallback; returns JSON-RPC response body or null */
-async function postPolygonRpc(payload) {
+/** Try primary POLYGON_RPC_URL first, then catalog NaaS fallback; returns JSON-RPC response body or null */
+async function postPolygonRpc(payload, options = {}) {
+	const didRefresh401 = options.didRefresh401 ?? false;
+	const didRefreshAfter500 = options.didRefreshAfter500 ?? false;
+
 	const primary = polygonRpcUrl || null;
-	const fallback = polygonBookRpcBase();
+	let fallback = null;
+	try {
+		fallback = await polygonBookRpcBase();
+	} catch (e) {
+		logPolygonDebug("polygon_tw_gateway_error", e?.message || e);
+	}
 	const candidates = [...new Set([primary, fallback].filter(Boolean))];
 
 	if (candidates.length === 0) return null;
 
+	const naas500Attempts = Number(process.env.POLYGON_NAAS_HTTP_500_MAX_ATTEMPTS || 3);
+	const naas500DelayMs = Number(process.env.POLYGON_NAAS_HTTP_500_RETRY_DELAY_MS || 300);
+
 	for (const url of candidates) {
 		try {
-			const { data } = await instance.post(url, payload, {
-				headers: { "Content-Type": "application/json" },
-			});
+			let data;
+			if (fallback && url === fallback) {
+				data = await postNaasJsonRpcWith500Retries(instance, url, payload, {
+					maxAttempts: naas500Attempts,
+					delayMs: naas500DelayMs,
+					onRetry: (attempt, max, u) =>
+						logPolygonDebug("polygon_naas_http_500_retry", attempt, "/", max, u),
+				});
+			} else {
+				const res = await instance.post(url, payload, {
+					headers: { "Content-Type": "application/json" },
+				});
+				data = res.data;
+			}
 
 			if (data?.error) {
 				logPolygonDebug("polygon_rpc_jsonrpc_error", url, data.error);
@@ -66,6 +95,24 @@ async function postPolygonRpc(payload) {
 
 			return data;
 		} catch (e) {
+			if (
+				!didRefresh401 &&
+				isNaasNodeUnauthorizedError(e) &&
+				fallback &&
+				url === fallback
+			) {
+				await refreshNaasCatalogAfterUnauthorized();
+				return postPolygonRpc(payload, { ...options, didRefresh401: true });
+			}
+			if (
+				!didRefreshAfter500 &&
+				fallback &&
+				url === fallback &&
+				isNaasNodeInternalServerError(e)
+			) {
+				await refreshNaasCatalogAfterUnauthorized();
+				return postPolygonRpc(payload, { ...options, didRefreshAfter500: true });
+			}
 			logPolygonDebug("polygon_rpc_transport_error", url, e?.message || e);
 		}
 	}
@@ -242,7 +289,7 @@ async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 
 		return hex === "0x" ? "0x0" : hex;
 	} catch (error) {
-		logPolygonDebug("rpc_balance_error", polygonRpcUrl || polygonBookRpcBase(), contractAddress, error?.message || error);
+		logPolygonDebug("rpc_balance_error", polygonRpcUrl || "naas_polygon_fallback", contractAddress, error?.message || error);
 
 		return "0x0";
 	}

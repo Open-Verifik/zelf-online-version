@@ -6,7 +6,14 @@ const urlBase = process.env.MICROSERVICES_BOGOTA_URL;
 const token = process.env.MICROSERVICES_BOGOTA_TOKEN;
 
 const { getCleanInstance } = require("../../../Core/axios");
-const { bscBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
+const {
+	getNaasNodeUrl,
+	NAAS_CHAIN,
+	refreshNaasCatalogAfterUnauthorized,
+	isNaasNodeUnauthorizedError,
+	isNaasNodeInternalServerError,
+	postNaasJsonRpcWith500Retries,
+} = require("../../../Core/naas-gateway-catalog");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
 const etherscanChains = require("../../etherscan/chains.json");
@@ -19,8 +26,8 @@ const instance = getCleanInstance(30000);
 const bscscanApiKey = process.env.BSCSCAN_API_KEY;
 const bscscanApiUrl = process.env.BSCSCAN_API_URL || "https://api.bscscan.com/api";
 const bscRpcUrl = process.env.BSC_RPC_URL; // QuickNode only
-/** SourceA NaaS when BSC_RPC_URL fails or is unset — BSC_BOOK_FALLBACK_URL or SOURCE_A_SESSION_ID */
-const bscBookRpcBase = () => process.env.BSC_BOOK_FALLBACK_URL || bscBookFallbackDefaultUrl();
+/** Nodes catalog NaaS when BSC_RPC_URL fails or is unset */
+const bscBookRpcBase = async () => getNaasNodeUrl(NAAS_CHAIN.SMARTCHAIN);
 const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 6);
 const BSCSCAN_BATCH_DELAY_MS = Number(process.env.BSCSCAN_BATCH_DELAY_MS || 350);
 
@@ -37,19 +44,41 @@ const dbgBsc = (...args) => {
 	}
 };
 
-/** Try BSC_RPC_URL first, then SourceA fallback */
-async function postBscRpc(payload) {
+/** Try BSC_RPC_URL first, then catalog NaaS fallback */
+async function postBscRpc(payload, options = {}) {
+	const didRefresh401 = options.didRefresh401 ?? false;
+	const didRefreshAfter500 = options.didRefreshAfter500 ?? false;
+
 	const primary = bscRpcUrl || null;
-	const fallback = bscBookRpcBase();
+	let fallback = null;
+	try {
+		fallback = await bscBookRpcBase();
+	} catch (e) {
+		dbgBsc("bsc_tw_gateway_error", e?.message || e);
+	}
 	const candidates = [...new Set([primary, fallback].filter(Boolean))];
 
 	if (candidates.length === 0) return null;
 
+	const naas500Attempts = Number(process.env.BSC_NAAS_HTTP_500_MAX_ATTEMPTS || 3);
+	const naas500DelayMs = Number(process.env.BSC_NAAS_HTTP_500_RETRY_DELAY_MS || 300);
+
 	for (const url of candidates) {
 		try {
-			const { data } = await instance.post(url, payload, {
-				headers: { "Content-Type": "application/json" },
-			});
+			let data;
+			if (fallback && url === fallback) {
+				data = await postNaasJsonRpcWith500Retries(instance, url, payload, {
+					maxAttempts: naas500Attempts,
+					delayMs: naas500DelayMs,
+					onRetry: (attempt, max, u) =>
+						dbgBsc("bsc_naas_http_500_retry", attempt, "/", max, u),
+				});
+			} else {
+				const res = await instance.post(url, payload, {
+					headers: { "Content-Type": "application/json" },
+				});
+				data = res.data;
+			}
 
 			if (data?.error) {
 				dbgBsc("bsc_rpc_jsonrpc_error", url, data.error);
@@ -58,6 +87,24 @@ async function postBscRpc(payload) {
 
 			return data;
 		} catch (e) {
+			if (
+				!didRefresh401 &&
+				isNaasNodeUnauthorizedError(e) &&
+				fallback &&
+				url === fallback
+			) {
+				await refreshNaasCatalogAfterUnauthorized();
+				return postBscRpc(payload, { ...options, didRefresh401: true });
+			}
+			if (
+				!didRefreshAfter500 &&
+				fallback &&
+				url === fallback &&
+				isNaasNodeInternalServerError(e)
+			) {
+				await refreshNaasCatalogAfterUnauthorized();
+				return postBscRpc(payload, { ...options, didRefreshAfter500: true });
+			}
 			dbgBsc("bsc_rpc_transport_error", url, e?.message || e);
 		}
 	}
@@ -232,7 +279,7 @@ async function getBep20BalanceViaRpc(contractAddress, userAddress) {
 
 		return hex === "0x" ? "0x0" : hex;
 	} catch (error) {
-		dbgBsc("rpc_balance_error", bscRpcUrl || bscBookRpcBase(), contractAddress, error?.message || error);
+		dbgBsc("rpc_balance_error", bscRpcUrl || "naas_smartchain_fallback", contractAddress, error?.message || error);
 
 		return "0x0";
 	}
