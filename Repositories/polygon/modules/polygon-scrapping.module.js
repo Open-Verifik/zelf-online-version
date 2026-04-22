@@ -223,7 +223,7 @@ async function getPolygonscanVerifiedContracts(contractAddresses) {
 
 							return null;
 						}
-					} catch (_) {}
+					} catch (_) { }
 
 					try {
 						const url = `${polygonscanApiUrl}?chainid=${POLYGON_CHAIN_ID}&module=contract&action=getsourcecode&address=${address}&apikey=${polygonscanApiKey}`;
@@ -913,27 +913,105 @@ const getGasTracker = async () => {
 	}
 };
 
-/**
- * get transaction status
- * @param {Object} params
- */
-const getTransactionStatus = async (params) => {
+/* ------------------------------------------------------------------------- *
+ * Polygon transaction status (GET /api/polygon/transaction/:id)
+ *
+ * Design contract:
+ *   - Each HTTP call performs ONE fast upstream attempt (no retry loop, no
+ *     sleep, no inter-source fallback in the same request).
+ *   - The client (extension) polls this endpoint on a short interval and
+ *     rotates `?source=rpc|bogota` until a real payload comes back, keeping
+ *     individual requests short and the server unblocked.
+ * ------------------------------------------------------------------------- */
+
+const isBogotaPolygonTxEmpty = (inner) => inner == null || (Array.isArray(inner) && inner.length === 0);
+
+const weiHexToPolString = (weiHex) => {
 	try {
-		const id = params.id;
+		return (Number(BigInt(weiHex || "0x0")) / 1e18).toString();
+	} catch (_) {
+		return "0";
+	}
+};
 
-		const { data } = await instance.get(`${urlBase}/api/evm-tx/polygon-transaction?address=${id}`, {
-			headers: {
-				Authorization: `Bearer ${token}`,
-			},
+/**
+ * Build a minimal tx detail from chain RPC. `eth_getTransactionReceipt` and
+ * `eth_getTransactionByHash` are independent reads, so we issue them in
+ * parallel to keep a single backend request fast.
+ * @param {string} txHash
+ */
+const buildPolygonTransactionFromRpc = async (txHash) => {
+	if (!txHash || typeof txHash !== "string" || !txHash.startsWith("0x")) return null;
+
+	const [receiptRes, txRes] = await Promise.all([
+		postPolygonRpc({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionReceipt", params: [txHash] }),
+		postPolygonRpc({ jsonrpc: "2.0", id: 2, method: "eth_getTransactionByHash", params: [txHash] }),
+	]);
+
+	const receipt = receiptRes && receiptRes.result;
+	const tx = txRes && txRes.result;
+	if (!receipt || !tx) return null;
+
+	const blockNum = receipt.blockNumber ? parseInt(String(receipt.blockNumber), 16) : 0;
+	const gasUsed = BigInt(receipt.gasUsed || "0x0");
+	const effPrice = BigInt(receipt.effectiveGasPrice || receipt.gasPrice || "0x0");
+	const feeWei = gasUsed * effPrice;
+	const isContractCall = tx.input && tx.input !== "0x" && String(tx.input).length > 2;
+
+	return {
+		id: txHash,
+		hash: txHash,
+		from: tx.from || "",
+		to: tx.to || "",
+		block: String(blockNum),
+		status: receipt.status === "0x1" ? "Success" : "Failed",
+		amount: weiHexToPolString(tx.value || "0x0"),
+		symbol: "POL",
+		network: "polygon",
+		date: new Date().toISOString().slice(0, 10),
+		timestamp: String(Math.floor(Date.now() / 1000)),
+		transactionFee: (Number(feeWei) / 1e18).toString(),
+		transactionFeeFiat: "0",
+		fiatAmount: 0,
+		gasPrice: "",
+		gwei: "",
+		age: "",
+		observation: "",
+		image: "",
+		transactionType: isContractCall ? "call" : "transfer",
+		tokensTransferred: [],
+	};
+};
+
+const fetchPolygonTxFromBogota = async (id) => {
+	if (!urlBase || !token) return null;
+	try {
+		const res = await instance.get(`${urlBase}/api/evm-tx/polygon-transaction?address=${id}`, {
+			headers: { Authorization: `Bearer ${token}` },
 		});
+		const inner = res && res.data && res.data.data;
+		return isBogotaPolygonTxEmpty(inner) ? null : inner;
+	} catch (e) {
+		logPolygonDebug("polygon_tx_bogota_error", e?.message || e);
+		return null;
+	}
+};
 
-		return data;
-	} catch (exception) {
-		const error = new Error("transaction_not_found");
+/**
+ * @param {Object} params  route params (`id` = tx hash)
+ * @param {Object} [query] query params (`source` = "rpc" | "bogota"; default "rpc")
+ * @returns the upstream payload, or `[]` when the chosen source has no data yet
+ */
+const getTransactionStatus = async (params, query = {}) => {
+	const id = params.id;
+	const source = String(query.source || "rpc").toLowerCase() === "bogota" ? "bogota" : "rpc";
 
-		error.status = 404;
-
-		throw error;
+	try {
+		const result = source === "bogota" ? await fetchPolygonTxFromBogota(id) : await buildPolygonTransactionFromRpc(id);
+		return result || [];
+	} catch (e) {
+		logPolygonDebug("polygon_tx_status_error", source, e?.message || e);
+		return [];
 	}
 };
 
@@ -953,7 +1031,7 @@ const getTransactionsList = async (params, query) => {
 		try {
 			const p = await getTickerPrice({ symbol: "POL" });
 			price = Number(p?.price || 0);
-		} catch (_) {}
+		} catch (_) { }
 
 		// Try OKLink first
 		let resp = await getOklinkTransactions(address, page, show, price);
@@ -969,7 +1047,7 @@ const getTransactionsList = async (params, query) => {
 				headers: token ? { Authorization: `Bearer ${token}` } : {},
 			});
 			return { pagination: { records: String(data?.length || 0), pages: "1", page: String(page) }, transactions: data || [] };
-		} catch (_) {}
+		} catch (_) { }
 
 		return { pagination: { records: "0", pages: "0", page: String(page) }, transactions: [] };
 	} catch (error) {
