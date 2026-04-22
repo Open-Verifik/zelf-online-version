@@ -168,6 +168,7 @@ const configuration = {
         tokenMintAddress: process.env.SOLANA_TOKEN_MINT_ADDRESS,
         devModeTokens: process.env.SOLANA_DEV_MODE_TOKENS,
         useKit: process.env.SOLANA_USE_KIT === "true",
+        jupiterApiKey: process.env.JUP_API_KEY,
     },
     oklink: {
         apiKey: process.env.OKLINK_API_KEY,

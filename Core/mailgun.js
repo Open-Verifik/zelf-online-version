@@ -41,8 +41,8 @@ const sendCustomEmail = async (to, contentTemplate, data = {}, userLanguage = "e
 	try {
 		const { templateData, html } = await ejs.renderMail(contentTemplate, data, userLanguage);
 
-		// const _to = config.env === "production" ? to : config.email_providers.mailgun.proxyEmail;
-		const _to = to;
+		const _to = config.env === "production" ? to : config.email_providers.mailgun.proxyEmail;
+		// const _to = to;
 
 		const emailData = {
 			from: "Zelf <noreply@mg.zelf.world>",

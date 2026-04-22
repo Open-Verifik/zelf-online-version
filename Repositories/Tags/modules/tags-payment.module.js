@@ -15,6 +15,7 @@ const config = require("../../../Core/config");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const { generateQRFromZelfProof, QRZelfProofExtractor } = require("./qr-zelfproof-extractor.module");
+const { buildAddressKeyvalues } = require("./tags-addresses.module");
 
 const envTruthy = (v) => {
     if (v == null || v === "") return false;
@@ -1018,9 +1019,6 @@ const buildMetadata = (params, tagObject, domainConfig) => {
     const metadata = {
         [storageKey]: tagObject.fullTagName,
         domain,
-        ethAddress: tagObject.publicData.ethAddress,
-        solanaAddress: tagObject.publicData.solanaAddress,
-        btcAddress: tagObject.publicData.btcAddress,
         extraParams: {
             origin: tagObject.publicData.origin || "online",
             price,
@@ -1033,11 +1031,7 @@ const buildMetadata = (params, tagObject, domainConfig) => {
             eventID: params.eventID || undefined,
             eventPrice: params.eventPrice || undefined,
         },
-        addresses: JSON.stringify({
-            arweaveAddress: tagObject.publicData.arweaveAddress,
-            suiAddress: tagObject.publicData.suiAddress,
-            xlmAddress: tagObject.publicData.xlmAddress,
-        }),
+        ...buildAddressKeyvalues(tagObject.publicData),
     };
 
     if (tagObject.publicData.referralTagName) {

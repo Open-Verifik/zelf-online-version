@@ -7,6 +7,7 @@ const explorerUrl = `https://viewblock.io/arweave/tx`;
 const moment = require("moment");
 const axios = require("axios");
 const { encrypt, encryptQR } = require("../../Wallet/modules/encryption");
+const { mergeAddressKeyvaluesIntoPublicData } = require("../../Tags/modules/tags-addresses.module");
 
 const zelfNamePricing = {
 	1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
@@ -194,13 +195,7 @@ const formatIPFSRecord = async (ipfsRecord, foundInArweave) => {
 		delete zelfNameObject.publicData.extraParams;
 	}
 
-	if (zelfNameObject.publicData.addresses) {
-		const addresses = JSON.parse(zelfNameObject.publicData.addresses);
-
-		Object.assign(zelfNameObject.publicData, addresses);
-
-		delete zelfNameObject.publicData.addresses;
-	}
+	mergeAddressKeyvaluesIntoPublicData(zelfNameObject.publicData);
 
 	if (zelfNameObject.publicData.leaseExpiresAt) zelfNameObject.publicData.expiresAt = zelfNameObject.publicData.leaseExpiresAt;
 

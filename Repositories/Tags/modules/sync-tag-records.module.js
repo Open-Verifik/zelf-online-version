@@ -1,12 +1,30 @@
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { healPublicDataXlm } = require("../../Wallet/modules/stellar");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
+const { createPolkadotWallet, createKusamaWallet } = require("../../Wallet/modules/polkadot-kusama");
 const SessionModule = require("../../Session/modules/session.module");
 const TagsPartsModule = require("./tags-parts.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const TagsIPFSModule = require("./tags-ipfs.module");
 const moment = require("moment");
 const { getDomainConfig } = require("../config/supported-domains");
+const { buildAddressKeyvalues } = require("./tags-addresses.module");
+
+/**
+ * Address fields are packed into chunked keyvalues by `buildAddressKeyvalues`,
+ * not stored as standalone Pinata keyvalues. Anything in this set must NOT be
+ * promoted to a top-level metadata key by the `tagsToAdd` loop below.
+ */
+const ADDRESS_FIELDS_HANDLED_BY_BUNDLE = new Set([
+    "ethAddress",
+    "solanaAddress",
+    "btcAddress",
+    "arweaveAddress",
+    "suiAddress",
+    "xlmAddress",
+    "dotAddress",
+    "ksmAddress",
+]);
 
 /**
  * Sync Tag Records Module for Tags
@@ -42,6 +60,19 @@ const initTagUpdates = async (tagObject, secretKeys) => {
         tagsToAdd.push({ name: "xlmAddress", value: tagObject.publicData.xlmAddress, new: !hadXlmBeforeHeal });
     }
 
+    const polkadot = await createPolkadotWallet(mnemonic);
+    const kusama = await createKusamaWallet(mnemonic);
+
+    if (!tagObject.publicData.dotAddress) {
+        tagObject.publicData.dotAddress = polkadot.address;
+        tagsToAdd.push({ name: "dotAddress", value: polkadot.address, new: true });
+    }
+
+    if (!tagObject.publicData.ksmAddress) {
+        tagObject.publicData.ksmAddress = kusama.address;
+        tagsToAdd.push({ name: "ksmAddress", value: kusama.address, new: true });
+    }
+
     const domainConfig = getDomainConfig(tagObject.publicData.domain || "zelf");
 
     const walletScopeKey = TagsPartsModule.getWalletScopeKey(tagObject.publicData, domainConfig);
@@ -54,6 +85,7 @@ const initTagUpdates = async (tagObject, secretKeys) => {
             suiSecretKey: sui.secretKey,
             stellarSecretKey: stellar.secretKey,
             arweavePrivateKey,
+            substrateSecretKey: polkadot.secretKey,
         },
         walletScopeKey,
         password,
@@ -94,9 +126,6 @@ const updateTags = async (tagObject, tagsToAdd) => {
 
     const metadata = {
         [tagKey]: tagName,
-        ethAddress: tagObject.publicData.ethAddress || undefined,
-        btcAddress: tagObject.publicData.btcAddress || undefined,
-        solanaAddress: tagObject.publicData.solanaAddress || undefined,
         extraParams,
         type: tagObject.publicData.type || (tagName.includes("hold") ? "hold" : "mainnet"),
     };
@@ -110,20 +139,14 @@ const updateTags = async (tagObject, tagsToAdd) => {
             continue;
         }
 
+        // Address fields are folded into the chunked address keyvalues below,
+        // so they must not be added as top-level metadata keys.
+        if (ADDRESS_FIELDS_HANDLED_BY_BUNDLE.has(tag.name)) continue;
+
         metadata[tag.name] = tag.value;
     }
 
-    const addressBundle = Object.fromEntries(
-        Object.entries({
-            arweaveAddress: tagObject.publicData.arweaveAddress,
-            suiAddress: tagObject.publicData.suiAddress,
-            xlmAddress: tagObject.publicData.xlmAddress,
-        }).filter(([, v]) => typeof v === "string" && v.trim())
-    );
-
-    if (Object.keys(addressBundle).length) {
-        metadata.addresses = JSON.stringify(addressBundle);
-    }
+    Object.assign(metadata, buildAddressKeyvalues(tagObject.publicData));
 
     metadata.extraParams = JSON.stringify(metadata.extraParams);
 

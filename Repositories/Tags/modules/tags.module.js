@@ -7,6 +7,7 @@ const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
 const { createStellarWallet } = require("../../Wallet/modules/stellar");
+const { createPolkadotWallet, createKusamaWallet } = require("../../Wallet/modules/polkadot-kusama");
 const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const config = require("../../../Core/config");
@@ -68,7 +69,7 @@ const leaseTag = async (params, authUser) => {
         securityType = /^\d{6}$/.test(password) ? "pin" : "password";
     }
 
-    const { eth, btc, solana, sui, stellar, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
+    const { eth, btc, solana, sui, stellar, polkadot, kusama, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
         ...params,
         mnemonic: decryptedParams.mnemonic,
     });
@@ -102,7 +103,7 @@ const leaseTag = async (params, authUser) => {
     TagsPartsModule.assignProperties(
         tagObject,
         dataToEncrypt,
-        { eth, btc, solana, sui, stellar, arweave },
+        { eth, btc, solana, sui, stellar, arweave, polkadot, kusama },
         { ...params, password: dataToEncrypt.password, referralTagObject },
         domainConfig
     );
@@ -123,7 +124,7 @@ const leaseTag = async (params, authUser) => {
         tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
     }
 
-    const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, stellar, arweave }, password);
+    const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, stellar, arweave, polkadot, kusama }, password);
 
     return {
         ipfs: [tagObject.ipfs],
@@ -147,6 +148,7 @@ const leaseTag = async (params, authUser) => {
                       mnemonic,
                       arweavePrivateKey: arweave.privateKey,
                       stellarSecretKey: stellar.secretKey,
+                      substrateSecretKey: polkadot.secretKey,
                   },
     };
 };
@@ -234,7 +236,8 @@ const decryptTag = async (params, authUser) => {
     // Generate Arweave wallet from mnemonic for consistency
     const arweave = await ArweaveModule.generateWalletFromMnemonic(mnemonic);
 
-    // XLM address heal, addresses JSON on re-pin, and stellarSecretKey in wallet encrypt live in sync-tag-records.module (initTagUpdates / updateTags).
+    // XLM heal + Polkadot/Kusama backfill (publicData + addresses JSON on re-pin) and stellarSecretKey / substrateSecretKey
+    // in wallet encrypt live in sync-tag-records.module (initTagUpdates / updateTags).
     const { encryptedMessage, privateKey, tagsToAdd } = await initTagUpdates(tagObject, {
         mnemonic,
         zkProof,
@@ -266,7 +269,16 @@ const decryptTag = async (params, authUser) => {
             },
             config.JWT_SECRET
         ),
-        metadata: config.env === "development" ? { mnemonic, zkProof, solanaSecretKey, arweavePrivateKey: arweave.privateKey } : undefined,
+        metadata:
+            config.env === "development"
+                ? {
+                      mnemonic,
+                      zkProof,
+                      solanaSecretKey,
+                      arweavePrivateKey: arweave.privateKey,
+                      substrateSecretKey: (await createPolkadotWallet(mnemonic)).secretKey,
+                  }
+                : undefined,
     };
 };
 
@@ -464,6 +476,8 @@ const _createWalletsFromPhrase = async (params) => {
     const solana = await createSolanaWallet(_mnemonic);
     const sui = await generateSuiWalletFromMnemonic(_mnemonic);
     const stellar = createStellarWallet(_mnemonic);
+    const polkadot = await createPolkadotWallet(_mnemonic);
+    const kusama = await createKusamaWallet(_mnemonic);
 
     const zkProof = await OfflineProofModule.createProof(_mnemonic);
     const arweave = await ArweaveModule.generateWalletFromMnemonic(_mnemonic);
@@ -474,6 +488,8 @@ const _createWalletsFromPhrase = async (params) => {
         solana,
         sui,
         stellar,
+        polkadot,
+        kusama,
         zkProof,
         mnemonic: _mnemonic,
         arweave,

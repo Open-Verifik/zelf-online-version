@@ -3,12 +3,13 @@ const { generateRandomUserAgent } = require("../../../Core/helpers");
 const { solanaBookFallbackDefaultUrl } = require("../../../Core/source-a-naas");
 const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
+const { getKnownSplDisplay, WSOL_MINT } = require("./solana-spl-known-metadata");
+const { enrichSplTokenRowsWithJupiter } = require("./jupiter-spl-metadata.module");
 
 const instance = getCleanInstance(30000);
 
 /** SourceA NaaS JSON-RPC — SOLANA_BOOK_FALLBACK_URL overrides full URL; else SOURCE_A_SESSION_ID */
 const SPL_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-const WSOL_MINT = "So11111111111111111111111111111111111111112";
 
 /** Cap SPL rows bundled into address overview (full list via GET …/token/:id with pagination). */
 const MAX_SPL_IN_ADDRESS_OVERVIEW = 200;
@@ -73,15 +74,15 @@ function parsedTokenAccountsToHoldings(ownerAddress, value) {
 		const ui = ta.uiAmount != null ? Number(ta.uiAmount) : Number(raw) / 10 ** decimals;
 
 		const mint = info.mint || "";
-		const isWsol = mint === WSOL_MINT;
+		const known = getKnownSplDisplay(mint);
 
 		tokens.push({
 			fiatBalance: 0,
-			name: isWsol ? "Wrapped SOL" : `SPL ${mint.slice(0, 4)}…${mint.slice(-4)}`,
+			name: known?.name || `SPL ${mint.slice(0, 4)}…${mint.slice(-4)}`,
 			amount: ui,
 			price: 0,
-			symbol: isWsol ? "WSOL" : "SPL",
-			image: "",
+			symbol: known?.symbol || "SPL",
+			image: known?.image || "",
 			address: row.pubkey,
 			tokenAddress: mint,
 			tokenType: "SPL",
@@ -119,6 +120,7 @@ const getAddress = async (params) => {
 		{ encoding: "jsonParsed" },
 	]);
 	const tokenHoldings = parsedTokenAccountsToHoldings(address, tokenResult?.value);
+	await enrichSplTokenRowsWithJupiter(tokenHoldings.tokens);
 	const splTotal = tokenHoldings.tokens.length;
 	if (splTotal > MAX_SPL_IN_ADDRESS_OVERVIEW) {
 		tokenHoldings.tokens = tokenHoldings.tokens.slice(0, MAX_SPL_IN_ADDRESS_OVERVIEW);
@@ -174,6 +176,7 @@ const getTokens = async (params, query = {}) => {
 		{ encoding: "jsonParsed" },
 	]);
 	const full = parsedTokenAccountsToHoldings(address, tokenResult?.value);
+	await enrichSplTokenRowsWithJupiter(full.tokens);
 	const start = page * show;
 	const slice = full.tokens.slice(start, start + show);
 	return {
@@ -208,4 +211,5 @@ module.exports = {
 	getAddress,
 	getTokens,
 	getTransactions,
+	parsedTokenAccountsToHoldings,
 };

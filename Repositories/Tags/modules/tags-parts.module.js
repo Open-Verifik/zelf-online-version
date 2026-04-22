@@ -388,7 +388,7 @@ const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainCo
         referralTagName ? `${referralTagName}.${domainConfig.name}` : ""
     );
 
-    const { eth, btc, solana, sui, stellar, arweave } = addresses;
+    const { eth, btc, solana, sui, stellar, arweave, polkadot, kusama } = addresses;
 
     tagObject.price = price;
     tagObject.reward = reward;
@@ -400,6 +400,8 @@ const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainCo
     tagObject.suiAddress = sui.address;
     tagObject.xlmAddress = stellar.address;
     tagObject.arweaveAddress = arweave.address;
+    tagObject.dotAddress = polkadot?.address;
+    tagObject.ksmAddress = kusama?.address;
     tagObject.hasPassword = `${Boolean(payload.password)}`;
 };
 
@@ -447,7 +449,7 @@ const getWalletScopeKey = (publicData, domainConfig) => {
 };
 
 const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
-    const { eth, solana, sui, stellar, arweave } = addresses;
+    const { eth, solana, sui, stellar, arweave, polkadot } = addresses;
 
     const { mnemonic, zkProof } = dataToEncrypt.metadata;
     const domainConfig = getDomainConfig(dataToEncrypt.publicData.domain || "zelf");
@@ -465,6 +467,7 @@ const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
             suiSecretKey: sui.secretKey,
             stellarSecretKey: stellar.secretKey,
             arweavePrivateKey: arweave.privateKey,
+            substrateSecretKey: polkadot?.secretKey,
         },
         walletScopeKey,
         password,
