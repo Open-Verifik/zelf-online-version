@@ -64,6 +64,20 @@ const get = async (params = {}, authUser = {}) => {
 };
 
 /**
+ * Staff Zelf record by `staffEmail` IPFS index only — does not use `accountEmail` first.
+ * Needed so license/tag flows decrypt the staff zelfProof, not an org owner client that shares the same email lookup.
+ * @param {string} email - Staff login email (matches staff invitation / staffEmail index)
+ * @returns {Object|null}
+ */
+const getByStaffEmail = async (email) => {
+	if (!email || !String(email).trim()) return null;
+
+	const records = await IPFSModule.get({ key: "staffEmail", value: String(email).trim() });
+
+	return records?.length ? records[0] : null;
+};
+
+/**
  *
  * @param {Object} params
  * @param {Object} authUser
@@ -425,8 +439,12 @@ const auth = async (data, authUser) => {
 	const solana = await createSolanaWallet(decryptedZelfAccount.metadata.mnemonic);
 	const sui = await generateSuiWalletFromMnemonic(decryptedZelfAccount.metadata.mnemonic);
 
+	const staffEmailOnly = isStaffAccount ? (accountJSON.data.staffEmail || data.email) : null;
+
+	const clientEmailLine =
+		accountJSON.data.email || accountJSON.data.clientEmail || data.email;
+
 	const jwtPayload = {
-		email: accountJSON.data.email || accountJSON.data.staffEmail || accountJSON.data.clientEmail || data.email,
 		accountType,
 		solanaAddress: solana.address,
 		phone: accountJSON.data.phone || accountJSON.data.staffPhone || accountJSON.data.clientPhone || data.phone,
@@ -435,6 +453,16 @@ const auth = async (data, authUser) => {
 	};
 
 	if (isStaffAccount) {
+		if (staffEmailOnly) {
+			jwtPayload.email = staffEmailOnly;
+			jwtPayload.staffEmail = staffEmailOnly;
+		}
+		// Dashboard PermissionService / RBAC: staff default to "read" if omitted — must match invitation JSON or metadata
+		const staffRole =
+			accountJSON.data.role || decryptedZelfAccount?.metadata?.staffRole || decryptedZelfAccount?.metadata?.role;
+		if (staffRole) {
+			jwtPayload.role = staffRole;
+		}
 		const ownerEmailForStaff =
 			accountJSON.data.ownerEmail ||
 			accountJSON.data.staffOwnerEmail ||
@@ -442,6 +470,8 @@ const auth = async (data, authUser) => {
 		if (ownerEmailForStaff) {
 			jwtPayload.ownerEmail = ownerEmailForStaff;
 		}
+	} else {
+		jwtPayload.email = clientEmailLine;
 	}
 
 	return {
@@ -568,6 +598,7 @@ const updatePassword = async (data, authUser) => {
 
 module.exports = {
 	get,
+	getByStaffEmail,
 	show,
 	create,
 	update,
