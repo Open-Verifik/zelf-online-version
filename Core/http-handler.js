@@ -78,9 +78,8 @@ const tryCatchLog = async (status = "failed", message, code, exception, ctx = nu
 				headerMessage += `\n**Headers:**\n\`\`\`json\n${JSON.stringify(headersToKeep, null, 2)}\n\`\`\`\n`;
 
 				if (headers["user-agent"]) {
-					headerMessage += `\n**User-Agent:** \`${headers["user-agent"].substring(0, 100)}${
-						headers["user-agent"].length > 100 ? "..." : ""
-					}\``;
+					headerMessage += `\n**User-Agent:** \`${headers["user-agent"].substring(0, 100)}${headers["user-agent"].length > 100 ? "..." : ""
+						}\``;
 				}
 				if (headers["referer"]) {
 					headerMessage += `\n**Referer:** \`${headers["referer"]}\``;
@@ -99,16 +98,14 @@ const tryCatchLog = async (status = "failed", message, code, exception, ctx = nu
 					if (hasBody) {
 						headerMessage += `\n### 📝 **Request Parameters**\n`;
 						const bodyStr = JSON.stringify(ctx.request.body, null, 2);
-						headerMessage += `**Request Body:**\n\`\`\`json\n${
-							bodyStr.length > 300 ? bodyStr.substring(0, 300) + "..." : bodyStr
-						}\n\`\`\``;
+						headerMessage += `**Request Body:**\n\`\`\`json\n${bodyStr.length > 300 ? bodyStr.substring(0, 300) + "..." : bodyStr
+							}\n\`\`\``;
 					}
 
 					if (hasQuery) {
 						const queryStr = JSON.stringify(ctx.request.query, null, 2);
-						headerMessage += `\n**Query Parameters:**\n\`\`\`json\n${
-							queryStr.length > 200 ? queryStr.substring(0, 200) + "..." : queryStr
-						}\n\`\`\``;
+						headerMessage += `\n**Query Parameters:**\n\`\`\`json\n${queryStr.length > 200 ? queryStr.substring(0, 200) + "..." : queryStr
+							}\n\`\`\``;
 					}
 				}
 			}
@@ -173,6 +170,32 @@ const errorHandler = (exception, ctx = null, optionalMessage) => {
 		};
 	}
 
+	// Errors that only set .status — reuse the same switch(exception.message) as numeric strings ("400"…),
+	// not a parallel mapping. "NNN:detail" in message is still handled by default split below.
+	if (
+		exception &&
+		Number.isFinite(exception.status) &&
+		exception.status >= 400 &&
+		exception.status < 600 &&
+		!(typeof exception.message === "string" && /^\d{3}:/.test(exception.message.trim()))
+	) {
+		const raw = typeof exception.message === "string" ? exception.message : "";
+		const isBareNumericCode = /^\d{3}$/.test(String(raw).trim());
+		const detail =
+			exception.clientMessage ||
+			(raw && !isBareNumericCode ? raw.replace(/_/g, " ") : null) ||
+			optionalMessage ||
+			"Request failed";
+
+		const inner = errorHandler({ message: String(exception.status) }, ctx, detail);
+
+		if (typeof exception.code === "string" && exception.code) {
+			return { ...inner, code: exception.code };
+		}
+
+		return inner;
+	}
+
 	let status = 500;
 	let message = "Internal Server Error";
 	let code = "InternalServerError";
@@ -207,6 +230,31 @@ const errorHandler = (exception, ctx = null, optionalMessage) => {
 			status = 429;
 			message = optionalMessage || "Too many requests. Please try again later.";
 			code = "TooManyRequests";
+			break;
+		case "405":
+			status = 405;
+			message = optionalMessage || "Method not allowed.";
+			code = "MethodNotAllowed";
+			break;
+		case "408":
+			status = 408;
+			message = optionalMessage || "Request timeout.";
+			code = "RequestTimeout";
+			break;
+		case "413":
+			status = 413;
+			message = optionalMessage || "Payload too large.";
+			code = "PayloadTooLarge";
+			break;
+		case "502":
+			status = 502;
+			message = optionalMessage || "Bad gateway.";
+			code = "BadGateway";
+			break;
+		case "503":
+			status = 503;
+			message = optionalMessage || "Service unavailable.";
+			code = "ServiceUnavailable";
 			break;
 		case "412":
 			status = 412;

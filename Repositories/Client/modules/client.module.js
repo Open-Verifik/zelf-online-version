@@ -434,6 +434,16 @@ const auth = async (data, authUser) => {
 		exp: moment().add(30, "day").unix(),
 	};
 
+	if (isStaffAccount) {
+		const ownerEmailForStaff =
+			accountJSON.data.ownerEmail ||
+			accountJSON.data.staffOwnerEmail ||
+			decryptedZelfAccount?.metadata?.ownerEmail;
+		if (ownerEmailForStaff) {
+			jwtPayload.ownerEmail = ownerEmailForStaff;
+		}
+	}
+
 	return {
 		wallet: {
 			ethAddress: eth.address,

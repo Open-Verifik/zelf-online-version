@@ -205,8 +205,10 @@ const searchLicense = async (query, user) => {
  * @returns {Promise<Array>} - Array of user's licenses
  */
 const getMyLicense = async (jwt, withJSON = false, ownershipCredentials) => {
-    // Determine the target email: if staff, use ownerEmail; otherwise use user's email
-    const targetEmail = jwt.accountType === "staff" && jwt.ownerEmail ? jwt.ownerEmail : jwt.email;
+    // Staff JWT may use accountType "staff" (Staff auth) or "staff_account" (unified Client auth)
+    const isStaffUser = jwt.accountType === "staff" || jwt.accountType === "staff_account";
+    // If staff, use owner email so license + decrypt resolve to the org owner's Zelf account
+    const targetEmail = isStaffUser && jwt.ownerEmail ? jwt.ownerEmail : jwt.email;
 
     // Get client data to get the zelfProof
     const client = await ClientModule.get({ email: targetEmail });

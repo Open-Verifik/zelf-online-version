@@ -1082,10 +1082,18 @@ const extendLicenseForOwner = async (tagName, domain, duration, ownershipCredent
 
     const tagObject = tagData.tagObject;
 
+    const tagKey = domainConfig.getTagKey();
+
+    const tagStorageValue = tagObject.publicData[tagKey];
+
+    if (typeof tagStorageValue !== "string" || !tagStorageValue.trim()) {
+        throw new Error("422:tag_storage_value_missing");
+    }
+
     // 4. Extend the duration (price: 0 since owner is not paying)
     const renewal = await addDurationToTag(
         {
-            tagName: tagObject.publicData[domainConfig.getTagKey()].split(".")[0],
+            tagName: tagStorageValue.split(".")[0],
             price: 0,
             domain,
             duration: duration === "lifetime" ? 100 : Number(duration),
