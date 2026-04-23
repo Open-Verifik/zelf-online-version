@@ -65,7 +65,6 @@ const fetchAndMergeOfficialThemeSettings = async (domainConfig) => {
     if (!url) return;
 
     try {
-        console.log("fetching theme settings from:", url);
         const jsonResponse = await axios.get(url);
         const remote = _normalizeRemoteThemePayload(jsonResponse.data);
         domainConfig.themeSettings = _deepMergeThemeObjects(domainConfig.themeSettings || {}, remote);
@@ -82,7 +81,6 @@ const loadCache = () => {
     try {
         const cached = licenseCache.get("official-licenses");
         if (cached) {
-            console.info("Loading official licenses from memory cache");
             return cached;
         }
         return null;
@@ -101,7 +99,6 @@ const saveCache = (licenses) => {
         // Check if we need to update the cache (avoid unnecessary operations)
         const existingCache = loadCache();
         if (existingCache && JSON.stringify(existingCache) === JSON.stringify(licenses)) {
-            console.log("Cache unchanged, skipping update");
             return;
         }
 
@@ -113,7 +110,7 @@ const saveCache = (licenses) => {
         // Save to memory cache with automatic expiration
         licenseCache.set("official-licenses", licensesMap);
 
-        console.log(
+        console.info(
             `Official licenses cached successfully (${licenses.length} licenses, TTL: ${licenseCache.getTtl("official-licenses") ? Math.round((licenseCache.getTtl("official-licenses") - Date.now()) / 1000) : "N/A"
             }s)`
         );
@@ -127,7 +124,6 @@ const saveCache = (licenses) => {
  */
 const clearCache = () => {
     licenseCache.del("official-licenses");
-    console.log("License cache cleared");
 };
 
 /**
@@ -247,14 +243,12 @@ const _getMyLicenseForStaffWithCredentials = async (jwt, withJSON, ownershipCred
 
     const accountZelfProof = accountJSON.data.zelfProof;
 
-    const decryptedAccount = await decrypt({
+    await decrypt({
         zelfProof: accountZelfProof,
         faceBase64,
         password: masterPassword || undefined,
         verifierKey: config.zelfEncrypt.serverKey,
     });
-
-    console.log("decryptedAccount", decryptedAccount);
 
     const orgOwnerEmail = _resolveStaffOrgOwnerEmail(client, accountJSON.data);
 
@@ -653,8 +647,6 @@ const loadOfficialLicenses = async (force = false) => {
 
         // Save to cache with automatic expiration
         saveCache(licenses);
-
-        console.info(`Loaded ${licenses.length} official licenses successfully`);
 
         return licenses;
     } catch (error) {
