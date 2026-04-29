@@ -18,7 +18,7 @@ const BlogSchema = new Schema({
             type: String,
         },
     ],
-    published: defaultField(Boolean, false),
+    published: defaultField(Boolean, true),
     canonicalSlug: { type: String, required: false },
     locale: defaultField(String, "en"),
 });

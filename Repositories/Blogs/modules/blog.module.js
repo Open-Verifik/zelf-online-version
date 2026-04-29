@@ -18,14 +18,9 @@ function buildBlogListFilter(params = {}) {
 
     let pubClause = null;
     if (!includeDrafts && !explicitPublished) {
-        /** Legacy imports often omit `published`; treat like locale — include unless explicitly false. */
+        /** Public list: exclude only explicit drafts (boolean/string 0). Omit missing/unusual legacy shapes — Compass counts ≠ matched-by-this-query rows if almost everything is draft:false. */
         pubClause = {
-            $or: [
-                { published: true },
-                { published: "true" },
-                { published: { $exists: false } },
-                { published: null },
-            ],
+            $nor: [{ published: false }, { published: "false" }, { published: 0 }, { published: "0" }],
         };
     } else if (explicitPublished) {
         pubClause = _truthy(params.where_published)
