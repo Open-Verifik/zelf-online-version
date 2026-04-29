@@ -1,11 +1,13 @@
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
+const matter = require("gray-matter");
 const { initMongoDB } = require("../Core/database");
 const Blog = require("../Repositories/Blogs/models/blog.model");
-const matter = require("/Users/miguel/ai-made/landing-zelf-nextjs/node_modules/gray-matter");
+const { resolveBlogContentDir, assertBlogContentDirExists } = require("./blog-content-dir.util.js");
 
-const contentDir = "/Users/miguel/ai-made/landing-zelf-nextjs/content/blog";
+const contentDir = resolveBlogContentDir();
+assertBlogContentDirExists(contentDir);
 
 /**
  * Extract a useful description from markdown content.

@@ -12,6 +12,7 @@ const BlogSchema = new Schema({
     date: defaultField(Date, Date.now),
     markdownContent: requiredField(String),
     coverImage: { type: String, required: false },
+    imageAlt: { type: String, required: false },
     tags: [
         {
             type: String,

@@ -115,10 +115,15 @@ const requestOtp = async (data) => {
     // For safety, let's pass an object that matches standard code emails.
     await Mailgun.sendCustomEmail(
         email,
-        "general_notification", // Using a fallback template or maybe none if we assume plain text isn't directly supported. Actually, "general_notification" might not exist.
+        "otp",
         {
             subject: "Zelf Super Admin - Your Login Code",
-            message: `Your login code is: ${otp}. It will expire in 15 minutes.`,
+            message: `Use the code below to sign in to your admin account. It will expire in 15 minutes.`,
+            otp,
+            authLink: "",
+            do_not_share: "Please do not share this code with anyone.",
+            did_not_request: "If you didn't request this code, you can safely ignore this email.",
+            verifikSigned: false,
         },
         "en"
     );

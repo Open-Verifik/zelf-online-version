@@ -1,12 +1,13 @@
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
+const matter = require("gray-matter");
 const { initMongoDB } = require("../Core/database");
 const Blog = require("../Repositories/Blogs/models/blog.model");
+const { resolveBlogContentDir, assertBlogContentDirExists } = require("./blog-content-dir.util.js");
 
-const contentDir = "/Users/miguel/ai-made/landing-zelf-nextjs/content/blog";
-
-const matter = require("/Users/miguel/ai-made/landing-zelf-nextjs/node_modules/gray-matter");
+const contentDir = resolveBlogContentDir();
+assertBlogContentDirExists(contentDir);
 
 const parseFrontmatter = (fileContent) => {
     try {
@@ -22,6 +23,13 @@ const getFolders = (src) => {
     return fs.readdirSync(src).filter((file) => fs.statSync(path.join(src, file)).isDirectory());
 };
 
+/** Skip repo housekeeping files accidentally named *.md */
+function isBlogPostFile(filename) {
+    const lower = filename.toLowerCase();
+    if (lower === "readme.md" || lower === "readme.mdx") return false;
+    return lower.endsWith(".md") || lower.endsWith(".mdx");
+}
+
 const seedBlogs = async () => {
     try {
         console.log("Connecting to the database...");
@@ -31,7 +39,7 @@ const seedBlogs = async () => {
             console.log("Connected. Sifting through Next.js Blog folder...");
 
             // 1. Get all English posts
-            const enFiles = fs.readdirSync(contentDir).filter((f) => f.endsWith(".md") || f.endsWith(".mdx"));
+            const enFiles = fs.readdirSync(contentDir).filter(isBlogPostFile);
             let allPosts = [];
 
             for (const file of enFiles) {
@@ -67,7 +75,7 @@ const seedBlogs = async () => {
 
             for (const locale of locales) {
                 const locDir = path.join(contentDir, locale);
-                const lsFiles = fs.readdirSync(locDir).filter((f) => f.endsWith(".md") || f.endsWith(".mdx"));
+                const lsFiles = fs.readdirSync(locDir).filter(isBlogPostFile);
 
                 for (const file of lsFiles) {
                     const fullPath = path.join(locDir, file);
@@ -95,6 +103,19 @@ const seedBlogs = async () => {
             }
 
             console.log(`Found ${finalDocs.length} total blogs and translation variants.`);
+
+            if (finalDocs.length === 0) {
+                const allowEmpty = process.env.ALLOW_EMPTY_BLOG_SEED === "1" || process.env.ALLOW_EMPTY_BLOG_SEED === "true";
+                if (!allowEmpty) {
+                    console.error("\nNo .md/.mdx posts found — nothing to import. Database was not modified.");
+                    console.error(`Source folder: ${contentDir}`);
+                    console.error("Add English posts as *.md/*.mdx here and translations under locale subfolders.");
+                    console.error("To wipe all blogs despite zero files: ALLOW_EMPTY_BLOG_SEED=1 node scripts/seed-blogs.js\n");
+                    process.exit(1);
+                }
+                console.warn("ALLOW_EMPTY_BLOG_SEED set — wiping blog collection with 0 Markdown sources.");
+            }
+
             console.log("Wiping existing DB blogs for a clean slate...");
             await Blog.deleteMany({});
 
@@ -104,7 +125,7 @@ const seedBlogs = async () => {
                 await Blog.findOneAndUpdate({ slug: doc.slug, locale: doc.locale }, doc, { upsert: true, new: true });
             }
 
-            console.log("✅ Successfully seeded the latest 5 blogs + translations into MongoDB!");
+            console.log(`✅ Seeded ${finalDocs.length} blog document(s) into MongoDB.`);
             process.exit(0);
         });
 
