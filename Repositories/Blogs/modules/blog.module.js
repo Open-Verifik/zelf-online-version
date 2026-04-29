@@ -18,8 +18,14 @@ function buildBlogListFilter(params = {}) {
 
     let pubClause = null;
     if (!includeDrafts && !explicitPublished) {
+        /** Legacy imports often omit `published`; treat like locale — include unless explicitly false. */
         pubClause = {
-            $or: [{ published: true }, { published: "true" }],
+            $or: [
+                { published: true },
+                { published: "true" },
+                { published: { $exists: false } },
+                { published: null },
+            ],
         };
     } else if (explicitPublished) {
         pubClause = _truthy(params.where_published)
