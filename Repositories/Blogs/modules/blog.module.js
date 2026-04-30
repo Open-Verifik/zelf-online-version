@@ -41,6 +41,12 @@ function buildBlogListFilter(params = {}) {
         filter.locale = loc;
     }
 
+    const canonical =
+        typeof params.where_canonicalSlug === "string" ? params.where_canonicalSlug.trim() : "";
+    if (canonical) {
+        and.push({ canonicalSlug: canonical });
+    }
+
     if (and.length) {
         filter.$and = and;
     }
@@ -51,6 +57,12 @@ function buildBlogListFilter(params = {}) {
 const get = async (params = {}, authUser = {}) => {
     const mongoFilter = buildBlogListFilter(params);
     let q = Model.find(mongoFilter).sort(params.sort || "-createdAt");
+
+    const canonicalLookup =
+        typeof params.where_canonicalSlug === "string" ? params.where_canonicalSlug.trim() : "";
+    if (canonicalLookup) {
+        q = q.select("slug locale canonicalSlug published createdAt").lean();
+    }
 
     if (params.limit) {
         q = q.limit(Number(params.limit));
