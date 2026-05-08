@@ -115,7 +115,6 @@ const updateTags = async (tagObject, tagsToAdd) => {
     const extraParams = {
         hasPassword: tagObject.publicData.hasPassword,
         origin: tagObject.publicData.origin || "online",
-        suiAddress: tagObject.publicData.suiAddress || undefined,
         registeredAt: moment(tagObject.publicData.registeredAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss") || undefined,
         expiresAt: moment(tagObject.publicData.expiresAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss") || undefined,
         price: tagObject.publicData.price || undefined,
@@ -132,12 +131,6 @@ const updateTags = async (tagObject, tagsToAdd) => {
 
     for (let index = 0; index < tagsToAdd.length; index++) {
         const tag = tagsToAdd[index];
-
-        if (tag.name === "suiAddress") {
-            metadata.extraParams.suiAddress = tag.value;
-
-            continue;
-        }
 
         // Address fields are folded into the chunked address keyvalues below,
         // so they must not be added as top-level metadata keys.

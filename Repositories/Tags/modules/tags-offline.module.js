@@ -99,12 +99,9 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
     // keys to updte goes here
     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-    if (syncPublicData.suiAddress) {
-        metadata.extraParams.suiAddress = syncPublicData.suiAddress;
-    }
-
     const addressSource = {
         ...tagObject.publicData,
+        suiAddress: syncPublicData.suiAddress || tagObject.publicData.suiAddress,
         xlmAddress: syncPublicData.stellarAddress || syncPublicData.xlmAddress || tagObject.publicData.xlmAddress,
         dotAddress: syncPublicData.dotAddress || tagObject.publicData.dotAddress,
         ksmAddress: syncPublicData.ksmAddress || tagObject.publicData.ksmAddress,
