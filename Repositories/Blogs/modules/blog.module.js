@@ -23,9 +23,7 @@ function buildBlogListFilter(params = {}) {
             $nor: [{ published: false }, { published: "false" }, { published: 0 }, { published: "0" }],
         };
     } else if (explicitPublished) {
-        pubClause = _truthy(params.where_published)
-            ? { $or: [{ published: true }, { published: "true" }] }
-            : { published: false };
+        pubClause = _truthy(params.where_published) ? { $or: [{ published: true }, { published: "true" }] } : { published: false };
     }
 
     if (pubClause) {
@@ -41,8 +39,7 @@ function buildBlogListFilter(params = {}) {
         filter.locale = loc;
     }
 
-    const canonical =
-        typeof params.where_canonicalSlug === "string" ? params.where_canonicalSlug.trim() : "";
+    const canonical = typeof params.where_canonicalSlug === "string" ? params.where_canonicalSlug.trim() : "";
     if (canonical) {
         and.push({ canonicalSlug: canonical });
     }
@@ -56,10 +53,11 @@ function buildBlogListFilter(params = {}) {
 
 const get = async (params = {}, authUser = {}) => {
     const mongoFilter = buildBlogListFilter(params);
+
     let q = Model.find(mongoFilter).sort(params.sort || "-createdAt");
 
-    const canonicalLookup =
-        typeof params.where_canonicalSlug === "string" ? params.where_canonicalSlug.trim() : "";
+    const canonicalLookup = typeof params.where_canonicalSlug === "string" ? params.where_canonicalSlug.trim() : "";
+
     if (canonicalLookup) {
         q = q.select("slug locale canonicalSlug published createdAt").lean();
     }
@@ -96,8 +94,7 @@ const show = async (params = {}, authUser = {}) => {
         clauses.push({ locale: localeFilter });
     }
 
-    const query =
-        clauses.length === 0 ? {} : clauses.length === 1 ? clauses[0] : { $and: clauses };
+    const query = clauses.length === 0 ? {} : clauses.length === 1 ? clauses[0] : { $and: clauses };
 
     return await Model.findOne(query);
 };

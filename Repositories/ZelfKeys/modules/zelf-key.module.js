@@ -315,6 +315,7 @@ const retrieveData = async (data, authToken) => {
             {
                 password,
                 faceBase64,
+                removePGP: data.removePGP,
             },
             authToken,
         );

@@ -51,6 +51,7 @@ module.exports = (server) => {
     require("../Repositories/Rewards/routes/rewards.route")(server);
     //S
     require("../Repositories/SocialCampaigns/routes/social-campaigns.routes")(server);
+    require("../Repositories/Status/routes/status-check.routes")(server);
     require("../Repositories/sui/routes/sui-scrapping.route")(server);
     require("../Repositories/Solana/routes/solana-scrapping.route")(server);
     require("../Repositories/Solana/routes/solana-payment.route")(server);
@@ -61,6 +62,7 @@ module.exports = (server) => {
     //T
     require("../Repositories/tron/routes/tron-scrapping.route")(server);
     require("../Repositories/Tags/routes/tags.routes")(server);
+    require("../Repositories/Tags/routes/zelf-ids.routes")(server);
     require("../Repositories/Tags/routes/my-tags.routes")(server);
     //U
     //V

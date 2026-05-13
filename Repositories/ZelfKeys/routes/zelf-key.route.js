@@ -9,25 +9,27 @@ const config = require("../../../Core/config");
 const base = "/zelf-keys";
 
 module.exports = (server) => {
-	const PATH = config.basePath(base);
+    const PATH = config.basePath(base);
 
-	server.post(`${PATH}/store/password`, Middleware.storePasswordValidation, Controller.storePassword);
-	server.post(`${PATH}/store/zotp`, Middleware.storeZOTPValidation, Controller.storeZOTP);
-	server.post(`${PATH}/store/notes`, Middleware.storeNotesValidation, Controller.storeNotes);
-	server.post(`${PATH}/store/credit-card`, Middleware.storeCreditCardValidation, Controller.storeCreditCard);
+    server.post(`${PATH}/store/password`, Middleware.storePasswordValidation, Controller.storePassword);
+    server.post(`${PATH}/store/zotp`, Middleware.storeZOTPValidation, Controller.storeZOTP);
+    server.post(`${PATH}/store/notes`, Middleware.storeNotesValidation, Controller.storeNotes);
+    server.post(`${PATH}/store/credit-card`, Middleware.storeCreditCardValidation, Controller.storeCreditCard);
 
-	// add records, that don't require subscription but pay with ZNS!
-	server.post(`${PATH}/add/password`, Middleware.storePasswordValidation, Controller.storePassword);
-	server.post(`${PATH}/add/zotp`, Middleware.storeZOTPValidation, Controller.storeZOTP);
-	server.post(`${PATH}/add/notes`, Middleware.storeNotesValidation, Controller.storeNotes);
-	server.post(`${PATH}/add/credit-card`, Middleware.storeCreditCardValidation, Controller.storeCreditCard);
+    // add records, that don't require subscription but pay with ZNS!
+    server.post(`${PATH}/add/password`, Middleware.storePasswordValidation, Controller.storePassword);
+    server.post(`${PATH}/add/zotp`, Middleware.storeZOTPValidation, Controller.storeZOTP);
+    server.post(`${PATH}/add/notes`, Middleware.storeNotesValidation, Controller.storeNotes);
+    server.post(`${PATH}/add/credit-card`, Middleware.storeCreditCardValidation, Controller.storeCreditCard);
 
-	server.get(`${PATH}/list`, Middleware.listValidation, Controller.listData);
-	server.get(`${PATH}/list-all`, Middleware.listAllValidation, Controller.listAllData);
-	server.get(`${PATH}/dashboard/list`, Middleware.listDashboardValidation, Controller.listDataDashboard);
-	server.get(`${PATH}/dashboard/list-all`, Middleware.listAllDashboardValidation, Controller.listAllDataDashboard);
-	server.post(`${PATH}/retrieve`, Middleware.retrieveValidation, Controller.retrieveData);
-	server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewData);
+    server.get(`${PATH}/list`, Middleware.listValidation, Controller.listData);
+    server.get(`${PATH}/list-all`, Middleware.listAllValidation, Controller.listAllData);
+    server.post(`${PATH}/retrieve`, Middleware.retrieveValidation, Controller.retrieveData);
+    server.post(`${PATH}/preview`, Middleware.previewValidation, Controller.previewData);
 
-	server.put(`${PATH}/delete/:id`, Middleware.deleteZelfKeyValidation, Controller.deleteZelfKey);
+    server.put(`${PATH}/delete/:id`, Middleware.deleteZelfKeyValidation, Controller.deleteZelfKey);
+
+    // admin endpoints
+    server.get(`${PATH}/dashboard/list`, Middleware.listDashboardValidation, Controller.listDataDashboard);
+    server.get(`${PATH}/dashboard/list-all`, Middleware.listAllDashboardValidation, Controller.listAllDataDashboard);
 };
