@@ -74,7 +74,7 @@
         "js-sha3": "^0.9.3",
         "jsonwebtoken": "^9.0.2",
         "jsqr": "^1.4.0",
-        "koa": "^2.15.3",
+        "koa": "^3.1.2",
         "koa-body": "^7.0.1",
         "koa-bodyparser": "^4.4.1",
         "koa-jwt": "^4.0.4",
