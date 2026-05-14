@@ -11,6 +11,17 @@ const csvOrDefault = (value, fallback) => {
     return items.length ? items : fallback;
 };
 
+/** Absolute origin for zelf-dashboard Plan & Billing Stripe redirects (success/cancel). */
+const stripeDashboardUrlBase = String(
+    (process.env.DASHBOARD_URL || process.env.FRONTEND_URL || "https://dashboard.zelf.world").trim() || "https://dashboard.zelf.world",
+).replace(/\/$/, "");
+
+/** Positive finite float from env; otherwise `fallback` (for USD rates and REWARD_PRICE). */
+const parsePositiveFloat = (value, fallback) => {
+    const n = parseFloat(value);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
 const configuration = {
     name: "API",
     env: process.env.NODE_ENV || "development",
@@ -67,9 +78,23 @@ const configuration = {
         skipArweave: process.env.SKIP_ARWEAVE || false,
     },
     token: {
-        rewardPrice: process.env.REWARD_PRICE || 0.05,
+        rewardPrice: parsePositiveFloat(process.env.REWARD_PRICE, 0.05),
         whitelist: process.env.WHITELIST || "",
         priceEnv: process.env.PRICE_ENV || "production",
+    },
+    /** Dashboard Plan & Billing copy + subscription pricing disclosure (USD per operation before ZNS conversion). */
+    subscriptionPricing: {
+        encryptUsd: parsePositiveFloat(process.env.API_USAGE_ENCRYPT_USD, 0.1),
+        activeUserMonthlyUsd: parsePositiveFloat(process.env.API_USAGE_ACTIVE_USER_USD, 0.1),
+        decryptWithLivenessUsd: parsePositiveFloat(process.env.API_USAGE_DECRYPT_WITH_LIVENESS_USD, 0.05),
+        decryptNoLivenessUsd: parsePositiveFloat(process.env.API_USAGE_DECRYPT_NO_LIVENESS_USD, 0.01),
+        /** Free decrypts per month when liveness applies (marketing / disclosure). */
+        decryptIncludedPerMonth: (() => {
+            const raw = process.env.API_USAGE_DECRYPT_INCLUDED_PER_MONTH;
+            if (raw === undefined || raw === "") return 10;
+            const n = Math.floor(Number(raw));
+            return Number.isFinite(n) && n >= 0 ? n : 10;
+        })(),
     },
     landingUrl: process.env.LANDING_URL || (process.env.NODE_ENV === "development" ? "http://localhost:3009" : "https://zelf.world"),
     pgp: {
@@ -219,8 +244,10 @@ const configuration = {
             cancel: `${process.env.FRONTEND_URL}/zelfkeys/cancel?canceled=true`,
         },
         dashboard: {
-            success: `${process.env.DASHBOARD_URL}/settings/plan-billing?session_id={CHECKOUT_SESSION_ID}`,
-            cancel: `${process.env.DASHBOARD_URL}/settings/plan-billing?canceled=true`,
+            /** Absolute origin only (no trailing slash); used for checkout + portal return URLs */
+            origin: stripeDashboardUrlBase,
+            success: `${stripeDashboardUrlBase}/settings/plan-billing?session_id={CHECKOUT_SESSION_ID}`,
+            cancel: `${stripeDashboardUrlBase}/settings/plan-billing?canceled=true`,
         },
         plans: {
             basic: {
@@ -598,4 +625,34 @@ const configuration = {
     },
 };
 
+/**
+ * JSON for GET /api/subscription-plans (`pricingMeta`). Token counts use ceil(usd / rewardPrice).
+ */
+const buildSubscriptionPricingMeta = () => {
+    const rp = Number(configuration.token.rewardPrice);
+    const rewardPrice = Number.isFinite(rp) && rp > 0 ? rp : 0.05;
+    const sp = configuration.subscriptionPricing;
+    const ceilTok = (usd) => Math.ceil(Number(usd) / rewardPrice);
+    const fmt = (n) => (Number.isFinite(Number(n)) ? Number(n).toFixed(2) : String(n));
+
+    return {
+        rewardPrice,
+        rewardPriceFormatted: fmt(rewardPrice),
+        encryptUsd: sp.encryptUsd,
+        encryptUsdFormatted: fmt(sp.encryptUsd),
+        activeUserMonthlyUsd: sp.activeUserMonthlyUsd,
+        activeUserMonthlyUsdFormatted: fmt(sp.activeUserMonthlyUsd),
+        decryptWithLivenessUsd: sp.decryptWithLivenessUsd,
+        decryptWithLivenessUsdFormatted: fmt(sp.decryptWithLivenessUsd),
+        decryptNoLivenessUsd: sp.decryptNoLivenessUsd,
+        decryptNoLivenessUsdFormatted: fmt(sp.decryptNoLivenessUsd),
+        decryptIncludedPerMonth: sp.decryptIncludedPerMonth,
+        encryptTokens: ceilTok(sp.encryptUsd),
+        activeUserMonthlyTokens: ceilTok(sp.activeUserMonthlyUsd),
+        decryptWithLivenessTokens: ceilTok(sp.decryptWithLivenessUsd),
+        decryptNoLivenessTokens: ceilTok(sp.decryptNoLivenessUsd),
+    };
+};
+
 module.exports = configuration;
+module.exports.buildSubscriptionPricingMeta = buildSubscriptionPricingMeta;

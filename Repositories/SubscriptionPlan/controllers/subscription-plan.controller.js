@@ -1,11 +1,18 @@
 const Module = require("../modules/subscription-plan.module");
+const { reconcileSubscriptionZnsGrants } = require("../modules/subscription-zns-reconcile.module");
 const { errorHandler } = require("../../../Core/http-handler");
+
+const config = require("../../../Core/config");
 
 const list = async (ctx) => {
 	try {
 		const data = await Module.listSubscriptionPlans();
 
-		ctx.body = { data, count: data.length };
+		ctx.body = {
+			data,
+			count: data.length,
+			pricingMeta: typeof config.buildSubscriptionPricingMeta === "function" ? config.buildSubscriptionPricingMeta() : undefined,
+		};
 	} catch (error) {
 		const _exception = errorHandler(error, ctx);
 
@@ -98,6 +105,26 @@ const verifySession = async (ctx) => {
 	}
 };
 
+const reconcileZns = async (ctx) => {
+	try {
+		const data = await reconcileSubscriptionZnsGrants(ctx.state.user);
+
+		ctx.body = { data };
+
+		console.info("[subscription-zns-reconcile] http_response", {
+			reconciled: data.reconciled,
+			skippedReason: data.skippedReason,
+			actionCount: data.actions?.length ?? 0,
+		});
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
 module.exports = {
 	list,
 	getById,
@@ -105,4 +132,5 @@ module.exports = {
 	mySubscription,
 	createPortalSession,
 	verifySession,
+	reconcileZns,
 };

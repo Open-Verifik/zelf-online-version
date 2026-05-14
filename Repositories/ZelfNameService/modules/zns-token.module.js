@@ -63,10 +63,11 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
 
         // Convert amount to smallest unit (8 decimals for ZNS token)
         // Amount is expected in tokens, so always multiply by 10^8
-        // In dev mode, divide by 10000 to preserve wallet balance during testing
+        // In dev mode, divide by 10 to preserve wallet balance during testing while still
+        // emitting a meaningful balance (e.g. $99 plan -> 1980 / 10 = 198 ZNS).
         const isDevMode = config.solana.devModeTokens === true || config.solana.devModeTokens === "true";
 
-        const actualAmount = isDevMode ? amount / 10000 : amount;
+        const actualAmount = isDevMode ? amount / 10 : amount;
 
         const amountToSend = Math.round(actualAmount * 10 ** 8);
 

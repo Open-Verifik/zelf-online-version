@@ -23,4 +23,7 @@ module.exports = (server) => {
 
 	// verify session after redirect
 	server.post(`${PATH}/verify-session`, Middleware.verifySessionValidation, Controller.verifySession);
+
+	// reconcile monthly ZNS grants against Stripe paid invoices and the local ledger
+	server.post(`${PATH}/reconcile-zns`, Controller.reconcileZns);
 };
