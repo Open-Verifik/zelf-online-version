@@ -10,14 +10,14 @@ const QRCode = require("qrcode");
  * @returns {string|undefined}
  */
 const normalizeFaceBase64 = (faceBase64) => {
-	if (faceBase64 == null || typeof faceBase64 !== "string") return faceBase64;
-	const trimmed = faceBase64.trim();
-	const marker = "base64,";
-	const idx = trimmed.indexOf(marker);
-	if (idx !== -1 && trimmed.slice(0, 5).toLowerCase() === "data:") {
-		return trimmed.slice(idx + marker.length).replace(/\s/g, "");
-	}
-	return trimmed.replace(/\s/g, "");
+    if (faceBase64 == null || typeof faceBase64 !== "string") return faceBase64;
+    const trimmed = faceBase64.trim();
+    const marker = "base64,";
+    const idx = trimmed.indexOf(marker);
+    if (idx !== -1 && trimmed.slice(0, 5).toLowerCase() === "data:") {
+        return trimmed.slice(idx + marker.length).replace(/\s/g, "");
+    }
+    return trimmed.replace(/\s/g, "");
 };
 
 const encrypt = async (data) => {
@@ -33,9 +33,9 @@ const encrypt = async (data) => {
             verifiers_auth_key: data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
         });
 
-        const zelfProof = encryptedResponse.data.zelfProof;
+        const zelfID = encryptedResponse.data.zelfProof;
 
-        return { zelfProof };
+        return { zelfID };
     } catch (exception) {
         const _error = exception.response?.data;
 
@@ -97,6 +97,7 @@ const encryptQRCode = async (data) => {
         if (!encryptedResponse?.data) return encryptedResponse;
 
         const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
+
         const zelfQR = `data:image/png;base64,${base64Image}`;
 
         let zelfProof = null;
@@ -105,7 +106,10 @@ const encryptQRCode = async (data) => {
             zelfProof = await QRZelfProofExtractor.extractZelfProof(base64Image);
         }
 
-        return { zelfQR, zelfProof: zelfProof || undefined };
+        return {
+            zelfIDQR: zelfQR,
+            zelfID: zelfProof || undefined
+        };
     } catch (exception) {
         return exception?.message;
     }
