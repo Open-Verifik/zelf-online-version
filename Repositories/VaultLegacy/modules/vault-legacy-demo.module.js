@@ -350,11 +350,23 @@ const resolveDemoHeartbeatInterval = (isDemo, heartbeatInterval) => {
     return config.legacyDemo?.heartbeatInterval || 2592000;
 };
 
-const getDemoStatus = () => ({
-    enabled: isDemoModeEnabled(),
-    demoLawyerAddress: isDemoModeEnabled() ? getDemoLawyerAddress() : null,
-    demoHeartbeatInterval: config.legacyDemo?.heartbeatInterval || 2592000,
-});
+const getDemoStatus = async () => {
+    const RelayerHealth = require("./vault-legacy-relayer.module");
+    const relayer = await RelayerHealth.getRelayerHealth().catch(() => ({
+        contractAddress: null,
+        onChainRelayer: null,
+        serverRelayer: null,
+        relayerMatches: false,
+        relayerPrivateKeyConfigured: false,
+    }));
+
+    return {
+        enabled: isDemoModeEnabled(),
+        demoLawyerAddress: isDemoModeEnabled() ? getDemoLawyerAddress() : null,
+        demoHeartbeatInterval: config.legacyDemo?.heartbeatInterval || 2592000,
+        relayer,
+    };
+};
 
 module.exports = {
     VAULT_STATE,

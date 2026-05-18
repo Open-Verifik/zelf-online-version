@@ -16,6 +16,7 @@ const path = require("path");
 const config = require("../../../Core/config");
 const VaultLegacy = require("../models/vault-legacy.model");
 const LegacyDemo = require("../modules/vault-legacy-demo.module");
+const RelayerHealth = require("../modules/vault-legacy-relayer.module");
 
 const { sendLawyerNewPlan, sendTestatorPlanActive, sendBeneficiaryClaimable } = require("../modules/email");
 
@@ -50,6 +51,22 @@ function initRelayer() {
         iface = new ethers.Interface(artifact.abi);
     } catch {
         console.warn("⚠️  VaultRegistry ABI not found — calldata decoding disabled");
+    }
+
+    if (CONTRACT_ADDRESS) {
+        RelayerHealth.getRelayerHealth()
+            .then((health) => {
+                if (!health.onChainRelayer) return;
+                if (health.relayerMatches) {
+                    console.log(`✅ VaultLegacy relayer matches contract relayer(): ${health.onChainRelayer}`);
+                } else {
+                    console.error(
+                        `❌ VaultLegacy RELAYER MISMATCH — server ${health.serverRelayer} ≠ contract ${health.onChainRelayer}. ` +
+                            "createVault will revert with 'Not authorized to create vault'."
+                    );
+                }
+            })
+            .catch((e) => console.warn("⚠️  Relayer health check failed:", e.message));
     }
 }
 
@@ -159,6 +176,10 @@ const sendTx = async (ctx) => {
             } catch {}
         }
         console.log(`📡 Relaying tx → ${fnName} (${calldata.substring(0, 10)}...)`);
+
+        if (fnName === "createVault") {
+            await RelayerHealth.assertRelayerMatchesContract();
+        }
 
         const tx = await relayerWallet.sendTransaction({ to, data: calldata, value: value || "0x0" });
         console.log(`📤 Tx sent: ${tx.hash}`);

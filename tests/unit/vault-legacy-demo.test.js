@@ -84,14 +84,16 @@ describe("vault-legacy-demo.module", () => {
     });
 
     describe("getDemoStatus", () => {
-        it("returns enabled false when LEGACY_DEMO_MODE is off", () => {
+        it("returns enabled false when LEGACY_DEMO_MODE is off", async () => {
             process.env.LEGACY_DEMO_MODE = "false";
             jest.resetModules();
             const Demo = require("../../Repositories/VaultLegacy/modules/vault-legacy-demo.module");
-            expect(Demo.getDemoStatus()).toEqual({
+            const status = await Demo.getDemoStatus();
+            expect(status).toMatchObject({
                 enabled: false,
                 demoLawyerAddress: null,
                 demoHeartbeatInterval: expect.any(Number),
+                relayer: expect.any(Object),
             });
         });
     });
