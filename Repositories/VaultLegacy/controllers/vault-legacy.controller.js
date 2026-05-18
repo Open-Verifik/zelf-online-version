@@ -189,6 +189,26 @@ const rejectVault = async (ctx) => {
     }
 };
 
+const getDemoStatus = async (ctx) => {
+    try {
+        const status = await Module.getDemoStatus();
+        ctx.body = { success: true, ...status };
+    } catch (error) {
+        ctx.status = error.status || 500;
+        ctx.body = { error: error.message };
+    }
+};
+
+const ensureDemoVaultAccepted = async (ctx) => {
+    try {
+        const result = await Module.ensureDemoVaultAccepted(ctx.params.vaultId);
+        ctx.body = { success: true, result };
+    } catch (error) {
+        ctx.status = error.status || 500;
+        ctx.body = { error: error.message, details: error.details };
+    }
+};
+
 module.exports = {
     collectShares,
     getShares,
@@ -208,4 +228,6 @@ module.exports = {
     getExecutionStatus,
     acceptVault,
     rejectVault,
+    getDemoStatus,
+    ensureDemoVaultAccepted,
 };

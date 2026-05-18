@@ -4,7 +4,9 @@ const { ethers } = require("ethers");
 const fs = require("fs");
 const path = require("path");
 
+const config = require("../../Core/config");
 const VaultLegacy = require("./models/vault-legacy.model");
+const LegacyDemo = require("./modules/vault-legacy-demo.module");
 const { sendTestatorGracePeriod, sendLawyerLivenessFailed } = require("./modules/email");
 
 const MONGODB_URI = process.env.MONGODB_URI || process.env.DB_URI || process.env.MONGODB_URL;
@@ -30,7 +32,7 @@ async function runCronJob() {
     const vaults = await VaultLegacy.find({});
     const now = Math.floor(Date.now() / 1000);
 
-    let checked = 0, warned = 0, errors = 0;
+    let checked = 0, warned = 0, errors = 0, demoConfirmed = 0;
 
     for (const entry of vaults) {
         checked++;
@@ -67,7 +69,19 @@ async function runCronJob() {
 
                 // Send "lawyer: liveness failed" when fully expired (100% or more)
                 if (fractionElapsed >= 1.0 && !notifiedEvents.livenessFailed) {
-                    if (entry.lawyerEmail) {
+                    const isDemoVault = entry.isDemo && config.legacyDemo?.enabled;
+
+                    if (isDemoVault) {
+                        const demoResult = await LegacyDemo.autoConfirmDeath(vaultId, { fractionElapsed }).catch((e) => {
+                            console.error(`[LEGACY-DEMO] autoConfirmDeath cron error for ${vaultId}:`, e.message);
+                            return { skipped: true, error: e.message };
+                        });
+                        if (demoResult?.success) {
+                            demoConfirmed++;
+                            notifiedEvents.livenessFailed = new Date().toISOString();
+                            updatedEvents = true;
+                        }
+                    } else if (entry.lawyerEmail) {
                         const testatorAddress = vault.owner;
                         console.log(`🔔 Vault ${vaultId}: sending liveness-failed email to lawyer`);
                         await sendLawyerLivenessFailed(entry.lawyerEmail, vaultId, testatorAddress)
@@ -103,7 +117,7 @@ async function runCronJob() {
         }
     }
 
-    console.log(`✅ Cron complete: ${checked} checked, ${warned} warnings sent, ${errors} errors.`);
+    console.log(`✅ Cron complete: ${checked} checked, ${warned} warnings sent, ${demoConfirmed} demo auto-confirmed, ${errors} errors.`);
 
     await mongoose.disconnect();
     process.exit(0);

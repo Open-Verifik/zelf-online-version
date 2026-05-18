@@ -19,6 +19,10 @@ module.exports = (server) => {
     // --- Auth: unprotected session endpoint ---
     server.post(`${PATH}/sessions`, SessionController.create);
 
+    // --- Demo mode status (banner for mobile; only meaningful when LEGACY_DEMO_MODE=true) ---
+    server.get(`${PATH}/demo/status`, Controller.getDemoStatus);
+    server.post(`${PATH}/demo/ensure-accepted/:vaultId`, requireJWT, Controller.ensureDemoVaultAccepted);
+
     // --- Relay endpoints (called by the WebView JS bundle) ---
     server.post(`${RELAY_PATH}/ipfs-upload`, requireJWT, RelayController.ipfsUpload);
     server.post(`${RELAY_PATH}/send-tx`, requireJWT, RelayController.sendTx);

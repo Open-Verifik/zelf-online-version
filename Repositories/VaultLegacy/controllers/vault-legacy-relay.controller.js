@@ -13,7 +13,9 @@ const { ethers } = require("ethers");
 const fs = require("fs");
 const path = require("path");
 
+const config = require("../../../Core/config");
 const VaultLegacy = require("../models/vault-legacy.model");
+const LegacyDemo = require("../modules/vault-legacy-demo.module");
 
 const { sendLawyerNewPlan, sendTestatorPlanActive, sendBeneficiaryClaimable } = require("../modules/email");
 
@@ -89,7 +91,7 @@ const ipfsUpload = async (ctx) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const registerEmails = async (ctx) => {
     try {
-        const { vaultId, testatorEmail, lawyerEmail, beneficiaryEmails, beneficiaryTagNames } = ctx.request.body;
+        const { vaultId, testatorEmail, lawyerEmail, beneficiaryEmails, beneficiaryTagNames, isDemo } = ctx.request.body;
 
         if (!vaultId) {
             ctx.status = 400;
@@ -97,21 +99,32 @@ const registerEmails = async (ctx) => {
             return;
         }
 
+        const vaultIdNorm = LegacyDemo.normalizeVaultId(vaultId);
+        const wantsDemo = isDemo === true;
+
+        if (wantsDemo) {
+            LegacyDemo.assertDemoModeEnabled();
+        }
+
+        const update = {
+            testatorEmail: testatorEmail || null,
+            lawyerEmail: lawyerEmail || null,
+            beneficiaryEmails: beneficiaryEmails || [],
+            beneficiaryTagNames: beneficiaryTagNames || [],
+        };
+
+        if (wantsDemo) {
+            update.isDemo = true;
+        }
+
         await VaultLegacy.findOneAndUpdate(
-            { vaultId },
-            {
-                $set: {
-                    testatorEmail: testatorEmail || null,
-                    lawyerEmail: lawyerEmail || null,
-                    beneficiaryEmails: beneficiaryEmails || [],
-                    beneficiaryTagNames: beneficiaryTagNames || [],
-                },
-            },
+            { vaultId: vaultIdNorm },
+            { $set: update },
             { upsert: true, new: true }
         );
 
-        console.log(`📋 Registered emails for vault ${vaultId} (MongoDB)`);
-        ctx.body = { success: true };
+        console.log(`📋 Registered emails for vault ${vaultIdNorm} (MongoDB)${wantsDemo ? " [demo]" : ""}`);
+        ctx.body = { success: true, vaultId: vaultIdNorm, isDemo: wantsDemo };
     } catch (error) {
         ctx.status = 500;
         ctx.body = { error: error.message };
@@ -157,18 +170,34 @@ const sendTx = async (ctx) => {
             try {
                 if (fnName === "createVault") {
                     const vaultId = decoded.args[1];
-                    const vaultIdHex = typeof vaultId === "bigint" ? "0x" + vaultId.toString(16).padStart(64, "0") : vaultId.toString();
+                    const vaultIdHex = LegacyDemo.normalizeVaultId(
+                        typeof vaultId === "bigint" ? vaultId : vaultId.toString()
+                    );
                     const testatorAddress = decoded.args[0];
+                    const lawyerAddress = decoded.args[3];
+
+                    let demoAcceptResult = null;
+                    if (config.legacyDemo?.enabled && LegacyDemo.isDemoLawyerAddress(lawyerAddress)) {
+                        try {
+                            demoAcceptResult = await LegacyDemo.syncDemoVaultAfterCreate({
+                                vaultId: vaultIdHex,
+                                lawyerAddress,
+                            });
+                            console.log(`[LEGACY-DEMO] syncDemoVaultAfterCreate:`, demoAcceptResult?.reason || "accepted");
+                        } catch (e) {
+                            console.error("[LEGACY-DEMO] syncDemoVaultAfterCreate failed:", e.message);
+                        }
+                    }
 
                     const entry = await VaultLegacy.findOne({ vaultId: vaultIdHex });
-                    if (entry?.lawyerEmail) {
+                    if (!demoAcceptResult?.success && !entry?.isDemo && entry?.lawyerEmail) {
                         console.log(`📧 Sending "new plan" email to lawyer ${entry.lawyerEmail}`);
                         sendLawyerNewPlan(entry.lawyerEmail, vaultIdHex, testatorAddress).catch((e) =>
                             console.error("❌ Lawyer email failed:", e.message)
                         );
                     }
                 } else if (fnName === "acceptVault") {
-                    const vaultIdHex = decoded.args[0].toString();
+                    const vaultIdHex = LegacyDemo.normalizeVaultId(decoded.args[0]);
                     const entry = await VaultLegacy.findOne({ vaultId: vaultIdHex });
                     if (entry?.testatorEmail) {
                         console.log(`📧 Sending "plan active" email to testator ${entry.testatorEmail}`);
@@ -177,7 +206,7 @@ const sendTx = async (ctx) => {
                         );
                     }
                 } else if (fnName === "confirmDeath") {
-                    const vaultIdHex = decoded.args[0].toString();
+                    const vaultIdHex = LegacyDemo.normalizeVaultId(decoded.args[0]);
                     const entry = await VaultLegacy.findOne({ vaultId: vaultIdHex });
 
                     if (entry && entry.beneficiaryEmails.length > 0) {
