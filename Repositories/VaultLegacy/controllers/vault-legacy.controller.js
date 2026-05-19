@@ -209,6 +209,16 @@ const ensureDemoVaultAccepted = async (ctx) => {
     }
 };
 
+const resendBeneficiaryClaimableEmails = async (ctx) => {
+    try {
+        const result = await Module.resendBeneficiaryClaimableEmails(ctx.params.vaultId);
+        ctx.body = { success: true, result };
+    } catch (error) {
+        ctx.status = error.status || 500;
+        ctx.body = { error: error.message };
+    }
+};
+
 module.exports = {
     collectShares,
     getShares,
@@ -230,4 +240,5 @@ module.exports = {
     rejectVault,
     getDemoStatus,
     ensureDemoVaultAccepted,
+    resendBeneficiaryClaimableEmails,
 };

@@ -345,9 +345,22 @@ const ensureDemoVaultAccepted = async (vaultId) => {
     return { vaultId: vaultIdNorm, ...result };
 };
 
+const resendBeneficiaryClaimableEmails = async (vaultId) => {
+    const vaultIdNorm = LegacyDemo.normalizeVaultId(vaultId);
+    const entry = await VaultLegacy.findOne({ vaultId: vaultIdNorm });
+    if (!entry) {
+        const err = new Error("Vault email record not found");
+        err.status = 404;
+        throw err;
+    }
+    const result = await LegacyDemo.ensureBeneficiaryClaimableEmails(entry, vaultIdNorm);
+    return { vaultId: vaultIdNorm, ...result };
+};
+
 module.exports = {
     getDemoStatus,
     ensureDemoVaultAccepted,
+    resendBeneficiaryClaimableEmails,
     // Vault share ops
     collectShares,
     getShares,

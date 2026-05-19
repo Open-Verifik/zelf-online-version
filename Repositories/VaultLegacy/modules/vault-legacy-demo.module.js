@@ -110,28 +110,47 @@ const assertNotDemoVaultForLawyerAction = async (vaultId) => {
     }
 };
 
-const notifyBeneficiaryClaimable = async (entry, vaultIdHex) => {
-    if (!entry?.beneficiaryEmails?.length) return;
-
+const resolveBeneficiaryTagName = (entry, vaultIdHex, index) => {
     const tagNames = entry.beneficiaryTagNames || [];
     const isSingle = entry.beneficiaryEmails.length === 1;
+    let tagName = tagNames[index] || vaultIdHex;
 
-    for (let i = 0; i < entry.beneficiaryEmails.length; i++) {
-        const email = entry.beneficiaryEmails[i];
-        let tagName = tagNames[i] || vaultIdHex;
-
-        if (isSingle) {
-            if (tagNames.length > 1) {
-                const valTag = tagNames.find((t) => t.toLowerCase().includes("val"));
-                if (valTag) tagName = valTag;
-            }
-            tagName = tagName.replace(/\.zelf$/, "");
+    if (isSingle) {
+        if (tagNames.length > 1) {
+            const valTag = tagNames.find((t) => t.toLowerCase().includes("val"));
+            if (valTag) tagName = valTag;
         }
-
-        sendBeneficiaryClaimable(email, tagName).catch((e) =>
-            console.error("[LEGACY-DEMO] Beneficiary email failed:", e.message)
-        );
+        tagName = tagName.replace(/\.zelf$/, "");
     }
+    return tagName;
+};
+
+/** Send claimable emails (awaited). Used after confirmDeath or when vault is already claimable. */
+const notifyBeneficiaryClaimable = async (entry, vaultIdHex) => {
+    if (!entry?.beneficiaryEmails?.length) {
+        return { sent: 0, skipped: true, reason: "no_beneficiary_emails" };
+    }
+
+    const sends = entry.beneficiaryEmails.map((email, i) =>
+        sendBeneficiaryClaimable(email, resolveBeneficiaryTagName(entry, vaultIdHex, i))
+    );
+    await Promise.all(sends);
+    log(`notifyBeneficiaryClaimable: sent ${sends.length} email(s) for vault ${vaultIdHex}`);
+    return { sent: sends.length, success: true };
+};
+
+/**
+ * Idempotent beneficiary notification — safe to call from cron catch-up paths.
+ */
+const ensureBeneficiaryClaimableEmails = async (entry, vaultIdHex) => {
+    if (entry.notifiedEvents?.beneficiaryClaimable) {
+        return { skipped: true, reason: "already_notified" };
+    }
+    const result = await notifyBeneficiaryClaimable(entry, vaultIdHex);
+    if (result.success) {
+        await markNotifiedEvent(entry, "beneficiaryClaimable");
+    }
+    return result;
 };
 
 const markNotifiedEvent = async (entry, key) => {
@@ -290,6 +309,10 @@ const autoConfirmDeath = async (vaultId, { fractionElapsed } = {}) => {
     }
 
     if (entry.notifiedEvents?.demoAutoConfirmed) {
+        const catchUp = await ensureBeneficiaryClaimableEmails(entry, vaultIdNorm);
+        if (catchUp.success) {
+            return { success: true, reason: "beneficiary_emails_catchup", ...catchUp };
+        }
         return { skipped: true, reason: "already_auto_confirmed" };
     }
 
@@ -326,16 +349,17 @@ const autoConfirmDeath = async (vaultId, { fractionElapsed } = {}) => {
     }
 
     if (claimable) {
-        log(`autoConfirmDeath: vault ${vaultIdNorm} already claimable`);
+        log(`autoConfirmDeath: vault ${vaultIdNorm} already claimable — sending beneficiary emails if needed`);
+        const emailResult = await ensureBeneficiaryClaimableEmails(entry, vaultIdNorm);
         await markNotifiedEvent(entry, "demoAutoConfirmed");
-        return { skipped: true, reason: "already_claimable" };
+        return { success: true, reason: "already_claimable", ...emailResult };
     }
 
     try {
         const result = await manager.confirmDeath(demoLawyer, vaultIdNorm);
         log(`autoConfirmDeath: confirmed vault ${vaultIdNorm} tx=${result.transactionHash}`);
 
-        await notifyBeneficiaryClaimable(entry, vaultIdNorm);
+        await ensureBeneficiaryClaimableEmails(entry, vaultIdNorm);
         await markNotifiedEvent(entry, "demoAutoConfirmed");
         return { success: true, ...result };
     } catch (e) {
@@ -388,4 +412,6 @@ module.exports = {
     resolveDemoHeartbeatInterval,
     getDemoStatus,
     notifyBeneficiaryClaimable,
+    ensureBeneficiaryClaimableEmails,
+    resolveBeneficiaryTagName,
 };

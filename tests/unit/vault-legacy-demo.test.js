@@ -66,6 +66,16 @@ describe("vault-legacy-demo.module", () => {
         });
     });
 
+    describe("resolveBeneficiaryTagName", () => {
+        it("strips .zelf suffix for single beneficiary with validator tag", () => {
+            const entry = {
+                beneficiaryEmails: ["a@b.com"],
+                beneficiaryTagNames: ["alice.zelf", "aliceval.zelf"],
+            };
+            expect(LegacyDemo.resolveBeneficiaryTagName(entry, "0xabc", 0)).toBe("aliceval");
+        });
+    });
+
     describe("isDemoLawyerAddress", () => {
         it("returns true when address matches LEGACY_DEMO_LAWYER_ADDRESS", () => {
             process.env.LEGACY_DEMO_MODE = "true";

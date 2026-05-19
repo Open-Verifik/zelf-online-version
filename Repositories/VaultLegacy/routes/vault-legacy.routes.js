@@ -22,6 +22,7 @@ module.exports = (server) => {
     // --- Demo mode status (banner for mobile; only meaningful when LEGACY_DEMO_MODE=true) ---
     server.get(`${PATH}/demo/status`, Controller.getDemoStatus);
     server.post(`${PATH}/demo/ensure-accepted/:vaultId`, requireJWT, Controller.ensureDemoVaultAccepted);
+    server.post(`${PATH}/demo/resend-beneficiary-emails/:vaultId`, requireJWT, Controller.resendBeneficiaryClaimableEmails);
 
     // --- Relay endpoints (called by the WebView JS bundle) ---
     server.post(`${RELAY_PATH}/ipfs-upload`, requireJWT, RelayController.ipfsUpload);

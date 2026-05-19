@@ -18,7 +18,7 @@ const VaultLegacy = require("../models/vault-legacy.model");
 const LegacyDemo = require("../modules/vault-legacy-demo.module");
 const RelayerHealth = require("../modules/vault-legacy-relayer.module");
 
-const { sendLawyerNewPlan, sendTestatorPlanActive, sendBeneficiaryClaimable } = require("../modules/email");
+const { sendLawyerNewPlan, sendTestatorPlanActive } = require("../modules/email");
 
 const IPFS = require("../../IPFS/modules/ipfs.module");
 
@@ -230,25 +230,10 @@ const sendTx = async (ctx) => {
                     const vaultIdHex = LegacyDemo.normalizeVaultId(decoded.args[0]);
                     const entry = await VaultLegacy.findOne({ vaultId: vaultIdHex });
 
-                    if (entry && entry.beneficiaryEmails.length > 0) {
-                        const tagNames = entry.beneficiaryTagNames || [];
-                        const isSingle = entry.beneficiaryEmails.length === 1;
-
-                        for (let i = 0; i < entry.beneficiaryEmails.length; i++) {
-                            const email = entry.beneficiaryEmails[i];
-                            let tagName = tagNames[i] || vaultIdHex;
-
-                            if (isSingle) {
-                                if (tagNames.length > 1) {
-                                    const valTag = tagNames.find((t) => t.toLowerCase().includes("val"));
-                                    if (valTag) tagName = valTag;
-                                }
-                                tagName = tagName.replace(/\.zelf$/, "");
-                            }
-
-                            console.log(`📧 Sending claimable email to beneficiary ${email}`);
-                            sendBeneficiaryClaimable(email, tagName).catch((e) => console.error("❌ Beneficiary email failed:", e.message));
-                        }
+                    if (entry) {
+                        LegacyDemo.ensureBeneficiaryClaimableEmails(entry, vaultIdHex).catch((e) =>
+                            console.error("❌ Beneficiary claimable emails failed:", e.message)
+                        );
                     }
                 }
             } catch (emailErr) {
