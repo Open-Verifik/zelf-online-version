@@ -327,6 +327,33 @@ const retrieveData = async (data, authToken) => {
             zelfProof,
         });
     } catch (error) {
+        console.error({ error });
+
+        if (typeof error?.code === "string" && error.code.startsWith("ERR_")) {
+            const status =
+                Number.isFinite(error.status) && error.status >= 400 && error.status < 600 ? error.status : 422;
+
+            throw new Error(`${status}:${error.code}`);
+        }
+
+        if (error?.message && typeof error.message === "string") {
+            const normalizedMessage = error.message.toLowerCase();
+
+            if (normalizedMessage.includes("password") && normalizedMessage.includes("invalid")) {
+                throw new Error("400:ERR_INVALID_PASSWORD");
+            }
+
+            if (
+                normalizedMessage.includes("liveness") ||
+                normalizedMessage.includes("face is not central") ||
+                normalizedMessage.includes("no face detected") ||
+                normalizedMessage.includes("multiple face") ||
+                normalizedMessage.includes("face not recognized")
+            ) {
+                throw new Error("422:ERR_LIVENESS_FAILED");
+            }
+        }
+
         throw new Error("409:failed_to_decrypt");
     }
 
@@ -601,29 +628,29 @@ const SUPPORTED_CATEGORIES = ["password", "notes", "credit_card", "contact", "zo
  * @returns {Promise<Object>} List of data items
  */
 const listDataForDashboard = async (identifier, category, authToken) => {
-	const parts = identifier.split(".");
-	if (parts.length < 2) {
-		throw new Error("400:Invalid identifier format. Use user.domain (e.g. miguel.zelf)");
-	}
-	const domainPart = parts.pop();
-	const identifierPart = parts.join(".");
+    const parts = identifier.split(".");
+    if (parts.length < 2) {
+        throw new Error("400:Invalid identifier format. Use user.domain (e.g. miguel.zelf)");
+    }
+    const domainPart = parts.pop();
+    const identifierPart = parts.join(".");
 
-	const accountType = authToken.accountType || authToken.publicData?.accountType || "";
-	const isPrivileged = ["staff", "staff_account", "lawyer", "lawyer_account"].includes(accountType);
-	const userIdentifier = authToken.tagName || authToken.identifier;
-	if (!isPrivileged && userIdentifier) {
-		const userTagName = TagsPartsModule.getFullTagName(userIdentifier, authToken.domain || "zelf");
-		if (identifier !== userTagName) {
-			throw new Error("403:Not authorized to query ZelfKeys for this identifier");
-		}
-	}
+    const accountType = authToken.accountType || authToken.publicData?.accountType || "";
+    const isPrivileged = ["staff", "staff_account", "lawyer", "lawyer_account"].includes(accountType);
+    const userIdentifier = authToken.tagName || authToken.identifier;
+    if (!isPrivileged && userIdentifier) {
+        const userTagName = TagsPartsModule.getFullTagName(userIdentifier, authToken.domain || "zelf");
+        if (identifier !== userTagName) {
+            throw new Error("403:Not authorized to query ZelfKeys for this identifier");
+        }
+    }
 
-	const syntheticAuthToken = { ...authToken, tagName: identifierPart, identifier: identifierPart, domain: domainPart };
+    const syntheticAuthToken = { ...authToken, tagName: identifierPart, identifier: identifierPart, domain: domainPart };
 
-	if (category) {
-		return listData({ category }, syntheticAuthToken);
-	}
-	return listAllData({}, syntheticAuthToken);
+    if (category) {
+        return listData({ category }, syntheticAuthToken);
+    }
+    return listAllData({}, syntheticAuthToken);
 };
 
 /**
@@ -633,22 +660,22 @@ const listDataForDashboard = async (identifier, category, authToken) => {
  * @returns {Promise<Object>} Merged list of all data items by category
  */
 const listAllDataForDashboard = async (identifier, authToken) => {
-	const resultsByCategory = {};
-	let totalCount = 0;
+    const resultsByCategory = {};
+    let totalCount = 0;
 
-	for (const cat of SUPPORTED_CATEGORIES) {
-		const listResult = await listDataForDashboard(identifier, cat, authToken);
-		resultsByCategory[cat] = listResult.data || [];
-		totalCount += (listResult.data || []).length;
-	}
+    for (const cat of SUPPORTED_CATEGORIES) {
+        const listResult = await listDataForDashboard(identifier, cat, authToken);
+        resultsByCategory[cat] = listResult.data || [];
+        totalCount += (listResult.data || []).length;
+    }
 
-	return {
-		success: true,
-		message: `Found ${totalCount} items across all categories`,
-		data: resultsByCategory,
-		timestamp: new Date().toISOString(),
-		totalCount,
-	};
+    return {
+        success: true,
+        message: `Found ${totalCount} items across all categories`,
+        data: resultsByCategory,
+        timestamp: new Date().toISOString(),
+        totalCount,
+    };
 };
 
 /**
@@ -755,13 +782,13 @@ const _isValidCreditCard = (cardNumber) => {
 };
 
 module.exports = {
-	storeData,
-	retrieveData,
-	previewData,
-	createNFTReadyData,
-	listData,
-	listAllData,
-	listDataForDashboard,
-	listAllDataForDashboard,
-	deleteZelfKey,
+    storeData,
+    retrieveData,
+    previewData,
+    createNFTReadyData,
+    listData,
+    listAllData,
+    listDataForDashboard,
+    listAllDataForDashboard,
+    deleteZelfKey,
 };

@@ -10,25 +10,26 @@ const QRCode = require("qrcode");
  * @returns {string|undefined}
  */
 const normalizeFaceBase64 = (faceBase64) => {
-	if (faceBase64 == null || typeof faceBase64 !== "string") return faceBase64;
-	const trimmed = faceBase64.trim();
-	const marker = "base64,";
-	const idx = trimmed.indexOf(marker);
-	if (idx !== -1 && trimmed.slice(0, 5).toLowerCase() === "data:") {
-		return trimmed.slice(idx + marker.length).replace(/\s/g, "");
-	}
-	return trimmed.replace(/\s/g, "");
+    if (faceBase64 == null || typeof faceBase64 !== "string") return faceBase64;
+    const trimmed = faceBase64.trim();
+    const marker = "base64,";
+    const idx = trimmed.indexOf(marker);
+    if (idx !== -1 && trimmed.slice(0, 5).toLowerCase() === "data:") {
+        return trimmed.slice(idx + marker.length).replace(/\s/g, "");
+    }
+    return trimmed.replace(/\s/g, "");
 };
 
 const encrypt = async (data) => {
     try {
         const encryptedResponse = await axios.post("/zelf/encrypt", {
+            liveness_detection_prior_creation: data.livenessDetectionPriorCreation || false,
             cleartext_data: data.publicData,
             face_base_64: normalizeFaceBase64(data.faceBase64),
             metadata: data.metadata,
             password: data.password || undefined,
             record_id: data.identifier || data.record_id || data._id,
-            require_live_face: data.requireLiveness || true,
+            require_live_face: data.requireLiveness || true, // decrypt 
             tolerance: data.tolerance || "REGULAR",
             verifiers_auth_key: data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
         });

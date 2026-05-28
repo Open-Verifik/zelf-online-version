@@ -25,6 +25,7 @@ module.exports = (server) => {
     require("../Repositories/fantom/routes/fantom-scrapping.route")(server);
     //G
     //H
+    require("../Repositories/HumanAuthn/routes/human-authn-protected.route")(server);
     //H
     //I
     require("../Repositories/IPFS/routes/ipfs.routes")(server);

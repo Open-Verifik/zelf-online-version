@@ -18,6 +18,7 @@
         "test:lease-recovery": "jest tests/integration/leaseRecovery-api.test.js --verbose --no-coverage",
         "test:authentication": "jest tests/integration/authentication.test.js --verbose --no-coverage",
         "test:license": "jest tests/integration/license.test.js --verbose --no-coverage",
+        "test:human-authn-onboarding": "jest --config jest.integration.config.js tests/integration/human-authn-onboarding-api.test.js --verbose --no-coverage",
         "test:license-theme": "jest tests/unit/license-theme-merge.test.js --verbose --no-coverage && jest --config jest.integration.http.config.js tests/integration/license-zelf-theme-api.test.js --verbose --no-coverage",
         "test:stellar": "jest tests/integration/stellar-api.test.js --verbose --no-coverage",
         "test:ethereum-gas": "jest tests/unit/etherscan-gas-tracker.util.test.js --verbose --no-coverage && jest --config jest.integration.config.js tests/integration/ethereum-gas-tracker-live.test.js --verbose --no-coverage",
