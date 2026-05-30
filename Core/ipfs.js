@@ -139,53 +139,6 @@ const web3Instance = new pinataWeb3.PinataSDK({
     pinataGateway,
 });
 
-/** Pinata: each metadata key and value must be under this length when stringified. */
-const PINATA_KEYVALUE_MAX_LENGTH = 250;
-
-const _pinataValueToString = (value) => {
-    if (value === null || value === undefined) return "";
-    if (typeof value === "object") return JSON.stringify(value);
-    return String(value);
-};
-
-/**
- * Logs each keyvalue key/value length before upload (development, or LOG_PINATA_KEYVALUES=1).
- * Debug: Pinata 400 "keyvalues keys and values must be less than 250 characters".
- */
-const logPinataMetadataKeyvalueLengths = (metadata, context = {}) => {
-    const enabled = process.env.NODE_ENV === "development" || process.env.LOG_PINATA_KEYVALUES === "1";
-    if (!enabled || !metadata || typeof metadata !== "object") return;
-
-    const label = context.label || "pinata_keyvalues";
-    const { filename } = context;
-
-    console.log(`[${label}] Pinata keyvalues preflight`, {
-        filename,
-        maxLength: PINATA_KEYVALUE_MAX_LENGTH,
-        entryCount: Object.keys(metadata).length,
-    });
-
-    for (const [key, value] of Object.entries(metadata)) {
-        const keyStr = String(key);
-        const valStr = _pinataValueToString(value);
-        const keyLen = keyStr.length;
-        const valLen = valStr.length;
-        const overKey = keyLen > PINATA_KEYVALUE_MAX_LENGTH;
-        const overVal = valLen > PINATA_KEYVALUE_MAX_LENGTH;
-
-        if (overKey || overVal) {
-            console.warn(`[${label}] VIOLATION`, {
-                key: keyStr,
-                keyLen,
-                valLen,
-                valuePreview: valStr.slice(0, 240),
-            });
-        } else {
-            console.log(`[${label}] ok`, { key: keyStr, keyLen, valLen });
-        }
-    }
-};
-
 const upload = async (base64Image, filename = "image.png", mimeType = "image/png", metadata = {}) => {
     if (base64Image == null || typeof base64Image !== "string" || base64Image.trim() === "") {
         const err = new Error("ipfs_upload_missing_base64");
@@ -196,8 +149,6 @@ const upload = async (base64Image, filename = "image.png", mimeType = "image/png
     try {
         // Use the new Pinata SDK v2.5.0 with JWT authentication
         const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
-
-        logPinataMetadataKeyvalueLengths(metadata, { label: "ipfs.upload", filename });
 
         const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 
@@ -264,8 +215,6 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
     try {
         const base64Data = base64Image.replace(/^data:[^;]+;base64,/, "");
 
-        logPinataMetadataKeyvalueLengths(metadata, { label: "ipfs.pinFile", filename });
-
         const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 
         const normalizedResponse = normalizePinataResponse(uploadResponse);
@@ -316,8 +265,6 @@ const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "i
         formData.append("file", buffer, filename);
 
         if (metadata) {
-            logPinataMetadataKeyvalueLengths(metadata, { label: "ipfs.pinFileWindows", filename });
-
             formData.append(
                 "pinataMetadata",
                 JSON.stringify({
