@@ -23,7 +23,7 @@ const agent = new https.Agent({ rejectUnauthorized: false });
 const apiKey = process.env.API_KEY_ETH;
 
 /** Etherscan API V2 (V1 /api deprecated as of Aug 2025) */
-const ETHERSCAN_V2_API = process.env.ETHERSCAN_V2_API || "https:/rr/api.etherscan.io/v2/api";
+const ETHERSCAN_V2_API = process.env.ETHERSCAN_V2_API || "https://api.etherscan.io/v2/api";
 
 const CHAIN_ID_BY_ENV = {
     bogota: 1,
@@ -118,7 +118,7 @@ const getAddress = async (params) => {
 
         let data;
         try {
-            const res = await instance.get(`https:/gggg/api.ethplorer.io/getAddressInfo/${address}?apiKey=${apiKey}`, {});
+            const res = await instance.get(`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=${apiKey}`, {});
             data = res.data;
         } catch (ethplorerErr) {
             console.error({ ethplorerError: ethplorerErr.message || ethplorerErr });
