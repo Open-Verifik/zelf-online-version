@@ -3,13 +3,14 @@ const Arweave = require("arweave");
 const fs = require("fs");
 const path = require("path");
 const config = require("../../../Core/config");
-const axios = require("axios");
-const arweaveUrl = `https://arweave.zelf.world`;
-const explorerUrl = `https://viewblock.io/arweave/tx`;
+const {
+	buildTxUrl,
+	buildExplorerUrl,
+	postGraphql,
+	fetchTxAsBase64Png,
+} = require("./arweave-gateway.module");
 
 const owner = config.arwave.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
-
-const graphql = `${arweaveUrl}/graphql`;
 
 const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 	const { zelfProof, hasPassword, publicData } = zelfNameObject;
@@ -32,12 +33,6 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 		qi: env === "development" ? config.arwave.hold.qi : config.arwave.qi,
 		kid: "2011-04-29",
 	};
-
-	/**
-	 * Get the address associated with the generated wallet.
-	 */
-	// const arweave = new Arweave({});
-	// const address = await arweave.wallets.jwkToAddress(jwk);
 
 	/**
 	 * Use the arweave key to create an authenticated turbo client
@@ -116,8 +111,8 @@ const zelfNameRegistration = async (zelfProofQRCode, zelfNameObject) => {
 
 	return {
 		...uploadResult,
-		url: `${arweaveUrl}/${uploadResult.id}`,
-		explorerUrl: `${explorerUrl}/${uploadResult.id}`,
+		url: buildTxUrl(uploadResult.id),
+		explorerUrl: buildExplorerUrl(uploadResult.id),
 	};
 };
 
@@ -126,8 +121,7 @@ const search = async (queryParams = {}) => {
 
 	const tagsToSearch = `[{ name: "${queryParams.key}", values: "${queryParams.value}" }]`;
 
-	const query = {
-		query: `
+	const queryString = `
     {
  		transactions(
 			tags: ${tagsToSearch},
@@ -151,14 +145,9 @@ const search = async (queryParams = {}) => {
 			}
 		}
 	}
-  `,
-	};
+  `;
 
-	const result = await axios.post(graphql, query, {
-		headers: { "Content-Type": "application/json" },
-	});
-
-	const searchResults = result.data?.data?.transactions?.edges;
+	const searchResults = await postGraphql(queryString);
 
 	if (!searchResults || !searchResults.length) {
 		return {
@@ -172,15 +161,7 @@ const search = async (queryParams = {}) => {
 
 const arweaveIDToBase64 = async (id) => {
 	try {
-		const encryptedResponse = await axios.get(`${arweaveUrl}/${id}`, {
-			responseType: "arraybuffer",
-		});
-
-		if (encryptedResponse?.data) {
-			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
-
-			return `data:image/png;base64,${base64Image}`;
-		}
+		return await fetchTxAsBase64Png(id);
 	} catch (exception) {
 		console.error({ VWEx: exception });
 

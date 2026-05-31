@@ -5,9 +5,9 @@
 		const isLocalhost = window.location.hostname === "localhost";
 
 		const randomlocalhosts = [
-			"miguel114_bdag_zelf.arweave.zelf.world",
-			"john4_bdag_zelf.arweave.zelf.world",
-			"johnone_bdag_zelf.arweave.zelf.world",
+			"miguel114_bdag_zelf.arweave.net",
+			"john4_bdag_zelf.arweave.net",
+			"johnone_bdag_zelf.arweave.net",
 		];
 
 		const url = isLocalhost ? randomlocalhosts[Math.floor(Math.random() * randomlocalhosts.length)] : window.location.hostname;

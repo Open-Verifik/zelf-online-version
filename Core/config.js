@@ -16,6 +16,17 @@ const stripeDashboardUrlBase = String(
     (process.env.DASHBOARD_URL || process.env.FRONTEND_URL || "https://dashboard.zelf.world").trim() || "https://dashboard.zelf.world",
 ).replace(/\/$/, "");
 
+/** Default Arweave gateway pool — override per server via .env (see arwave in configuration). */
+const ARWEAVE_DEFAULT_PUBLIC_GATEWAY_URL = "https://arweave.net";
+const ARWEAVE_DEFAULT_GRAPHQL_GATEWAYS = [
+    "https://arweave.net",
+    "https://zigza.xyz",
+    "https://mipenode.pro",
+    "https://ar11.innostack.xyz",
+    "https://ardrive.net",
+];
+const ARWEAVE_DEFAULT_ARNS_GATEWAY_HOST = "arweave.net";
+
 /** Positive finite float from env; otherwise `fallback` (for USD rates and REWARD_PRICE). */
 const parsePositiveFloat = (value, fallback) => {
     const n = parseFloat(value);
@@ -120,6 +131,9 @@ const configuration = {
     arwave: {
         env: process.env.ARWAVE_ENV || "production",
         key: process.env.ARWAVE_KEY,
+        publicGatewayUrl: process.env.ARWEAVE_PUBLIC_GATEWAY_URL || ARWEAVE_DEFAULT_PUBLIC_GATEWAY_URL,
+        graphqlGateways: csvOrDefault(process.env.ARWEAVE_GRAPHQL_GATEWAYS, ARWEAVE_DEFAULT_GRAPHQL_GATEWAYS),
+        arnsGatewayHost: process.env.ARWEAVE_ARNS_GATEWAY_HOST || ARWEAVE_DEFAULT_ARNS_GATEWAY_HOST,
         owner: process.env.ARWEAVE_OWNER,
         n: process.env.ARWAVE_N,
         e: process.env.ARWAVE_E,

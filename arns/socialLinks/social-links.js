@@ -4,14 +4,14 @@
 		const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
 		const randomlocalhosts = [
-			"liza_socials_zelf.arweave.zelf.world",
-			"miguel_socials_zelf.arweave.zelf.world",
-			"johan_socials_zelf.arweave.zelf.world",
+			"liza_socials_zelf.arweave.net",
+			"miguel_socials_zelf.arweave.net",
+			"johan_socials_zelf.arweave.net",
 		];
 
 		const url = isLocalhost ? randomlocalhosts[Math.floor(Math.random() * randomlocalhosts.length)] : window.location.hostname;
 
-		// Extract username from URL like "liza_socials_zelf.arweave.zelf.world"
+		// Extract username from URL like "liza_socials_zelf.arweave.net"
 		// The username is the first part before the first underscore
 		const username = url.split("_")[0]?.toLowerCase() || "liza";
 

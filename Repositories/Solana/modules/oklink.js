@@ -76,7 +76,7 @@ const getAddress = async (params) => {
             data.tokenHoldings.tokens.unshift({
                 amount: data.balance,
                 fiatBalance: fiat,
-                image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+                image: "https://arweave.net/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
                 name: "Solana",
                 price: data.account.price,
                 symbol: "SOL",

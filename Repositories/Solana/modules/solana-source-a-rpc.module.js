@@ -168,7 +168,7 @@ const getAddress = async (params) => {
 			name: "Solana",
 			price: priceNum,
 			amount: balanceSol,
-			image: "https://vtxz26svcpnbg5ncfansdb5zt33ec2bwco6uuah3g3sow3pewfma.arweave.zelf.world/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
+			image: "https://arweave.net/rO-delUT2hN1oigbIYe5nvZBaDYTvUoA-zbk623ksVg",
 		});
 	}
 

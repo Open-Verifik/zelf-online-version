@@ -1,7 +1,5 @@
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
-
-const arweaveUrl = `https://arweave.zelf.world`;
-const explorerUrl = `https://viewblock.io/arweave/tx`;
+const { buildTxUrl, buildExplorerUrl } = require("../../Arweave/modules/arweave-gateway.module");
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
 const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
@@ -725,9 +723,9 @@ const previewZelfName = async (params, authUser) => {
 			const zelfNameObject = zelfNameObjects[index];
 
 			if (zelfNameObject.ipfs_pin_hash && zelfNameObject.publicData.arweaveId) {
-				zelfNameObject.url = `${arweaveUrl}/${zelfNameObject.publicData.arweaveId}`;
+				zelfNameObject.url = buildTxUrl(zelfNameObject.publicData.arweaveId);
 
-				zelfNameObject.explorerUrl = `${explorerUrl}/${zelfNameObject.publicData.arweaveId}`;
+				zelfNameObject.explorerUrl = buildExplorerUrl(zelfNameObject.publicData.arweaveId);
 			}
 
 			zelfNameObject.source = zelfNameObject.ipfs_pin_hash ? "ipfs" : "arweave";

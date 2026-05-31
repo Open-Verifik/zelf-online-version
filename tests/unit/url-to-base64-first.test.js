@@ -28,7 +28,7 @@ describe("urlToBase64First", () => {
 				arrayBuffer: () => Promise.resolve(pngBody.buffer.slice(pngBody.byteOffset, pngBody.byteOffset + pngBody.byteLength)),
 			});
 		});
-		const out = await urlToBase64First(["https://arweave.zelf.world/dead", "https://gateway.example/ipfs/QmGood"]);
+		const out = await urlToBase64First(["https://arweave.net/dead", "https://gateway.example/ipfs/QmGood"]);
 		expect(out).toMatch(/^data:image\/png;base64,/);
 		expect(global.fetch).toHaveBeenCalledTimes(2);
 	});
