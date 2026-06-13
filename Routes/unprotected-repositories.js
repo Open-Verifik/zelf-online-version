@@ -42,6 +42,7 @@ module.exports = (server) => {
     //V
     require("../Repositories/VaultLegacy/routes/vault-legacy.routes")(server);
     //W
+    require("../Repositories/WhatsApp/routes/whatsapp.route")(server);
     require("../Repositories/Wallet/routes/unprotected-wallet.route")(server);
     //X
     //Y

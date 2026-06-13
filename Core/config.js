@@ -626,6 +626,16 @@ const configuration = {
             })(),
         },
     },
+    /** Verifik WhatsApp relay — Meta Graph API egress from Zelf (non-GCP). */
+    whatsApp: {
+        phoneIdentifier: process.env.WHATSAPP_API_PHONE_IDENTIFIER || "111417608275326",
+        relayApiKey: process.env.VERIFIK_WHATSAPP_RELAY_API_KEY || "",
+        apiKeys: {
+            default: process.env.WHATSAPP_API_TOKEN || "",
+            111417608275326: process.env.WHATSAPP_API_TOKEN || "",
+            624749820726878: process.env.TCC_WHATSAPP_API_KEY || "",
+        },
+    },
     /** ZelfBlockDagPay.sol — native BDAG tag checkout only */
     blockdag: {
         defaultCollectionAddress: process.env.BLOCKDAG_DEFAULT_COLLECTION_ADDRESS || null,
