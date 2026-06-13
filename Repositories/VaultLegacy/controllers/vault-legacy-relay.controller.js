@@ -13,9 +13,12 @@ const { ethers } = require("ethers");
 const fs = require("fs");
 const path = require("path");
 
+const config = require("../../../Core/config");
 const VaultLegacy = require("../models/vault-legacy.model");
+const LegacyDemo = require("../modules/vault-legacy-demo.module");
+const RelayerHealth = require("../modules/vault-legacy-relayer.module");
 
-const { sendLawyerNewPlan, sendTestatorPlanActive, sendBeneficiaryClaimable } = require("../modules/email");
+const { sendLawyerNewPlan, sendTestatorPlanActive } = require("../modules/email");
 
 const IPFS = require("../../IPFS/modules/ipfs.module");
 
@@ -48,6 +51,22 @@ function initRelayer() {
         iface = new ethers.Interface(artifact.abi);
     } catch {
         console.warn("⚠️  VaultRegistry ABI not found — calldata decoding disabled");
+    }
+
+    if (CONTRACT_ADDRESS) {
+        RelayerHealth.getRelayerHealth()
+            .then((health) => {
+                if (!health.onChainRelayer) return;
+                if (health.relayerMatches) {
+                    console.log(`✅ VaultLegacy relayer matches contract relayer(): ${health.onChainRelayer}`);
+                } else {
+                    console.error(
+                        `❌ VaultLegacy RELAYER MISMATCH — server ${health.serverRelayer} ≠ contract ${health.onChainRelayer}. ` +
+                            "createVault will revert with 'Not authorized to create vault'."
+                    );
+                }
+            })
+            .catch((e) => console.warn("⚠️  Relayer health check failed:", e.message));
     }
 }
 
@@ -89,7 +108,7 @@ const ipfsUpload = async (ctx) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const registerEmails = async (ctx) => {
     try {
-        const { vaultId, testatorEmail, lawyerEmail, beneficiaryEmails, beneficiaryTagNames } = ctx.request.body;
+        const { vaultId, testatorEmail, lawyerEmail, beneficiaryEmails, beneficiaryTagNames, isDemo } = ctx.request.body;
 
         if (!vaultId) {
             ctx.status = 400;
@@ -97,21 +116,32 @@ const registerEmails = async (ctx) => {
             return;
         }
 
+        const vaultIdNorm = LegacyDemo.normalizeVaultId(vaultId);
+        const wantsDemo = isDemo === true;
+
+        if (wantsDemo) {
+            LegacyDemo.assertDemoModeEnabled();
+        }
+
+        const update = {
+            testatorEmail: testatorEmail || null,
+            lawyerEmail: lawyerEmail || null,
+            beneficiaryEmails: beneficiaryEmails || [],
+            beneficiaryTagNames: beneficiaryTagNames || [],
+        };
+
+        if (wantsDemo) {
+            update.isDemo = true;
+        }
+
         await VaultLegacy.findOneAndUpdate(
-            { vaultId },
-            {
-                $set: {
-                    testatorEmail: testatorEmail || null,
-                    lawyerEmail: lawyerEmail || null,
-                    beneficiaryEmails: beneficiaryEmails || [],
-                    beneficiaryTagNames: beneficiaryTagNames || [],
-                },
-            },
+            { vaultId: vaultIdNorm },
+            { $set: update },
             { upsert: true, new: true }
         );
 
-        console.log(`📋 Registered emails for vault ${vaultId} (MongoDB)`);
-        ctx.body = { success: true };
+        console.log(`📋 Registered emails for vault ${vaultIdNorm} (MongoDB)${wantsDemo ? " [demo]" : ""}`);
+        ctx.body = { success: true, vaultId: vaultIdNorm, isDemo: wantsDemo };
     } catch (error) {
         ctx.status = 500;
         ctx.body = { error: error.message };
@@ -147,6 +177,10 @@ const sendTx = async (ctx) => {
         }
         console.log(`📡 Relaying tx → ${fnName} (${calldata.substring(0, 10)}...)`);
 
+        if (fnName === "createVault") {
+            await RelayerHealth.assertRelayerMatchesContract();
+        }
+
         const tx = await relayerWallet.sendTransaction({ to, data: calldata, value: value || "0x0" });
         console.log(`📤 Tx sent: ${tx.hash}`);
         const receipt = await tx.wait();
@@ -157,18 +191,34 @@ const sendTx = async (ctx) => {
             try {
                 if (fnName === "createVault") {
                     const vaultId = decoded.args[1];
-                    const vaultIdHex = typeof vaultId === "bigint" ? "0x" + vaultId.toString(16).padStart(64, "0") : vaultId.toString();
+                    const vaultIdHex = LegacyDemo.normalizeVaultId(
+                        typeof vaultId === "bigint" ? vaultId : vaultId.toString()
+                    );
                     const testatorAddress = decoded.args[0];
+                    const lawyerAddress = decoded.args[3];
+
+                    let demoAcceptResult = null;
+                    if (config.legacyDemo?.enabled && LegacyDemo.isDemoLawyerAddress(lawyerAddress)) {
+                        try {
+                            demoAcceptResult = await LegacyDemo.syncDemoVaultAfterCreate({
+                                vaultId: vaultIdHex,
+                                lawyerAddress,
+                            });
+                            console.log(`[LEGACY-DEMO] syncDemoVaultAfterCreate:`, demoAcceptResult?.reason || "accepted");
+                        } catch (e) {
+                            console.error("[LEGACY-DEMO] syncDemoVaultAfterCreate failed:", e.message);
+                        }
+                    }
 
                     const entry = await VaultLegacy.findOne({ vaultId: vaultIdHex });
-                    if (entry?.lawyerEmail) {
+                    if (!demoAcceptResult?.success && !entry?.isDemo && entry?.lawyerEmail) {
                         console.log(`📧 Sending "new plan" email to lawyer ${entry.lawyerEmail}`);
                         sendLawyerNewPlan(entry.lawyerEmail, vaultIdHex, testatorAddress).catch((e) =>
                             console.error("❌ Lawyer email failed:", e.message)
                         );
                     }
                 } else if (fnName === "acceptVault") {
-                    const vaultIdHex = decoded.args[0].toString();
+                    const vaultIdHex = LegacyDemo.normalizeVaultId(decoded.args[0]);
                     const entry = await VaultLegacy.findOne({ vaultId: vaultIdHex });
                     if (entry?.testatorEmail) {
                         console.log(`📧 Sending "plan active" email to testator ${entry.testatorEmail}`);
@@ -177,28 +227,13 @@ const sendTx = async (ctx) => {
                         );
                     }
                 } else if (fnName === "confirmDeath") {
-                    const vaultIdHex = decoded.args[0].toString();
+                    const vaultIdHex = LegacyDemo.normalizeVaultId(decoded.args[0]);
                     const entry = await VaultLegacy.findOne({ vaultId: vaultIdHex });
 
-                    if (entry && entry.beneficiaryEmails.length > 0) {
-                        const tagNames = entry.beneficiaryTagNames || [];
-                        const isSingle = entry.beneficiaryEmails.length === 1;
-
-                        for (let i = 0; i < entry.beneficiaryEmails.length; i++) {
-                            const email = entry.beneficiaryEmails[i];
-                            let tagName = tagNames[i] || vaultIdHex;
-
-                            if (isSingle) {
-                                if (tagNames.length > 1) {
-                                    const valTag = tagNames.find((t) => t.toLowerCase().includes("val"));
-                                    if (valTag) tagName = valTag;
-                                }
-                                tagName = tagName.replace(/\.zelf$/, "");
-                            }
-
-                            console.log(`📧 Sending claimable email to beneficiary ${email}`);
-                            sendBeneficiaryClaimable(email, tagName).catch((e) => console.error("❌ Beneficiary email failed:", e.message));
-                        }
+                    if (entry) {
+                        LegacyDemo.ensureBeneficiaryClaimableEmails(entry, vaultIdHex).catch((e) =>
+                            console.error("❌ Beneficiary claimable emails failed:", e.message)
+                        );
                     }
                 }
             } catch (emailErr) {

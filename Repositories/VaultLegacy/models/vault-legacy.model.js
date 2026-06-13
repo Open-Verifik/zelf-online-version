@@ -27,6 +27,9 @@ const VaultLegacySchema = new Schema({
     // Keys are event names (e.g. "createVault", "gracePeriod", "livenessFailed"),
     // values are ISO-8601 timestamps of when the e-mail was sent.
     notifiedEvents: { type: Schema.Types.Mixed, default: {} },
+
+    /** Demo inheritance plan — automation only when LEGACY_DEMO_MODE=true */
+    isDemo: { type: Boolean, default: false, index: true },
 });
 
 addBasicPlugins(VaultLegacySchema);
