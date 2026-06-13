@@ -65,7 +65,6 @@ const fetchAndMergeOfficialThemeSettings = async (domainConfig) => {
     if (!url) return;
 
     try {
-        console.log("fetching theme settings from:", url);
         const jsonResponse = await axios.get(url);
         const remote = _normalizeRemoteThemePayload(jsonResponse.data);
         domainConfig.themeSettings = _deepMergeThemeObjects(domainConfig.themeSettings || {}, remote);
@@ -82,7 +81,6 @@ const loadCache = () => {
     try {
         const cached = licenseCache.get("official-licenses");
         if (cached) {
-            console.info("Loading official licenses from memory cache");
             return cached;
         }
         return null;
@@ -101,7 +99,6 @@ const saveCache = (licenses) => {
         // Check if we need to update the cache (avoid unnecessary operations)
         const existingCache = loadCache();
         if (existingCache && JSON.stringify(existingCache) === JSON.stringify(licenses)) {
-            console.log("Cache unchanged, skipping update");
             return;
         }
 
@@ -113,7 +110,7 @@ const saveCache = (licenses) => {
         // Save to memory cache with automatic expiration
         licenseCache.set("official-licenses", licensesMap);
 
-        console.log(
+        console.info(
             `Official licenses cached successfully (${licenses.length} licenses, TTL: ${licenseCache.getTtl("official-licenses") ? Math.round((licenseCache.getTtl("official-licenses") - Date.now()) / 1000) : "N/A"
             }s)`
         );
@@ -127,7 +124,6 @@ const saveCache = (licenses) => {
  */
 const clearCache = () => {
     licenseCache.del("official-licenses");
-    console.log("License cache cleared");
 };
 
 /**
@@ -199,14 +195,119 @@ const searchLicense = async (query, user) => {
 };
 
 /**
+ * Org owner email bound to a staff account (IPFS JSON and/or client publicData).
+ * @param {Object} client - Client record from ClientModule.get
+ * @param {Object} accountData - Parsed body from client.url (staff JSON)
+ * @returns {string} - Normalized email or empty string
+ */
+const _resolveStaffOrgOwnerEmail = (client, accountData) => {
+    const data = accountData && typeof accountData === "object" ? accountData : {};
+    const pd = client?.publicData && typeof client.publicData === "object" ? client.publicData : {};
+    const candidates = [data.ownerEmail, data.staffOwnerEmail, pd.staffOwnerEmail, pd.ownerEmail];
+
+    for (const c of candidates) {
+        if (c && String(c).trim()) {
+            return String(c).trim();
+        }
+    }
+
+    return "";
+};
+
+/**
+ * Staff proves identity with **staff** face + password (decrypt staff zelfProof), then licenses load by org owner (licenseOwner index).
+ * @param {Object} jwt - JWT
+ * @param {boolean} withJSON - Load full license JSON
+ * @param {Object} ownershipCredentials - { faceBase64, masterPassword }
+ * @returns {Promise<Object>}
+ */
+const _getMyLicenseForStaffWithCredentials = async (jwt, withJSON, ownershipCredentials) => {
+    const { faceBase64, masterPassword } = ownershipCredentials;
+
+    // Must load the **staff** IPFS row (staffEmail index). `ClientModule.get({ email })` tries
+    // `accountEmail` first and can return the **org owner** client when emails overlap — then
+    // decrypt runs on the owner's zelfProof with staff face/password and fails.
+    const staffLookupKeys = [...new Set([jwt.staffEmail, jwt.email].filter(Boolean))];
+
+    let client = null;
+
+    for (const em of staffLookupKeys) {
+        client = await ClientModule.getByStaffEmail(String(em).trim());
+
+        if (client) break;
+    }
+
+    if (!client) throw new Error("404:staff_client_not_found");
+
+    const accountJSON = await axios.get(client.url);
+
+    const accountZelfProof = accountJSON.data.zelfProof;
+
+    await decrypt({
+        zelfProof: accountZelfProof,
+        faceBase64,
+        password: masterPassword || undefined,
+        verifierKey: config.zelfEncrypt.serverKey,
+    });
+
+    const orgOwnerEmail = _resolveStaffOrgOwnerEmail(client, accountJSON.data);
+
+    if (!orgOwnerEmail) {
+        throw new Error("400:staff_org_owner_email_missing");
+    }
+
+    if (jwt.ownerEmail && orgOwnerEmail.toLowerCase() !== String(jwt.ownerEmail).toLowerCase()) {
+        throw new Error("403:staff_owner_email_mismatch");
+    }
+
+    const myRecords = await IPFS.get({ key: "licenseOwner", value: orgOwnerEmail });
+
+    const myLicenses = [];
+
+    for (const record of myRecords) {
+        if (record.publicData.type === "license") {
+            myLicenses.push(record);
+        }
+    }
+
+    if (withJSON && myLicenses.length) {
+        try {
+            const jsonResponse = await axios.get(myLicenses[0].url);
+
+            myLicenses[0].domainConfig = jsonResponse.data;
+        } catch (error) {
+            console.error("Error getting json from url:", error);
+            throw error;
+        }
+    }
+
+    const ownerClient = await ClientModule.get({ email: orgOwnerEmail });
+
+    return {
+        myLicense: myLicenses.length ? myLicenses[0] : null,
+        zelfAccount: ownerClient || client,
+        accountZelfProof,
+        accountJSON,
+    };
+};
+
+/**
  * Get user's own licenses
  * @param {Object} query - Query parameters
  * @param {Object} jwt - JWT object
  * @returns {Promise<Array>} - Array of user's licenses
  */
 const getMyLicense = async (jwt, withJSON = false, ownershipCredentials) => {
-    // Determine the target email: if staff, use ownerEmail; otherwise use user's email
-    const targetEmail = jwt.accountType === "staff" && jwt.ownerEmail ? jwt.ownerEmail : jwt.email;
+    // Staff JWT may use accountType "staff" (Staff auth) or "staff_account" (unified Client auth)
+    const isStaffUser = jwt.accountType === "staff" || jwt.accountType === "staff_account";
+
+    // Biometric path: staff decrypts the **staff** zelfProof; licenses resolve via staffOwnerEmail/ownerEmail → licenseOwner
+    if (isStaffUser && ownershipCredentials) {
+        return _getMyLicenseForStaffWithCredentials(jwt, withJSON, ownershipCredentials);
+    }
+
+    // Non-staff, or staff GET without biometrics: load client for license index by accountEmail
+    const targetEmail = isStaffUser && jwt.ownerEmail ? jwt.ownerEmail : jwt.email;
 
     // Get client data to get the zelfProof
     const client = await ClientModule.get({ email: targetEmail });
@@ -546,8 +647,6 @@ const loadOfficialLicenses = async (force = false) => {
 
         // Save to cache with automatic expiration
         saveCache(licenses);
-
-        console.info(`Loaded ${licenses.length} official licenses successfully`);
 
         return licenses;
     } catch (error) {

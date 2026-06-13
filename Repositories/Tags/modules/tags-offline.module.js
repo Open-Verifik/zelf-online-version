@@ -7,6 +7,7 @@ const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const TagsRegistrationModule = require("./tags-registration.module");
 const { extractZelfProofFromQR, generateQRFromZelfProof } = require("./qr-zelfproof-extractor.module");
+const { buildAddressKeyvalues } = require("./tags-addresses.module");
 
 const _getExtraPublicData = async (password, zelfProof, syncPublicData) => {
     if (!password || !zelfProof || !syncPublicData) {
@@ -87,18 +88,10 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
         referralSolanaAddress: tagObject.publicData.referralSolanaAddress || undefined,
     };
 
-    const addresses = {
-        suiAddress: tagObject.publicData.suiAddress || undefined,
-    };
-
     const metadata = {
         [tagKey]: tagObject.publicData[tagKey],
         hasPassword: tagObject.publicData.hasPassword || "false",
-        ethAddress: tagObject.publicData.ethAddress || undefined,
-        btcAddress: tagObject.publicData.btcAddress || undefined,
-        solanaAddress: tagObject.publicData.solanaAddress || undefined,
         extraParams,
-        addresses,
         type: tagObject.publicData.type || "hold",
         domain: tagObject.publicData.domain || undefined,
     };
@@ -106,19 +99,19 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
     // keys to updte goes here
     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-    if (syncPublicData.suiAddress) {
-        metadata.extraParams.suiAddress = syncPublicData.suiAddress;
-    }
-
-    if (syncPublicData.stellarAddress || syncPublicData.xlmAddress) {
-        metadata.addresses.xlmAddress = syncPublicData.stellarAddress || syncPublicData.xlmAddress;
-    }
+    const addressSource = {
+        ...tagObject.publicData,
+        suiAddress: syncPublicData.suiAddress || tagObject.publicData.suiAddress,
+        xlmAddress: syncPublicData.stellarAddress || syncPublicData.xlmAddress || tagObject.publicData.xlmAddress,
+        dotAddress: syncPublicData.dotAddress || tagObject.publicData.dotAddress,
+        ksmAddress: syncPublicData.ksmAddress || tagObject.publicData.ksmAddress,
+    };
 
     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
     metadata.extraParams = JSON.stringify(metadata.extraParams);
 
-    metadata.addresses = JSON.stringify(metadata.addresses);
+    Object.assign(metadata, buildAddressKeyvalues(addressSource));
 
     if (ipfsHash) {
         await TagsIPFSModule.deleteFiles([ipfsRecord.id]);

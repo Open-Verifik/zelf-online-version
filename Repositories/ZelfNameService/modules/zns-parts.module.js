@@ -2,11 +2,11 @@ const SessionModule = require("../../Session/modules/session.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const config = require("../../../Core/config");
-const arweaveUrl = `https://arweave.zelf.world`;
-const explorerUrl = `https://viewblock.io/arweave/tx`;
+const { buildTxUrl, buildExplorerUrl } = require("../../Arweave/modules/arweave-gateway.module");
 const moment = require("moment");
 const axios = require("axios");
 const { encrypt, encryptQR } = require("../../Wallet/modules/encryption");
+const { mergeAddressKeyvaluesIntoPublicData } = require("../../Tags/modules/tags-addresses.module");
 
 const zelfNamePricing = {
 	1: { 1: 240, 2: 432, 3: 612, 4: 768, 5: 900, lifetime: 3600 },
@@ -114,8 +114,8 @@ const decryptParams = async (data, authUser) => {
 const formatArweaveRecord = async (transactionRecord) => {
 	const zelfNameObject = {
 		id: transactionRecord.node?.id,
-		url: `${arweaveUrl}/${transactionRecord.node?.id}`,
-		explorerUrl: `${explorerUrl}/${transactionRecord.node?.id}`,
+		url: buildTxUrl(transactionRecord.node?.id),
+		explorerUrl: buildExplorerUrl(transactionRecord.node?.id),
 		publicData: {},
 		zelfProofQRCode: await ArweaveModule.arweaveIDToBase64(transactionRecord.node?.id),
 	};
@@ -194,13 +194,7 @@ const formatIPFSRecord = async (ipfsRecord, foundInArweave) => {
 		delete zelfNameObject.publicData.extraParams;
 	}
 
-	if (zelfNameObject.publicData.addresses) {
-		const addresses = JSON.parse(zelfNameObject.publicData.addresses);
-
-		Object.assign(zelfNameObject.publicData, addresses);
-
-		delete zelfNameObject.publicData.addresses;
-	}
+	mergeAddressKeyvaluesIntoPublicData(zelfNameObject.publicData);
 
 	if (zelfNameObject.publicData.leaseExpiresAt) zelfNameObject.publicData.expiresAt = zelfNameObject.publicData.leaseExpiresAt;
 
@@ -248,23 +242,7 @@ const urlToBase64 = async (url) => {
 	}
 };
 
-const _arweaveIDToBase64 = async (id) => {
-	try {
-		const encryptedResponse = await axios.get(`${arweaveUrl}/${id}`, {
-			responseType: "arraybuffer",
-		});
-
-		if (encryptedResponse?.data) {
-			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
-
-			return `data:image/png;base64,${base64Image}`;
-		}
-	} catch (exception) {
-		console.error({ VWEx: exception });
-
-		return exception?.message;
-	}
-};
+const _arweaveIDToBase64 = async (id) => ArweaveModule.arweaveIDToBase64(id);
 
 const generatePGPKeys = async (dataToEncrypt, addresses, password) => {
 	const { eth, solana, sui } = addresses;

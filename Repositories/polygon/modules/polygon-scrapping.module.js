@@ -4,6 +4,14 @@ const cheerio = require("cheerio");
 const moment = require("moment");
 
 const { getCleanInstance } = require("../../../Core/axios");
+const {
+	getNaasNodeUrl,
+	NAAS_CHAIN,
+	refreshNaasCatalogAfterUnauthorized,
+	isNaasNodeUnauthorizedError,
+	isNaasNodeInternalServerError,
+	postNaasJsonRpcWith500Retries,
+} = require("../../../Core/naas-gateway-catalog");
 const config = require("../../../Core/config");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
@@ -24,6 +32,10 @@ const polygonscanApiKey = process.env.POLYGONSCAN_API_KEY || process.env.ETHERSC
 const polygonscanApiUrl = process.env.POLYGONSCAN_API_URL || process.env.ETHERSCAN_V2_API || "https://api.etherscan.io/v2/api";
 
 const polygonRpcUrl = process.env.POLYGON_RPC_URL; // QuickNode only, no public RPCs
+
+/** Nodes catalog NaaS JSON-RPC when POLYGON_RPC_URL fails or is unset */
+const polygonBookRpcBase = async () => getNaasNodeUrl(NAAS_CHAIN.POLYGON);
+
 const POLYGONSCAN_BATCH_DELAY_MS = Number(process.env.POLYGONSCAN_BATCH_DELAY_MS || 350);
 const CURATED_RPC_FALLBACK_MAX = Number(process.env.CURATED_RPC_FALLBACK_MAX || 6);
 
@@ -38,6 +50,74 @@ const logPolygonDebug = (...args) => {
 // Simple async sleep helper for batch spacing
 function sleep(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Try primary POLYGON_RPC_URL first, then catalog NaaS fallback; returns JSON-RPC response body or null */
+async function postPolygonRpc(payload, options = {}) {
+	const didRefresh401 = options.didRefresh401 ?? false;
+	const didRefreshAfter500 = options.didRefreshAfter500 ?? false;
+
+	const primary = polygonRpcUrl || null;
+	let fallback = null;
+	try {
+		fallback = await polygonBookRpcBase();
+	} catch (e) {
+		logPolygonDebug("polygon_tw_gateway_error", e?.message || e);
+	}
+	const candidates = [...new Set([primary, fallback].filter(Boolean))];
+
+	if (candidates.length === 0) return null;
+
+	const naas500Attempts = Number(process.env.POLYGON_NAAS_HTTP_500_MAX_ATTEMPTS || 3);
+	const naas500DelayMs = Number(process.env.POLYGON_NAAS_HTTP_500_RETRY_DELAY_MS || 300);
+
+	for (const url of candidates) {
+		try {
+			let data;
+			if (fallback && url === fallback) {
+				data = await postNaasJsonRpcWith500Retries(instance, url, payload, {
+					maxAttempts: naas500Attempts,
+					delayMs: naas500DelayMs,
+					onRetry: (attempt, max, u) =>
+						logPolygonDebug("polygon_naas_http_500_retry", attempt, "/", max, u),
+				});
+			} else {
+				const res = await instance.post(url, payload, {
+					headers: { "Content-Type": "application/json" },
+				});
+				data = res.data;
+			}
+
+			if (data?.error) {
+				logPolygonDebug("polygon_rpc_jsonrpc_error", url, data.error);
+				continue;
+			}
+
+			return data;
+		} catch (e) {
+			if (
+				!didRefresh401 &&
+				isNaasNodeUnauthorizedError(e) &&
+				fallback &&
+				url === fallback
+			) {
+				await refreshNaasCatalogAfterUnauthorized();
+				return postPolygonRpc(payload, { ...options, didRefresh401: true });
+			}
+			if (
+				!didRefreshAfter500 &&
+				fallback &&
+				url === fallback &&
+				isNaasNodeInternalServerError(e)
+			) {
+				await refreshNaasCatalogAfterUnauthorized();
+				return postPolygonRpc(payload, { ...options, didRefreshAfter500: true });
+			}
+			logPolygonDebug("polygon_rpc_transport_error", url, e?.message || e);
+		}
+	}
+
+	return null;
 }
 
 // Global request counters for external scanner calls
@@ -143,7 +223,7 @@ async function getPolygonscanVerifiedContracts(contractAddresses) {
 
 							return null;
 						}
-					} catch (_) {}
+					} catch (_) { }
 
 					try {
 						const url = `${polygonscanApiUrl}?chainid=${POLYGON_CHAIN_ID}&module=contract&action=getsourcecode&address=${address}&apikey=${polygonscanApiKey}`;
@@ -193,7 +273,7 @@ async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 
 		const payload = {
 			jsonrpc: "2.0",
-			id: Math.floor(Math.random() * 1e6),
+			id: 0,
 			method: "eth_call",
 			params: [
 				{
@@ -204,14 +284,12 @@ async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 			],
 		};
 
-		if (!polygonRpcUrl) throw new Error("POLYGON_RPC_URL missing");
-
-		const { data: rpc } = await instance.post(polygonRpcUrl, payload);
+		const rpc = await postPolygonRpc(payload);
 		const hex = rpc?.result || "0x0";
 
 		return hex === "0x" ? "0x0" : hex;
 	} catch (error) {
-		logPolygonDebug("rpc_balance_error", polygonRpcUrl, contractAddress, error?.message || error);
+		logPolygonDebug("rpc_balance_error", polygonRpcUrl || "naas_polygon_fallback", contractAddress, error?.message || error);
 
 		return "0x0";
 	}
@@ -221,27 +299,18 @@ async function getErc20BalanceViaRpc(contractAddress, userAddress) {
 async function getErc20BalancesViaRpcBatch(contracts, userAddress) {
 	if (!Array.isArray(contracts) || contracts.length === 0) return new Map();
 
-	if (!polygonRpcUrl) return new Map();
-
 	const methodId = "0x70a08231";
 	const addressHex = String(userAddress).toLowerCase().replace(/^0x/, "");
 
-	const calls = contracts.map((c) => ({
+	const calls = contracts.map((c, i) => ({
 		jsonrpc: "2.0",
-		id: Math.floor(Math.random() * 1e9),
+		id: i + 1,
 		method: "eth_call",
 		params: [{ to: c, data: methodId + "000000000000000000000000" + addressHex }, "latest"],
 	}));
 
 	try {
-		const results = await Promise.all(
-			calls.map((payload) =>
-				instance
-					.post(polygonRpcUrl, payload)
-					.then((r) => r.data)
-					.catch(() => null)
-			)
-		);
+		const results = await Promise.all(calls.map((payload) => postPolygonRpc(payload).catch(() => null)));
 
 		const map = new Map();
 
@@ -263,13 +332,15 @@ async function getNativeBalanceViaRpc(userAddress) {
 	try {
 		const payload = {
 			jsonrpc: "2.0",
-			id: Math.floor(Math.random() * 1e6),
+			id: 0,
 			method: "eth_getBalance",
 			params: [userAddress, "latest"],
 		};
 
-		const { data: rpc } = await instance.post(polygonRpcUrl, payload);
-		const hex = rpc?.result || "0x0";
+		const rpc = await postPolygonRpc(payload);
+		if (!rpc?.result) return 0;
+
+		const hex = rpc.result || "0x0";
 		const wei = hex && typeof hex === "string" && hex.startsWith("0x") ? parseInt(hex, 16) : Number(hex || 0);
 
 		return Number(wei);
@@ -842,27 +913,105 @@ const getGasTracker = async () => {
 	}
 };
 
-/**
- * get transaction status
- * @param {Object} params
- */
-const getTransactionStatus = async (params) => {
+/* ------------------------------------------------------------------------- *
+ * Polygon transaction status (GET /api/polygon/transaction/:id)
+ *
+ * Design contract:
+ *   - Each HTTP call performs ONE fast upstream attempt (no retry loop, no
+ *     sleep, no inter-source fallback in the same request).
+ *   - The client (extension) polls this endpoint on a short interval and
+ *     rotates `?source=rpc|bogota` until a real payload comes back, keeping
+ *     individual requests short and the server unblocked.
+ * ------------------------------------------------------------------------- */
+
+const isBogotaPolygonTxEmpty = (inner) => inner == null || (Array.isArray(inner) && inner.length === 0);
+
+const weiHexToPolString = (weiHex) => {
 	try {
-		const id = params.id;
+		return (Number(BigInt(weiHex || "0x0")) / 1e18).toString();
+	} catch (_) {
+		return "0";
+	}
+};
 
-		const { data } = await instance.get(`${urlBase}/api/evm-tx/polygon-transaction?address=${id}`, {
-			headers: {
-				Authorization: `Bearer ${token}`,
-			},
+/**
+ * Build a minimal tx detail from chain RPC. `eth_getTransactionReceipt` and
+ * `eth_getTransactionByHash` are independent reads, so we issue them in
+ * parallel to keep a single backend request fast.
+ * @param {string} txHash
+ */
+const buildPolygonTransactionFromRpc = async (txHash) => {
+	if (!txHash || typeof txHash !== "string" || !txHash.startsWith("0x")) return null;
+
+	const [receiptRes, txRes] = await Promise.all([
+		postPolygonRpc({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionReceipt", params: [txHash] }),
+		postPolygonRpc({ jsonrpc: "2.0", id: 2, method: "eth_getTransactionByHash", params: [txHash] }),
+	]);
+
+	const receipt = receiptRes && receiptRes.result;
+	const tx = txRes && txRes.result;
+	if (!receipt || !tx) return null;
+
+	const blockNum = receipt.blockNumber ? parseInt(String(receipt.blockNumber), 16) : 0;
+	const gasUsed = BigInt(receipt.gasUsed || "0x0");
+	const effPrice = BigInt(receipt.effectiveGasPrice || receipt.gasPrice || "0x0");
+	const feeWei = gasUsed * effPrice;
+	const isContractCall = tx.input && tx.input !== "0x" && String(tx.input).length > 2;
+
+	return {
+		id: txHash,
+		hash: txHash,
+		from: tx.from || "",
+		to: tx.to || "",
+		block: String(blockNum),
+		status: receipt.status === "0x1" ? "Success" : "Failed",
+		amount: weiHexToPolString(tx.value || "0x0"),
+		symbol: "POL",
+		network: "polygon",
+		date: new Date().toISOString().slice(0, 10),
+		timestamp: String(Math.floor(Date.now() / 1000)),
+		transactionFee: (Number(feeWei) / 1e18).toString(),
+		transactionFeeFiat: "0",
+		fiatAmount: 0,
+		gasPrice: "",
+		gwei: "",
+		age: "",
+		observation: "",
+		image: "",
+		transactionType: isContractCall ? "call" : "transfer",
+		tokensTransferred: [],
+	};
+};
+
+const fetchPolygonTxFromBogota = async (id) => {
+	if (!urlBase || !token) return null;
+	try {
+		const res = await instance.get(`${urlBase}/api/evm-tx/polygon-transaction?address=${id}`, {
+			headers: { Authorization: `Bearer ${token}` },
 		});
+		const inner = res && res.data && res.data.data;
+		return isBogotaPolygonTxEmpty(inner) ? null : inner;
+	} catch (e) {
+		logPolygonDebug("polygon_tx_bogota_error", e?.message || e);
+		return null;
+	}
+};
 
-		return data;
-	} catch (exception) {
-		const error = new Error("transaction_not_found");
+/**
+ * @param {Object} params  route params (`id` = tx hash)
+ * @param {Object} [query] query params (`source` = "rpc" | "bogota"; default "rpc")
+ * @returns the upstream payload, or `[]` when the chosen source has no data yet
+ */
+const getTransactionStatus = async (params, query = {}) => {
+	const id = params.id;
+	const source = String(query.source || "rpc").toLowerCase() === "bogota" ? "bogota" : "rpc";
 
-		error.status = 404;
-
-		throw error;
+	try {
+		const result = source === "bogota" ? await fetchPolygonTxFromBogota(id) : await buildPolygonTransactionFromRpc(id);
+		return result || [];
+	} catch (e) {
+		logPolygonDebug("polygon_tx_status_error", source, e?.message || e);
+		return [];
 	}
 };
 
@@ -882,7 +1031,7 @@ const getTransactionsList = async (params, query) => {
 		try {
 			const p = await getTickerPrice({ symbol: "POL" });
 			price = Number(p?.price || 0);
-		} catch (_) {}
+		} catch (_) { }
 
 		// Try OKLink first
 		let resp = await getOklinkTransactions(address, page, show, price);
@@ -898,7 +1047,7 @@ const getTransactionsList = async (params, query) => {
 				headers: token ? { Authorization: `Bearer ${token}` } : {},
 			});
 			return { pagination: { records: String(data?.length || 0), pages: "1", page: String(page) }, transactions: data || [] };
-		} catch (_) {}
+		} catch (_) { }
 
 		return { pagination: { records: "0", pages: "0", page: String(page) }, transactions: [] };
 	} catch (error) {

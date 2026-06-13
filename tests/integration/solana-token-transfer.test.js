@@ -9,7 +9,7 @@
  *
  * Prerequisites:
  *   - .env has SOLANA_NODE_SECRET (or SOLANA_RPC_URL), SENDER_KEY, SOLANA_TOKEN_MINT_ADDRESS.
- *   - SOLANA_DEV_MODE_TOKENS=true (divides amount by 10 000 so balance is preserved).
+ *   - SOLANA_DEV_MODE_TOKENS=true (divides amount by 10 so balance is preserved).
  *   - Sender wallet has SOL for fees and some ZNS tokens.
  *
  * Run:
@@ -24,7 +24,7 @@ const { Connection, PublicKey } = require("@solana/web3.js");
 const { sendAndConfirmViaPolling } = require("../../Core/solana-tx");
 
 const TARGET_WALLET = "5d1jNutWr7jEGxrzjGGGLb1fVe8mqHxK6wsdcQ2x4Eak";
-const REWARD_AMOUNT = 1; // 1 ZNS (dev mode divides by 10 000 → 0.0001 ZNS actually sent)
+const REWARD_AMOUNT = 1; // 1 ZNS (dev mode divides by 10 → 0.1 ZNS actually sent)
 
 const _redactUrl = (url) => url.replace(/\/[a-f0-9]{20,}\/?/i, "/***REDACTED***/");
 
@@ -86,7 +86,7 @@ describe("Solana ZNS token transfer (HTTP-only polling)", () => {
 		const senderWallet = solanaWeb3.Keypair.fromSecretKey(senderKey);
 
 		const isDevMode = config.solana.devModeTokens === true || config.solana.devModeTokens === "true";
-		const actualAmount = isDevMode ? REWARD_AMOUNT / 10000 : REWARD_AMOUNT;
+		const actualAmount = isDevMode ? REWARD_AMOUNT / 10 : REWARD_AMOUNT;
 		const amountToSend = Math.round(actualAmount * 10 ** 8);
 		console.log(`  Dev mode: ${isDevMode} — sending ${actualAmount} ZNS (${amountToSend} raw units)`);
 

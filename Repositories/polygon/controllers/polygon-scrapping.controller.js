@@ -30,7 +30,7 @@ const transactionsList = async (ctx) => {
 
 const transactionStatus = async (ctx) => {
 	try {
-		const data = await Module.getTransactionStatus(ctx.request.params);
+		const data = await Module.getTransactionStatus(ctx.request.params, ctx.request.query);
 
 		ctx.body = { data };
 	} catch (error) {

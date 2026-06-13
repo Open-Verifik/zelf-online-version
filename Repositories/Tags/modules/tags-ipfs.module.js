@@ -2,6 +2,7 @@ const IPFS = require("../../../Core/ipfs");
 const config = require("../../../Core/config");
 const { getDomainConfig } = require("../config/supported-domains");
 const { generateStorageKey } = require("./domain-registry.module");
+const { mergeAddressKeyvaluesIntoPublicData } = require("./tags-addresses.module");
 
 /**
  * Tags IPFS Module
@@ -74,12 +75,8 @@ const _formatRecord = (item) => {
 		delete formattedResult.publicData.extraParams;
 	}
 
-	if (formattedResult?.publicData?.addresses) {
-		const addresses = JSON.parse(formattedResult.publicData.addresses);
-
-		Object.assign(formattedResult.publicData, addresses);
-
-		delete formattedResult.publicData.addresses;
+	if (formattedResult?.publicData) {
+		mergeAddressKeyvaluesIntoPublicData(formattedResult.publicData);
 	}
 
 	if (formattedResult?.publicData?.referral) {

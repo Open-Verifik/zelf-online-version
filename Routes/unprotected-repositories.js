@@ -6,6 +6,7 @@ module.exports = (server) => {
     require("../Repositories/Client/routes/unprotected-client.route")(server);
     require("../Repositories/BlockDAG/routes/blockdag-nft-public.routes")(server);
     require("../Repositories/BlockDAG/routes/blockdag-public.routes")(server);
+    require("../Repositories/Blogs/routes/blog-public.routes")(server);
     //D
     //E
     //F
@@ -42,9 +43,11 @@ module.exports = (server) => {
     //V
     require("../Repositories/VaultLegacy/routes/vault-legacy.routes")(server);
     //W
+    require("../Repositories/WhatsApp/routes/whatsapp.route")(server);
     require("../Repositories/Wallet/routes/unprotected-wallet.route")(server);
     //X
     //Y
     //Z
     require("../Repositories/ZelfProof/routes/zelf-proof.route")(server);
+    require("../Repositories/HumanAuthn/routes/human-authn.route")(server);
 };

@@ -3,8 +3,7 @@ const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const moment = require("moment");
 const { getDomainConfig } = require("../config/supported-domains");
-
-const PINATA_KEYVALUE_MAX_LENGTH = 250;
+const { buildAddressKeyvalues, PINATA_KEYVALUE_MAX_LENGTH } = require("./tags-addresses.module");
 
 /**
  * Cleans extraParams only when needed to stay under Pinata's 250-char limit.
@@ -58,9 +57,6 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, securi
     const metadata = {
         [storageKey]: tagName,
         domain,
-        ethAddress: tagObject.ethAddress,
-        solanaAddress: tagObject.solanaAddress,
-        btcAddress: tagObject.btcAddress,
         extraParams: {
             origin: tagObject.origin || "online",
             price: tagObject.price,
@@ -70,11 +66,7 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, securi
             type: "mainnet",
             hasPassword: tagObject.hasPassword,
         },
-        addresses: JSON.stringify({
-            arweaveAddress: tagObject.arweaveAddress,
-            suiAddress: tagObject.suiAddress,
-            xlmAddress: tagObject.xlmAddress,
-        }),
+        ...buildAddressKeyvalues(tagObject),
     };
 
     if (securityType && tagObject.hasPassword == "true") {
@@ -151,9 +143,6 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
     const metadata = {
         [tagKey]: holdName,
         domain,
-        ethAddress: tagObject.ethAddress,
-        solanaAddress: tagObject.solanaAddress,
-        btcAddress: tagObject.btcAddress,
         extraParams: {
             hasPassword: tagObject.hasPassword,
             type: "hold",
@@ -161,11 +150,7 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
             registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
             expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
         },
-        addresses: JSON.stringify({
-            arweaveAddress: tagObject.arweaveAddress,
-            suiAddress: tagObject.suiAddress,
-            xlmAddress: tagObject.xlmAddress,
-        }),
+        ...buildAddressKeyvalues(tagObject),
     };
 
     if (securityType && tagObject.hasPassword == "true") {

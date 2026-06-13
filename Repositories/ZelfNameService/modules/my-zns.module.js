@@ -10,6 +10,7 @@ const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const ZNSPartsModule = require("./zns-parts.module");
 const { addReferralReward, addPurchaseReward, getPurchaseReward } = require("./zns-token.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
+const { buildAddressKeyvalues, mergeAddressKeyvaluesIntoPublicData } = require("../../Tags/modules/tags-addresses.module");
 
 const renewMyZelfName = async (params, authUser) => {
 	if (!authUser || !authUser.zelfName) {
@@ -301,14 +302,7 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 			: moment(expiresAt).subtract(1, "month").format("YYYY-MM-DD HH:mm:ss")
 		: moment().format("YYYY-MM-DD HH:mm:ss");
 
-	if (zelfNameObject.publicData.addresses) {
-		// remove the addresses from the object (it is in a string format, we need to do JSON.parse)
-		zelfNameObject.publicData.addresses = JSON.parse(zelfNameObject.publicData.addresses);
-
-		zelfNameObject.publicData.ethAddress = zelfNameObject.publicData.addresses?.ethAddress;
-		zelfNameObject.publicData.btcAddress = zelfNameObject.publicData.addresses?.btcAddress;
-		zelfNameObject.publicData.solanaAddress = zelfNameObject.publicData.addresses?.solanaAddress;
-	}
+	mergeAddressKeyvaluesIntoPublicData(zelfNameObject.publicData);
 
 	if (zelfNameObject.publicData.payment) {
 		// remove the payment from the object (it is in a string format, we need to do JSON.parse)
@@ -326,9 +320,6 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 			zelfProof: zelfNameObject.publicData.zelfProof,
 			zelfName: zelfNameObject.publicData.zelfName,
 			hasPassword: zelfNameObject.publicData.hasPassword,
-			ethAddress: zelfNameObject.publicData.ethAddress,
-			btcAddress: zelfNameObject.publicData.btcAddress,
-			solanaAddress: zelfNameObject.publicData.solanaAddress,
 			extraParams: JSON.stringify({
 				origin: zelfNameObject.publicData.origin,
 				suiAddress: zelfNameObject.publicData.suiAddress,
@@ -339,6 +330,7 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 				referralZelfName: zelfNameObject.publicData.referralZelfName,
 				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
 			}),
+			...buildAddressKeyvalues(zelfNameObject.publicData),
 			type,
 		},
 	};

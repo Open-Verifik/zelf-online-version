@@ -67,13 +67,8 @@ const request = async (ctx) => {
     }
 };
 
-/**
- * Drop-in JSON-RPC 2.0: POST /api/rpc/:chain with body
- * `{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}` — chain is taken from the path only.
- */
-const requestJsonRpc = async (ctx) => {
-    const body = ctx.request.body;
-    const chainKey = ctx.params.chainKey;
+/** Forward a single validated JSON-RPC request and return its `{jsonrpc, id, result|error}` envelope. */
+const handleSingleJsonRpc = async (ctx, body, chainKey, options, purpose) => {
     const rpcId = body.id;
 
     try {
@@ -84,67 +79,109 @@ const requestJsonRpc = async (ctx) => {
                 params: body.params ?? [],
                 rpcId,
                 origin: ctx.get("origin") || undefined,
-                purpose: "json-rpc",
+                purpose,
             },
             {
                 authUser: ctx.state.user,
                 ip: ctx.ip,
-            }
+            },
+            options
         );
 
-        ctx.status = 200;
-        ctx.body = {
-            jsonrpc: "2.0",
-            id: rpcId !== undefined ? rpcId : null,
-            result: data.result,
+        return {
+            ok: true,
+            response: {
+                jsonrpc: "2.0",
+                id: rpcId !== undefined ? rpcId : null,
+                result: data.result,
+            },
         };
     } catch (error) {
         const status = error.status || 500;
-        if (status === 429 && error.retryAfterSeconds != null) {
-            ctx.set("Retry-After", String(error.retryAfterSeconds));
-        }
-        ctx.status = 200;
-        ctx.body = jsonRpcErrorBody(rpcId, status, error);
+        return {
+            ok: false,
+            status,
+            retryAfterSeconds: error.retryAfterSeconds,
+            response: jsonRpcErrorBody(rpcId, status, error),
+        };
     }
+};
+
+/**
+ * Run a JSON-RPC batch produced by `validateJsonRpcBody` (each entry is
+ * `{ value, error, originalId }`) and respond with an array of result/error
+ * envelopes — required for ethers v6 `JsonRpcProvider`, which sends batches.
+ */
+const handleJsonRpcBatch = async (ctx, chainKey, options, purpose) => {
+    const batch = ctx.state.rpcBatch || [];
+
+    let earliestRetryAfter = null;
+
+    const responses = await Promise.all(
+        batch.map(async (item) => {
+            if (item.error) {
+                return {
+                    jsonrpc: "2.0",
+                    id: item.originalId,
+                    error: { code: -32600, message: item.error.message.trim() },
+                };
+            }
+
+            const outcome = await handleSingleJsonRpc(ctx, item.value, chainKey, options, purpose);
+            if (!outcome.ok && outcome.status === 429 && outcome.retryAfterSeconds != null) {
+                if (earliestRetryAfter == null || outcome.retryAfterSeconds < earliestRetryAfter) {
+                    earliestRetryAfter = outcome.retryAfterSeconds;
+                }
+            }
+            return outcome.response;
+        })
+    );
+
+    if (earliestRetryAfter != null) {
+        ctx.set("Retry-After", String(earliestRetryAfter));
+    }
+
+    ctx.status = 200;
+    ctx.body = responses;
+};
+
+/**
+ * Drop-in JSON-RPC 2.0: POST /api/rpc/:chain with body
+ * `{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}` — chain is taken from the path only.
+ * Also accepts a JSON-RPC 2.0 batch (array of request objects) and replies with an array of responses.
+ */
+const requestJsonRpc = async (ctx) => {
+    const chainKey = ctx.params.chainKey;
+
+    if (ctx.state.rpcBatch) {
+        await handleJsonRpcBatch(ctx, chainKey, {}, "json-rpc");
+        return;
+    }
+
+    const outcome = await handleSingleJsonRpc(ctx, ctx.request.body, chainKey, {}, "json-rpc");
+    if (!outcome.ok && outcome.status === 429 && outcome.retryAfterSeconds != null) {
+        ctx.set("Retry-After", String(outcome.retryAfterSeconds));
+    }
+    ctx.status = 200;
+    ctx.body = outcome.response;
 };
 
 /** POST /api/protected/rpc/:chainKey — same JSON-RPC proxy as public route, but uses extension RPC URLs and requires JWT. */
 const requestExtensionJsonRpc = async (ctx) => {
-    const body = ctx.request.body;
     const chainKey = ctx.params.chainKey;
-    const rpcId = body.id;
+    const options = { useExtensionRpc: true };
 
-    try {
-        const data = await Module.forwardRequest(
-            {
-                chain: chainKey,
-                method: body.method,
-                params: body.params ?? [],
-                rpcId,
-                origin: ctx.get("origin") || undefined,
-                purpose: "extension-json-rpc",
-            },
-            {
-                authUser: ctx.state.user,
-                ip: ctx.ip,
-            },
-            { useExtensionRpc: true }
-        );
-
-        ctx.status = 200;
-        ctx.body = {
-            jsonrpc: "2.0",
-            id: rpcId !== undefined ? rpcId : null,
-            result: data.result,
-        };
-    } catch (error) {
-        const status = error.status || 500;
-        if (status === 429 && error.retryAfterSeconds != null) {
-            ctx.set("Retry-After", String(error.retryAfterSeconds));
-        }
-        ctx.status = 200;
-        ctx.body = jsonRpcErrorBody(rpcId, status, error);
+    if (ctx.state.rpcBatch) {
+        await handleJsonRpcBatch(ctx, chainKey, options, "extension-json-rpc");
+        return;
     }
+
+    const outcome = await handleSingleJsonRpc(ctx, ctx.request.body, chainKey, options, "extension-json-rpc");
+    if (!outcome.ok && outcome.status === 429 && outcome.retryAfterSeconds != null) {
+        ctx.set("Retry-After", String(outcome.retryAfterSeconds));
+    }
+    ctx.status = 200;
+    ctx.body = outcome.response;
 };
 
 module.exports = {

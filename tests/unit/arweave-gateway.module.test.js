@@ -1,0 +1,95 @@
+const axios = require("axios");
+const config = require("../../Core/config");
+const {
+	getGraphqlGateways,
+	getPublicGatewayUrl,
+	getArnsGatewayHost,
+	buildTxUrl,
+	buildExplorerUrl,
+	buildArnsUndernameUrl,
+	isSingleTagLookupKey,
+	postGraphql,
+	postGraphqlToGateway,
+} = require("../../Repositories/Arweave/modules/arweave-gateway.module");
+
+describe("arweave-gateway.module", () => {
+	beforeEach(() => {
+		jest.restoreAllMocks();
+	});
+
+	it("returns default ranked graphql gateways", () => {
+		expect(getGraphqlGateways()).toEqual(config.arwave.graphqlGateways);
+	});
+
+	it("returns default public gateway url", () => {
+		expect(getPublicGatewayUrl()).toBe(config.arwave.publicGatewayUrl);
+	});
+
+	it("returns default arns gateway host", () => {
+		expect(getArnsGatewayHost()).toBe(config.arwave.arnsGatewayHost);
+	});
+
+	it("builds tx and explorer urls", () => {
+		expect(buildTxUrl("abc123")).toBe("https://arweave.net/abc123");
+		expect(buildExplorerUrl("abc123")).toBe("https://viewblock.io/arweave/tx/abc123");
+	});
+
+	it("builds arns undername urls", () => {
+		expect(buildArnsUndernameUrl("migueltrevino", "zelf")).toBe("https://migueltrevino_zelf.arweave.net");
+		expect(buildArnsUndernameUrl("migueltrevino", "bdag")).toBe("https://migueltrevino_bdag_zelf.arweave.net");
+	});
+
+	it("detects single-tag lookup keys", () => {
+		expect(isSingleTagLookupKey("tagName")).toBe(true);
+		expect(isSingleTagLookupKey("zelfName")).toBe(true);
+		expect(isSingleTagLookupKey("domain")).toBe(false);
+	});
+
+	it("postGraphqlToGateway returns edges on success", async () => {
+		jest.spyOn(axios, "post").mockResolvedValue({
+			data: {
+				data: {
+					transactions: {
+						edges: [{ node: { id: "tx1" } }],
+					},
+				},
+			},
+		});
+
+		const edges = await postGraphqlToGateway("https://arweave.net", "{ transactions { edges { node { id } } } }");
+		expect(edges).toHaveLength(1);
+		expect(axios.post).toHaveBeenCalledWith(
+			"https://arweave.net/graphql",
+			expect.any(Object),
+			expect.objectContaining({ timeout: 10000 })
+		);
+	});
+
+	it("postGraphql fails over to the next gateway", async () => {
+		jest
+			.spyOn(axios, "post")
+			.mockRejectedValueOnce(new Error("gateway down"))
+			.mockResolvedValueOnce({
+				data: {
+					data: {
+						transactions: {
+							edges: [{ node: { id: "tx2" } }],
+						},
+					},
+				},
+			});
+
+		const edges = await postGraphql("{ transactions { edges { node { id } } } }");
+		expect(edges).toHaveLength(1);
+		expect(axios.post).toHaveBeenCalledTimes(2);
+		expect(axios.post.mock.calls[0][0]).toBe("https://arweave.net/graphql");
+		expect(axios.post.mock.calls[1][0]).toBe("https://zigza.xyz/graphql");
+	});
+
+	it("postGraphql throws after all gateways fail", async () => {
+		jest.spyOn(axios, "post").mockRejectedValue(new Error("all down"));
+
+		await expect(postGraphql("{ transactions { edges { node { id } } } }")).rejects.toThrow("all down");
+		expect(axios.post).toHaveBeenCalledTimes(getGraphqlGateways().length);
+	});
+});

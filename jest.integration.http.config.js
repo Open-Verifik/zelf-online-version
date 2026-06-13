@@ -7,7 +7,7 @@ const testConfig = require("./tests/config/test.config");
 module.exports = {
 	testEnvironment: "node",
 	testMatch: ["**/__tests__/**/*.js", "**/?(*.)+(spec|test).js"],
-	collectCoverage: true,
+	collectCoverage: false,
 	coverageDirectory: "coverage",
 	coverageReporters: ["text", "lcov", "html"],
 	collectCoverageFrom: [

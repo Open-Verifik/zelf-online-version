@@ -1,67 +1,51 @@
-const { ARIO, ArweaveSigner, ANT } = require("@ar.io/sdk");
 const config = require("../../../Core/config");
+const { initAnt, setAntRecord, resolveExpectedTransactionId } = require("../../Arweave/modules/ar-io-arns-shared.module");
 
-//qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE
-ARIO.init({ processId: config.arns.processId });
-
-// create under name logic here
+/**
+ * Create or refresh an ANT undername for a registered tag (production).
+ * @param {Object} payload
+ * @param {string} payload.parentName - ARNS parent name (unused; kept for callers)
+ * @param {string} payload.undername - Record key prefix (tag name without domain suffix)
+ * @param {string} [payload.domain='zelf']
+ * @returns {Promise<Object|null>}
+ */
 const createUnderName = async (payload) => {
-	const { parentName, undername } = payload;
+	const { undername, domain = "zelf" } = payload;
 
-	const processId = config.arns.processId;
+	if (!undername) return null;
 
-	const walletKey = {
-		kty: "RSA",
-		n: config.arwave.n,
-		e: config.arwave.e,
-		d: config.arwave.d,
-		p: config.arwave.p,
-		q: config.arwave.q,
-		dp: config.arwave.dp,
-		dq: config.arwave.dq,
-		qi: config.arwave.qi,
-		kid: "2011-04-29",
-	};
-
-	if (!parentName || !undername) {
-		return null;
-	}
-
-	// in a node environment
-	const ant = ANT.init({
-		signer: new ArweaveSigner(walletKey),
-		processId,
-	});
-
-	const owner = await ant.getOwner();
-
-	const records = await ant.getRecords();
-
-	return {
-		records,
-		owner,
-	};
+	const recordKey = domain === "zelf" ? undername : `${undername}_${domain}`;
+	const transactionId = resolveExpectedTransactionId(recordKey);
 
 	try {
-		// Create the under name
-		const newUnderName = await ant.setRecord(
-			{
-				undername,
-				transactionId: config.arwave.transactionId,
-				ttlSeconds: 3600,
-			},
-			// optional additional tags
-			{
-				tags: [],
-			}
-		);
+		const ant = initAnt();
+		const records = await ant.getRecords();
 
-		return newUnderName;
+		if (records[recordKey]?.transactionId === transactionId) {
+			return {
+				skipped: true,
+				recordKey,
+				transactionId,
+				record: records[recordKey],
+			};
+		}
+
+		const newUnderName = await setAntRecord({
+			ant,
+			recordKey,
+			transactionId,
+			ttlSeconds: 3600,
+		});
+
+		return {
+			recordKey,
+			transactionId,
+			...newUnderName,
+		};
 	} catch (error) {
 		console.error({ newUnderNameError: error });
+		return null;
 	}
-
-	return null;
 };
 
 module.exports = {

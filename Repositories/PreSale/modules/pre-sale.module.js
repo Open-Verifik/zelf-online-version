@@ -5,6 +5,9 @@ const Mailgun = require("../../../Core/mailgun");
 const IPFS = require("../../IPFS/modules/ipfs.module");
 
 const ZNSTokenModule = require("../../ZelfNameService/modules/zns-token.module");
+const MyTagsModule = require("../../Tags/modules/my-tags.module");
+const { extractDomainAndName } = require("../../Tags/middlewares/tags.middleware");
+const { isDomainActive } = require("../../Tags/config/supported-domains");
 const axios = require("axios");
 
 const testingStripeCards = {
@@ -79,6 +82,8 @@ const PRESALE_CONFIG = {
 const getBonusTier = (amount) => {
     return PRESALE_CONFIG.bonusTiers.find((tier) => amount >= tier.minAmount) || PRESALE_CONFIG.bonusTiers[PRESALE_CONFIG.bonusTiers.length - 1];
 };
+
+const { getPresaleLicenseExtensionYears } = require("./presale-license.util");
 
 const calculateTokens = (usdAmount) => {
     const tier = getBonusTier(usdAmount);
@@ -217,10 +222,91 @@ const _releasePendingTokens = async (amount, address) => {
 };
 
 /**
+ * Attempt to extend tag license as a presale reward (best-effort).
+ * @param {string} zelfName - Full tag name (e.g. "alice.zelf")
+ * @param {number} amountUSD - Purchase amount in USD
+ * @returns {Promise<Object>}
+ */
+const _extendTagLicenseForPresale = async (zelfName, amountUSD) => {
+    const emptyResult = (error) => ({
+        extended: false,
+        years: 0,
+        tagName: null,
+        domain: null,
+        expiresAt: null,
+        ipfsId: null,
+        error,
+    });
+
+    if (!zelfName?.trim()) {
+        return emptyResult("zelf_name_missing");
+    }
+
+    const years = getPresaleLicenseExtensionYears(amountUSD);
+    if (!years) {
+        return emptyResult("no_extension_tier");
+    }
+
+    const { domain, name } = extractDomainAndName(zelfName.trim());
+    if (!domain || !name) {
+        return emptyResult("invalid_zelf_name");
+    }
+
+    if (!isDomainActive(domain)) {
+        return emptyResult("unsupported_domain");
+    }
+
+    try {
+        const renewal = await MyTagsModule.extendTagDurationFree(name, domain, years);
+        return {
+            extended: true,
+            years,
+            tagName: name,
+            domain,
+            expiresAt: renewal.expiresAt,
+            ipfsId: renewal.ipfsId,
+            error: null,
+        };
+    } catch (err) {
+        console.error("Presale license extension failed:", err);
+        return emptyResult(err.message || "extension_failed");
+    }
+};
+
+const {
+    buildPresaleReceiptIpfsMetadata: _buildPresaleReceiptIpfsMetadata,
+    parseReceiptSummary: _parseReceiptSummary,
+    validatePresaleReceiptMetadata: _validatePresaleReceiptMetadata,
+} = require("./presale-receipt-ipfs-metadata.util");
+
+const _isTruthyMetadataFlag = (value) => value === true || value === "true";
+
+const _parseLegacyPaymentDetails = (publicData) => {
+    if (!publicData?.paymentDetails) return {};
+    try {
+        return JSON.parse(publicData.paymentDetails);
+    } catch (e) {
+        console.error("Error parsing paymentDetails JSON", e);
+        return {};
+    }
+};
+
+const _readPresaleReceiptFlags = (publicData) => {
+    const legacy = _parseLegacyPaymentDetails(publicData);
+
+    return {
+        tokensReleased:
+            _isTruthyMetadataFlag(publicData.tokensReleased) || legacy.tokensReleased === true,
+        licenseExtended:
+            _isTruthyMetadataFlag(publicData.licenseExtended) || legacy.licenseExtended === true,
+    };
+};
+
+/**
  * Save or update receipt in IPFS
  */
 const _saveReceiptToIPFS = async (existingRecord, data) => {
-    const { sessionId, details, totalTokens, bonusPercentage, released, address, signature, zelfName } = data;
+    const { sessionId, details, totalTokens, bonusPercentage, released, address, signature, zelfName, licenseExtension } = data;
 
     const receiptData = {
         sessionId: sessionId,
@@ -240,43 +326,38 @@ const _saveReceiptToIPFS = async (existingRecord, data) => {
             signature: signature,
             date: released ? new Date().toISOString() : null,
         },
+        licenseExtension: licenseExtension || { extended: false },
     };
 
-    const ipfsMetadata = {
-        type: "presale_receipt",
-        presaleSessionId: sessionId,
-        presaleEmail: details.email || "",
-        presaleZelfName: zelfName || "",
-        presaleSolanaAddress: address || "",
-        // Group everything else into a JSON string to save metadata slots
-        paymentDetails: JSON.stringify({
-            amountUSD: details.amount,
-            totalTokens: totalTokens,
-            bonusPercentage: bonusPercentage,
-            tokensReleased: released,
-            transactionSignature: signature || "",
-        }),
-    };
+    const licenseExtended = licenseExtension?.extended === true;
+
+    const ipfsMetadata = _buildPresaleReceiptIpfsMetadata({
+        sessionId,
+        details,
+        totalTokens,
+        bonusPercentage,
+        released,
+        address,
+        signature,
+        zelfName,
+        licenseExtension,
+    });
+
+    _validatePresaleReceiptMetadata(ipfsMetadata);
 
     const base64Data = Buffer.from(JSON.stringify(receiptData)).toString("base64");
     const fileName = `presale_receipt_${sessionId}.json`;
 
     if (existingRecord) {
-        // Only update if released status changed to true (check both new JSON format and old string format)
-        let alreadyReleased = false;
-
         const keyvalues = existingRecord.publicData || {};
+        const { tokensReleased: alreadyReleased, licenseExtended: alreadyLicenseExtended } =
+            _readPresaleReceiptFlags(keyvalues);
 
-        if (keyvalues.paymentDetails) {
-            try {
-                const details = JSON.parse(keyvalues.paymentDetails);
-                alreadyReleased = details.tokensReleased === true;
-            } catch (e) { }
-        } else {
-            alreadyReleased = keyvalues.tokensReleased === "true";
-        }
+        const shouldUpdate =
+            (released && !alreadyReleased) ||
+            (licenseExtended && !alreadyLicenseExtended);
 
-        if (released && !alreadyReleased) {
+        if (shouldUpdate) {
             await IPFS.unPinFiles([existingRecord.ipfs_pin_hash]);
             await IPFS.insert(
                 {
@@ -313,31 +394,35 @@ const _saveReceiptToIPFS = async (existingRecord, data) => {
  * Format details from an existing IPFS record
  */
 const _formatDetailsFromRecord = (existingRecord) => {
-    // Already recorded, likely paid
     const publicData = existingRecord.publicData || {};
-
-    // Parse partial details from JSON string if available
-    let details = {};
-    if (publicData.paymentDetails) {
-        try {
-            details = JSON.parse(publicData.paymentDetails);
-        } catch (e) {
-            console.error("Error parsing paymentDetails JSON", e);
-        }
-    }
+    const legacy = _parseLegacyPaymentDetails(publicData);
+    const summary = _parseReceiptSummary(publicData);
+    const { tokensReleased, licenseExtended } = _readPresaleReceiptFlags(publicData);
 
     return {
         method: publicData.method || "unknown",
         status: "paid",
-        amount: parseFloat(details.amountUSD || publicData.amountUSD || "0"),
+        amount: parseFloat(publicData.amountUSD || summary.amountUSD || legacy.amountUSD || "0"),
         email: publicData.presaleEmail || publicData.email,
         metadata: {
-            tokens: details.totalTokens?.toString() || publicData.totalTokens,
-            solanaAddress: publicData.presaleSolanaAddress || details.solanaAddress || publicData.solanaAddress,
-            bonus: details.bonusPercentage?.toString() || publicData.bonusPercentage,
-            tokensReleased: details.tokensReleased === true || publicData.tokensReleased === "true",
-            transactionSignature: details.transactionSignature || publicData.transactionSignature,
+            tokens: (publicData.totalTokens ?? summary.totalTokens ?? legacy.totalTokens)?.toString(),
+            solanaAddress: publicData.presaleSolanaAddress || legacy.solanaAddress || publicData.solanaAddress,
+            bonus: (publicData.bonusPercentage ?? summary.bonusPercentage ?? legacy.bonusPercentage)?.toString(),
+            tokensReleased,
+            transactionSignature:
+                publicData.transactionSignature || summary.transactionSignature || legacy.transactionSignature || "",
             zelfName: publicData.presaleZelfName || publicData.zelfName || "",
+            licenseExtended,
+            licenseExtensionYears: Number(
+                publicData.licenseExtensionYears ?? summary.licenseExtensionYears ?? legacy.licenseExtensionYears ?? 0
+            ),
+            licenseExtensionExpiresAt:
+                publicData.licenseExtensionExpiresAt ||
+                summary.licenseExtensionExpiresAt ||
+                legacy.licenseExtensionExpiresAt ||
+                "",
+            licenseExtensionTag:
+                publicData.licenseExtensionTag || summary.licenseExtensionTag || legacy.licenseExtensionTag || "",
         },
         currency: "USD",
     };
@@ -358,8 +443,35 @@ const _processPayment = async (sessionIdOrCode, details, isPaid, existingRecord)
     // Get zelfName from metadata (passed during session creation)
     const zelfName = details.metadata?.zelfName || "";
 
-    // Attempt Release
-    const releaseResult = await _releasePendingTokens(totalTokens, solanaAddress);
+    const tokensAlreadyReleased = details.metadata?.tokensReleased === true;
+    let releaseResult = {
+        released: tokensAlreadyReleased,
+        signature: details.metadata?.transactionSignature || "",
+    };
+
+    if (!tokensAlreadyReleased) {
+        releaseResult = await _releasePendingTokens(totalTokens, solanaAddress);
+    }
+
+    const licenseAlreadyExtended = details.metadata?.licenseExtended === true;
+    let licenseResult = {
+        extended: licenseAlreadyExtended,
+        years: details.metadata?.licenseExtensionYears || 0,
+        tagName: null,
+        domain: null,
+        expiresAt: details.metadata?.licenseExtensionExpiresAt || null,
+        ipfsId: null,
+        error: null,
+    };
+
+    if (!licenseAlreadyExtended) {
+        licenseResult = await _extendTagLicenseForPresale(zelfName, details.amount);
+    }
+
+    const licenseExtensionTag =
+        licenseResult.tagName && licenseResult.domain
+            ? `${licenseResult.tagName}.${licenseResult.domain}`
+            : details.metadata?.licenseExtensionTag || "";
 
     // Save/Update IPFS
     const receipt = await _saveReceiptToIPFS(existingRecord, {
@@ -371,6 +483,7 @@ const _processPayment = async (sessionIdOrCode, details, isPaid, existingRecord)
         address: solanaAddress,
         signature: releaseResult.signature,
         zelfName: zelfName,
+        licenseExtension: licenseResult,
     });
 
     return {
@@ -386,6 +499,10 @@ const _processPayment = async (sessionIdOrCode, details, isPaid, existingRecord)
             solanaAddress: solanaAddress,
             transactionSignature: releaseResult.signature,
             zelfName: zelfName,
+            licenseExtended: licenseResult.extended,
+            licenseExtensionYears: licenseResult.years,
+            licenseExtensionExpiresAt: licenseResult.expiresAt,
+            licenseExtensionTag,
         },
         currency: "USD",
         receipt: receipt,
@@ -446,10 +563,16 @@ const getPaymentDetails = async (sessionIdOrCode) => {
             details = _formatDetailsFromRecord(existingRecord);
             isPaid = true;
 
-            const publicData = existingRecord.publicData || {};
-            // If tokens already released, return immediately
-            // Check details.metadata.tokensReleased since it handles the JSON parsing
-            if (details.metadata?.tokensReleased === true || publicData.tokensReleased === "true") {
+            const zelfName = details.metadata?.zelfName || "";
+            const solanaAddress = details.metadata?.solanaAddress || "";
+            const tokensReleased = details.metadata?.tokensReleased === true;
+            const licenseExtended = details.metadata?.licenseExtended === true;
+            const licenseExtensionSkipped = !zelfName.trim() || getPresaleLicenseExtensionYears(details.amount) === 0;
+            const tokensDone = tokensReleased || !solanaAddress;
+            const licenseDone = licenseExtended || licenseExtensionSkipped;
+            const fullyProcessed = tokensDone && licenseDone;
+
+            if (fullyProcessed) {
                 return {
                     ...details,
                     ipfsHash: existingRecord.ipfs_pin_hash,
@@ -477,6 +600,7 @@ const getPaymentDetails = async (sessionIdOrCode) => {
 module.exports = {
     createStripeSession,
     calculateTokens,
+    getPresaleLicenseExtensionYears,
     sendReceiptEmail,
     getPaymentDetails,
 };

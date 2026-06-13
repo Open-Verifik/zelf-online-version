@@ -11,6 +11,28 @@ const csvOrDefault = (value, fallback) => {
     return items.length ? items : fallback;
 };
 
+/** Absolute origin for zelf-dashboard Plan & Billing Stripe redirects (success/cancel). */
+const stripeDashboardUrlBase = String(
+    (process.env.DASHBOARD_URL || process.env.FRONTEND_URL || "https://dashboard.zelf.world").trim() || "https://dashboard.zelf.world",
+).replace(/\/$/, "");
+
+/** Default Arweave gateway pool — override per server via .env (see arwave in configuration). */
+const ARWEAVE_DEFAULT_PUBLIC_GATEWAY_URL = "https://arweave.net";
+const ARWEAVE_DEFAULT_GRAPHQL_GATEWAYS = [
+    "https://arweave.net",
+    "https://zigza.xyz",
+    "https://mipenode.pro",
+    "https://ar11.innostack.xyz",
+    "https://ardrive.net",
+];
+const ARWEAVE_DEFAULT_ARNS_GATEWAY_HOST = "arweave.net";
+
+/** Positive finite float from env; otherwise `fallback` (for USD rates and REWARD_PRICE). */
+const parsePositiveFloat = (value, fallback) => {
+    const n = parseFloat(value);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
 const configuration = {
     name: "API",
     env: process.env.NODE_ENV || "development",
@@ -62,14 +84,28 @@ const configuration = {
         serverKey: process.env.ZELF_ENCRYPT_SERVER_KEY,
     },
     zelfProof: {
-        url: process.env.ZELF_PROOF_URL || "https://api.zelf.world",
+        url: process.env.ZELF_PROOF_URL || "https://v3.zelf.world",
         apiKey: process.env.ZELF_PROOF_API_KEY || "password",
         skipArweave: process.env.SKIP_ARWEAVE || false,
     },
     token: {
-        rewardPrice: process.env.REWARD_PRICE || 0.05,
+        rewardPrice: parsePositiveFloat(process.env.REWARD_PRICE, 0.05),
         whitelist: process.env.WHITELIST || "",
         priceEnv: process.env.PRICE_ENV || "production",
+    },
+    /** Dashboard Plan & Billing copy + subscription pricing disclosure (USD per operation before ZNS conversion). */
+    subscriptionPricing: {
+        encryptUsd: parsePositiveFloat(process.env.API_USAGE_ENCRYPT_USD, 0.1),
+        activeUserMonthlyUsd: parsePositiveFloat(process.env.API_USAGE_ACTIVE_USER_USD, 0.1),
+        decryptWithLivenessUsd: parsePositiveFloat(process.env.API_USAGE_DECRYPT_WITH_LIVENESS_USD, 0.05),
+        decryptNoLivenessUsd: parsePositiveFloat(process.env.API_USAGE_DECRYPT_NO_LIVENESS_USD, 0.01),
+        /** Free decrypts per month when liveness applies (marketing / disclosure). */
+        decryptIncludedPerMonth: (() => {
+            const raw = process.env.API_USAGE_DECRYPT_INCLUDED_PER_MONTH;
+            if (raw === undefined || raw === "") return 10;
+            const n = Math.floor(Number(raw));
+            return Number.isFinite(n) && n >= 0 ? n : 10;
+        })(),
     },
     landingUrl: process.env.LANDING_URL || (process.env.NODE_ENV === "development" ? "http://localhost:3009" : "https://zelf.world"),
     pgp: {
@@ -95,6 +131,9 @@ const configuration = {
     arwave: {
         env: process.env.ARWAVE_ENV || "production",
         key: process.env.ARWAVE_KEY,
+        publicGatewayUrl: process.env.ARWEAVE_PUBLIC_GATEWAY_URL || ARWEAVE_DEFAULT_PUBLIC_GATEWAY_URL,
+        graphqlGateways: csvOrDefault(process.env.ARWEAVE_GRAPHQL_GATEWAYS, ARWEAVE_DEFAULT_GRAPHQL_GATEWAYS),
+        arnsGatewayHost: process.env.ARWEAVE_ARNS_GATEWAY_HOST || ARWEAVE_DEFAULT_ARNS_GATEWAY_HOST,
         owner: process.env.ARWEAVE_OWNER,
         n: process.env.ARWAVE_N,
         e: process.env.ARWAVE_E,
@@ -168,6 +207,7 @@ const configuration = {
         tokenMintAddress: process.env.SOLANA_TOKEN_MINT_ADDRESS,
         devModeTokens: process.env.SOLANA_DEV_MODE_TOKENS,
         useKit: process.env.SOLANA_USE_KIT === "true",
+        jupiterApiKey: process.env.JUP_API_KEY,
     },
     oklink: {
         apiKey: process.env.OKLINK_API_KEY,
@@ -183,14 +223,21 @@ const configuration = {
             },
         },
         networks: {
-            ethereum: process.env.ALCHEMY_ETHEREUM_URL || (process.env.ALCHEMY_API_KEY ? `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
-            polygon: process.env.ALCHEMY_POLYGON_URL || (process.env.ALCHEMY_API_KEY ? `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+            ethereum:
+                process.env.ALCHEMY_ETHEREUM_URL ||
+                (process.env.ALCHEMY_API_KEY ? `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+            polygon:
+                process.env.ALCHEMY_POLYGON_URL ||
+                (process.env.ALCHEMY_API_KEY ? `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
             arbitrum:
-                process.env.ALCHEMY_ARBITRUM_URL || (process.env.ALCHEMY_API_KEY ? `https://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+                process.env.ALCHEMY_ARBITRUM_URL ||
+                (process.env.ALCHEMY_API_KEY ? `https://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
             optimism:
-                process.env.ALCHEMY_OPTIMISM_URL || (process.env.ALCHEMY_API_KEY ? `https://opt-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+                process.env.ALCHEMY_OPTIMISM_URL ||
+                (process.env.ALCHEMY_API_KEY ? `https://opt-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
             avalanche:
-                process.env.ALCHEMY_AVALANCHE_URL || (process.env.ALCHEMY_API_KEY ? `https://avax-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
+                process.env.ALCHEMY_AVALANCHE_URL ||
+                (process.env.ALCHEMY_API_KEY ? `https://avax-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : null),
         },
     },
     lifi: {
@@ -211,8 +258,10 @@ const configuration = {
             cancel: `${process.env.FRONTEND_URL}/zelfkeys/cancel?canceled=true`,
         },
         dashboard: {
-            success: `${process.env.DASHBOARD_URL}/settings/plan-billing?session_id={CHECKOUT_SESSION_ID}`,
-            cancel: `${process.env.DASHBOARD_URL}/settings/plan-billing?canceled=true`,
+            /** Absolute origin only (no trailing slash); used for checkout + portal return URLs */
+            origin: stripeDashboardUrlBase,
+            success: `${stripeDashboardUrlBase}/settings/plan-billing?session_id={CHECKOUT_SESSION_ID}`,
+            cancel: `${stripeDashboardUrlBase}/settings/plan-billing?canceled=true`,
         },
         plans: {
             basic: {
@@ -249,9 +298,7 @@ const configuration = {
         tagPayUsdcAddress: (process.env.AVALANCHE_TAG_PAY_USDC_ADDRESS || "").trim(),
         tagPayConfirmations: Math.max(1, Number(process.env.AVALANCHE_TAG_PAY_CONFIRMATIONS) || 1),
         createNFT: process.env.AVALANCHE_CREATE_NFT === "true",
-        rpcUrl:
-            process.env.AVALANCHE_RPC_URL ||
-            "https://wild-bitter-meadow.avalanche-mainnet.quiknode.pro/e2565749ca44c2873fe2a0a747f5ac68ae7eb14f/ext/bc/C/rpc/",
+        rpcUrl: process.env.AVALANCHE_RPC_URL,
         chainId: Number(process.env.AVALANCHE_CHAIN_ID) || 43114, // Avalanche C-Chain mainnet; use 43113 for Fuji
         privateKey: process.env.WALRUS_PRIVATE_KEY,
     },
@@ -465,15 +512,16 @@ const configuration = {
             },
             blockdag: {
                 chainId: Number(process.env.BLOCKDAG_CHAIN_ID) || 1404,
-                rpcUrl: process.env.RPC_PROXY_BLOCKDAG_URL || process.env.BLOCKDAG_MAIN_RPC_URL || process.env.BLOCKDAG_RPC_URL || "https://rpc.bdagscan.com",
+                rpcUrl:
+                    process.env.RPC_PROXY_BLOCKDAG_URL ||
+                    process.env.BLOCKDAG_MAIN_RPC_URL ||
+                    process.env.BLOCKDAG_RPC_URL ||
+                    "https://rpc.bdagscan.com",
             },
             /** Sui: chainId is a logical Zelf id for /api/rpc/chains (not an EVM chain id). */
             sui: {
                 chainId: Number(process.env.SUI_CHAIN_ID) || 101,
-                rpcUrl:
-                    process.env.RPC_PROXY_SUI_URL ||
-                    process.env.SUI_RPC_URL ||
-                    "https://fullnode.mainnet.sui.io:443",
+                rpcUrl: process.env.RPC_PROXY_SUI_URL || process.env.SUI_RPC_URL || "https://fullnode.mainnet.sui.io:443",
             },
         },
     },
@@ -578,6 +626,16 @@ const configuration = {
             })(),
         },
     },
+    /** Verifik WhatsApp relay — Meta Graph API egress from Zelf (non-GCP). */
+    whatsApp: {
+        phoneIdentifier: process.env.WHATSAPP_API_PHONE_IDENTIFIER || "111417608275326",
+        relayApiKey: process.env.VERIFIK_WHATSAPP_RELAY_API_KEY || "",
+        apiKeys: {
+            default: process.env.WHATSAPP_API_TOKEN || "",
+            111417608275326: process.env.WHATSAPP_API_TOKEN || "",
+            624749820726878: process.env.TCC_WHATSAPP_API_KEY || "",
+        },
+    },
     /** ZelfBlockDagPay.sol — native BDAG tag checkout only */
     blockdag: {
         defaultCollectionAddress: process.env.BLOCKDAG_DEFAULT_COLLECTION_ADDRESS || null,
@@ -591,4 +649,34 @@ const configuration = {
     },
 };
 
+/**
+ * JSON for GET /api/subscription-plans (`pricingMeta`). Token counts use ceil(usd / rewardPrice).
+ */
+const buildSubscriptionPricingMeta = () => {
+    const rp = Number(configuration.token.rewardPrice);
+    const rewardPrice = Number.isFinite(rp) && rp > 0 ? rp : 0.05;
+    const sp = configuration.subscriptionPricing;
+    const ceilTok = (usd) => Math.ceil(Number(usd) / rewardPrice);
+    const fmt = (n) => (Number.isFinite(Number(n)) ? Number(n).toFixed(2) : String(n));
+
+    return {
+        rewardPrice,
+        rewardPriceFormatted: fmt(rewardPrice),
+        encryptUsd: sp.encryptUsd,
+        encryptUsdFormatted: fmt(sp.encryptUsd),
+        activeUserMonthlyUsd: sp.activeUserMonthlyUsd,
+        activeUserMonthlyUsdFormatted: fmt(sp.activeUserMonthlyUsd),
+        decryptWithLivenessUsd: sp.decryptWithLivenessUsd,
+        decryptWithLivenessUsdFormatted: fmt(sp.decryptWithLivenessUsd),
+        decryptNoLivenessUsd: sp.decryptNoLivenessUsd,
+        decryptNoLivenessUsdFormatted: fmt(sp.decryptNoLivenessUsd),
+        decryptIncludedPerMonth: sp.decryptIncludedPerMonth,
+        encryptTokens: ceilTok(sp.encryptUsd),
+        activeUserMonthlyTokens: ceilTok(sp.activeUserMonthlyUsd),
+        decryptWithLivenessTokens: ceilTok(sp.decryptWithLivenessUsd),
+        decryptNoLivenessTokens: ceilTok(sp.decryptNoLivenessUsd),
+    };
+};
+
 module.exports = configuration;
+module.exports.buildSubscriptionPricingMeta = buildSubscriptionPricingMeta;

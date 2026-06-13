@@ -15,19 +15,14 @@ const path = require("path");
 
 const VaultLegacy = require("../models/vault-legacy.model");
 
-const {
-    sendLawyerNewPlan,
-    sendTestatorPlanActive,
-    sendBeneficiaryClaimable,
-} = require("../modules/email");
+const { sendLawyerNewPlan, sendTestatorPlanActive, sendBeneficiaryClaimable } = require("../modules/email");
 
 const IPFS = require("../../IPFS/modules/ipfs.module");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Relayer wallet + contract ABI
 // ─────────────────────────────────────────────────────────────────────────────
-const AVALANCHE_RPC_URL =
-    process.env.LEGACY_AVALANCHE_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc";
+const AVALANCHE_RPC_URL = process.env.LEGACY_AVALANCHE_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc";
 const RELAYER_PRIVATE_KEY = process.env.LEGACY_RELAYER_PRIVATE_KEY;
 const CONTRACT_ADDRESS = process.env.LEGACY_VAULT_REGISTRY_ADDRESS;
 
@@ -72,10 +67,7 @@ const ipfsUpload = async (ctx) => {
         const base64 = Buffer.from(JSON.stringify(data)).toString("base64");
         const metadata = { name };
 
-        const result = await IPFS.insert(
-            { base64, metadata, name, pinIt: true },
-            { pro: true }
-        );
+        const result = await IPFS.insert({ base64, metadata, name, pinIt: true }, { pro: true });
 
         if (!result?.cid && !result?.ipfsHash) {
             ctx.status = 502;
@@ -97,8 +89,7 @@ const ipfsUpload = async (ctx) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const registerEmails = async (ctx) => {
     try {
-        const { vaultId, testatorEmail, lawyerEmail, beneficiaryEmails, beneficiaryTagNames } =
-            ctx.request.body;
+        const { vaultId, testatorEmail, lawyerEmail, beneficiaryEmails, beneficiaryTagNames } = ctx.request.body;
 
         if (!vaultId) {
             ctx.status = 400;
@@ -152,7 +143,7 @@ const sendTx = async (ctx) => {
             try {
                 decoded = iface.parseTransaction({ data: calldata });
                 fnName = decoded?.name || "unknown";
-            } catch { }
+            } catch {}
         }
         console.log(`📡 Relaying tx → ${fnName} (${calldata.substring(0, 10)}...)`);
 
@@ -166,26 +157,21 @@ const sendTx = async (ctx) => {
             try {
                 if (fnName === "createVault") {
                     const vaultId = decoded.args[1];
-                    const vaultIdHex =
-                        typeof vaultId === "bigint"
-                            ? "0x" + vaultId.toString(16).padStart(64, "0")
-                            : vaultId.toString();
+                    const vaultIdHex = typeof vaultId === "bigint" ? "0x" + vaultId.toString(16).padStart(64, "0") : vaultId.toString();
                     const testatorAddress = decoded.args[0];
 
                     const entry = await VaultLegacy.findOne({ vaultId: vaultIdHex });
                     if (entry?.lawyerEmail) {
                         console.log(`📧 Sending "new plan" email to lawyer ${entry.lawyerEmail}`);
-                        sendLawyerNewPlan(entry.lawyerEmail, vaultIdHex, testatorAddress).catch(
-                            (e) => console.error("❌ Lawyer email failed:", e.message)
+                        sendLawyerNewPlan(entry.lawyerEmail, vaultIdHex, testatorAddress).catch((e) =>
+                            console.error("❌ Lawyer email failed:", e.message)
                         );
                     }
                 } else if (fnName === "acceptVault") {
                     const vaultIdHex = decoded.args[0].toString();
                     const entry = await VaultLegacy.findOne({ vaultId: vaultIdHex });
                     if (entry?.testatorEmail) {
-                        console.log(
-                            `📧 Sending "plan active" email to testator ${entry.testatorEmail}`
-                        );
+                        console.log(`📧 Sending "plan active" email to testator ${entry.testatorEmail}`);
                         sendTestatorPlanActive(entry.testatorEmail, vaultIdHex).catch((e) =>
                             console.error("❌ Testator active email failed:", e.message)
                         );
@@ -204,18 +190,14 @@ const sendTx = async (ctx) => {
 
                             if (isSingle) {
                                 if (tagNames.length > 1) {
-                                    const valTag = tagNames.find((t) =>
-                                        t.toLowerCase().includes("val")
-                                    );
+                                    const valTag = tagNames.find((t) => t.toLowerCase().includes("val"));
                                     if (valTag) tagName = valTag;
                                 }
                                 tagName = tagName.replace(/\.zelf$/, "");
                             }
 
                             console.log(`📧 Sending claimable email to beneficiary ${email}`);
-                            sendBeneficiaryClaimable(email, tagName).catch((e) =>
-                                console.error("❌ Beneficiary email failed:", e.message)
-                            );
+                            sendBeneficiaryClaimable(email, tagName).catch((e) => console.error("❌ Beneficiary email failed:", e.message));
                         }
                     }
                 }

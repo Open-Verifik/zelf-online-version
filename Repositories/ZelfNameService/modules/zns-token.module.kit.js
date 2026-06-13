@@ -43,8 +43,10 @@ const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
             senderWallet.publicKey,
         );
 
+        // Dev-mode divisor matches non-kit module (10): preserves sender wallet during testing
+        // while still emitting meaningful per-purchase balances.
         const isDevMode = config.solana.devModeTokens === true || config.solana.devModeTokens === "true";
-        const actualAmount = isDevMode ? amount / 10000 : amount;
+        const actualAmount = isDevMode ? amount / 10 : amount;
         const amountToSend = Math.round(actualAmount * 10 ** 8);
 
         if (isDevMode) console.log(`[DEV MODE] Token transfer reduced: ${amount} → ${actualAmount} tokens`);

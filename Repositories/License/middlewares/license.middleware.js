@@ -158,7 +158,7 @@ const searchValidation = async (ctx, next) => {
  * @param {*} next
  */
 const getMyLicenseValidation = async (ctx, next) => {
-	if (!ctx.state.user.email) {
+	if (!ctx.state.user.email && !ctx.state.user.staffEmail) {
 		ctx.status = 409;
 		ctx.body = { validationError: "User not authenticated" };
 		return;

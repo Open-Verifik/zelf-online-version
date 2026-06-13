@@ -48,6 +48,54 @@ const requestValidation = async (ctx, next) => {
     await next();
 };
 
+/**
+ * Validate a JSON-RPC body that may be either a single object or a batch array
+ * (ethers v6 `JsonRpcProvider` sends arrays). On batch validation, sets
+ * `ctx.state.rpcBatch` to an array of `{ value, error, originalId }` so the
+ * controller can produce per-item responses; on single-object input, replaces
+ * `ctx.request.body` with the validated value (existing behavior).
+ */
+const validateJsonRpcBody = (ctx) => {
+    const body = ctx.request.body;
+
+    if (Array.isArray(body)) {
+        if (!body.length) {
+            ctx.status = 200;
+            ctx.body = {
+                jsonrpc: "2.0",
+                id: null,
+                error: { code: -32600, message: "Invalid Request: empty batch" },
+            };
+            return false;
+        }
+
+        ctx.state.rpcBatch = body.map((item) => {
+            const valid = validate(schemas.jsonRpc, item || {});
+            return {
+                value: valid.value,
+                error: valid.error,
+                originalId: item && item.id !== undefined ? item.id : null,
+            };
+        });
+
+        return true;
+    }
+
+    const valid = validate(schemas.jsonRpc, body || {});
+    if (valid.error) {
+        ctx.status = 200;
+        ctx.body = {
+            jsonrpc: "2.0",
+            id: body?.id ?? null,
+            error: { code: -32600, message: valid.error.message.trim() },
+        };
+        return false;
+    }
+
+    ctx.request.body = valid.value;
+    return true;
+};
+
 /** JWT extension proxy: uses config.extension.rpc.chains (same JSON-RPC body as public /api/rpc/:chainKey). */
 const jsonRpcValidationExtension = async (ctx, next) => {
     if (!config.extension?.rpc?.chains || !Object.keys(config.extension.rpc.chains).length) {
@@ -67,18 +115,10 @@ const jsonRpcValidationExtension = async (ctx, next) => {
         return;
     }
 
-    const valid = validate(schemas.jsonRpc, ctx.request.body || {});
-    if (valid.error) {
-        ctx.status = 200;
-        ctx.body = {
-            jsonrpc: "2.0",
-            id: ctx.request.body?.id ?? null,
-            error: { code: -32600, message: valid.error.message.trim() },
-        };
+    if (!validateJsonRpcBody(ctx)) {
         return;
     }
 
-    ctx.request.body = valid.value;
     await next();
 };
 
@@ -100,18 +140,10 @@ const jsonRpcValidation = async (ctx, next) => {
         return;
     }
 
-    const valid = validate(schemas.jsonRpc, ctx.request.body || {});
-    if (valid.error) {
-        ctx.status = 200;
-        ctx.body = {
-            jsonrpc: "2.0",
-            id: ctx.request.body?.id ?? null,
-            error: { code: -32600, message: valid.error.message.trim() },
-        };
+    if (!validateJsonRpcBody(ctx)) {
         return;
     }
 
-    ctx.request.body = valid.value;
     await next();
 };
 

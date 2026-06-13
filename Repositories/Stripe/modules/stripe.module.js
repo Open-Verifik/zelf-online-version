@@ -1,7 +1,8 @@
 const Stripe = require("stripe");
 const config = require("../../../Core/config");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
-const { syncLicenseWithStripe, saveSubscriptionRecord } = require("../../License/modules/license.module");
+const { saveSubscriptionRecord } = require("../../License/modules/license.module");
+const { tryGrantMonthlyZnsForPaidInvoice } = require("../../SubscriptionPlan/modules/subscription-zns-grant.module");
 
 /**
  * Get Stripe client instance
@@ -63,13 +64,17 @@ const processWebhookEvent = async (event) => {
  */
 const handleInvoicePaymentSucceeded = async (invoice, stripe) => {
     try {
-        // Get subscription details
-        const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+        if (!invoice.subscription) {
+            console.warn("[stripe webhook] invoice.payment_succeeded without subscription id:", invoice.id);
+            return { status: "skipped", action: "invoice_payment_succeeded", reason: "no_subscription_on_invoice" };
+        }
 
-        // Get customer details
+        const subscription = await stripe.subscriptions.retrieve(invoice.subscription, {
+            expand: ["items.data.price"],
+        });
+
         const customer = await stripe.customers.retrieve(invoice.customer);
 
-        // Process successful payment
         const paymentData = {
             invoiceId: invoice.id,
             subscriptionId: invoice.subscription,
@@ -81,18 +86,26 @@ const handleInvoicePaymentSucceeded = async (invoice, stripe) => {
             status: "paid",
             subscription,
             customer,
+            priceId: subscription.items?.data?.[0]?.price?.id,
         };
 
         const accountsWithSameEmail = await IPFSModule.get({ key: "accountEmail", value: customer.email });
 
         if (!accountsWithSameEmail.length) throw new Error("404:account_not_found");
 
-        // retrieve the license from IPFS with the same accountEmail
         const licensesWithSameEmail = await IPFSModule.get({ key: "licenseOwner", value: customer.email });
 
         await saveSubscriptionRecord(licensesWithSameEmail[0], paymentData);
 
-        return { status: "success", action: "invoice_payment_succeeded", data: paymentData };
+        const znsGrant = await tryGrantMonthlyZnsForPaidInvoice({
+            invoiceId: invoice.id,
+            subscriptionId: invoice.subscription,
+            customerEmail: customer.email,
+            subscription,
+            amountPaid: invoice.amount_paid,
+        });
+
+        return { status: "success", action: "invoice_payment_succeeded", data: paymentData, znsGrant };
     } catch (error) {
         console.error("Error handling invoice payment succeeded:", error);
         throw error;

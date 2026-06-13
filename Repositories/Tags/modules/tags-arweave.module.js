@@ -2,48 +2,16 @@ const { TurboFactory, USD, WinstonToTokenAmount, productionTurboConfiguration } 
 const Arweave = require("arweave");
 const { Readable } = require("stream");
 const config = require("../../../Core/config");
-const axios = require("axios");
+const {
+	buildTxUrl,
+	buildExplorerUrl,
+	isSingleTagLookupKey,
+	postGraphql,
+	fetchTxAsBase64Png,
+} = require("../../Arweave/modules/arweave-gateway.module");
 const { getDomainConfiguration } = require("./domain-registry.module");
 
-const arweaveUrl = `https://arweave.zelf.world`;
-const fallbackArweaveUrl = `https://arweave.net`;
-const explorerUrl = `https://viewblock.io/arweave/tx`;
-
 const owner = config.arwave.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
-
-/** Max wait for Arweave GraphQL / gateway HTTP (axios), in ms */
-const ARWEAVE_HTTP_TIMEOUT_MS = 10_000;
-
-/** After primary GraphQL fails, prefer public arweave.net/graphql first for this long (ms) */
-const STICKY_FALLBACK_MS = 5 * 60 * 1000;
-
-let stickyPublicGraphqlUntil = 0;
-
-/**
- * POST a single GraphQL query to an Arweave gateway.
- * @param {string} graphqlUrl - Full URL e.g. https://arweave.zelf.world/graphql
- * @param {string} queryString
- * @returns {Promise<Array|undefined>} transactions.edges
- */
-const postArweaveGraphql = async (graphqlUrl, queryString) => {
-	const result = await axios.post(
-		graphqlUrl,
-		{ query: queryString },
-		{
-			headers: { "Content-Type": "application/json" },
-			timeout: ARWEAVE_HTTP_TIMEOUT_MS,
-		}
-	);
-
-	if (result.data?.errors?.length) {
-		const msg = result.data.errors.map((e) => e.message).join("; ");
-		const err = new Error(msg);
-		err.graphqlErrors = result.data.errors;
-		throw err;
-	}
-
-	return result.data?.data?.transactions?.edges;
-};
 
 /**
  * Register tag on Arweave
@@ -137,8 +105,8 @@ const tagRegistration = async (tagProofQRCode, tagObject, fileName) => {
 	return formatCreatedRecord({
 		...uploadResult,
 		publicData,
-		url: `${arweaveUrl}/${uploadResult.id}`,
-		explorerUrl: `${explorerUrl}/${uploadResult.id}`,
+		url: buildTxUrl(uploadResult.id),
+		explorerUrl: buildExplorerUrl(uploadResult.id),
 	});
 };
 
@@ -213,8 +181,8 @@ const receiptRegistration = async (dataUrl, tagObject, fileName) => {
 	return formatCreatedRecord({
 		...uploadResult,
 		publicData,
-		url: `${arweaveUrl}/${uploadResult.id}`,
-		explorerUrl: `${explorerUrl}/${uploadResult.id}`,
+		url: buildTxUrl(uploadResult.id),
+		explorerUrl: buildExplorerUrl(uploadResult.id),
 	});
 };
 
@@ -239,6 +207,64 @@ const searchByDomain = async (params) => {
 	return await searchInArweave("domain", domain);
 };
 
+const _buildLegacyQuery = (tagsToSearch) => `
+	{
+		 transactions(
+			tags: ${tagsToSearch},
+			owners: ["${owner}"]
+		) {
+			edges {
+				node {
+					id
+					owner {
+						address
+					}
+					data {
+						size
+						type
+					}
+					tags {
+						name
+						value
+					}
+				}
+			}
+		}
+	}
+  `;
+
+const _buildAdvancedQuery = (tagsToSearch) => `
+	{
+		 transactions(
+			tags: ${tagsToSearch},
+			owners: ["${owner}"],
+			sort: HEIGHT_DESC,
+			first: 100
+		) {
+			edges {
+				node {
+					id
+					owner {
+						address
+					}
+					block {
+						height
+						id
+					}
+					data {
+						size
+						type
+					}
+					tags {
+						name
+						value
+					}
+				}
+			}
+		}
+	}
+  `;
+
 /**
  * Search Arweave for data
  * @param {string} key - Search key
@@ -249,117 +275,25 @@ const searchInArweave = async (key, value) => {
 	if (!key || !value) return null;
 
 	const tagsToSearch = `[{ name: "${key}", values: "${value}" }]`;
+	const legacyQuery = _buildLegacyQuery(tagsToSearch);
+	const advancedQuery = _buildAdvancedQuery(tagsToSearch);
 
-	const primaryGql = `${arweaveUrl}/graphql`;
-	const publicGql = `${fallbackArweaveUrl}/graphql`;
-
-	const advancedQuery = `
-		{
-			 transactions(
-				tags: ${tagsToSearch},
-				owners: ["${owner}"],
-				sort: HEIGHT_DESC,
-				first: 100
-			) {
-				edges {
-					node {
-						id
-						owner {
-							address
-						}
-						block {
-							height
-							id
-						}
-						data {
-							size
-							type
-						}
-						tags {
-							name
-							value
-						}
-					}
-				}
-			}
-		}
-	  `;
-
-	const legacyQuery = `
-		{
-			 transactions(
-				tags: ${tagsToSearch},
-				owners: ["${owner}"]
-			) {
-				edges {
-					node {
-						id
-						owner {
-							address
-						}
-						data {
-							size
-							type
-						}
-						tags {
-							name
-							value
-						}
-					}
-				}
-			}
-		}
-	  `;
-
-	const advancedThenLegacyOnUrl = async (graphqlUrl) => {
+	const queryWithFallback = async (primaryQuery, fallbackQuery) => {
 		try {
-			const edges = await postArweaveGraphql(graphqlUrl, advancedQuery);
+			const edges = await postGraphql(primaryQuery);
 			return edges || [];
-		} catch (eAdv) {
-			console.warn("Arweave GraphQL (sorted) failed, retrying legacy query:", graphqlUrl, eAdv?.message || eAdv);
-			const edges = await postArweaveGraphql(graphqlUrl, legacyQuery);
+		} catch (primaryError) {
+			console.warn("Arweave GraphQL primary query failed, retrying fallback:", primaryError?.message || primaryError);
+			const edges = await postGraphql(fallbackQuery);
 			return edges || [];
 		}
 	};
 
 	let searchResults;
-	const stickyActive = Date.now() < stickyPublicGraphqlUntil;
-
-	if (stickyActive) {
-		let edgesFromPublic = null;
-		let publicError = null;
-		try {
-			edgesFromPublic = await advancedThenLegacyOnUrl(publicGql);
-		} catch (e) {
-			publicError = e;
-			console.warn("Arweave public GraphQL failed (sticky mode), trying primary:", e?.message || e);
-		}
-
-		if (edgesFromPublic?.length) {
-			searchResults = edgesFromPublic;
-		} else {
-			try {
-				searchResults = await advancedThenLegacyOnUrl(primaryGql);
-				stickyPublicGraphqlUntil = 0;
-			} catch (ePri) {
-				if (publicError) {
-					throw publicError;
-				}
-				searchResults = edgesFromPublic || [];
-			}
-		}
+	if (isSingleTagLookupKey(key)) {
+		searchResults = await queryWithFallback(legacyQuery, advancedQuery);
 	} else {
-		try {
-			searchResults = await advancedThenLegacyOnUrl(primaryGql);
-		} catch (ePri) {
-			console.warn("Arweave primary GraphQL failed, trying public:", ePri?.message || ePri);
-			try {
-				searchResults = await advancedThenLegacyOnUrl(publicGql);
-				stickyPublicGraphqlUntil = Date.now() + STICKY_FALLBACK_MS;
-			} catch (ePub) {
-				throw ePub;
-			}
-		}
+		searchResults = await queryWithFallback(advancedQuery, legacyQuery);
 	}
 
 	if (!searchResults || !searchResults.length) return [];
@@ -417,8 +351,8 @@ const formatSearchResults = (searchResults) => {
 		const formattedResult = {
 			id: searchResult.node.id,
 			owner: searchResult.node.owner.address,
-			url: `${arweaveUrl}/${searchResult.node.id}`,
-			explorerUrl: `${explorerUrl}/${searchResult.node.id}`,
+			url: buildTxUrl(searchResult.node.id),
+			explorerUrl: buildExplorerUrl(searchResult.node.id),
 			publicData: {},
 			size: searchResult.node.data.size,
 			blockHeight: blockHeight != null ? Number(blockHeight) : null,
@@ -454,35 +388,12 @@ const formatSearchResults = (searchResults) => {
 };
 
 const arweaveIDToBase64 = async (id) => {
-	const fetchTx = async (baseUrl) => {
-		const encryptedResponse = await axios.get(`${baseUrl}/${id}`, {
-			responseType: "arraybuffer",
-			timeout: ARWEAVE_HTTP_TIMEOUT_MS,
-			validateStatus: (s) => s >= 200 && s < 300,
-		});
-		if (encryptedResponse?.data && encryptedResponse.data.byteLength > 0) {
-			const base64Image = Buffer.from(encryptedResponse.data).toString("base64");
-			return `data:image/png;base64,${base64Image}`;
-		}
-		return null;
-	};
-
 	try {
-		const primary = await fetchTx(arweaveUrl);
-		if (primary) return primary;
+		return await fetchTxAsBase64Png(id);
 	} catch (exception) {
-		console.error({ VWEx_primary: exception });
+		console.error({ VWEx: exception });
+		return exception?.message || null;
 	}
-
-	try {
-		const fallback = await fetchTx(fallbackArweaveUrl);
-		if (fallback) return fallback;
-	} catch (exception) {
-		console.error({ VWEx_fallback: exception });
-		return exception?.message;
-	}
-
-	return null;
 };
 
 const formatCreatedRecord = (record) => {

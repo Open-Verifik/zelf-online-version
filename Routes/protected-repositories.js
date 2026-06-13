@@ -13,6 +13,7 @@ module.exports = (server) => {
     require("../Repositories/binance/routes/binance.route")(server);
     require("../Repositories/bitcoin/routes/bitcoin-scrapping.route")(server);
     require("../Repositories/base/routes/base.routes")(server);
+    require("../Repositories/Blogs/routes/blog-protected.routes")(server);
     //C
     require("../Repositories/cardano/routes/cardano-scrapping.route")(server);
     require("../Repositories/Client/routes/client.route")(server);
@@ -24,6 +25,7 @@ module.exports = (server) => {
     require("../Repositories/fantom/routes/fantom-scrapping.route")(server);
     //G
     //H
+    require("../Repositories/HumanAuthn/routes/human-authn-protected.route")(server);
     //H
     //I
     require("../Repositories/IPFS/routes/ipfs.routes")(server);
@@ -50,6 +52,7 @@ module.exports = (server) => {
     require("../Repositories/Rewards/routes/rewards.route")(server);
     //S
     require("../Repositories/SocialCampaigns/routes/social-campaigns.routes")(server);
+    require("../Repositories/Status/routes/status-check.routes")(server);
     require("../Repositories/sui/routes/sui-scrapping.route")(server);
     require("../Repositories/Solana/routes/solana-scrapping.route")(server);
     require("../Repositories/Solana/routes/solana-payment.route")(server);
@@ -60,6 +63,7 @@ module.exports = (server) => {
     //T
     require("../Repositories/tron/routes/tron-scrapping.route")(server);
     require("../Repositories/Tags/routes/tags.routes")(server);
+    require("../Repositories/Tags/routes/zelf-ids.routes")(server);
     require("../Repositories/Tags/routes/my-tags.routes")(server);
     //U
     //V

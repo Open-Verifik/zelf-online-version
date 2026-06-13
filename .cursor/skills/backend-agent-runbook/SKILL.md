@@ -65,7 +65,7 @@ For a test file that expects another port, export that same `PORT` before starti
 ### Docs work
 
 - Public API docs belong in `zelf-documentation/docs/api/`.
-- Public examples must use `https://api.zelf.world`, not localhost.
+- Public examples must use `https://v3.zelf.world`, not localhost.
 
 ## Maintenance
 

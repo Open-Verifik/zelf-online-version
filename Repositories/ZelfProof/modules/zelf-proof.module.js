@@ -3,15 +3,33 @@ const config = require("../../../Core/config");
 const { QRZelfProofExtractor } = require("../../Tags/modules/qr-zelfproof-extractor.module");
 const QRCode = require("qrcode");
 
+/**
+ * Upstream `/zelf/*` expects raw base64 image bytes. Clients often send a data URL
+ * (`data:image/jpeg;base64,...`) from `readAsDataURL` or paste — strip prefix and whitespace.
+ * @param {string} [faceBase64]
+ * @returns {string|undefined}
+ */
+const normalizeFaceBase64 = (faceBase64) => {
+    if (faceBase64 == null || typeof faceBase64 !== "string") return faceBase64;
+    const trimmed = faceBase64.trim();
+    const marker = "base64,";
+    const idx = trimmed.indexOf(marker);
+    if (idx !== -1 && trimmed.slice(0, 5).toLowerCase() === "data:") {
+        return trimmed.slice(idx + marker.length).replace(/\s/g, "");
+    }
+    return trimmed.replace(/\s/g, "");
+};
+
 const encrypt = async (data) => {
     try {
         const encryptedResponse = await axios.post("/zelf/encrypt", {
+            liveness_detection_prior_creation: data.livenessDetectionPriorCreation || false,
             cleartext_data: data.publicData,
-            face_base_64: data.faceBase64,
+            face_base_64: normalizeFaceBase64(data.faceBase64),
             metadata: data.metadata,
             password: data.password || undefined,
             record_id: data.identifier || data.record_id || data._id,
-            require_live_face: data.requireLiveness || true,
+            require_live_face: data.requireLiveness || true, // decrypt 
             tolerance: data.tolerance || "REGULAR",
             verifiers_auth_key: data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
         });
@@ -23,6 +41,8 @@ const encrypt = async (data) => {
         const _error = exception.response?.data;
 
         let error = new Error(_error?.message || "Something went wrong");
+
+        error.code = _error?.code;
 
         switch (_error.code) {
             case "ERR_INVALID_IMAGE":
@@ -60,13 +80,15 @@ const encryptQRCode = async (data) => {
             "/zelf/encrypt-qr-code",
             {
                 cleartext_data: data.publicData,
-                face_base_64: data.faceBase64,
+                face_base_64: normalizeFaceBase64(data.faceBase64),
                 metadata: data.metadata,
                 password: data.password || undefined,
                 record_id: data.identifier || data.record_id || data._id,
                 require_live_face: data.requireLiveness || true,
+                check_live_face_before_creation: data.check_live_face_before_creation || false,
                 tolerance: data.tolerance || "REGULAR",
-                verifiers_auth_key: data.verifierKey || undefined,
+                verifiers_auth_key:
+                    data.verifierKey || data.addServerPassword ? config.zelfEncrypt.serverKey : undefined,
                 qr_format: "PNG",
                 os: data.os || "DESKTOP",
             },
@@ -86,8 +108,6 @@ const encryptQRCode = async (data) => {
 
         return { zelfQR, zelfProof: zelfProof || undefined };
     } catch (exception) {
-        console.error({ exception });
-
         return exception?.message;
     }
 };
@@ -99,7 +119,7 @@ const decrypt = async (data) => {
 
     try {
         const encryptedResponse = await axios.post("/zelf/decrypt", {
-            face_base_64: data.faceBase64,
+            face_base_64: normalizeFaceBase64(data.faceBase64),
             os: data.os || "DESKTOP",
             password: data.password || undefined,
             senseprint_base_64: data.zelfProof,
@@ -113,6 +133,7 @@ const decrypt = async (data) => {
         let _error = new Error(error.message);
 
         _error.status = error.status;
+        _error.code = error.code;
 
         throw _error;
     }
@@ -139,6 +160,7 @@ const preview = async (data) => {
         let _error = new Error(error.message);
 
         _error.status = error.status;
+        _error.code = error.code;
 
         throw _error;
     }
@@ -151,7 +173,7 @@ const _formattingError = (error = {}) => {
 
     error.message = error.message?.toUpperCase();
 
-    if (error.message.includes(config.terms.zk)) {
+    if (error.message?.includes(config.terms.zk)) {
         error.message = error.message.replaceAll(config.terms.zk, config.terms._zk).toUpperCase();
     }
 
@@ -189,9 +211,12 @@ const _formattingError = (error = {}) => {
             message.includes("INVALID IMAGE") ||
             message.includes("INVALID FORMAT") ||
             message.includes("INVALID DATA") ||
-            code === "ERR_INVALID_IMAGE"
+            code === "ERR_INVALID_IMAGE" ||
+            code === "ERR_INVALID_SENSEPRINT_BYTES"
         ) {
             error.status = 400;
+        } else if (code === "ERR_PASSWORD_REQUIRED") {
+            error.status = 409;
         }
         // Default to 500 for unknown errors
         else {

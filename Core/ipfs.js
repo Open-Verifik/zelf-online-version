@@ -214,6 +214,7 @@ const pinFile = async (base64Image, filename = "image.png", mimeType = "image/pn
 
     try {
         const base64Data = base64Image.replace(/^data:[^;]+;base64,/, "");
+
         const uploadResponse = await web3Instance.upload.public.base64(base64Data).name(filename).keyvalues(metadata);
 
         const normalizedResponse = normalizePinataResponse(uploadResponse);

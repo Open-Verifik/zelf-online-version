@@ -432,7 +432,7 @@ const leaseOfflineValidation = async (ctx, next) => {
  * @param {*} next - Next middleware
  */
 const deleteTagValidation = async (ctx, next) => {
-    const { cid, tagName, domain, faceBase64, password } = ctx.request.body;
+    const { cid, tagName, domain, faceBase64, password } = ctx.request.body || {};
 
     const valid = validate(schemas.deleteTag, {
         cid,

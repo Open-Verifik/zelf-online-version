@@ -20,36 +20,38 @@ npm start
 
 Once the server is running, you can access the interactive API documentation at:
 
-- **Development**: http://localhost:${PORT}/swagger (where PORT is from your environment or config)
-- **Production**: https://api.zelf.world/swagger
+-   **Development**: http://localhost:${PORT}/swagger (where PORT is from your environment or config)
+-   **Production**: https://v3.zelf.world/swagger
 
 ## 📚 API Documentation Features
 
 ### Interactive Documentation
-- **Try it out**: Test endpoints directly from the browser
-- **Authentication**: Built-in JWT token support
-- **Request/Response Examples**: Pre-filled examples for all endpoints
-- **Schema Validation**: Automatic request validation
-- **Error Handling**: Comprehensive error responses
+
+-   **Try it out**: Test endpoints directly from the browser
+-   **Authentication**: Built-in JWT token support
+-   **Request/Response Examples**: Pre-filled examples for all endpoints
+-   **Schema Validation**: Automatic request validation
+-   **Error Handling**: Comprehensive error responses
 
 ### Organized by Tags
+
 The API is organized into logical groups:
 
-- **Authentication**: Login and token management
-- **Zero-Knowledge Proofs**: ZKP generation and verification
-- **Public**: Endpoints that don't require authentication
-- **Protected**: Endpoints that require JWT authentication
-- **Client**: Client management operations
-- **IPFS**: IPFS storage and retrieval
-- **Mail**: Email service operations
-- **SuperAdmin**: Super admin management
-- **Session**: Session management
-- **Subscribers**: Subscriber operations
-- **Wallet**: Wallet management
-- **Blockchain**: Blockchain integrations (Avalanche, Bitcoin, Cardano, etc.)
-- **Data Analytics**: Analytics and reporting
-- **Rewards**: Rewards and incentives
-- **Zelf Services**: Zelf-specific services
+-   **Authentication**: Login and token management
+-   **Zero-Knowledge Proofs**: ZKP generation and verification
+-   **Public**: Endpoints that don't require authentication
+-   **Protected**: Endpoints that require JWT authentication
+-   **Client**: Client management operations
+-   **IPFS**: IPFS storage and retrieval
+-   **Mail**: Email service operations
+-   **SuperAdmin**: Super admin management
+-   **Session**: Session management
+-   **Subscribers**: Subscriber operations
+-   **Wallet**: Wallet management
+-   **Blockchain**: Blockchain integrations (Avalanche, Bitcoin, Cardano, etc.)
+-   **Data Analytics**: Analytics and reporting
+-   **Rewards**: Rewards and incentives
+-   **Zelf Services**: Zelf-specific services
 
 ## 🔧 Configuration
 
@@ -57,11 +59,11 @@ The API is organized into logical groups:
 
 The main configuration file defines:
 
-- **API Information**: Title, version, description, contact info
-- **Servers**: Development and production URLs
-- **Security Schemes**: JWT Bearer token authentication
-- **Global Schemas**: Reusable data models
-- **Tags**: API endpoint categorization
+-   **API Information**: Title, version, description, contact info
+-   **Servers**: Development and production URLs
+-   **Security Schemes**: JWT Bearer token authentication
+-   **Global Schemas**: Reusable data models
+-   **Tags**: API endpoint categorization
 
 ### Environment Variables
 
@@ -97,7 +99,7 @@ PORT=3002
  *                   example: "Success"
  */
 router.get("/api/example", async (ctx) => {
-  ctx.body = { message: "Success" };
+    ctx.body = { message: "Success" };
 });
 ```
 
@@ -120,7 +122,7 @@ router.get("/api/example", async (ctx) => {
  *         description: Unauthorized
  */
 router.get("/api/protected-example", async (ctx) => {
-  ctx.body = { message: "Protected endpoint" };
+    ctx.body = { message: "Protected endpoint" };
 });
 ```
 
@@ -164,9 +166,9 @@ router.get("/api/protected-example", async (ctx) => {
  *         description: Created successfully
  */
 router.post("/api/example", async (ctx) => {
-  const { name, email } = ctx.request.body;
-  ctx.status = 201;
-  ctx.body = { id: "new-id", name, email };
+    const { name, email } = ctx.request.body;
+    ctx.status = 201;
+    ctx.body = { id: "new-id", name, email };
 });
 ```
 
@@ -247,14 +249,11 @@ You can customize the Swagger UI appearance by adding custom CSS:
 ```javascript
 // In server.js, after swagger setup
 app.use(async (ctx, next) => {
-  if (ctx.path === '/swagger') {
-    // Add custom CSS
-    ctx.body = ctx.body.replace(
-      '</head>',
-      '<style>.swagger-ui .topbar { display: none }</style></head>'
-    );
-  }
-  await next();
+    if (ctx.path === "/swagger") {
+        // Add custom CSS
+        ctx.body = ctx.body.replace("</head>", "<style>.swagger-ui .topbar { display: none }</style></head>");
+    }
+    await next();
 });
 ```
 
@@ -291,18 +290,16 @@ The Swagger specification can be used for automated testing:
 
 ```javascript
 // Example using supertest
-const request = require('supertest');
-const app = require('./server');
+const request = require("supertest");
+const app = require("./server");
 
-describe('API Tests', () => {
-  it('should login successfully', async () => {
-    const response = await request(app)
-      .post('/login')
-      .send({ username: 'user', password: 'password' });
-    
-    expect(response.status).toBe(200);
-    expect(response.body).toHaveProperty('token');
-  });
+describe("API Tests", () => {
+    it("should login successfully", async () => {
+        const response = await request(app).post("/login").send({ username: "user", password: "password" });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveProperty("token");
+    });
 });
 ```
 
@@ -315,11 +312,11 @@ You can track API usage by adding middleware:
 ```javascript
 // Add to server.js
 app.use(async (ctx, next) => {
-  const start = Date.now();
-  await next();
-  const ms = Date.now() - start;
-  
-  console.log(`${ctx.method} ${ctx.url} - ${ms}ms`);
+    const start = Date.now();
+    await next();
+    const ms = Date.now() - start;
+
+    console.log(`${ctx.method} ${ctx.url} - ${ms}ms`);
 });
 ```
 
@@ -360,10 +357,10 @@ When adding new endpoints:
 
 For questions or issues with the API documentation:
 
-- Check the Swagger UI for interactive examples
-- Review the endpoint documentation
-- Contact the development team
+-   Check the Swagger UI for interactive examples
+-   Review the endpoint documentation
+-   Contact the development team
 
 ---
 
-**Happy API Testing! 🎉** 
+**Happy API Testing! 🎉**

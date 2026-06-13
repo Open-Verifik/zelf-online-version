@@ -270,7 +270,7 @@ const createPortalSession = async (authToken) => {
     // Create portal session
     const sessionParams = {
         customer: customerId,
-        return_url: config.stripe.frontendUrl + "/settings/plan-billing",
+        return_url: `${config.stripe.dashboard.origin}/settings/plan-billing`,
     };
 
     const session = await stripe.billingPortal.sessions.create(sessionParams);
@@ -332,7 +332,27 @@ const verifySession = async (sessionId, authToken) => {
     const { saveSubscriptionRecord } = require("../../License/modules/license.module");
     const record = await saveSubscriptionRecord(myLicense, paymentData);
 
-    return { success: true, record };
+    // 6. Mirror the webhook's monthly ZNS grant so checkout-redirect users get tokens even if
+    // the invoice.payment_succeeded webhook is delayed or fails. Idempotent: the grant ledger
+    // is keyed on invoice.id, so a later webhook will short-circuit on duplicate_invoice.
+    let znsGrant = null;
+    if (paymentData.invoiceId) {
+        try {
+            const { tryGrantMonthlyZnsForPaidInvoice } = require("./subscription-zns-grant.module");
+            znsGrant = await tryGrantMonthlyZnsForPaidInvoice({
+                invoiceId: paymentData.invoiceId,
+                subscriptionId: paymentData.subscriptionId,
+                customerEmail: paymentData.customerEmail,
+                subscription: paymentData.subscription,
+                amountPaid: paymentData.amountPaid,
+                authUser: authToken,
+            });
+        } catch (err) {
+            console.error("[verifySession] ZNS grant attempt failed:", err?.message || err);
+        }
+    }
+
+    return { success: true, record, znsGrant };
 };
 
 const migrateLegacySubscription = async (myLicense, IPFSModule) => {

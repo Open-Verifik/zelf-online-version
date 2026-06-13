@@ -33,7 +33,7 @@ const server = http.createServer((req, res) => {
 	const hostname = req.headers.host || "";
 	const isBdagDomain = hostname.includes("_bdag") || hostname.includes(".bdag") || (hostname === "localhost" && req.url.includes("domain=bdag"));
 	
-	// Check if this is a social links domain (e.g., liza_socials_zelf.arweave.zelf.world)
+	// Check if this is a social links domain (e.g., liza_socials_zelf.arweave.net)
 	const isSocialLinksDomain = hostname.includes("_socials_") || (hostname === "localhost" && req.url.includes("domain=socials"));
 
 	// Direct route for social links (easier access on localhost)

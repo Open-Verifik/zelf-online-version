@@ -23,7 +23,7 @@ describe("ensureZelfProofQRCode", () => {
 			"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 		TagsPartsModule.urlToBase64First.mockResolvedValue(`data:image/png;base64,${tinyPng}`);
 		const tagObject = {
-			url: "https://arweave.zelf.world/missing",
+			url: "https://arweave.net/missing",
 			ipfsContentUrl: "https://pinata/ipfs/QmX",
 		};
 		await ensureZelfProofQRCode(tagObject);
@@ -33,7 +33,7 @@ describe("ensureZelfProofQRCode", () => {
 
 	it("throws zelf_proof_qr_unavailable when URLs and zelfProof are missing", async () => {
 		TagsPartsModule.urlToBase64First.mockResolvedValue(null);
-		const tagObject = { url: "https://arweave.zelf.world/missing", publicData: {} };
+		const tagObject = { url: "https://arweave.net/missing", publicData: {} };
 		await expect(ensureZelfProofQRCode(tagObject)).rejects.toMatchObject({ message: "zelf_proof_qr_unavailable" });
 	});
 });

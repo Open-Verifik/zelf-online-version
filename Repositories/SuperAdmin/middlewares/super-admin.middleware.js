@@ -16,6 +16,13 @@ const schemas = {
 	auth: {
 		email: string().required(),
 	},
+	requestOtp: {
+		email: string().required(),
+	},
+	verifyOtp: {
+		email: string().required(),
+		code: string().required(),
+	},
 };
 
 const getValidation = async (ctx, next) => {
@@ -162,6 +169,30 @@ const authValidation = async (ctx, next) => {
 	await next();
 };
 
+const requestOtpValidation = async (ctx, next) => {
+	const valid = validate(schemas.requestOtp, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
+const verifyOtpValidation = async (ctx, next) => {
+	const valid = validate(schemas.verifyOtp, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	getValidation,
 	showValidation,
@@ -169,4 +200,6 @@ module.exports = {
 	updateValidation,
 	destroyValidation,
 	authValidation,
+	requestOtpValidation,
+	verifyOtpValidation,
 };
