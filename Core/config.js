@@ -11,6 +11,17 @@ const csvOrDefault = (value, fallback) => {
     return items.length ? items : fallback;
 };
 
+const parseWhatsAppExtraApiKeys = () => {
+    if (!process.env.WHATSAPP_EXTRA_API_KEYS) return {};
+
+    try {
+        return JSON.parse(process.env.WHATSAPP_EXTRA_API_KEYS);
+    } catch (error) {
+        console.error("Invalid WHATSAPP_EXTRA_API_KEYS JSON:", error.message);
+        return {};
+    }
+};
+
 /** Absolute origin for zelf-dashboard Plan & Billing Stripe redirects (success/cancel). */
 const stripeDashboardUrlBase = String(
     (process.env.DASHBOARD_URL || process.env.FRONTEND_URL || "https://dashboard.zelf.world").trim() || "https://dashboard.zelf.world",
@@ -641,6 +652,7 @@ const configuration = {
             default: process.env.WHATSAPP_API_TOKEN || "",
             111417608275326: process.env.WHATSAPP_API_TOKEN || "",
             624749820726878: process.env.TCC_WHATSAPP_API_KEY || "",
+            ...parseWhatsAppExtraApiKeys(),
         },
     },
     /** ZelfBlockDagPay.sol — native BDAG tag checkout only */

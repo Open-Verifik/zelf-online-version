@@ -1,18 +1,36 @@
 #!/usr/bin/env node
 /**
- * Standalone Meta WhatsApp Cloud API send test (no dependencies).
- * Usage:
+ * WhatsApp send test — direct Meta Graph API or Verifik relay on Zelf.
+ *
+ * Direct Meta (default Verifik WABA):
  *   WHATSAPP_API_TOKEN=... WHATSAPP_API_PHONE_IDENTIFIER=111417608275326 \
  *   node scripts/test-whatsapp-send.js [recipient] [otp]
+ *
+ * Relay — default sender (whatsAppIdentifier null):
+ *   VERIFIK_WHATSAPP_RELAY_API_KEY=... \
+ *   node scripts/test-whatsapp-send.js --relay [recipient] [otp]
+ *
+ * Relay — TCC sender (whatsAppIdentifier 624749820726878):
+ *   VERIFIK_WHATSAPP_RELAY_API_KEY=... TCC_WHATSAPP_API_KEY=... \
+ *   node scripts/test-whatsapp-send.js --relay --tcc [recipient] [otp]
  */
 
 const os = require("os");
 const https = require("https");
 
-const phoneId = process.env.WHATSAPP_API_PHONE_IDENTIFIER || "111417608275326";
-const token = process.env.WHATSAPP_API_TOKEN;
-const to = (process.argv[2] || "50765342766").replace(/\D/g, "");
-const otp = process.argv[3] || `${Math.floor(100000 + Math.random() * 900000)}`;
+const args = process.argv.slice(2);
+const useRelay = args.includes("--relay");
+const useTcc = args.includes("--tcc");
+const positional = args.filter((arg) => !arg.startsWith("--"));
+
+const defaultPhoneId = process.env.WHATSAPP_API_PHONE_IDENTIFIER || "111417608275326";
+const tccPhoneId = "624749820726878";
+const phoneId = useTcc ? tccPhoneId : defaultPhoneId;
+const token = useTcc ? process.env.TCC_WHATSAPP_API_KEY : process.env.WHATSAPP_API_TOKEN;
+const relayApiKey = process.env.VERIFIK_WHATSAPP_RELAY_API_KEY;
+const relayBaseUrl = (process.env.ZELF_WHATSAPP_URL || "https://v3.zelf.world").replace(/\/$/, "");
+const to = (positional[0] || "50765342766").replace(/\D/g, "");
+const otp = positional[1] || `${Math.floor(100000 + Math.random() * 900000)}`;
 
 const httpsGet = (url) =>
 	new Promise((resolve, reject) => {
@@ -55,9 +73,32 @@ const httpsPostJson = (url, headers, body) =>
 		req.end();
 	});
 
+const buildTemplatePayload = () => ({
+	to,
+	template: "authentication",
+	language: "es",
+	components: [
+		{
+			type: "body",
+			parameters: [{ type: "text", text: `${otp}` }],
+		},
+		{
+			type: "button",
+			sub_type: "url",
+			index: "0",
+			parameters: [{ type: "text", text: `${otp}` }],
+		},
+	],
+});
+
 const run = async () => {
-	if (!token) {
-		console.error("Missing WHATSAPP_API_TOKEN");
+	if (useRelay) {
+		if (!relayApiKey) {
+			console.error("Missing VERIFIK_WHATSAPP_RELAY_API_KEY");
+			process.exit(1);
+		}
+	} else if (!token) {
+		console.error(useTcc ? "Missing TCC_WHATSAPP_API_KEY" : "Missing WHATSAPP_API_TOKEN");
 		process.exit(1);
 	}
 
@@ -72,54 +113,63 @@ const run = async () => {
 	console.log(
 		JSON.stringify(
 			{
+				mode: useRelay ? "relay" : "direct-meta",
+				sender: useTcc ? "tcc" : "verifik-default",
 				host: os.hostname(),
 				outboundIp,
-				phoneId,
+				phoneId: useRelay && !useTcc ? null : phoneId,
+				relayUrl: useRelay ? `${relayBaseUrl}/api/whatsapp/messages` : undefined,
 				to,
 				otp,
-				tokenPrefix: token.slice(0, 12),
+				tokenPrefix: token ? token.slice(0, 12) : undefined,
 			},
 			null,
 			2
 		)
 	);
 
-	const payload = {
-		messaging_product: "whatsapp",
-		to,
-		type: "template",
-		template: {
-			name: "authentication",
-			language: { code: "es" },
-			components: [
-				{
-					type: "body",
-					parameters: [{ type: "text", text: `${otp}` }],
-				},
-				{
-					type: "button",
-					sub_type: "url",
-					index: "0",
-					parameters: [{ type: "text", text: `${otp}` }],
-				},
-			],
-		},
-	};
+	const templatePayload = buildTemplatePayload();
 
 	try {
-		const response = await httpsPostJson(
-			`https://graph.facebook.com/v22.0/${phoneId}/messages`,
-			{ Authorization: `Bearer ${token}` },
-			payload
-		);
+		let response;
+
+		if (useRelay) {
+			response = await httpsPostJson(
+				`${relayBaseUrl}/api/whatsapp/messages`,
+				{ "X-API-Key": relayApiKey },
+				{
+					...templatePayload,
+					whatsAppIdentifier: useTcc ? Number(tccPhoneId) : null,
+				}
+			);
+		} else {
+			response = await httpsPostJson(
+				`https://graph.facebook.com/v22.0/${phoneId}/messages`,
+				{ Authorization: `Bearer ${token}` },
+				{
+					messaging_product: "whatsapp",
+					...templatePayload,
+					type: "template",
+					template: {
+						name: templatePayload.template,
+						language: { code: templatePayload.language },
+						components: templatePayload.components,
+					},
+				}
+			);
+		}
 
 		if (response.status >= 200 && response.status < 300) {
+			const messageId = useRelay
+				? response.body?.data?.messages?.[0]?.id
+				: response.body?.messages?.[0]?.id;
+
 			console.log(
 				JSON.stringify(
 					{
 						result: "OK",
 						httpStatus: response.status,
-						messageId: response.body?.messages?.[0]?.id,
+						messageId,
 						otp,
 					},
 					null,
@@ -130,6 +180,7 @@ const run = async () => {
 		}
 
 		const metaError = response.body?.error;
+		const relayError = response.body?.validationError || response.body?.message;
 
 		console.error(
 			JSON.stringify(
@@ -137,9 +188,10 @@ const run = async () => {
 					result: "FAIL",
 					httpStatus: response.status,
 					code: metaError?.code,
-					message: metaError?.message,
+					message: metaError?.message || relayError || response.body?.error,
 					isTransient: metaError?.is_transient,
 					fbtraceId: metaError?.fbtrace_id,
+					body: response.body,
 				},
 				null,
 				2

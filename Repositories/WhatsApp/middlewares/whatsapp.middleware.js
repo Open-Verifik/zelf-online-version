@@ -1,6 +1,6 @@
 const config = require("../../../Core/config");
 
-const { string, array, validate, stringEnum } = require("../../../Core/JoiUtils");
+const { string, array, validate, stringEnum, stringOrNumber } = require("../../../Core/JoiUtils");
 
 const schemas = {
 	sendMessage: {
@@ -8,7 +8,7 @@ const schemas = {
 		template: string().required(),
 		language: stringEnum(["en", "es"]).default("es"),
 		components: array().required(),
-		whatsAppIdentifier: string().allow(null).optional(),
+		whatsAppIdentifier: stringOrNumber().allow(null).optional(),
 	},
 };
 
@@ -41,6 +41,10 @@ const sendMessageValidation = async (ctx, next) => {
 		ctx.status = 409;
 		ctx.body = { validationError: valid.error.message };
 		return;
+	}
+
+	if (valid.value.whatsAppIdentifier != null) {
+		valid.value.whatsAppIdentifier = `${valid.value.whatsAppIdentifier}`;
 	}
 
 	ctx.request.body = valid.value;

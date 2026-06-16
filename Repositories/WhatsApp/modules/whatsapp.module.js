@@ -23,6 +23,21 @@ const maskPhone = (phone) => {
 	return `${phone.slice(0, -4).replace(/\d/g, "*")}${phone.slice(-4)}`;
 };
 
+const normalizePhoneId = (id) => (id == null ? null : `${id}`);
+
+const maskPhoneId = (phoneId) => {
+	if (!phoneId || phoneId.length < 4) return phoneId;
+
+	return `${phoneId.slice(0, -4).replace(/\d/g, "*")}${phoneId.slice(-4)}`;
+};
+
+const resolveWhatsAppCredentials = (whatsAppIdentifier) => {
+	const phoneId = normalizePhoneId(whatsAppIdentifier) || normalizePhoneId(config.whatsApp.phoneIdentifier);
+	const apiKey = config.whatsApp.apiKeys[phoneId] || config.whatsApp.apiKeys.default;
+
+	return { phoneId, apiKey };
+};
+
 const logWhatsAppError = (metaError, attempt, context = {}) => {
 	if (!metaError) {
 		console.error({ whatsappError: { message: "Unknown WhatsApp API error", attempt, ...context } });
@@ -60,12 +75,9 @@ const sendMessage = async (data, whatsAppIdentifier = null) => {
 	if (!template) throw new Error("403:only_template_allowed_for_now");
 
 	const recipient = `${to}`.replace(/\D/g, "");
-	const apiKey =
-		whatsAppIdentifier && config.whatsApp.apiKeys[whatsAppIdentifier]
-			? config.whatsApp.apiKeys[whatsAppIdentifier]
-			: config.whatsApp.apiKeys.default;
+	const { phoneId, apiKey } = resolveWhatsAppCredentials(whatsAppIdentifier);
 	const axiosInstance = createWhatsAppAxios(apiKey);
-	const identifier = whatsAppIdentifier || config.whatsApp.phoneIdentifier;
+	const identifier = phoneId;
 
 	const dataToSend = {
 		messaging_product: "whatsapp",
@@ -82,7 +94,7 @@ const sendMessage = async (data, whatsAppIdentifier = null) => {
 
 	const errorContext = {
 		template,
-		phoneIdentifier: identifier,
+		senderPhoneId: maskPhoneId(identifier),
 		recipient: maskPhone(recipient),
 	};
 
