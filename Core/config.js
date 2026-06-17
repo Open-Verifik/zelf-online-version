@@ -209,6 +209,15 @@ const configuration = {
         useKit: process.env.SOLANA_USE_KIT === "true",
         jupiterApiKey: process.env.JUP_API_KEY,
     },
+    ton: {
+        rpcUrl: process.env.TON_RPC_URL || "https://toncenter.com/api/v2/jsonRPC",
+        apiKey: process.env.TON_API_KEY || "",
+        indexerUrl: process.env.TON_INDEXER_URL || "https://tonapi.io",
+        serviceWalletAddress: process.env.TON_SERVICE_WALLET_ADDRESS || "",
+        usdtJettonMaster:
+            process.env.TON_USDT_JETTON_MASTER || "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+        timeoutMs: Number(process.env.TON_TIMEOUT_MS) || 30000,
+    },
     oklink: {
         apiKey: process.env.OKLINK_API_KEY,
     },

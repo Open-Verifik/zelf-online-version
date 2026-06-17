@@ -34,6 +34,13 @@ This is a Koa backend API with MongoDB, Mongoose, and JWT-protected routes.
 -   Register new endpoints through `Routes/unprotected-repositories.js` or `Routes/protected-repositories.js`; adding a repository route file alone is not enough.
 -   Most backend work follows the repository pattern under `Repositories/<Feature>/`: routes, controllers, modules, middlewares, and models.
 
+## Vault Legacy demo mode
+
+-   Demo wills: `LEGACY_DEMO_MODE=true`, per-vault `isDemo` on `VaultLegacy` Mongo records, fixed `LEGACY_DEMO_LAWYER_ADDRESS`.
+-   Never enable demo mode on production `v3.zelf.world`.
+-   Cron: `node Repositories/VaultLegacy/check-vaults.js` (auto-confirms succession for demo vaults after liveness expiry).
+-   Mobile contract: `Repositories/VaultLegacy/DEMO-MOBILE.md`.
+
 ## Documentation
 
 -   Backend source docs live in this repo (`README.md`, `tests/README.md`, `security/`, feature notes).

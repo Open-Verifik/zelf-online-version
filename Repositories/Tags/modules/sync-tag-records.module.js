@@ -1,6 +1,7 @@
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { healPublicDataXlm } = require("../../Wallet/modules/stellar");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
+const { createTonWallet } = require("../../Wallet/modules/ton");
 const { createPolkadotWallet, createKusamaWallet } = require("../../Wallet/modules/polkadot-kusama");
 const SessionModule = require("../../Session/modules/session.module");
 const TagsPartsModule = require("./tags-parts.module");
@@ -24,6 +25,7 @@ const ADDRESS_FIELDS_HANDLED_BY_BUNDLE = new Set([
     "xlmAddress",
     "dotAddress",
     "ksmAddress",
+    "tonAddress",
 ]);
 
 /**
@@ -44,6 +46,12 @@ const initTagUpdates = async (tagObject, secretKeys) => {
         tagObject.publicData.suiAddress = sui.address;
 
         tagsToAdd.push({ name: "suiAddress", value: sui.address, new: true });
+    }
+
+    if (!tagObject.publicData.tonAddress) {
+        const ton = await createTonWallet(mnemonic);
+        tagObject.publicData.tonAddress = ton.address;
+        tagsToAdd.push({ name: "tonAddress", value: ton.address, new: true });
     }
 
     if (!(tagObject.publicData.btcAddress || "").startsWith("bc1")) {

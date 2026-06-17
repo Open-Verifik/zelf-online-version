@@ -101,6 +101,7 @@ const schemas = {
         ethAddress: string().max(128).allow(""),
         btcAddress: string().max(128).allow(""),
         solanaAddress: string().max(128).allow(""),
+        tonAddress: string().max(128).allow(""),
     },
 };
 
@@ -798,17 +799,18 @@ const updateValidation = async (ctx, next) => {
 };
 
 /**
- * GET /tags/wallet-balances — optional eth/btc/solana query params; at least one non-empty required.
+ * GET /tags/wallet-balances — optional eth/btc/solana/ton query params; at least one non-empty required.
  */
 const walletBalancesValidation = async (ctx, next) => {
     const q = ctx.request.query || {};
     const ethAddress = typeof q.ethAddress === "string" ? q.ethAddress.trim() : "";
     const btcAddress = typeof q.btcAddress === "string" ? q.btcAddress.trim() : "";
     const solanaAddress = typeof q.solanaAddress === "string" ? q.solanaAddress.trim() : "";
+    const tonAddress = typeof q.tonAddress === "string" ? q.tonAddress.trim() : "";
 
-    if (!ethAddress && !btcAddress && !solanaAddress) {
+    if (!ethAddress && !btcAddress && !solanaAddress && !tonAddress) {
         ctx.status = 409;
-        ctx.body = { validationError: "missing at least one of ethAddress, btcAddress, solanaAddress\n" };
+        ctx.body = { validationError: "missing at least one of ethAddress, btcAddress, solanaAddress, tonAddress\n" };
         return;
     }
 
@@ -816,6 +818,7 @@ const walletBalancesValidation = async (ctx, next) => {
         ethAddress: ethAddress || undefined,
         btcAddress: btcAddress || undefined,
         solanaAddress: solanaAddress || undefined,
+        tonAddress: tonAddress || undefined,
     });
 
     if (valid.error) {
@@ -828,6 +831,7 @@ const walletBalancesValidation = async (ctx, next) => {
         ethAddress: ethAddress || undefined,
         btcAddress: btcAddress || undefined,
         solanaAddress: solanaAddress || undefined,
+        tonAddress: tonAddress || undefined,
     };
 
     await next();
