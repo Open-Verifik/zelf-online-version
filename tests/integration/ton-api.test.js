@@ -41,6 +41,12 @@ describe("TON API Integration Tests - Real Server", () => {
 			expect(Array.isArray(data.tokenHoldings.tokens)).toBe(true);
 			expect(data).toHaveProperty("transactions");
 			expect(Array.isArray(data.transactions)).toBe(true);
+			expect(data.account).toHaveProperty("price");
+			expect(Number(data.account.price)).toBeGreaterThan(0);
+			expect(typeof data.fiatBalance).toBe("number");
+			const nativeTon = data.tokenHoldings.tokens.find((t) => t.symbol === "TON");
+			expect(nativeTon).toBeDefined();
+			expect(Number(nativeTon.price)).toBeGreaterThan(0);
 		});
 	});
 

@@ -1,7 +1,7 @@
 const moment = require("moment");
-const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { tonApiGet } = require("./ton-api.client");
 const { nanotonToTonString, jettonAmountToString } = require("./ton-jetton.util");
+const { getTonUsdPrice, getJettonUsdRates, sumTokenFiatBalances, normalizeTokenKey } = require("./ton-price.util");
 
 const TON_LOGO = "https://cdn.zelf.world/icons/ic_ton.png";
 
@@ -19,13 +19,14 @@ const buildNativeTonToken = (balanceTon, price, fiatBalance) => ({
 	tokenType: "TON",
 });
 
-const mapJettonBalances = (balances = [], priceTon) =>
+const mapJettonBalances = (balances = [], jettonRates = {}) =>
 	balances.map((item) => {
 		const jetton = item.jetton || {};
 		const decimals = jetton.decimals ?? 9;
 		const amount = jettonAmountToString(item.balance ?? 0, decimals);
 		const symbol = jetton.symbol || "JETTON";
-		const price = item.price?.prices?.USD ?? priceTon ?? "0";
+		const jettonAddress = normalizeTokenKey(jetton.address);
+		const price = jettonRates[jettonAddress] ?? 0;
 		const fiat = Number(amount) * Number(price);
 		return {
 			_fiatBalance: String(fiat || 0),
@@ -87,8 +88,7 @@ const getAddress = async (params) => {
 	let price = "0";
 
 	try {
-		const priceData = await getTickerPrice({ symbol: "TON" });
-		price = priceData.price || "0";
+		price = await getTonUsdPrice();
 	} catch (_) {
 		/* price optional */
 	}
@@ -96,12 +96,15 @@ const getAddress = async (params) => {
 	try {
 		const account = await tonApiGet(`/accounts/${encodeAccountId(address)}`);
 		const balanceTon = nanotonToTonString(account.balance ?? 0);
-		const fiatBalance = Number(balanceTon) * Number(price);
+		const nativeFiatBalance = parseFloat((Number(balanceTon) * Number(price)).toFixed(4));
 
 		let jettonBalances = [];
 		try {
 			const jettons = await tonApiGet(`/accounts/${encodeAccountId(address)}/jettons`);
-			jettonBalances = mapJettonBalances(jettons.balances || [], price);
+			const rawBalances = jettons.balances || [];
+			const jettonAddresses = rawBalances.map((item) => item.jetton?.address).filter(Boolean);
+			const jettonRates = await getJettonUsdRates(jettonAddresses);
+			jettonBalances = mapJettonBalances(rawBalances, jettonRates);
 		} catch (error) {
 			console.error("TON jettons fetch:", error.message);
 		}
@@ -114,21 +117,22 @@ const getAddress = async (params) => {
 			console.error("TON events fetch:", error.message);
 		}
 
-		const tokens = [buildNativeTonToken(balanceTon, price, fiatBalance), ...jettonBalances.filter((t) => t.symbol !== "TON")];
+		const tokens = [buildNativeTonToken(balanceTon, price, nativeFiatBalance), ...jettonBalances.filter((t) => t.symbol !== "TON")];
+		const totalFiatBalance = sumTokenFiatBalances(tokens);
 
 		return {
 			_balance: balanceTon,
-			_fiatBalance: String(fiatBalance),
+			_fiatBalance: String(totalFiatBalance),
 			address,
 			balance: balanceTon,
-			fiatBalance,
+			fiatBalance: totalFiatBalance,
 			account: {
 				asset: "TON",
-				fiatBalance,
+				fiatBalance: nativeFiatBalance,
 				price,
 			},
 			tokenHoldings: {
-				balance: String(fiatBalance),
+				balance: String(totalFiatBalance),
 				total: tokens.length,
 				tokens,
 			},
