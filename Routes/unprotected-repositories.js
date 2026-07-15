@@ -39,6 +39,7 @@ module.exports = (server) => {
     require("../Repositories/ZelfKeysSubscription/routes/zelf-keys-subscription.routes")(server);
     require("../Repositories/Staff/routes/unprotected-staff.route")(server);
     //T
+    require("../Repositories/TON/routes/ton-unprotected.route")(server);
     //U
     //V
     require("../Repositories/VaultLegacy/routes/vault-legacy.routes")(server);

@@ -176,6 +176,8 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
         avalancheAddress: renewTagPayObject?.publicData?.ethAddress,
         btcAddress: renewTagPayObject?.publicData?.btcAddress,
         solanaAddress: renewTagPayObject?.publicData?.solanaAddress,
+        tonAddress: renewTagPayObject?.publicData?.tonAddress,
+        tonServiceWallet: config.ton?.serviceWalletAddress || null,
     };
 
     const prices = {
@@ -187,6 +189,7 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
         POL: null,
         BASE: null,
         BDAG: null,
+        TON: null,
     };
 
     // Check for enabled networks and their native currencies
@@ -259,6 +262,14 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
     // Do not add prices.BDAG_USDC / BDAG_USDT or JWT usdc/usdt for tag pay until those assets exist on BlockDAG.
     if (networks?.blockdag?.enabled && networks?.blockdag?.nativeCurrency?.enabled && networks?.blockdag?.nativeCurrency?.code === "BDAG") {
         prices.BDAG = await calculateCryptoValue("BDAG", billableUsdPrice);
+    }
+
+    // TON — The Open Network native TON
+    if (
+        oldCurrencies?.includes("TON") ||
+        (networks?.ton?.enabled && networks?.ton?.nativeCurrency?.enabled && networks?.ton?.nativeCurrency?.code === "TON")
+    ) {
+        prices.TON = await calculateCryptoValue("TON", billableUsdPrice);
     }
 
     const returnData = {

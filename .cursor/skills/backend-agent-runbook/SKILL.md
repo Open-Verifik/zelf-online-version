@@ -62,6 +62,13 @@ For a test file that expects another port, export that same `PORT` before starti
 - Check `Repositories/BlockDAG/`, especially the public/protected route split and the smart-contract folder under `Repositories/BlockDAG/smart-contracts/`.
 - Relevant maintenance scripts include `npm run repair:blockdag-nft-index`.
 
+### Vault Legacy (inheritance plans)
+
+- Feature root: `Repositories/VaultLegacy/`.
+- Demo mode env: `LEGACY_DEMO_MODE`, `LEGACY_DEMO_LAWYER_ADDRESS` (see `.env.example`). Do not enable on production.
+- Heartbeat cron: `node Repositories/VaultLegacy/check-vaults.js`.
+- Mobile demo contract: `Repositories/VaultLegacy/DEMO-MOBILE.md`.
+
 ### Docs work
 
 - Public API docs belong in `zelf-documentation/docs/api/`.

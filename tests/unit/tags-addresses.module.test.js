@@ -22,11 +22,12 @@ const sampleAddresses = {
 
 describe("tags-addresses.module", () => {
     describe("SHORT_STORAGE_TO_APP", () => {
-        test("maps all six chunk keys to app *Address names", () => {
+        test("maps all chunk keys to app *Address names", () => {
             expect(SHORT_STORAGE_TO_APP).toEqual({
                 btc: "btcAddress",
                 arweave: "arweaveAddress",
                 sui: "suiAddress",
+                ton: "tonAddress",
                 xlm: "xlmAddress",
                 dot: "dotAddress",
                 ksm: "ksmAddress",

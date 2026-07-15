@@ -1,5 +1,6 @@
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
+const { createTonWallet } = require("../../Wallet/modules/ton");
 const SessionModule = require("../../Session/modules/session.module");
 const moment = require("moment");
 const IPFSModule = require("../../IPFS/modules/ipfs.module");
@@ -25,6 +26,12 @@ const initTagUpdates = async (zelfNameObject, secretKeys) => {
 		zelfNameObject.publicData.suiAddress = sui.address;
 
 		tagsToAdd.push({ name: "suiAddress", value: sui.address, new: true });
+	}
+
+	if (!zelfNameObject.publicData.tonAddress) {
+		const ton = await createTonWallet(mnemonic);
+		zelfNameObject.publicData.tonAddress = ton.address;
+		tagsToAdd.push({ name: "tonAddress", value: ton.address, new: true });
 	}
 
 	if (!zelfNameObject.publicData.btcAddress.startsWith("bc1")) {

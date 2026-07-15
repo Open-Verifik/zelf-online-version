@@ -223,6 +223,7 @@ const deleteZelfKey = async (ctx) => {
 				id: ctx.request.params.id,
 				faceBase64: ctx.request.body.faceBase64,
 				masterPassword: ctx.request.body.masterPassword,
+				removePGP: ctx.request.body.removePGP,
 			},
 			ctx.state.user
 		);
