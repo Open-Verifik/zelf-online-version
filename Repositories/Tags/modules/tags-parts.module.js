@@ -388,7 +388,7 @@ const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainCo
         referralTagName ? `${referralTagName}.${domainConfig.name}` : ""
     );
 
-    const { eth, btc, solana, sui, stellar, arweave, polkadot, kusama } = addresses;
+    const { eth, btc, solana, sui, stellar, arweave, polkadot, kusama, ton } = addresses;
 
     tagObject.price = price;
     tagObject.reward = reward;
@@ -402,6 +402,7 @@ const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainCo
     tagObject.arweaveAddress = arweave.address;
     tagObject.dotAddress = polkadot?.address;
     tagObject.ksmAddress = kusama?.address;
+    tagObject.tonAddress = ton?.address;
     tagObject.hasPassword = `${Boolean(payload.password)}`;
 };
 

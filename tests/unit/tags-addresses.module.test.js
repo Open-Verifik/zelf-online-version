@@ -18,6 +18,7 @@ const sampleAddresses = {
     arweaveAddress: "ArWeAvE000000000000000000000000000000000001",
     suiAddress: "0xsui0000000000000000000000000000000000000001",
     xlmAddress: "GXLM000000000000000000000000000000000000001",
+    tonAddress: "EQBHyu-oZVDHRYQ1-rKlGqpHy5yAqanPBirEQNMNOmfHLotW",
 };
 
 describe("tags-addresses.module", () => {
@@ -58,10 +59,12 @@ describe("tags-addresses.module", () => {
             expect(bundle.arweave).toBe(sampleAddresses.arweaveAddress);
             expect(bundle.sui).toBe(sampleAddresses.suiAddress);
             expect(bundle.xlm).toBe(sampleAddresses.xlmAddress);
+            expect(bundle.ton).toBe(sampleAddresses.tonAddress);
             expect(bundle.dot).toBe("DOT000000000000000000000000000000000000001");
             expect(bundle.ksm).toBe("KSM000000000000000000000000000000000000001");
             expect(bundle.dotAddress).toBeUndefined();
             expect(bundle.ksmAddress).toBeUndefined();
+            expect(bundle.tonAddress).toBeUndefined();
         });
 
         test("falls back to a short key on the source if the app key is missing", () => {
@@ -180,6 +183,8 @@ describe("tags-addresses.module", () => {
             expect(chunkBlob).toContain('"xlm"');
             expect(chunkBlob).toContain('"dot"');
             expect(chunkBlob).toContain('"ksm"');
+            expect(chunkBlob).toContain('"ton"');
+            expect(chunkBlob).not.toContain("tonAddress");
         });
 
         test("round-trips back to canonical app field names on publicData", () => {
@@ -200,10 +205,12 @@ describe("tags-addresses.module", () => {
             expect(merged.xlmAddress).toBe(source.xlmAddress);
             expect(merged.dotAddress).toBe(source.dotAddress);
             expect(merged.ksmAddress).toBe(source.ksmAddress);
+            expect(merged.tonAddress).toBe(source.tonAddress);
             expect(merged.addresses).toBeUndefined();
             expect(merged.btc).toBeUndefined();
             expect(merged.dot).toBeUndefined();
             expect(merged.ksm).toBeUndefined();
+            expect(merged.ton).toBeUndefined();
         });
     });
 
