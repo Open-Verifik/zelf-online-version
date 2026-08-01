@@ -102,6 +102,7 @@ const schemas = {
         btcAddress: string().max(128).allow(""),
         solanaAddress: string().max(128).allow(""),
         tonAddress: string().max(128).allow(""),
+        aptosAddress: string().max(128).allow(""),
     },
 };
 
@@ -799,7 +800,7 @@ const updateValidation = async (ctx, next) => {
 };
 
 /**
- * GET /tags/wallet-balances — optional eth/btc/solana/ton query params; at least one non-empty required.
+ * GET /tags/wallet-balances — optional eth/btc/solana/ton/aptos query params; at least one non-empty required.
  */
 const walletBalancesValidation = async (ctx, next) => {
     const q = ctx.request.query || {};
@@ -807,10 +808,11 @@ const walletBalancesValidation = async (ctx, next) => {
     const btcAddress = typeof q.btcAddress === "string" ? q.btcAddress.trim() : "";
     const solanaAddress = typeof q.solanaAddress === "string" ? q.solanaAddress.trim() : "";
     const tonAddress = typeof q.tonAddress === "string" ? q.tonAddress.trim() : "";
+    const aptosAddress = typeof q.aptosAddress === "string" ? q.aptosAddress.trim() : "";
 
-    if (!ethAddress && !btcAddress && !solanaAddress && !tonAddress) {
+    if (!ethAddress && !btcAddress && !solanaAddress && !tonAddress && !aptosAddress) {
         ctx.status = 409;
-        ctx.body = { validationError: "missing at least one of ethAddress, btcAddress, solanaAddress, tonAddress\n" };
+        ctx.body = { validationError: "missing at least one of ethAddress, btcAddress, solanaAddress, tonAddress, aptosAddress\n" };
         return;
     }
 
@@ -819,6 +821,7 @@ const walletBalancesValidation = async (ctx, next) => {
         btcAddress: btcAddress || undefined,
         solanaAddress: solanaAddress || undefined,
         tonAddress: tonAddress || undefined,
+        aptosAddress: aptosAddress || undefined,
     });
 
     if (valid.error) {
@@ -832,6 +835,7 @@ const walletBalancesValidation = async (ctx, next) => {
         btcAddress: btcAddress || undefined,
         solanaAddress: solanaAddress || undefined,
         tonAddress: tonAddress || undefined,
+        aptosAddress: aptosAddress || undefined,
     };
 
     await next();

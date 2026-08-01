@@ -28,6 +28,9 @@ const _getExtraPublicData = async (password, zelfProof, syncPublicData) => {
     if (syncPublicData.suiAddress) {
         extraKeys.suiAddress = syncPublicData.suiAddress;
     }
+    if (syncPublicData.aptosAddress) {
+        extraKeys.aptosAddress = syncPublicData.aptosAddress;
+    }
 
     return extraKeys;
 };
@@ -105,6 +108,7 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
         xlmAddress: syncPublicData.stellarAddress || syncPublicData.xlmAddress || tagObject.publicData.xlmAddress,
         dotAddress: syncPublicData.dotAddress || tagObject.publicData.dotAddress,
         ksmAddress: syncPublicData.ksmAddress || tagObject.publicData.ksmAddress,
+        aptosAddress: syncPublicData.aptosAddress || tagObject.publicData.aptosAddress,
     };
 
     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -250,6 +254,9 @@ const leaseOfflineTag = async (params, authUser) => {
     }
     if (extraPublicData?.solanaAddress) {
         tagObject.solanaAddress = extraPublicData.solanaAddress;
+    }
+    if (extraPublicData?.aptosAddress) {
+        tagObject.aptosAddress = extraPublicData.aptosAddress;
     }
 
     const securityType = password ? (/^\d{6}$/.test(password) ? "pin" : "password") : null;

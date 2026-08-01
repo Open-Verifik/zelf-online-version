@@ -19,6 +19,7 @@ const sampleAddresses = {
     suiAddress: "0xsui0000000000000000000000000000000000000001",
     xlmAddress: "GXLM000000000000000000000000000000000000001",
     tonAddress: "EQBHyu-oZVDHRYQ1-rKlGqpHy5yAqanPBirEQNMNOmfHLotW",
+    aptosAddress: "0xeb663b681209e7087d681c5d3eed12aaa8e1915e7c87794542c3f96e94b3d3bf",
 };
 
 describe("tags-addresses.module", () => {
@@ -29,6 +30,7 @@ describe("tags-addresses.module", () => {
                 arweave: "arweaveAddress",
                 sui: "suiAddress",
                 ton: "tonAddress",
+                aptos: "aptosAddress",
                 xlm: "xlmAddress",
                 dot: "dotAddress",
                 ksm: "ksmAddress",
@@ -60,11 +62,13 @@ describe("tags-addresses.module", () => {
             expect(bundle.sui).toBe(sampleAddresses.suiAddress);
             expect(bundle.xlm).toBe(sampleAddresses.xlmAddress);
             expect(bundle.ton).toBe(sampleAddresses.tonAddress);
+            expect(bundle.aptos).toBe(sampleAddresses.aptosAddress);
             expect(bundle.dot).toBe("DOT000000000000000000000000000000000000001");
             expect(bundle.ksm).toBe("KSM000000000000000000000000000000000000001");
             expect(bundle.dotAddress).toBeUndefined();
             expect(bundle.ksmAddress).toBeUndefined();
             expect(bundle.tonAddress).toBeUndefined();
+            expect(bundle.aptosAddress).toBeUndefined();
         });
 
         test("falls back to a short key on the source if the app key is missing", () => {
@@ -184,7 +188,9 @@ describe("tags-addresses.module", () => {
             expect(chunkBlob).toContain('"dot"');
             expect(chunkBlob).toContain('"ksm"');
             expect(chunkBlob).toContain('"ton"');
+            expect(chunkBlob).toContain('"aptos"');
             expect(chunkBlob).not.toContain("tonAddress");
+            expect(chunkBlob).not.toContain("aptosAddress");
         });
 
         test("round-trips back to canonical app field names on publicData", () => {
@@ -206,11 +212,13 @@ describe("tags-addresses.module", () => {
             expect(merged.dotAddress).toBe(source.dotAddress);
             expect(merged.ksmAddress).toBe(source.ksmAddress);
             expect(merged.tonAddress).toBe(source.tonAddress);
+            expect(merged.aptosAddress).toBe(source.aptosAddress);
             expect(merged.addresses).toBeUndefined();
             expect(merged.btc).toBeUndefined();
             expect(merged.dot).toBeUndefined();
             expect(merged.ksm).toBeUndefined();
             expect(merged.ton).toBeUndefined();
+            expect(merged.aptos).toBeUndefined();
         });
     });
 
@@ -303,6 +311,7 @@ describe("tags-addresses.module", () => {
             expect(result.xlmAddress).toBe(sampleAddresses.xlmAddress);
             expect(result.dotAddress).toBe("DOT123");
             expect(result.ksmAddress).toBe("KSM123");
+            expect(result.aptosAddress).toBe(sampleAddresses.aptosAddress);
             expect(result.btc).toBeUndefined();
             expect(result.dot).toBeUndefined();
             expect(result.ksm).toBeUndefined();

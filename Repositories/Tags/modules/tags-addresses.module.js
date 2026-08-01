@@ -20,6 +20,7 @@
  *   - `dot` → `dotAddress`
  *   - `ksm` → `ksmAddress`
  *   - `ton` → `tonAddress`
+ *   - `aptos` → `aptosAddress`
  *
  * Legacy pins may still have full `*Address` keys inside chunk JSON; those merge
  * onto `publicData` unchanged.
@@ -39,7 +40,7 @@ const TOP_LEVEL_ADDRESS_FIELDS = ["ethAddress", "solanaAddress"];
  * Stable order in which fields are packed into the chunked JSON. Top-level
  * fields above are intentionally NOT in this list.
  */
-const ADDRESS_FIELDS_ORDER = ["btc", "arweave", "sui", "xlm", "dot", "ksm", "ton"];
+const ADDRESS_FIELDS_ORDER = ["btc", "arweave", "sui", "xlm", "dot", "ksm", "ton", "aptos"];
 
 /**
  * Chunk JSON key → canonical app field name (expanded on merge).
@@ -52,6 +53,7 @@ const SHORT_STORAGE_TO_APP = {
     dot: "dotAddress",
     ksm: "ksmAddress",
     ton: "tonAddress",
+    aptos: "aptosAddress",
 };
 
 const APP_TO_SHORT_STORAGE = {
@@ -62,10 +64,21 @@ const APP_TO_SHORT_STORAGE = {
     dotAddress: "dot",
     ksmAddress: "ksm",
     tonAddress: "ton",
+    aptosAddress: "aptos",
 };
 
 /** Canonical app field names exposed on `publicData`. */
-const APP_ADDRESS_FIELDS = [...TOP_LEVEL_ADDRESS_FIELDS, "btcAddress", "arweaveAddress", "suiAddress", "xlmAddress", "dotAddress", "ksmAddress", "tonAddress"];
+const APP_ADDRESS_FIELDS = [
+    ...TOP_LEVEL_ADDRESS_FIELDS,
+    "btcAddress",
+    "arweaveAddress",
+    "suiAddress",
+    "xlmAddress",
+    "dotAddress",
+    "ksmAddress",
+    "tonAddress",
+    "aptosAddress",
+];
 
 const _isUsableString = (value) => typeof value === "string" && value.trim() !== "";
 

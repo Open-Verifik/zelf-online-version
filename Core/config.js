@@ -229,6 +229,14 @@ const configuration = {
             process.env.TON_USDT_JETTON_MASTER || "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
         timeoutMs: Number(process.env.TON_TIMEOUT_MS) || 30000,
     },
+    aptos: {
+        network: process.env.APTOS_NETWORK || "mainnet",
+        fullnodeUrl: process.env.APTOS_FULLNODE_URL || "",
+        indexerUrl: process.env.APTOS_INDEXER_URL || "",
+        apiKey: process.env.APTOS_API_KEY || "",
+        timeoutMs: Number(process.env.APTOS_TIMEOUT_MS) || 30000,
+        maxGasAmount: Number(process.env.APTOS_MAX_GAS_AMOUNT) || 200000,
+    },
     oklink: {
         apiKey: process.env.OKLINK_API_KEY,
     },

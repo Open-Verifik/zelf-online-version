@@ -4,6 +4,7 @@ const solanaScrapingModule = require("../../Solana/modules/solana-scrapping.modu
 const avalancheScrapingModule = require("../../Avalanche/modules/avalanche-scrapping.module");
 const blockdagModule = require("../../BlockDAG/modules/blockdag.module");
 const tonScrapingModule = require("../../TON/modules/ton-scrapping.module");
+const aptosScrapingModule = require("../../Aptos/modules/aptos-scrapping.module");
 
 const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
@@ -68,18 +69,19 @@ const rejectionMessage = (reason) => {
 };
 
 /**
- * Native balances for tag public addresses (ETH / BTC / SOL / AVAX C-chain / BDAG).
+ * Native balances for tag public addresses (ETH / BTC / SOL / AVAX C-chain / BDAG / TON / APT).
  * AVAX and BDAG use the same 0x address as ETH when present.
  *
- * @param {{ ethAddress?: string, btcAddress?: string, solanaAddress?: string, tonAddress?: string }} params
- * @param {{ skipNetworks?: string[], networkTimeoutMs?: number }} [options] skipNetworks: lowercase eth|btc|sol|avax|bdag|ton. networkTimeoutMs caps each network call (audit / bulk use).
- * @returns {Promise<{ eth: object, btc: object, sol: object, avax: object, bdag: object, ton: object }>}
+ * @param {{ ethAddress?: string, btcAddress?: string, solanaAddress?: string, tonAddress?: string, aptosAddress?: string }} params
+ * @param {{ skipNetworks?: string[], networkTimeoutMs?: number }} [options] skipNetworks: lowercase eth|btc|sol|avax|bdag|ton|aptos. networkTimeoutMs caps each network call (audit / bulk use).
+ * @returns {Promise<{ eth: object, btc: object, sol: object, avax: object, bdag: object, ton: object, aptos: object }>}
  */
 const getTagWalletBalances = async (params, options = {}) => {
     const eth = params.ethAddress?.trim() || "";
     const btc = params.btcAddress?.trim() || "";
     const sol = params.solanaAddress?.trim() || "";
     const ton = params.tonAddress?.trim() || "";
+    const aptos = params.aptosAddress?.trim() || "";
 
     const evm = isEvmAddress(eth) ? eth : "";
 
@@ -121,6 +123,11 @@ const getTagWalletBalances = async (params, options = {}) => {
             ? skip.has("ton")
                 ? Promise.resolve(SKIPPED)
                 : withOptionalTimeout(tonScrapingModule.getAddress({ id: ton }), networkTimeoutMs, "ton")
+            : Promise.resolve(null),
+        aptos
+            ? skip.has("aptos")
+                ? Promise.resolve(SKIPPED)
+                : withOptionalTimeout(aptosScrapingModule.getNativeBalance(aptos), networkTimeoutMs, "aptos")
             : Promise.resolve(null),
     ]);
 
@@ -219,6 +226,18 @@ const getTagWalletBalances = async (params, options = {}) => {
         tonSlot = chainSlot(null, "TON", undefined, err);
     }
 
+    let aptosSlot = chainSlot(null, "APT");
+    if (!aptos) {
+        aptosSlot = chainSlot(null, "APT");
+    } else if (settled[6].status === "fulfilled" && settled[6].value && settled[6].value.__balanceSkipped) {
+        aptosSlot = chainSlot(null, "APT", undefined, "skipped");
+    } else if (settled[6].status === "fulfilled") {
+        const balance = settled[6].value;
+        aptosSlot = balance != null && balance !== "" ? chainSlot(String(balance), "APT") : chainSlot(null, "APT", undefined, "unavailable");
+    } else {
+        aptosSlot = chainSlot(null, "APT", undefined, rejectionMessage(settled[6].reason));
+    }
+
     return {
         eth: ethSlot,
         btc: btcSlot,
@@ -226,6 +245,7 @@ const getTagWalletBalances = async (params, options = {}) => {
         avax: avaxSlot,
         bdag: bdagSlot,
         ton: tonSlot,
+        aptos: aptosSlot,
     };
 };
 

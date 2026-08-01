@@ -24,6 +24,7 @@
         "test:license-theme": "jest tests/unit/license-theme-merge.test.js --verbose --no-coverage && jest --config jest.integration.http.config.js tests/integration/license-zelf-theme-api.test.js --verbose --no-coverage",
         "test:stellar": "jest tests/integration/stellar-api.test.js --verbose --no-coverage",
         "test:ton": "jest tests/unit/ton-wallet.test.js --verbose --no-coverage && jest --config jest.integration.config.js tests/integration/ton-api.test.js --verbose --no-coverage",
+        "test:aptos": "jest tests/unit/aptos-wallet.test.js tests/unit/aptos-format.util.test.js tests/unit/tags-addresses.module.test.js --verbose --no-coverage && jest tests/integration/aptos-live.test.js --verbose --no-coverage",
         "test:ethereum-gas": "jest tests/unit/etherscan-gas-tracker.util.test.js --verbose --no-coverage && jest --config jest.integration.config.js tests/integration/ethereum-gas-tracker-live.test.js --verbose --no-coverage",
         "test:avalanche-rpc": "jest --config jest.integration.config.js tests/integration/avalanche-rpc-live.test.js --verbose --no-coverage",
         "test:sui-rpc": "jest --config jest.integration.config.js tests/integration/sui-rpc-live.test.js --verbose --no-coverage",
@@ -49,6 +50,7 @@
         "test": "tests"
     },
     "dependencies": {
+        "@aptos-labs/ts-sdk": "6.3.1",
         "@ar.io/sdk": "^3.9.1",
         "@ardrive/turbo-sdk": "^1.10.1",
         "@google-cloud/recaptcha-enterprise": "^5.13.0",

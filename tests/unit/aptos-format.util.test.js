@@ -1,0 +1,37 @@
+const {
+    atomicToDecimalString,
+    aptosFeeFromGas,
+    decimalToAtomicString,
+    expandScientificNotation,
+} = require("../../Repositories/Aptos/modules/aptos-format.util");
+
+describe("Aptos amount formatting", () => {
+    it("converts octas to exact APT strings", () => {
+        expect(atomicToDecimalString("123456789")).toBe("1.23456789");
+        expect(atomicToDecimalString("100000000")).toBe("1");
+        expect(atomicToDecimalString("1")).toBe("0.00000001");
+    });
+
+    it("converts APT to octas without floating-point arithmetic", () => {
+        expect(decimalToAtomicString("1.23456789")).toBe("123456789");
+        expect(decimalToAtomicString("0.00000001")).toBe("1");
+    });
+
+    it("rejects zero, malformed values and excess precision", () => {
+        expect(() => decimalToAtomicString("0")).toThrow(/greater_than_zero/);
+        expect(() => decimalToAtomicString("1e-8")).toThrow(/amount_invalid/);
+        expect(() => decimalToAtomicString("0.000000001")).toThrow(/exceeds_8_decimals/);
+    });
+
+    it("calculates gas fees in octas and APT", () => {
+        expect(aptosFeeFromGas("151", "100")).toEqual({
+            feeOctas: "15100",
+            feeApt: "0.000151",
+        });
+    });
+
+    it("expands scientific notation returned by numeric APIs", () => {
+        expect(expandScientificNotation("1e+8")).toBe("100000000");
+        expect(expandScientificNotation("1.5e+3")).toBe("1500");
+    });
+});

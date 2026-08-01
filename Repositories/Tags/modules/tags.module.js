@@ -9,6 +9,7 @@ const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
 const { createStellarWallet } = require("../../Wallet/modules/stellar");
 const { createPolkadotWallet, createKusamaWallet } = require("../../Wallet/modules/polkadot-kusama");
 const { createTonWallet } = require("../../Wallet/modules/ton");
+const { createAptosWallet } = require("../../Wallet/modules/aptos");
 const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const config = require("../../../Core/config");
@@ -70,7 +71,7 @@ const leaseTag = async (params, authUser) => {
         securityType = /^\d{6}$/.test(password) ? "pin" : "password";
     }
 
-    const { eth, btc, solana, sui, stellar, polkadot, kusama, ton, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
+    const { eth, btc, solana, sui, stellar, polkadot, kusama, ton, aptos, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
         ...params,
         mnemonic: decryptedParams.mnemonic,
     });
@@ -104,7 +105,7 @@ const leaseTag = async (params, authUser) => {
     TagsPartsModule.assignProperties(
         tagObject,
         dataToEncrypt,
-        { eth, btc, solana, sui, stellar, arweave, polkadot, kusama, ton },
+        { eth, btc, solana, sui, stellar, arweave, polkadot, kusama, ton, aptos },
         { ...params, password: dataToEncrypt.password, referralTagObject },
         domainConfig
     );
@@ -125,7 +126,11 @@ const leaseTag = async (params, authUser) => {
         tagObject.zelfProof = await QRZelfProofExtractor.extractZelfProofFromQR(tagObject.ipfs.url);
     }
 
-    const pgp = await TagsPartsModule.generatePGPKeys(dataToEncrypt, { eth, btc, solana, sui, stellar, arweave, polkadot, kusama, ton }, password);
+    const pgp = await TagsPartsModule.generatePGPKeys(
+        dataToEncrypt,
+        { eth, btc, solana, sui, stellar, arweave, polkadot, kusama, ton, aptos },
+        password
+    );
 
     return {
         ipfs: [tagObject.ipfs],
@@ -480,6 +485,7 @@ const _createWalletsFromPhrase = async (params) => {
     const polkadot = await createPolkadotWallet(_mnemonic);
     const kusama = await createKusamaWallet(_mnemonic);
     const ton = await createTonWallet(_mnemonic);
+    const aptos = await createAptosWallet(_mnemonic);
 
     const zkProof = await OfflineProofModule.createProof(_mnemonic);
     const arweave = await ArweaveModule.generateWalletFromMnemonic(_mnemonic);
@@ -493,6 +499,7 @@ const _createWalletsFromPhrase = async (params) => {
         polkadot,
         kusama,
         ton,
+        aptos,
         zkProof,
         mnemonic: _mnemonic,
         arweave,
