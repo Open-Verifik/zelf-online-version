@@ -24,6 +24,7 @@
         "test:license-theme": "jest tests/unit/license-theme-merge.test.js --verbose --no-coverage && jest --config jest.integration.http.config.js tests/integration/license-zelf-theme-api.test.js --verbose --no-coverage",
         "test:stellar": "jest tests/integration/stellar-api.test.js --verbose --no-coverage",
         "test:ton": "jest tests/unit/ton-wallet.test.js --verbose --no-coverage && jest --config jest.integration.config.js tests/integration/ton-api.test.js --verbose --no-coverage",
+        "test:canton": "jest tests/unit/canton-format.util.test.js tests/unit/canton-sdk.client.test.js tests/unit/canton-transfer.module.test.js tests/unit/canton.middleware.test.js --verbose --no-coverage && jest --config jest.integration.config.js tests/integration/canton-live.test.js --verbose --no-coverage",
         "test:ethereum-gas": "jest tests/unit/etherscan-gas-tracker.util.test.js --verbose --no-coverage && jest --config jest.integration.config.js tests/integration/ethereum-gas-tracker-live.test.js --verbose --no-coverage",
         "test:avalanche-rpc": "jest --config jest.integration.config.js tests/integration/avalanche-rpc-live.test.js --verbose --no-coverage",
         "test:sui-rpc": "jest --config jest.integration.config.js tests/integration/sui-rpc-live.test.js --verbose --no-coverage",
@@ -51,6 +52,7 @@
     "dependencies": {
         "@ar.io/sdk": "^3.9.1",
         "@ardrive/turbo-sdk": "^1.10.1",
+        "@canton-network/wallet-sdk": "1.4.0",
         "@google-cloud/recaptcha-enterprise": "^5.13.0",
         "@joi/date": "^2.1.0",
         "@koa/cors": "^5.0.0",

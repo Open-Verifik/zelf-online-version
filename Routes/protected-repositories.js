@@ -15,6 +15,7 @@ module.exports = (server) => {
     require("../Repositories/base/routes/base.routes")(server);
     require("../Repositories/Blogs/routes/blog-protected.routes")(server);
     //C
+    require("../Repositories/Canton/routes/canton.route")(server);
     require("../Repositories/cardano/routes/cardano-scrapping.route")(server);
     require("../Repositories/Client/routes/client.route")(server);
     //D
