@@ -3,6 +3,11 @@ const config = require("../../../Core/config");
 
 const getBaseUrl = () => (config.ton?.indexerUrl || "https://tonapi.io").replace(/\/$/, "");
 
+const normalizeTonRpcUrl = (value) => {
+	const rpcUrl = (value || "https://toncenter.com/api/v2/jsonRPC").trim().replace(/\/$/, "");
+	return /\/api\/v2$/i.test(rpcUrl) ? `${rpcUrl}/jsonRPC` : rpcUrl;
+};
+
 const getHeaders = () => {
 	const apiKey = config.ton?.apiKey;
 	if (!apiKey) return {};
@@ -20,7 +25,7 @@ const tonApiGet = async (path, params = {}) => {
 };
 
 const tonCenterPost = async (method, params = {}) => {
-	const rpcUrl = (config.ton?.rpcUrl || "https://toncenter.com/api/v2").replace(/\/$/, "");
+	const rpcUrl = normalizeTonRpcUrl(config.ton?.rpcUrl);
 	const body = { id: "1", jsonrpc: "2.0", method, params };
 	const headers = { "Content-Type": "application/json" };
 	if (config.ton?.apiKey) {
@@ -39,6 +44,7 @@ const tonCenterPost = async (method, params = {}) => {
 };
 
 module.exports = {
+	normalizeTonRpcUrl,
 	tonApiGet,
 	tonCenterPost,
 };
