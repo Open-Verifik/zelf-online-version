@@ -10,6 +10,7 @@ const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const IPFS = require("../../../Core/ipfs");
 const QRZelfProofExtractor = require("../../Tags/modules/qr-zelfproof-extractor.module");
+const PGPKeyModule = require("../../PGP/modules/pgp-keys.module");
 const {
     isWalrusStorageSupported,
     isIPFSStorageSupported,
@@ -17,6 +18,8 @@ const {
 const { createNFT } = require("../../Avalanche/modules/avax-nft.module");
 
 const config = require("../../../Core/config");
+
+const TYPES_REQUIRING_TRANSPORT_ENCRYPTION = new Set(["password", "notes", "note", "credit_card", "payment-card"]);
 
 const createMetadataAndPublicData = async (type, data, authToken) => {
     const identifier = authToken.tagName || authToken.identifier;
@@ -300,11 +303,13 @@ const storeData = async (data, authToken) => {
  * @param {Object} data
  * @param {string} data.zelfProof - Encrypted ZelfProof
  * @param {string} data.faceBase64 - User's face for decryption
- * @param {string} data.password - User's master password
+ * @param {string} [data.password] - Optional ZelfProof password
+ * @param {string} data.clientPublicKey - Client ephemeral public key for transport encryption
+ * @param {string} [data.type] - Record type (password, notes, credit_card, ...)
  * @returns {Promise<Object>}
  */
 const retrieveData = async (data, authToken) => {
-    const { zelfProof, faceBase64, password, type } = data;
+    const { zelfProof, faceBase64, password, type, clientPublicKey } = data;
 
     let decryptedParams = null;
     let pgp = null;
@@ -359,37 +364,16 @@ const retrieveData = async (data, authToken) => {
 
     if (!zelfKey) throw new Error("409:zelf_key_record_not_found");
 
-    try {
-        const encryptionParams = {
-            ...zelfKey?.metadata,
-        };
+    const resolvedType = type || zelfKey?.publicData?.type;
 
-        switch (type) {
-            case "payment-card":
-            case "credit_card":
-                pgp = await TagsPartsModule.encryptCreditCardParams(encryptionParams, authToken);
-                zelfKey.metadata = {};
-
-                break;
-            case "password":
-                pgp = await TagsPartsModule.encryptPasswordParams(encryptionParams, authToken);
-                zelfKey.metadata = {};
-
-                break;
-            case "notes":
-                pgp = await TagsPartsModule.encryptNotesParams(encryptionParams, authToken);
-                zelfKey.metadata = {};
-
-                break;
-            case "zotp":
-                // pgp = await TagsPartsModule.encryptZOTPParams(encryptionParams, authToken);
-
-                break;
-            default:
-                break;
+    if (TYPES_REQUIRING_TRANSPORT_ENCRYPTION.has(resolvedType) && zelfKey.metadata) {
+        try {
+            pgp = await PGPKeyModule.encryptToPublicKey(zelfKey.metadata, clientPublicKey);
+            zelfKey.metadata = {};
+        } catch (error) {
+            console.error("failed_to_encrypt_metadata_for_transport", error);
+            throw new Error("409:failed_to_encrypt_metadata_for_transport");
         }
-    } catch (error) {
-        throw new Error("409:failed_to_encrypt_metadata_for_transport");
     }
 
     return {

@@ -51,6 +51,10 @@ const schemas = {
 		zelfProof: string().required(),
 		faceBase64: string().required(),
 		password: string(),
+		// Required for password/notes/cards transport encryption; accepted for all retrieve types
+		clientPublicKey: string().required(),
+		type: string().optional().allow(""),
+		removePGP: boolean().optional(),
 	},
 	preview: {
 		zelfProof: string().required(),
