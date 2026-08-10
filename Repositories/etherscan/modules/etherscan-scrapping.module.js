@@ -10,10 +10,10 @@ const { mapGasOracleToTrackerShape, weiHexToGwei, weiHexToEth, gasTrackerFromNet
 const { idAseet_ } = require("../../dataAnalytics/modules/dataAnalytics.module");
 const { getCleanInstance } = require("../../../Core/axios");
 const {
-	getNaasNodeUrl,
-	NAAS_CHAIN,
-	refreshNaasCatalogAfterUnauthorized,
-	isNaasNodeUnauthorizedError,
+    getNaasNodeUrl,
+    NAAS_CHAIN,
+    refreshNaasCatalogAfterUnauthorized,
+    isNaasNodeUnauthorizedError,
 } = require("../../../Core/naas-gateway-catalog");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { get_ApiKey } = require("../../Solana/modules/oklink");
@@ -38,8 +38,8 @@ const infuraProjectId = () => process.env.INFURA_APIKEY || config.etherscan.apiK
 const getGasTrackerFromRpc = async (isSepolia) => {
     const pid = infuraProjectId();
     const rpcUrl = isSepolia
-        ? process.env.ETH_SEPOLIA_RPC_URL || (pid ? `https://sepolia.infura.io/v3/${pid}` : null)
-        : process.env.ETH_MAINNET_RPC_URL || (pid ? `https://mainnet.infura.io/v3/${pid}` : null);
+        ? process.env.ETH_SEPOLIA_RPC_URL || null
+        : process.env.ETH_MAINNET_RPC_URL || null;
 
     if (!rpcUrl) {
         throw new Error("gas_tracker_rpc_unconfigured");

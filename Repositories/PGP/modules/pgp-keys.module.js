@@ -156,6 +156,26 @@ const decryptKey = async (type = "session", encryptedKey) => {
 };
 
 /**
+ * Encrypt arbitrary content to a client-provided public key (no passphrase / no stored keys).
+ * @param {Object|string} content
+ * @param {string} armoredPublicKey
+ * @returns {Promise<{ encryptedMessage: string }>}
+ */
+const encryptToPublicKey = async (content, armoredPublicKey) => {
+	if (!armoredPublicKey) throw new Error("missing_client_public_key");
+
+	const publicKey = await openpgp.readKey({ armoredKey: armoredPublicKey });
+	const encryptedMessage = await openpgp.encrypt({
+		message: await openpgp.createMessage({
+			text: typeof content === "string" ? content : JSON.stringify(content),
+		}),
+		encryptionKeys: publicKey,
+	});
+
+	return { encryptedMessage };
+};
+
+/**
  * decrypt content with global passphrase
  * @param {String} privateKey
  * @param {String} content
@@ -189,5 +209,6 @@ module.exports = {
 	findStorageKey,
 	encryptKey,
 	decryptKey,
+	encryptToPublicKey,
 	decryptContent,
 };

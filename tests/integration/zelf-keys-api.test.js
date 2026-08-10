@@ -8,6 +8,7 @@
 const request = require("supertest");
 const fs = require("fs");
 const path = require("path");
+const openpgp = require("openpgp");
 require("dotenv").config();
 
 const API_BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
@@ -417,11 +418,32 @@ describe("ZelfKeys API Integration Tests", () => {
             expect(response.body).toHaveProperty("validationError");
         });
 
-        it("POST /zelf-keys/retrieve — should decrypt a stored password", async () => {
+        it("POST /zelf-keys/retrieve — should return 409 when clientPublicKey is missing", async () => {
+            const response = await request(API_BASE_URL)
+                .post(`${ZELF_KEYS_PATH}/retrieve`)
+                .set("Origin", "https://test.example.com")
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    zelfProof: "fake-proof",
+                    faceBase64,
+                    type: "password",
+                });
+
+            expect(response.status).toBe(409);
+            expect(response.body).toHaveProperty("validationError");
+        });
+
+        it("POST /zelf-keys/retrieve — should decrypt a stored password with clientPublicKey", async () => {
             if (!storedPasswordZelfProof) {
                 console.log("⚠️  Skipping: no stored password zelfProof available");
                 return;
             }
+
+            const { privateKey: clientPrivateKey, publicKey: clientPublicKey } = await openpgp.generateKey({
+                type: "ecc",
+                curve: "curve25519",
+                userIDs: [{ name: "ZelfKeys Test", email: "test@zelf.world" }],
+            });
 
             const response = await request(API_BASE_URL)
                 .post(`${ZELF_KEYS_PATH}/retrieve`)
@@ -433,18 +455,31 @@ describe("ZelfKeys API Integration Tests", () => {
                     faceBase64,
                     password: TEST_PASSWORD,
                     removePGP: true,
+                    clientPublicKey,
                 });
 
             expect(response.status).toBe(200);
             expect(response.body).toHaveProperty("data");
+            expect(response.body.data.pgp).toBeDefined();
+            expect(response.body.data.pgp.encryptedMessage).toBeDefined();
+            expect(response.body.data.pgp.privateKey).toBeUndefined();
+            expect(response.body.data.metadata).toEqual({});
 
-            // The decrypted data should have metadata with the original password
-            if (response.body.data.metadata) {
-                expect(response.body.data.metadata).toHaveProperty("password");
-                expect(response.body.data.metadata).toHaveProperty("username");
-            }
+            const privateKey = await openpgp.readPrivateKey({ armoredKey: clientPrivateKey });
+            const message = await openpgp.readMessage({
+                armoredMessage: response.body.data.pgp.encryptedMessage,
+            });
+            const { data: decrypted } = await openpgp.decrypt({
+                message,
+                decryptionKeys: privateKey,
+            });
 
-            console.log("✅ Password retrieved (decrypted) successfully");
+            const metadata = JSON.parse(decrypted);
+
+            expect(metadata).toHaveProperty("password");
+            expect(metadata).toHaveProperty("username");
+
+            console.log("✅ Password retrieved and client-decrypted successfully");
         });
 
         it("POST /zelf-keys/preview — should return 409 when zelfProof is missing", async () => {
