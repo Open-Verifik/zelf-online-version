@@ -52,6 +52,7 @@
     "dependencies": {
         "@ar.io/sdk": "^3.9.1",
         "@ardrive/turbo-sdk": "^1.10.1",
+        "@canton-network/core-tx-visualizer": "1.7.0",
         "@canton-network/wallet-sdk": "1.4.0",
         "@google-cloud/recaptcha-enterprise": "^5.13.0",
         "@joi/date": "^2.1.0",

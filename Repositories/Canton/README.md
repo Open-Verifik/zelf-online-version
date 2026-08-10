@@ -47,7 +47,7 @@ The `probe=true` status call verifies Ledger API connectivity and authentication
 }
 ```
 
-The response contains the Wallet SDK prepare response and `preparedTransactionHash`. The client must independently validate the prepared transaction and sign that hash with the external party's Ed25519 key.
+The response contains the Wallet SDK prepare response and `preparedTransactionHash`. Before returning it, the backend recomputes the Canton hash from the raw prepared transaction and verifies that the requested sender appears in `metadata.submitterInfo.actAs`. The client must still independently inspect the transaction, recompute the hash and sign it with the external party's Ed25519 key.
 
 ### Submit transfer
 
@@ -62,7 +62,7 @@ The response contains the Wallet SDK prepare response and `preparedTransactionHa
 }
 ```
 
-Canton Coin preparation references time-bound ledger state. Signing and submission should happen promptly. Long approval workflows need an explicit command-delegation design.
+Canton Coin preparation references time-bound ledger state. Signing and submission should happen promptly. On submission, the backend recomputes the hash again and confirms that `partyId` appears in `actAs` before forwarding the signature. Long approval workflows need an explicit command-delegation design.
 
 ## Required deployment configuration
 

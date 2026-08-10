@@ -1,4 +1,5 @@
 const config = require("../../../Core/config");
+const { decodePreparedTransaction, hashPreparedTransaction } = require("@canton-network/core-tx-visualizer");
 const { normalizeCcAmount, normalizePartyId } = require("./canton-format.util");
 const { getCantonSDK, toCantonUpstreamError, withCantonTimeout } = require("./canton-sdk.client");
 
@@ -35,6 +36,38 @@ const normalizeSignature = (value) => {
     return signature;
 };
 
+const verifyPreparedTransaction = async (value, partyId, errorStatus = 400) => {
+    const prepared = normalizePreparedTransaction(value);
+    const normalizedPartyId = normalizePartyId(partyId);
+
+    try {
+        const computedHash = await hashPreparedTransaction(prepared.preparedTransaction, "base64");
+
+        if (computedHash !== prepared.preparedTransactionHash) {
+            const error = new Error("canton_prepared_transaction_hash_mismatch");
+            error.status = errorStatus;
+            throw error;
+        }
+
+        const decoded = decodePreparedTransaction(prepared.preparedTransaction);
+        const actAs = decoded?.metadata?.submitterInfo?.actAs || [];
+
+        if (!actAs.includes(normalizedPartyId)) {
+            const error = new Error("canton_prepared_transaction_party_mismatch");
+            error.status = errorStatus;
+            throw error;
+        }
+
+        return prepared;
+    } catch (error) {
+        if (String(error?.message || "").startsWith("canton_")) throw error;
+
+        const invalid = new Error("canton_prepared_transaction_invalid");
+        invalid.status = errorStatus;
+        throw invalid;
+    }
+};
+
 const prepareTransfer = async ({ sender, recipient, amountCc, instrumentId, memo, inputUtxos }) => {
     const normalizedSender = normalizePartyId(sender);
     const normalizedRecipient = normalizePartyId(recipient);
@@ -61,6 +94,7 @@ const prepareTransfer = async ({ sender, recipient, amountCc, instrumentId, memo
             disclosedContracts,
         });
         const { response } = await withCantonTimeout(prepared.toJSON(), "transfer_prepare");
+        await verifyPreparedTransaction(response, normalizedSender, 502);
 
         return {
             sender: normalizedSender,
@@ -82,7 +116,7 @@ const prepareTransfer = async ({ sender, recipient, amountCc, instrumentId, memo
 
 const submitTransfer = async ({ partyId, preparedTransaction, signature }) => {
     const normalizedPartyId = normalizePartyId(partyId);
-    const normalizedPreparedTransaction = normalizePreparedTransaction(preparedTransaction);
+    const normalizedPreparedTransaction = await verifyPreparedTransaction(preparedTransaction, normalizedPartyId);
     const normalizedSignature = normalizeSignature(signature);
 
     try {
@@ -108,4 +142,5 @@ module.exports = {
     normalizeSignature,
     prepareTransfer,
     submitTransfer,
+    verifyPreparedTransaction,
 };
