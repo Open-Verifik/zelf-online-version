@@ -10,27 +10,68 @@ const agent = new https.Agent({
 });
 
 const instance = axios.create({
-    timeout: 10000,
+    // Explorer API is flaky behind Cloudflare; allow a bit more headroom than the old 10s.
+    timeout: 15000,
     httpsAgent: agent,
 });
 
 // Generate random user agent
 const generateRandomUserAgent = () => {
     const userAgents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     ];
     return userAgents[Math.floor(Math.random() * userAgents.length)];
 };
 
-// BlockDAG RPC endpoints: mainRpcUrl = dedicated RPC from BlockDAG team, rpcUrl = public fallback
-const BLOCKDAG_MAIN_RPC = config.blockdag?.mainRpcUrl || "https://dapps-rpc.bdagscan.com";
-const BLOCKDAG_RPC = config.blockdag?.rpcUrl || "https://rpc.bdagscan.com";
+/** Headers that match browser calls from bdagscan.com (CORS Origin is ignored server-side; CF often prefers them). */
+const explorerApiHeaders = () => ({
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    Origin: "https://bdagscan.com",
+    Referer: "https://bdagscan.com/",
+    "User-Agent": generateRandomUserAgent(),
+});
+
+const isRetryableExplorerError = (error) => {
+    const code = error?.code;
+    if (code === "ECONNABORTED" || code === "ETIMEDOUT" || code === "ECONNRESET" || code === "EAI_AGAIN") {
+        return true;
+    }
+    const status = error?.response?.status;
+    if (status >= 500 && status < 600) return true;
+    if (!error?.response && /timeout/i.test(error?.message || "")) return true;
+    return false;
+};
+
+const withExplorerRetry = async (fn, { attempts = 3, label = "BlockDAG API" } = {}) => {
+    let lastError;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error;
+            if (!isRetryableExplorerError(error) || attempt === attempts) break;
+            const delayMs = 400 * attempt;
+            console.warn(`${label} attempt ${attempt}/${attempts} failed (${error.message}); retrying in ${delayMs}ms`);
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+    }
+    throw lastError;
+};
+
+// BlockDAG JSON-RPC — public endpoint only (dapps-rpc.bdagscan.com is broken / blocked).
+// Optional BLOCKDAG_MAIN_RPC_URL may still override; if it differs from rpcUrl we try it once then fall back.
+const BLOCKDAG_PUBLIC_RPC = "https://rpc.bdagscan.com";
+const BLOCKDAG_MAIN_RPC = config.blockdag?.mainRpcUrl || BLOCKDAG_PUBLIC_RPC;
+const BLOCKDAG_RPC = config.blockdag?.rpcUrl || BLOCKDAG_PUBLIC_RPC;
 const NOWNODES_BLOCKDAG_RPC = "https://bdag.nownodes.io";
 
-// Process-lifetime: when mainRpcUrl fails, stop using it until process restart
+// Process-lifetime: when a distinct mainRpcUrl fails, stop using it until process restart
 let mainRpcUrlDisabled = false;
+const MAIN_RPC_DISTINCT =
+    String(BLOCKDAG_MAIN_RPC).replace(/\/$/, "").toLowerCase() !== String(BLOCKDAG_RPC).replace(/\/$/, "").toLowerCase();
 const BLOCKDAG_TESTNET_RPC = "https://testnet-rpc.blockdag.network"; // Keep for reference if needed
 const BLOCKDAG_EXPLORER = "https://bdagscan.com";
 const apiForAddressBalance = "https://api.bdagscan.com/v1/api/transaction/getAddressInfo?address=";
@@ -135,23 +176,24 @@ const apiForTransactionDetails = "https://api.bdagscan.com/v1/api/transaction/ge
 // Helper function to get address balance and details from API
 const getAddressBalanceFromAPI = async (address) => {
     try {
-        const response = await instance.get(`${apiForAddressBalance}${address}`, {
-            headers: {
-                "Content-Type": "application/json",
-                authority: "api.bdagscan.com",
-                "User-Agent": generateRandomUserAgent(),
-            },
-        });
+        return await withExplorerRetry(
+            async () => {
+                const response = await instance.get(`${apiForAddressBalance}${address}`, {
+                    headers: explorerApiHeaders(),
+                });
 
-        if (response.data && response.data.status === 200 && response.data.data) {
-            const { balance, firstTransaction, lastTransaction } = response.data.data;
-            return {
-                balance: balance !== undefined && balance !== null ? balance.toString() : "0",
-                firstTransaction,
-                lastTransaction,
-            };
-        }
-        throw new Error("Invalid API response");
+                if (response.data && response.data.status === 200 && response.data.data) {
+                    const { balance, firstTransaction, lastTransaction } = response.data.data;
+                    return {
+                        balance: balance !== undefined && balance !== null ? balance.toString() : "0",
+                        firstTransaction,
+                        lastTransaction,
+                    };
+                }
+                throw new Error("Invalid API response");
+            },
+            { label: "BlockDAG API balance" }
+        );
     } catch (error) {
         console.error("BlockDAG API balance fetch failed:", error.message);
         throw error;
@@ -161,25 +203,26 @@ const getAddressBalanceFromAPI = async (address) => {
 // Helper function to get address transactions from API
 const getAddressTransactionsFromAPI = async (address, page = 1, limit = 20, exportData = false) => {
     try {
-        const response = await instance.get(apiForAddressTransactions, {
-            params: {
-                address: address,
-                page: page,
-                limit: limit,
-                export: exportData,
-            },
-            headers: {
-                "Content-Type": "application/json",
-                authority: "api.bdagscan.com",
-                "User-Agent": generateRandomUserAgent(),
-            },
-        });
+        return await withExplorerRetry(
+            async () => {
+                const response = await instance.get(apiForAddressTransactions, {
+                    params: {
+                        address: address,
+                        page: page,
+                        limit: limit,
+                        export: exportData,
+                    },
+                    headers: explorerApiHeaders(),
+                });
 
-        if (response.data && response.data.status === 200) {
-            const data = response.data.data;
-            return Array.isArray(data) ? data : data || [];
-        }
-        throw new Error("Invalid API response");
+                if (response.data && response.data.status === 200) {
+                    const data = response.data.data;
+                    return Array.isArray(data) ? data : data || [];
+                }
+                throw new Error("Invalid API response");
+            },
+            { label: "BlockDAG API transactions" }
+        );
     } catch (error) {
         console.error("BlockDAG API transactions fetch failed:", error.message);
         throw error;
@@ -189,18 +232,19 @@ const getAddressTransactionsFromAPI = async (address, page = 1, limit = 20, expo
 // Helper function to get transaction details from API
 const getTransactionFromAPI = async (txnHash) => {
     try {
-        const response = await instance.get(`${apiForTransactionDetails}${txnHash}`, {
-            headers: {
-                "Content-Type": "application/json",
-                authority: "api.bdagscan.com",
-                "User-Agent": generateRandomUserAgent(),
-            },
-        });
+        return await withExplorerRetry(
+            async () => {
+                const response = await instance.get(`${apiForTransactionDetails}${txnHash}`, {
+                    headers: explorerApiHeaders(),
+                });
 
-        if (response.data && response.data.status === 200 && response.data.data) {
-            return response.data.data;
-        }
-        return null;
+                if (response.data && response.data.status === 200 && response.data.data) {
+                    return response.data.data;
+                }
+                return null;
+            },
+            { label: "BlockDAG API tx detail", attempts: 2 }
+        );
     } catch (error) {
         console.error("BlockDAG API transaction detail fetch failed:", error.message);
         return null;
@@ -263,8 +307,8 @@ const postToRpc = async (url, method, params, extraHeaders = {}) => {
 };
 
 /**
- * Centralized RPC request handler with NowNodes support and mainRpcUrl → rpcUrl fallback
- * When mainRpcUrl fails, it is disabled for the process lifetime (until restart).
+ * Centralized RPC request handler with optional NowNodes, then public rpcUrl.
+ * If BLOCKDAG_MAIN_RPC_URL is set to a distinct host, try it first then fall back to rpcUrl.
  * @param {string} method - RPC method
  * @param {Array} params - RPC parameters
  * @returns {Promise<Object>} RPC response data
@@ -286,8 +330,8 @@ const requestRPC = async (method, params = []) => {
         }
     }
 
-    // BlockDAG RPC chain: mainRpcUrl (dedicated) → rpcUrl (fallback)
-    if (!mainRpcUrlDisabled) {
+    // Only attempt a separate main URL when it differs from the public/fallback RPC
+    if (MAIN_RPC_DISTINCT && !mainRpcUrlDisabled) {
         try {
             const data = await postToRpc(BLOCKDAG_MAIN_RPC, method, params);
             if (data && !data.error) {
@@ -303,9 +347,7 @@ const requestRPC = async (method, params = []) => {
         }
     }
 
-    // Fallback to rpcUrl
-    const data = await postToRpc(BLOCKDAG_RPC, method, params);
-    return data;
+    return postToRpc(BLOCKDAG_RPC, method, params);
 };
 
 /**
@@ -397,15 +439,13 @@ const getLatestBlock = async () => {
 };
 
 /**
- * Fetch BDAG balance with API fallback to RPC
+ * Fetch BDAG balance: prefer explorer API (includes first/last tx), fall back to RPC eth_getBalance.
  * @param {string} address - Address to fetch balance for
  * @returns {Promise<Object>} Object containing balance and transaction stats
  */
 const fetchBdagBalance = async (address) => {
     try {
-        const response = await getAddressBalanceFromAPI(address);
-
-        return response;
+        return await getAddressBalanceFromAPI(address);
     } catch (apiError) {
         console.log("BlockDAG API balance fetch failed, trying RPC:", apiError.message);
         try {
