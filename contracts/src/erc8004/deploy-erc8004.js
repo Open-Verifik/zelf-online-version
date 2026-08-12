@@ -1,14 +1,10 @@
 /**
  * ERC8004 Contract Deployment Script for Zelf Lawyer System
  *
- * Prerequisites:
- *   npm install --save-dev hardhat @nomicfoundation/hardhat-toolbox
- *   npm install @openzeppelin/contracts
- *   npx hardhat compile
- *
- * Usage:
- *   npx hardhat run contracts/erc8004/deploy-erc8004.js --network fuji
- *   npx hardhat run contracts/erc8004/deploy-erc8004.js --network avalanche
+ * Run from the contracts/ package (not the Koa API root):
+ *   cd contracts && npm install && npm run compile
+ *   npm run deploy:erc8004:fuji
+ *   npm run deploy:erc8004:avalanche
  */
 
 const fs = require("fs");
@@ -62,7 +58,7 @@ async function main() {
 		deployedAt: new Date().toISOString(),
 	};
 
-	const outputPath = path.resolve(__dirname, "../../erc8004-deployment.json");
+	const outputPath = path.resolve(__dirname, "../../../erc8004-deployment.json");
 	fs.writeFileSync(outputPath, JSON.stringify(deployment, null, 2));
 
 	console.log("\nDeployment saved to erc8004-deployment.json");

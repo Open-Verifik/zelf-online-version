@@ -18,7 +18,7 @@ Constructor: `constructor(address _treasury, address _usdc)` — both addresses 
 With Foundry:
 
 ```bash
-cd contracts/avalanche
+cd contracts && npm install  # sources in src/avalanche
 forge build --contracts ZelfAvalanchePay.sol
 ```
 

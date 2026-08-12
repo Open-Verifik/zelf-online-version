@@ -52,5 +52,9 @@ config/gemini_key.json
 Avalanche/artifacts/
 Avalanche/cache/
 
+# Isolated Hardhat workspace (contracts/package.json)
+contracts/cache/
+contracts/compiled-contracts/
+
 # checkoutContracts deploy scripts compile output (solc)
 checkoutContracts/.solc-out-*/

@@ -33,6 +33,7 @@ This is a Koa backend API with MongoDB, Mongoose, and JWT-protected routes.
 -   `server.js` loads unprotected routes first, then applies `koa-jwt`, then loads protected routes.
 -   Register new endpoints through `Routes/unprotected-repositories.js` or `Routes/protected-repositories.js`; adding a repository route file alone is not enough.
 -   Most backend work follows the repository pattern under `Repositories/<Feature>/`: routes, controllers, modules, middlewares, and models.
+-   Hardhat / Solidity for ERC-8004 lives in `contracts/` (own `package.json`). Install with `npm run contracts:install`. It is not part of the Koa API dependency tree.
 
 ## Vault Legacy demo mode
 

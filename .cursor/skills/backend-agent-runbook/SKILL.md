@@ -62,6 +62,11 @@ For a test file that expects another port, export that same `PORT` before starti
 - Check `Repositories/BlockDAG/`, especially the public/protected route split and the smart-contract folder under `Repositories/BlockDAG/smart-contracts/`.
 - Relevant maintenance scripts include `npm run repair:blockdag-nft-index`.
 
+### Solidity / Hardhat
+
+- Root Koa API does not install Hardhat. Use `contracts/` (`npm run contracts:install`, `npm run contracts:compile`).
+- BlockDAG NFT contracts: `Repositories/BlockDAG/smart-contracts/`. Avalanche ZelfKey NFT: `Avalanche/`.
+
 ### Vault Legacy (inheritance plans)
 
 - Feature root: `Repositories/VaultLegacy/`.

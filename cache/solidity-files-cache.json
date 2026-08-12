@@ -685,6 +685,43 @@
       "artifacts": [
         "ERC8004ReputationRegistry"
       ]
+    },
+    "/Users/miguel/zelf/contracts/avalanche/ZelfAvalanchePay.sol": {
+      "lastModificationDate": 1786571285279,
+      "contentHash": "f1165a1a06915821295195452db16f18",
+      "sourceName": "contracts/avalanche/ZelfAvalanchePay.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "IERC20",
+        "ZelfAvalanchePay"
+      ]
     }
   }
 }

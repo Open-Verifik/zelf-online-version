@@ -8,7 +8,7 @@ This folder holds **`ZelfAvalanchePay`**, **`ZelfBscPay`**, and **`ZelfEthPay`**
 
 **Treasury on BSC and Ethereum:** deploy `ZelfBscPay` / `ZelfEthPay` with the **same treasury address** as Avalanche — the address derived from **`AVALANCHE_PRIVATE_KEY`** (one EVM identity across chains; separate balances per network).
 
-Canonical Solidity also lives at [`../contracts/avalanche/ZelfAvalanchePay.sol`](../contracts/avalanche/ZelfAvalanchePay.sol); keep them in sync if you edit one.
+Canonical Solidity also lives at [`../contracts/src/avalanche/ZelfAvalanchePay.sol`](../contracts/src/avalanche/ZelfAvalanchePay.sol); keep them in sync if you edit one.
 
 ## Constructor arguments
 

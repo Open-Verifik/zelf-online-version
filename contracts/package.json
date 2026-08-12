@@ -1,0 +1,19 @@
+{
+    "name": "zelf-contracts",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Hardhat workspace for Zelf Solidity (ERC-8004, Avalanche pay helpers). Isolated from the Koa API root.",
+    "scripts": {
+        "compile": "hardhat compile",
+        "clean": "hardhat clean",
+        "deploy:erc8004:fuji": "hardhat run src/erc8004/deploy-erc8004.js --network fuji",
+        "deploy:erc8004:avalanche": "hardhat run src/erc8004/deploy-erc8004.js --network avalanche"
+    },
+    "devDependencies": {
+        "@nomicfoundation/hardhat-ethers": "^3.1.3",
+        "@openzeppelin/contracts": "^5.4.0",
+        "dotenv": "^16.4.5",
+        "ethers": "^6.17.0",
+        "hardhat": "^2.29.0"
+    }
+}
