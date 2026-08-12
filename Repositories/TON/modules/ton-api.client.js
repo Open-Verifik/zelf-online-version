@@ -3,6 +3,11 @@ const config = require("../../../Core/config");
 
 const getBaseUrl = () => (config.ton?.indexerUrl || "https://tonapi.io").replace(/\/$/, "");
 
+const normalizeTonRpcUrl = (value) => {
+	const rpcUrl = (value || "https://toncenter.com/api/v2/jsonRPC").trim().replace(/\/$/, "");
+	return /\/api\/v2$/i.test(rpcUrl) ? `${rpcUrl}/jsonRPC` : rpcUrl;
+};
+
 const getHeaders = () => {
 	const apiKey = config.ton?.apiKey;
 	if (!apiKey) return {};
@@ -20,16 +25,29 @@ const tonApiGet = async (path, params = {}) => {
 };
 
 const tonCenterPost = async (method, params = {}) => {
-	const rpcUrl = (config.ton?.rpcUrl || "https://toncenter.com/api/v2").replace(/\/$/, "");
+	const rpcUrl = normalizeTonRpcUrl(config.ton?.rpcUrl);
 	const body = { id: "1", jsonrpc: "2.0", method, params };
 	const headers = { "Content-Type": "application/json" };
 	if (config.ton?.apiKey) {
 		headers["X-API-Key"] = config.ton.apiKey;
 	}
-	const { data } = await axios.post(rpcUrl, body, {
-		headers,
-		timeout: config.ton?.timeoutMs || 30000,
-	});
+	let data;
+	try {
+		({ data } = await axios.post(rpcUrl, body, {
+			headers,
+			timeout: config.ton?.timeoutMs || 30000,
+		}));
+	} catch (error) {
+		const upstreamMessage =
+			error?.response?.data?.error ||
+			error?.response?.data?.message ||
+			error?.message ||
+			"ton_rpc_error";
+		const rpcError = new Error(upstreamMessage);
+		rpcError.status = error?.response?.status === 429 ? 429 : 502;
+		rpcError.code = error?.code || "TON_RPC_ERROR";
+		throw rpcError;
+	}
 	if (data.error) {
 		const err = new Error(data.error.message || "ton_rpc_error");
 		err.status = 502;
@@ -39,6 +57,7 @@ const tonCenterPost = async (method, params = {}) => {
 };
 
 module.exports = {
+	normalizeTonRpcUrl,
 	tonApiGet,
 	tonCenterPost,
 };

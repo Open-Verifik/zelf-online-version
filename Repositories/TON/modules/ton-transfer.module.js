@@ -1,7 +1,15 @@
 const bip39 = require("bip39");
 const { derivePath } = require("ed25519-hd-key");
 const { keyPairFromSeed } = require("@ton/crypto");
-const { WalletContractV5R1, internal, Address, toNano, beginCell } = require("@ton/ton");
+const {
+	WalletContractV5R1,
+	internal,
+	external,
+	storeMessage,
+	Address,
+	toNano,
+	beginCell,
+} = require("@ton/ton");
 const { tonCenterPost } = require("./ton-api.client");
 const { resolveJettonWalletAddress } = require("./ton-jetton.util");
 
@@ -11,9 +19,18 @@ const deriveKeyPairFromMnemonic = async (mnemonic) => {
 	return keyPairFromSeed(derived.slice(0, 32));
 };
 
-const getSeqno = async (address) => {
-	const info = await tonCenterPost("getWalletInformation", { address });
-	return Number(info?.seqno ?? 0);
+const getWalletInformation = (address) => tonCenterPost("getWalletInformation", { address });
+
+const getSeqno = async (address) => Number((await getWalletInformation(address))?.seqno ?? 0);
+
+const buildExternalTransferBoc = (wallet, transfer, accountState) => {
+	const message = external({
+		to: wallet.address,
+		init: accountState === "active" ? undefined : wallet.init,
+		body: transfer,
+	});
+
+	return beginCell().store(storeMessage(message)).endCell().toBoc().toString("base64");
 };
 
 /**
@@ -23,7 +40,8 @@ const getSeqno = async (address) => {
 const sendNativeTransfer = async ({ mnemonic, toAddress, amountTon, comment }) => {
 	const keyPair = await deriveKeyPairFromMnemonic(mnemonic);
 	const wallet = WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey });
-	const seqno = await getSeqno(wallet.address.toString());
+	const walletInformation = await getWalletInformation(wallet.address.toString());
+	const seqno = Number(walletInformation?.seqno ?? 0);
 
 	const messages = [
 		internal({
@@ -40,7 +58,7 @@ const sendNativeTransfer = async ({ mnemonic, toAddress, amountTon, comment }) =
 		messages,
 	});
 
-	const boc = transfer.toBoc().toString("base64");
+	const boc = buildExternalTransferBoc(wallet, transfer, walletInformation?.account_state);
 	const result = await tonCenterPost("sendBoc", { boc });
 	return {
 		success: true,
@@ -56,7 +74,8 @@ const sendNativeTransfer = async ({ mnemonic, toAddress, amountTon, comment }) =
 const sendJettonTransfer = async ({ mnemonic, toAddress, jettonMaster, amount, decimals = 6 }) => {
 	const keyPair = await deriveKeyPairFromMnemonic(mnemonic);
 	const wallet = WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey });
-	const seqno = await getSeqno(wallet.address.toString());
+	const walletInformation = await getWalletInformation(wallet.address.toString());
+	const seqno = Number(walletInformation?.seqno ?? 0);
 	const fromFriendly = wallet.address.toString({ bounceable: true, urlSafe: true });
 
 	const senderJettonWallet = await resolveJettonWalletAddress(fromFriendly, jettonMaster);
@@ -91,7 +110,7 @@ const sendJettonTransfer = async ({ mnemonic, toAddress, jettonMaster, amount, d
 		messages,
 	});
 
-	const boc = transfer.toBoc().toString("base64");
+	const boc = buildExternalTransferBoc(wallet, transfer, walletInformation?.account_state);
 	const result = await tonCenterPost("sendBoc", { boc });
 	return {
 		success: true,
@@ -106,5 +125,6 @@ module.exports = {
 	sendNativeTransfer,
 	sendJettonTransfer,
 	getSeqno,
+	buildExternalTransferBoc,
 	deriveKeyPairFromMnemonic,
 };
