@@ -59,6 +59,7 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, securi
         domain,
         extraParams: {
             origin: tagObject.origin || "online",
+            ...(tagObject.zelfEncryptVersion ? { zelfEncryptVersion: tagObject.zelfEncryptVersion } : {}),
             price: tagObject.price,
             duration: 1,
             registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -147,6 +148,7 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
             hasPassword: tagObject.hasPassword,
             type: "hold",
             origin: tagObject.origin || "online",
+            ...(tagObject.zelfEncryptVersion ? { zelfEncryptVersion: tagObject.zelfEncryptVersion } : {}),
             registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
             expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
         },

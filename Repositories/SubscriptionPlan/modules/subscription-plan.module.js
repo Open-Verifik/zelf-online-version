@@ -1,6 +1,24 @@
 const Stripe = require("stripe");
 const config = require("../../../Core/config");
 const { getMyLicense } = require("../../License/modules/license.module");
+const IpfsLookupCache = require("../../../Core/ipfs-lookup-cache");
+
+const loadSubscriptionRecords = async (domain) => {
+    if (!domain) return [];
+
+    const records = await IpfsLookupCache.getOrLoad(IpfsLookupCache.keys.subscription(domain), async () => {
+        const IPFSModule = require("../../IPFS/modules/ipfs.module");
+        const found = await IPFSModule.get({
+            key: "subscriptionDomain",
+            value: domain,
+            limit: 1,
+        });
+
+        return found?.length ? found : null;
+    });
+
+    return records || [];
+};
 
 /**
  * Get Stripe client
@@ -160,10 +178,7 @@ const getMySubscription = async (authToken) => {
     const IPFSModule = require("../../IPFS/modules/ipfs.module");
 
     // Try to find the subscription record in IPFS
-    const subscriptionRecords = await IPFSModule.get({
-        key: "subscriptionDomain",
-        value: myLicense.domainConfig.name,
-    });
+    const subscriptionRecords = await loadSubscriptionRecords(myLicense.domainConfig.name);
 
     let subscriptionId = myLicense.domainConfig?.stripe?.subscriptionId;
     let productId = myLicense.domainConfig?.stripe?.productId;
@@ -242,12 +257,7 @@ const createPortalSession = async (authToken) => {
 
     // Try to find the subscription record in IPFS to get the most recent/correct customer ID
     // because we now store subscription info in a separate record
-    const IPFSModule = require("../../IPFS/modules/ipfs.module");
-
-    const subscriptionRecords = await IPFSModule.get({
-        key: "subscriptionDomain",
-        value: myLicense.domainConfig.name,
-    });
+    const subscriptionRecords = await loadSubscriptionRecords(myLicense.domainConfig.name);
 
     if (subscriptionRecords && subscriptionRecords.length > 0) {
         const subRecord = subscriptionRecords[0];
@@ -332,6 +342,11 @@ const verifySession = async (sessionId, authToken) => {
     const { saveSubscriptionRecord } = require("../../License/modules/license.module");
     const record = await saveSubscriptionRecord(myLicense, paymentData);
 
+    IpfsLookupCache.invalidateLicense({
+        emails: [authToken.email, authToken.ownerEmail, myLicense?.publicData?.licenseOwner],
+        domains: [myLicense.domainConfig?.name, myLicense.publicData?.domain],
+    });
+
     // 6. Mirror the webhook's monthly ZNS grant so checkout-redirect users get tokens even if
     // the invoice.payment_succeeded webhook is delayed or fails. Idempotent: the grant ledger
     // is keyed on invoice.id, so a later webhook will short-circuit on duplicate_invoice.
@@ -385,10 +400,16 @@ const migrateLegacySubscription = async (myLicense, IPFSModule) => {
             const { saveSubscriptionRecord } = require("../../License/modules/license.module");
             await saveSubscriptionRecord(myLicense, paymentData);
 
+            IpfsLookupCache.invalidateLicense({
+                emails: [myLicense?.publicData?.licenseOwner, paymentData.customerEmail],
+                domains: [myLicense.domainConfig.name],
+            });
+
             // Re-fetch to return the new record immediately (optional, or just proceed)
             const newRecords = await IPFSModule.get({
                 key: "subscriptionDomain",
                 value: myLicense.domainConfig.name,
+                limit: 1,
             });
 
             if (newRecords && newRecords.length > 0) {

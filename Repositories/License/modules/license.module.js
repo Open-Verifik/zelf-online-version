@@ -8,6 +8,7 @@ const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
 const DefaultLicenseValues = require("./default-license.values");
 const { Domain } = require("../../Tags/modules/domain.class");
 const { initCacheInstance } = require("../../../cache/manager");
+const IpfsLookupCache = require("../../../Core/ipfs-lookup-cache");
 
 // Initialize cache with 2 hour TTL and check period of 10 minutes (see cache/manager.js stdTTL)
 const licenseCache = initCacheInstance();
@@ -291,22 +292,8 @@ const _getMyLicenseForStaffWithCredentials = async (jwt, withJSON, ownershipCred
     };
 };
 
-/**
- * Get user's own licenses
- * @param {Object} query - Query parameters
- * @param {Object} jwt - JWT object
- * @returns {Promise<Array>} - Array of user's licenses
- */
-const getMyLicense = async (jwt, withJSON = false, ownershipCredentials) => {
-    // Staff JWT may use accountType "staff" (Staff auth) or "staff_account" (unified Client auth)
+const _loadMyLicenseForAccount = async (jwt, withJSON, ownershipCredentials) => {
     const isStaffUser = jwt.accountType === "staff" || jwt.accountType === "staff_account";
-
-    // Biometric path: staff decrypts the **staff** zelfProof; licenses resolve via staffOwnerEmail/ownerEmail → licenseOwner
-    if (isStaffUser && ownershipCredentials) {
-        return _getMyLicenseForStaffWithCredentials(jwt, withJSON, ownershipCredentials);
-    }
-
-    // Non-staff, or staff GET without biometrics: load client for license index by accountEmail
     const targetEmail = isStaffUser && jwt.ownerEmail ? jwt.ownerEmail : jwt.email;
 
     // Get client data to get the zelfProof
@@ -370,6 +357,36 @@ const getMyLicense = async (jwt, withJSON = false, ownershipCredentials) => {
         accountZelfProof,
         accountJSON,
     };
+};
+
+/**
+ * Get user's own licenses
+ * @param {Object} jwt - JWT object
+ * @param {boolean} withJSON - Load full license JSON
+ * @param {Object} [ownershipCredentials] - Biometric credentials; skips cache
+ * @returns {Promise<Object>}
+ */
+const getMyLicense = async (jwt, withJSON = false, ownershipCredentials) => {
+    const isStaffUser = jwt.accountType === "staff" || jwt.accountType === "staff_account";
+
+    // Biometric path: staff decrypts the **staff** zelfProof; licenses resolve via staffOwnerEmail/ownerEmail → licenseOwner
+    if (isStaffUser && ownershipCredentials) {
+        return _getMyLicenseForStaffWithCredentials(jwt, withJSON, ownershipCredentials);
+    }
+
+    if (ownershipCredentials) {
+        return _loadMyLicenseForAccount(jwt, withJSON, ownershipCredentials);
+    }
+
+    const targetEmail = isStaffUser && jwt.ownerEmail ? jwt.ownerEmail : jwt.email;
+
+    if (!targetEmail) {
+        return _loadMyLicenseForAccount(jwt, withJSON);
+    }
+
+    return IpfsLookupCache.getOrLoad(IpfsLookupCache.keys.myLicense(targetEmail, withJSON), () =>
+        _loadMyLicenseForAccount(jwt, withJSON)
+    );
 };
 
 /**
@@ -543,6 +560,11 @@ const createOrUpdateLicense = async (body, jwt) => {
             { pro: true }
         );
 
+        IpfsLookupCache.invalidateLicense({
+            emails: [jwt.email, jwt.ownerEmail, zelfAccount?.publicData?.accountEmail],
+            domains: [body.domain, myLicense?.publicData?.domain, myLicense?.domainConfig?.name],
+        });
+
         return {
             ipfs: license,
             ...licenseMetadata,
@@ -570,6 +592,11 @@ const deleteLicense = async (params, authUser) => {
 
         // Unpin from IPFS
         const deletedFiles = await IPFS.unPinFiles([myLicense.id]);
+
+        IpfsLookupCache.invalidateLicense({
+            emails: [authUser.email, authUser.ownerEmail, myLicense?.publicData?.licenseOwner],
+            domains: [myLicense?.publicData?.domain, myLicense?.domainConfig?.name],
+        });
 
         return {
             success: true,
@@ -760,6 +787,11 @@ const saveSubscriptionRecord = async (license, paymentData) => {
         },
         { pro: true }
     );
+
+    IpfsLookupCache.invalidateLicense({
+        emails: [licenseData.owner, paymentData.customerEmail],
+        domains: [domainName],
+    });
 
     return subscriptionRecord;
 };

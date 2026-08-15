@@ -58,3 +58,6 @@ contracts/compiled-contracts/
 
 # checkoutContracts deploy scripts compile output (solc)
 checkoutContracts/.solc-out-*/
+
+# Local Seventh Sense refresh repro pack (face + script, not for the repo)
+scripts/sensecrypt-refresh-repro/

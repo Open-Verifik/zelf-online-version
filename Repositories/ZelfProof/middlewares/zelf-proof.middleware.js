@@ -2,12 +2,12 @@ const { string, validate, boolean, number, jsonObjectWithMinKeys, stringEnum, st
 const { jwtValidation } = require("./jwt-validation.middleware");
 
 /**
- *   "face_base_64": "face_base_64",
-  "liveness_tolerance": "REGULAR",
-  "os": "DESKTOP",
-  "password": "(optional) password",
-  "senseprint_base_64": "senseprint_base_64",
-  "verifiers_auth_key": "(optional) verifiers_auth_key"
+ * `/api/zelf-proof` Koa body (camelCase). Legacy `/zelf` stack.
+ *
+ * encrypt: faceBase64, metadata, identifier, livenessLevel, os (required);
+ *   publicData, password, requireLiveness, tolerance, verifierKey, livenessDetectionPriorCreation, referenceFaceBase64 (optional)
+ * decrypt: faceBase64, os, zelfProof (required); password, verifierKey, livenessLevel (optional)
+ * preview: zelfProof (required); verifierKey (optional)
  */
 
 const schemas = {
@@ -34,6 +34,14 @@ const schemas = {
 		verifierKey: string(),
 	},
 	preview: {
+		zelfProof: string().required(),
+		verifierKey: string(),
+	},
+	upgrade: {
+		faceBase64: string().required(),
+		os: stringEnum(["DESKTOP", "ANDROID", "IOS"]).required(),
+		password: string(),
+		requireLiveness: boolean(),
 		zelfProof: string().required(),
 		verifierKey: string(),
 	},
@@ -99,9 +107,24 @@ const previewValidation = async (ctx, next) => {
 	await next();
 };
 
+const upgradeValidation = async (ctx, next) => {
+	const valid = validate(schemas.upgrade, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+
+		ctx.body = { validationError: valid.error.message };
+
+		return;
+	}
+
+	await next();
+};
+
 module.exports = {
 	encryptValidation,
 	decryptValidation,
 	previewValidation,
+	upgradeValidation,
 	jwtValidation,
 };

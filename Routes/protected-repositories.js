@@ -27,6 +27,8 @@ module.exports = (server) => {
     //G
     //H
     require("../Repositories/HumanAuthn/routes/human-authn-protected.route")(server);
+    require("../Repositories/HumanAuthn/routes/human-authn-jwt.route")(server);
+    require("../Repositories/FaceCertificates/routes/face-certificates-protected.route")(server);
     //H
     //I
     require("../Repositories/IPFS/routes/ipfs.routes")(server);
@@ -66,8 +68,8 @@ module.exports = (server) => {
     require("../Repositories/TON/routes/ton-payment.route")(server);
     require("../Repositories/tron/routes/tron-scrapping.route")(server);
     require("../Repositories/Tags/routes/tags.routes")(server);
-    require("../Repositories/Tags/routes/zelf-ids.routes")(server);
     require("../Repositories/Tags/routes/my-tags.routes")(server);
+    require("../Repositories/ZelfID/routes/zelf-ids.routes")(server);
     //U
     //V
     //W
@@ -79,5 +81,6 @@ module.exports = (server) => {
     require("../Repositories/ZelfNameService/routes/zns.routes")(server);
     require("../Repositories/ZelfKeys/routes/zelf-key.route")(server);
     require("../Repositories/ZelfNameService/routes/my-zns.routes")(server);
+    require("../Repositories/ZelfProof/routes/zelf-proof-jwt.route")(server);
 };
 // end

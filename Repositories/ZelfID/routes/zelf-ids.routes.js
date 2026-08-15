@@ -1,15 +1,14 @@
 const config = require("../../../Core/config");
 
-const Controller = require("../controllers/tags.controller");
+const Controller = require("../controllers/zelf-id.controller");
 
-const Middleware = require("../middlewares/tags.middleware");
+const Middleware = require("../middlewares/zelf-id.middleware");
 
 const base = "/zelf-ids";
 
 module.exports = (server) => {
     const PATH = config.basePath(base);
 
-    // domain helper routes
     server.get(`${PATH}/domains`, Controller.getDomains);
 
     server.get(`${PATH}/domains/:domain`, Controller.getDomain);
@@ -25,8 +24,6 @@ module.exports = (server) => {
     server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseTag);
 
     server.post(`${PATH}/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery);
-
-    server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOfflineTag);
 
     server.delete(`${PATH}/delete`, Middleware.deleteTagValidation, Controller.deleteTag);
 

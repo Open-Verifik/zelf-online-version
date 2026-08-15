@@ -44,6 +44,14 @@ module.exports = (server) => {
         Controller.preview
     );
 
+    server.post(
+        `${PATH}/upgrade`,
+        OptionalJwtMiddleware.optionalJwt,
+        PaymentMiddleware.paymentRequired,
+        Middleware.upgradeValidation,
+        Controller.upgrade
+    );
+
     // Payment statistics endpoint (no payment required)
     server.get(`${PATH}/payment-stats`, PaymentMiddleware.getPaymentStats);
 };

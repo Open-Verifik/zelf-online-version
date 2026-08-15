@@ -51,4 +51,5 @@ module.exports = (server) => {
     //Z
     require("../Repositories/ZelfProof/routes/zelf-proof.route")(server);
     require("../Repositories/HumanAuthn/routes/human-authn.route")(server);
+    require("../Repositories/FaceCertificates/routes/face-certificates.route")(server);
 };

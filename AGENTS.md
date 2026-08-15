@@ -33,6 +33,10 @@ This is a Koa backend API with MongoDB, Mongoose, and JWT-protected routes.
 -   `server.js` loads unprotected routes first, then applies `koa-jwt`, then loads protected routes.
 -   Register new endpoints through `Routes/unprotected-repositories.js` or `Routes/protected-repositories.js`; adding a repository route file alone is not enough.
 -   Most backend work follows the repository pattern under `Repositories/<Feature>/`: routes, controllers, modules, middlewares, and models.
+-   `/api/zelf-ids` is owned by `Repositories/ZelfID/` and uses ZelfEncrypt v4 (`ZELF_PROOF_V4_URL`, default `https://v4.zelf.world`, path `/zelf-v4`). `/api/tags` stays on Tags + ZelfEncrypt 3.1.6 (`https://v3.zelf.world` + `/zelf`).
+-   Raw encrypt APIs: `/api/zelf-proof` → 3.1.6 on v3; `/api/human-authn` → v4 on `https://v4.zelf.world`.
+-   Upgrade 3.1.6 → v4: `POST /api/human-authn/upgrade` (402) and `POST /api/jwt/human-authn/upgrade` (dev JWT). Koa calls `https://v4.zelf.world/zelf-v4/upgrade` (SenseCrypt `/refresh-senseprint-face`).
+-   v4 Face Certificates: `https://v4.zelf.world` has Face PKI (`pki_private_key`) only. Proofs stay unsigned so Android/iOS can encrypt/decrypt offline. Do not embed `ISSUERS_PUBLIC_KEY` on ZNS or Zelf ID APKs. Koa: `/api/face-certificates` (402) and `/api/my-face-certificates` (JWT). Root cert: `GET /api/face-certificates/root-certificate` or `GET https://v4.zelf.world/root-certificate`. `https://v3.zelf.world` / 3.1.6 stays unsigned.
 -   Hardhat / Solidity for ERC-8004 lives in `contracts/` (own `package.json`). Install with `npm run contracts:install`. It is not part of the Koa API dependency tree.
 
 ## Vault Legacy demo mode
@@ -41,6 +45,13 @@ This is a Koa backend API with MongoDB, Mongoose, and JWT-protected routes.
 -   Never enable demo mode on production `v3.zelf.world`.
 -   Cron: `node Repositories/VaultLegacy/check-vaults.js` (auto-confirms succession for demo vaults after liveness expiry).
 -   Mobile contract: `Repositories/VaultLegacy/DEMO-MOBILE.md`.
+
+## Development-only JWT encrypt mirrors
+
+-   `POST /api/jwt/zelf-proof/{encrypt,encrypt-qr-code,decrypt,preview}` and `POST /api/jwt/human-authn/{encrypt,encrypt-qr-code,decrypt,preview,upgrade}` reuse the paid controllers but skip the ZNS payment gate.
+-   Registered in `Routes/protected-repositories.js`, so `koa-jwt` requires `Authorization: Bearer <token>`.
+-   Each route file returns immediately unless `config.env === "development"`. Never enable these on production `v3.zelf.world`.
+-   Focused checks: `PORT=3003 npm run test:jwt-dev` and `PORT=3003 npm run test:encrypt-compat` against a live server started with the same `PORT`.
 
 ## Documentation
 

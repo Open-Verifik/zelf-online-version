@@ -99,6 +99,12 @@ const configuration = {
         apiKey: process.env.ZELF_PROOF_API_KEY || "password",
         skipArweave: process.env.SKIP_ARWEAVE || false,
     },
+    /** ZelfEncrypt v4 stack for ZelfID / HumanAuthn (`https://v4.zelf.world` + `/zelf-v4/*`). Tags stay on zelfProof.url + `/zelf/*`. */
+    zelfProofV4: {
+        url: process.env.ZELF_PROOF_V4_URL || "https://v4.zelf.world",
+        apiKey: process.env.ZELF_PROOF_API_KEY_V4 || process.env.ZELF_PROOF_V4_API_KEY || "password",
+        pathPrefix: process.env.ZELF_PROOF_V4_PATH_PREFIX || "/zelf-v4",
+    },
     token: {
         rewardPrice: parsePositiveFloat(process.env.REWARD_PRICE, 0.05),
         whitelist: process.env.WHITELIST || "",

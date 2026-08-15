@@ -8,6 +8,8 @@ let _azureInstance = null;
 
 let _encryptionInstance = null;
 
+let _encryptionInstanceV4 = null;
+
 const getAzureInstance = () => {
 	_azureInstance = axios.create({
 		baseURL: config.azureVision.url,
@@ -47,9 +49,21 @@ const getEncryptionInstance = () => {
 	return _encryptionInstance;
 };
 
+const getEncryptionInstanceV4 = () => {
+	_encryptionInstanceV4 = axios.create({
+		timeout: 25000,
+		baseURL: config.zelfProofV4.url,
+	});
+
+	_encryptionInstanceV4.defaults.headers.common["X-API-Key"] = config.zelfProofV4.apiKey;
+
+	return _encryptionInstanceV4;
+};
+
 module.exports = {
 	getDefaultInstance,
 	getCleanInstance,
 	getAzureInstance,
 	getEncryptionInstance,
+	getEncryptionInstanceV4,
 };

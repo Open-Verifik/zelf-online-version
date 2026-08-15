@@ -7,9 +7,11 @@ const get = async (data) => {
 
 	if (cid) return await IPFS.retrieve(cid, expires);
 
-	if (zelfName) return await IPFS.filter("name", zelfName);
+	const filterOptions = data.limit ? { limit: data.limit } : {};
 
-	if (key && value) return await IPFS.filter(key, value);
+	if (zelfName) return await IPFS.filter("name", zelfName, filterOptions);
+
+	if (key && value) return await IPFS.filter(key, value, filterOptions);
 
 	const error = new Error("Conditions_not_acceptable");
 

@@ -12,6 +12,7 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
+const IpfsLookupCache = require("../../../Core/ipfs-lookup-cache");
 
 /**
  *
@@ -21,23 +22,27 @@ const { generateSuiWalletFromMnemonic } = require("../../Wallet/modules/sui");
  */
 const get = async (params = {}, authUser = {}) => {
 	if (params.email) {
-		const emailRecord = await IPFSModule.get({ key: "accountEmail", value: params.email });
+		return IpfsLookupCache.getOrLoad(IpfsLookupCache.keys.clientEmail(params.email), async () => {
+			const emailRecord = await IPFSModule.get({ key: "accountEmail", value: params.email, limit: 1 });
 
-		if (emailRecord.length) return emailRecord[0];
+			if (emailRecord.length) return emailRecord[0];
 
-		const staffRecord = await IPFSModule.get({ key: "staffEmail", value: params.email });
+			const staffRecord = await IPFSModule.get({ key: "staffEmail", value: params.email, limit: 1 });
 
-		return staffRecord.length ? staffRecord[0] : null;
+			return staffRecord.length ? staffRecord[0] : null;
+		});
 	}
 
 	if (params.phone) {
-		const phoneRecord = await IPFSModule.get({ key: "accountPhone", value: params.phone });
+		return IpfsLookupCache.getOrLoad(IpfsLookupCache.keys.clientPhone(params.phone), async () => {
+			const phoneRecord = await IPFSModule.get({ key: "accountPhone", value: params.phone, limit: 1 });
 
-		if (phoneRecord.length) return phoneRecord[0];
+			if (phoneRecord.length) return phoneRecord[0];
 
-		const staffRecord = await IPFSModule.get({ key: "staffPhone", value: params.phone });
+			const staffRecord = await IPFSModule.get({ key: "staffPhone", value: params.phone, limit: 1 });
 
-		return staffRecord.length ? staffRecord[0] : null;
+			return staffRecord.length ? staffRecord[0] : null;
+		});
 	}
 
 	// If no specific email/phone, return all client accounts with pagination
@@ -72,9 +77,13 @@ const get = async (params = {}, authUser = {}) => {
 const getByStaffEmail = async (email) => {
 	if (!email || !String(email).trim()) return null;
 
-	const records = await IPFSModule.get({ key: "staffEmail", value: String(email).trim() });
+	const trimmed = String(email).trim();
 
-	return records?.length ? records[0] : null;
+	return IpfsLookupCache.getOrLoad(IpfsLookupCache.keys.clientStaffEmail(trimmed), async () => {
+		const records = await IPFSModule.get({ key: "staffEmail", value: trimmed, limit: 1 });
+
+		return records?.length ? records[0] : null;
+	});
 };
 
 /**
@@ -207,6 +216,8 @@ const create = async (data) => {
 	delete zelfAccount.keyvalues;
 
 	zelfAccount.publicData.name = data.name;
+
+	IpfsLookupCache.invalidateClient({ email: data.email, phone: data.phone });
 
 	const eth = createEthWallet(mnemonic);
 	const btc = createBTCWallet(mnemonic);
@@ -360,6 +371,13 @@ const update = async (data, authUser) => {
 		{ pro: true }
 	);
 
+	IpfsLookupCache.invalidateClient({
+		email: updatedClientData.email,
+		previousEmail: metadata.accountEmail,
+		phone: updatedClientData.phone,
+		previousPhone: metadata.accountPhone,
+	});
+
 	// Return updated zelfAccount data
 	return {
 		zelfProof: accountJSON.data.zelfProof,
@@ -393,6 +411,11 @@ const destroy = async (data, authUser) => {
 
 	// now we can delete the zelfAccount
 	const deletedFiles = await IPFSModule.unPinFiles([zelfAccount.id]);
+
+	IpfsLookupCache.invalidateClient({
+		email: authUser.email,
+		phone: zelfAccount.publicData?.accountPhone,
+	});
 
 	return {
 		message: "Client deleted successfully",
@@ -581,6 +604,11 @@ const updatePassword = async (data, authUser) => {
 		},
 		{ pro: true }
 	);
+
+	IpfsLookupCache.invalidateClient({
+		email: authUser.email,
+		phone: metadata.accountPhone,
+	});
 
 	// Return updated zelfAccount data
 	return {

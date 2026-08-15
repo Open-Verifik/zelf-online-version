@@ -1,6 +1,7 @@
 // Zelf IDs API Integration Tests - Testing Real Running Server
-// Tests the /api/zelf-ids endpoints (rebranded /api/tags)
+// Tests /api/zelf-ids owned by Repositories/ZelfID (ZelfEncrypt v4 / /zelf-v4)
 // Complete flow: Session -> Search -> Preview -> Lease -> Decrypt -> Delete
+// Offline lease stays on /api/tags/lease-offline (Tags / ZelfEncrypt 3.1.6)
 const request = require("supertest");
 const fs = require("fs");
 const path = require("path");
@@ -194,6 +195,8 @@ describe("Zelf IDs API Integration Tests", () => {
             expect(publicData).toHaveProperty("ethAddress");
             expect(publicData).toHaveProperty("btcAddress");
             expect(publicData).toHaveProperty("solanaAddress");
+            expect(publicData.origin || "online").toBe("online");
+            expect(publicData.zelfEncryptVersion).toBe("4");
 
             console.log(`✅ Step 1: Leased ${tagName}.${TEST_DOMAIN}`);
 
@@ -249,66 +252,16 @@ describe("Zelf IDs API Integration Tests", () => {
         });
     });
 
-    // ─── 5. Lease Offline ───────────────────────────────────────────────
-    describe("5. Lease Offline", () => {
-        it("POST /zelf-ids/lease-offline — should return 409 when required fields are missing", async () => {
+    // ─── 5. Offline lease is not on ZelfID ──────────────────────────────
+    describe("5. Lease Offline not on /api/zelf-ids", () => {
+        it("POST /zelf-ids/lease-offline — should not exist (legacy lives on /api/tags)", async () => {
             const response = await request(API_BASE_URL)
                 .post(`${ZELF_IDS_PATH}/lease-offline`)
                 .set("Origin", "https://test.example.com")
                 .set("Authorization", `Bearer ${authToken}`)
                 .send({});
 
-            expect(response.status).toBe(409);
-            expect(response.body).toHaveProperty("validationError");
-        });
-
-        it("POST /zelf-ids/lease-offline — should accept valid input with zelfProof", async () => {
-            jest.setTimeout(60000);
-            // First create a zelfProof via a regular lease
-            const tempTagName = `ofpr${Math.floor(Math.random() * 100000).toString().padStart(5, "0")}`;
-
-            const leaseRes = await request(API_BASE_URL)
-                .post(`${ZELF_IDS_PATH}/lease`)
-                .set("Origin", "https://test.example.com")
-                .set("Authorization", `Bearer ${authToken}`)
-                .send({
-                    tagName: tempTagName,
-                    domain: TEST_DOMAIN,
-                    faceBase64,
-                    password: TEST_PASSWORD,
-                    type: "create",
-                    os: "DESKTOP",
-                    removePGP: true,
-                });
-
-            expect(leaseRes.status).toBe(200);
-
-            // Extract zelfProof from tagObject
-            const zelfProof = leaseRes.body.data.tagObject?.zelfProof;
-            expect(zelfProof).toBeDefined();
-
-            // Now use it for an offline lease with a different tag name
-            const offlineTagName = `offl${Math.floor(Math.random() * 100000).toString().padStart(5, "0")}`;
-
-            const offlineRes = await request(API_BASE_URL)
-                .post(`${ZELF_IDS_PATH}/lease-offline`)
-                .set("Origin", "https://test.example.com")
-                .set("Authorization", `Bearer ${authToken}`)
-                .send({
-                    tagName: offlineTagName,
-                    domain: TEST_DOMAIN,
-                    zelfProof,
-                });
-
-            // Offline lease may return 200 or 500 depending on IPFS pinning of the proof
-            expect([200, 500]).toContain(offlineRes.status);
-
-            if (offlineRes.status === 200) {
-                expect(offlineRes.body).toHaveProperty("data");
-                console.log(`✅ Offline lease created: ${offlineTagName}.${TEST_DOMAIN}`);
-            } else {
-                console.log(`⚠️  Offline lease returned 500 (IPFS processing issue — expected in some environments)`);
-            }
+            expect(response.status).toBe(404);
         });
     });
 
@@ -324,6 +277,19 @@ describe("Zelf IDs API Integration Tests", () => {
                     faceBase64,
                     password: TEST_PASSWORD,
                     type: "create",
+                    os: "DESKTOP",
+                });
+
+            expect(response.status).toBe(409);
+            expect(response.body).toHaveProperty("validationError");
+        });
+
+        it("POST /zelf-ids/preview-zelfproof — should return 409 when zelfProof is missing", async () => {
+            const response = await request(API_BASE_URL)
+                .post(`${ZELF_IDS_PATH}/preview-zelfproof`)
+                .set("Origin", "https://test.example.com")
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
                     os: "DESKTOP",
                 });
 
@@ -376,9 +342,9 @@ describe("Zelf IDs API Integration Tests", () => {
         });
     });
 
-    // ─── 7. Parity: /zelf-ids vs /tags return same results ──────────────
-    describe("7. Parity with /tags", () => {
-        it("search should return identical results on both paths", async () => {
+    // ─── 7. Shared index: /zelf-ids vs /tags (not crypto-identical) ─────
+    describe("7. Shared lookup with /tags", () => {
+        it("search should return the same availability and name on both paths", async () => {
             const query = { tagName: "migueltrevino", domain: "zelf", os: "DESKTOP" };
 
             const [zelfIdsRes, tagsRes] = await Promise.all([
@@ -399,7 +365,7 @@ describe("Zelf IDs API Integration Tests", () => {
             expect(zelfIdsRes.body.data.tagName).toBe(tagsRes.body.data.tagName);
         });
 
-        it("preview should return identical results on both paths", async () => {
+        it("preview availability should match /tags for the same name", async () => {
             const query = { tagName: "migueltrevino", domain: "zelf", os: "DESKTOP" };
 
             const [zelfIdsRes, tagsRes] = await Promise.all([
