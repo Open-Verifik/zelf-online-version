@@ -243,6 +243,28 @@ const configuration = {
         timeoutMs: Number(process.env.APTOS_TIMEOUT_MS) || 30000,
         maxGasAmount: Number(process.env.APTOS_MAX_GAS_AMOUNT) || 200000,
     },
+    canton: {
+        network: process.env.CANTON_NETWORK || "devnet",
+        ledgerApiUrl: process.env.CANTON_LEDGER_API_URL || "",
+        validatorApiUrl: process.env.CANTON_VALIDATOR_API_URL || "",
+        scanApiUrl: process.env.CANTON_SCAN_API_URL || "",
+        registryApiUrl: process.env.CANTON_REGISTRY_API_URL || "",
+        instrumentId: process.env.CANTON_INSTRUMENT_ID || "Amulet",
+        authMethod: process.env.CANTON_AUTH_METHOD || "client_credentials",
+        authConfigUrl: process.env.CANTON_AUTH_CONFIG_URL || "",
+        authIssuer: process.env.CANTON_AUTH_ISSUER || "",
+        authClientId: process.env.CANTON_AUTH_CLIENT_ID || "",
+        authClientSecret: process.env.CANTON_AUTH_CLIENT_SECRET || "",
+        authAudience: process.env.CANTON_AUTH_AUDIENCE || "",
+        authScope: process.env.CANTON_AUTH_SCOPE || "",
+        staticToken: process.env.CANTON_STATIC_TOKEN || "",
+        allowedParties: String(process.env.CANTON_ALLOWED_PARTIES || "")
+            .split(",")
+            .map((partyId) => partyId.trim())
+            .filter(Boolean),
+        allowUnboundParties: process.env.CANTON_ALLOW_UNBOUND_PARTIES === "true",
+        timeoutMs: Number(process.env.CANTON_TIMEOUT_MS) || 30000,
+    },
     oklink: {
         apiKey: process.env.OKLINK_API_KEY,
     },
