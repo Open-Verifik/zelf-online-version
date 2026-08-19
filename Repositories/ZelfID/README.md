@@ -30,7 +30,7 @@ Registered in `Routes/protected-repositories.js`.
 | POST | `/purchase-rewards` | — |
 | POST | `/referral-rewards` | — |
 
-`os`: `DESKTOP` | `ANDROID` | `IOS`. New leases stamp `origin: "online"` and `zelfEncryptVersion: "4"`.
+`os`: `DESKTOP` | `ANDROID` | `IOS`. New leases stamp `origin: "online"` and short `v: 4`.
 
 ## Example — POST `/api/zelf-ids/lease`
 

@@ -4,8 +4,6 @@ const { decrypt } = require("../../ZelfProof/modules/zelf-proof.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
 const TagsRegistrationModule = require("../../Tags/modules/tags-registration.module");
 
-const ZELF_ENCRYPT_VERSION = "4";
-
 const withV4 = (data) => ({ ...data, stack: "v4" });
 
 /**
@@ -65,7 +63,7 @@ const leaseRecovery = async (payload, authUser) => {
             [tagKey]: tagName,
             domain: domain,
             origin: "online",
-            zelfEncryptVersion: ZELF_ENCRYPT_VERSION,
+            v: "4",
         },
         metadata: {
             mnemonic,
@@ -82,7 +80,7 @@ const leaseRecovery = async (payload, authUser) => {
         ...dataToEncrypt.publicData,
         duration,
         origin: "online",
-        zelfEncryptVersion: ZELF_ENCRYPT_VERSION,
+        v: "4",
     };
 
     const skipZelfProof = decryptedZelfProof.publicData[tagKey] === tagName;

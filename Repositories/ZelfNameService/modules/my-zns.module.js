@@ -10,7 +10,8 @@ const IPFSModule = require("../../IPFS/modules/ipfs.module");
 const ZNSPartsModule = require("./zns-parts.module");
 const { addReferralReward, addPurchaseReward, getPurchaseReward } = require("./zns-token.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
-const { buildAddressKeyvalues, mergeAddressKeyvaluesIntoPublicData } = require("../../Tags/modules/tags-addresses.module");
+const { buildSearchablePinPages, mergeAddressKeyvaluesIntoPublicData, resolveEncryptVersion, stampExtraParamsVersion } = require("../../Tags/modules/tags-addresses.module");
+const { unpinContinuationSiblings } = require("../../Tags/modules/tags-ipfs.module");
 
 const renewMyZelfName = async (params, authUser) => {
 	if (!authUser || !authUser.zelfName) {
@@ -312,33 +313,55 @@ const _updateOldZelfNameObject = async (zelfNameObject) => {
 		zelfNameObject.publicData.referralSolanaAddress = zelfNameObject.publicData.payment?.referralSolanaAddress;
 	}
 
-	const payload = {
-		base64: await ZNSPartsModule.urlToBase64(zelfNameObject.url),
-		name: zelfNameObject.publicData.zelfName,
-		pinIt: true,
-		metadata: {
+	const canonicalName = zelfNameObject.publicData.zelfName;
+	const pages = buildSearchablePinPages({
+		reserved: {
 			zelfProof: zelfNameObject.publicData.zelfProof,
-			zelfName: zelfNameObject.publicData.zelfName,
+			zelfName: canonicalName,
 			hasPassword: zelfNameObject.publicData.hasPassword,
-			extraParams: JSON.stringify({
-				origin: zelfNameObject.publicData.origin,
-				suiAddress: zelfNameObject.publicData.suiAddress,
-				price: calculation.price,
-				duration: type === "hold" ? duration : undefined,
-				registeredAt: moment(registeredAt).isAfter(moment()) ? moment().format("YYYY-MM-DD HH:mm:ss") : registeredAt,
-				expiresAt,
-				referralZelfName: zelfNameObject.publicData.referralZelfName,
-				referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
-			}),
-			...buildAddressKeyvalues(zelfNameObject.publicData),
+			extraParams: JSON.stringify(
+				stampExtraParamsVersion(
+					{
+						origin: zelfNameObject.publicData.origin,
+						price: calculation.price,
+						duration: type === "hold" ? duration : undefined,
+						registeredAt: moment(registeredAt).isAfter(moment()) ? moment().format("YYYY-MM-DD HH:mm:ss") : registeredAt,
+						expiresAt,
+						referralZelfName: zelfNameObject.publicData.referralZelfName,
+						referralSolanaAddress: zelfNameObject.publicData.referralSolanaAddress,
+					},
+					resolveEncryptVersion(zelfNameObject.publicData)
+				)
+			),
 			type,
 		},
+		addresses: zelfNameObject.publicData,
+		tagName: canonicalName,
+	});
+
+	const payload = {
+		base64: await ZNSPartsModule.urlToBase64(zelfNameObject.url),
+		name: pages.primary.name,
+		pinIt: true,
+		metadata: pages.primary.keyvalues,
 	};
 
-	//remove the previous ipfs record
-	const deletedRecord = await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash || zelfNameObject.IpfsHash]);
+	await unpinContinuationSiblings(canonicalName);
+	await IPFSModule.unPinFiles([zelfNameObject.ipfs_pin_hash || zelfNameObject.IpfsHash]);
 
 	const ipfs = await IPFSModule.insert(payload, { pro: true });
+
+	for (const page of pages.continuations) {
+		await IPFSModule.insert(
+			{
+				base64: payload.base64,
+				name: page.name,
+				pinIt: true,
+				metadata: page.keyvalues,
+			},
+			{ pro: true }
+		);
+	}
 
 	const formattedIPFS = await ZNSPartsModule.formatIPFSRecord(ipfs, true);
 

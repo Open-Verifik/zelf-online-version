@@ -3,7 +3,7 @@ const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const moment = require("moment");
 const { getDomainConfig } = require("../config/supported-domains");
-const { buildAddressKeyvalues, PINATA_KEYVALUE_MAX_LENGTH } = require("./tags-addresses.module");
+const { PINATA_KEYVALUE_MAX_LENGTH, resolveEncryptVersion, stampExtraParamsVersion } = require("./tags-addresses.module");
 
 /**
  * Cleans extraParams only when needed to stay under Pinata's 250-char limit.
@@ -57,17 +57,18 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, securi
     const metadata = {
         [storageKey]: tagName,
         domain,
-        extraParams: {
-            origin: tagObject.origin || "online",
-            ...(tagObject.zelfEncryptVersion ? { zelfEncryptVersion: tagObject.zelfEncryptVersion } : {}),
-            price: tagObject.price,
-            duration: 1,
-            registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-            expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
-            type: "mainnet",
-            hasPassword: tagObject.hasPassword,
-        },
-        ...buildAddressKeyvalues(tagObject),
+        extraParams: stampExtraParamsVersion(
+            {
+                origin: tagObject.origin || "online",
+                price: tagObject.price,
+                duration: 1,
+                registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+                expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
+                type: "mainnet",
+                hasPassword: tagObject.hasPassword,
+            },
+            resolveEncryptVersion(tagObject)
+        ),
     };
 
     if (securityType && tagObject.hasPassword == "true") {
@@ -98,17 +99,16 @@ const confirmFreeTag = async (tagObject, referralTagObject, domainConfig, securi
         metadata.walrus = tagObject.walrus.blobId;
     }
 
-    tagObject.ipfs = await TagsIPFSModule.insert(
+    tagObject.ipfs = await TagsIPFSModule.insertSearchablePins(
         {
             base64: tagObject.zelfProofQRCode,
             name: tagObject[storageKey],
-            metadata,
+            reserved: metadata,
+            addresses: tagObject,
             pinIt: true,
         },
         { ...authUser, pro: true }
     );
-
-    tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
 
     if (domainConfig.isArweaveEnabled()) {
         tagObject.arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
@@ -144,15 +144,16 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
     const metadata = {
         [tagKey]: holdName,
         domain,
-        extraParams: {
-            hasPassword: tagObject.hasPassword,
-            type: "hold",
-            origin: tagObject.origin || "online",
-            ...(tagObject.zelfEncryptVersion ? { zelfEncryptVersion: tagObject.zelfEncryptVersion } : {}),
-            registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-            expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
-        },
-        ...buildAddressKeyvalues(tagObject),
+        extraParams: stampExtraParamsVersion(
+            {
+                hasPassword: tagObject.hasPassword,
+                type: "hold",
+                origin: tagObject.origin || "online",
+                registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+                expiresAt: moment().add(30, "day").format("YYYY-MM-DD HH:mm:ss"),
+            },
+            resolveEncryptVersion(tagObject)
+        ),
     };
 
     if (securityType && tagObject.hasPassword == "true") {
@@ -172,17 +173,16 @@ const saveHoldTagInIPFS = async (tagObject, referralTagObject, domainConfig, sec
 
     metadata.extraParams = JSON.stringify(cleanExtraParamsForPinata(metadata.extraParams));
 
-    tagObject.ipfs = await TagsIPFSModule.insert(
+    tagObject.ipfs = await TagsIPFSModule.insertSearchablePins(
         {
             base64: tagObject.zelfProofQRCode,
             name: holdName,
-            metadata,
+            reserved: metadata,
+            addresses: tagObject,
             pinIt: true,
         },
         { ...authUser, pro: true }
     );
-
-    tagObject.ipfs = TagsIPFSModule.formatRecord(tagObject.ipfs);
 };
 
 module.exports = {

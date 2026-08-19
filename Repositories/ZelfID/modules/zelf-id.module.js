@@ -27,11 +27,8 @@ const { extractZelfProofFromQR } = require("../../Tags/modules/qr-zelfproof-extr
 const SessionModule = require("../../Session/modules/session.module");
 const QRZelfProofExtractor = require("../../Tags/modules/qr-zelfproof-extractor.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
-const { unPinFiles } = require("../../Tags/modules/tags-ipfs.module");
+const { unPinFiles, unpinContinuationSiblings } = require("../../Tags/modules/tags-ipfs.module");
 const jwt = require("jsonwebtoken");
-
-/** Public metadata stamp for proofs created through `/api/zelf-ids`. */
-const ZELF_ENCRYPT_VERSION = "4";
 
 /**
  * Force the shared ZelfProof client onto `/zelf-v4`.
@@ -41,14 +38,14 @@ const ZELF_ENCRYPT_VERSION = "4";
 const withV4 = (data) => ({ ...data, stack: "v4" });
 
 /**
- * Add `origin: "online"` and `zelfEncryptVersion: "4"` to encrypt cleartext.
+ * Add `origin: "online"` and short `v: 4` to encrypt cleartext.
  * @param {Object} publicData
  * @returns {Object}
  */
 const stampV4PublicData = (publicData) => ({
     ...publicData,
     origin: "online",
-    zelfEncryptVersion: ZELF_ENCRYPT_VERSION,
+    v: "4",
 });
 
 /**
@@ -131,7 +128,7 @@ const leaseTag = async (params, authUser) => {
     const tagObject = {
         ...dataToEncrypt.publicData,
         origin: "online",
-        zelfEncryptVersion: ZELF_ENCRYPT_VERSION,
+        v: "4",
     };
 
     ZelfIdPartsModule.assignProperties(
@@ -200,7 +197,7 @@ const leaseTag = async (params, authUser) => {
  * @returns {Promise<Object>} search result (`available`, `tagName`, `tagObject?`, `price?`)
  */
 const searchTag = async (params, authUser) => {
-    const { tagName, domain, key, value, environment, type, domainConfig, duration } = params;
+    const { tagName, domain, key, value, environment, type, domainConfig, duration, includeAllAddressPages } = params;
 
     try {
         const _domainConfig = domainConfig || getDomainConfig(domain);
@@ -215,6 +212,7 @@ const searchTag = async (params, authUser) => {
                 type: type || "both",
                 domainConfig: _domainConfig,
                 duration: duration || "1",
+                includeAllAddressPages,
             },
             authUser
         );
@@ -247,7 +245,7 @@ const decryptTag = async (params, authUser) => {
 
     const domainConfig = getDomainConfig(domain);
 
-    const searchResult = await searchTag({ tagName, domain, domainConfig, environment: "all" }, authUser);
+    const searchResult = await searchTag({ tagName, domain, domainConfig, environment: "all", includeAllAddressPages: true }, authUser);
 
     if (searchResult.available) return searchResult;
 
@@ -289,7 +287,7 @@ const decryptTag = async (params, authUser) => {
         password,
     });
 
-    if (tagsToAdd.length) {
+    if (tagsToAdd.length || tagObject.publicData?._needsPinSplit) {
         const { ipfs, arweave: updatedArweave } = await updateTags(tagObject, tagsToAdd);
 
         tagObject.updatedIpfs = ipfs;
@@ -549,6 +547,12 @@ const deleteTag = async (params, authUser) => {
 
     const searchResult = await searchTag({ tagName, domain }, authUser);
 
+    if (!searchResult?.tagObject?.zelfProof) {
+        const error = new Error("404:tag_not_found");
+        error.status = 404;
+        throw error;
+    }
+
     const zelfProof = searchResult.tagObject.zelfProof;
 
     const ipfsID = searchResult.tagObject.id;
@@ -570,6 +574,9 @@ const deleteTag = async (params, authUser) => {
     const deletedFiles = [];
 
     if (ipfsID) {
+        const publicData = searchResult.tagObject.publicData || {};
+        const canonicalName = publicData.tagName || publicData.zelfName || `${tagName}.${domain}`;
+        deletedFiles.push(await unpinContinuationSiblings(canonicalName));
         deletedFiles.push(await unPinFiles([ipfsID]));
     }
 

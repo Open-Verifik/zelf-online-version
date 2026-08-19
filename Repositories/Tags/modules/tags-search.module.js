@@ -120,7 +120,7 @@ const searchTag = async (params, authUser) => {
  * @returns {Array} - IPFS search results
  */
 const searchIPFS = async (params, authUser) => {
-    const { tagName, key, value, type, domain } = params;
+    const { tagName, key, value, type, domain, includeAllAddressPages } = params;
 
     const domainConfig = params.domainConfig || getDomainConfiguration(domain);
 
@@ -135,14 +135,14 @@ const searchIPFS = async (params, authUser) => {
     try {
         switch (type) {
             case "hold":
-                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
+                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig, includeAllAddressPages })));
             case "mainnet":
-                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
+                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig, includeAllAddressPages })));
             default:
-                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig })));
+                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig, includeAllAddressPages })));
 
                 // now also query adding .hold to the tagName
-                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: `${_tagName}.hold`, key, value, domainConfig })));
+                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: `${_tagName}.hold`, key, value, domainConfig, includeAllAddressPages })));
         }
 
         return ipfsRecords;

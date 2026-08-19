@@ -23,7 +23,7 @@ const { extractZelfProofFromQR } = require("./qr-zelfproof-extractor.module");
 const SessionModule = require("../../Session/modules/session.module");
 const QRZelfProofExtractor = require("./qr-zelfproof-extractor.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
-const { unPinFiles } = require("./tags-ipfs.module");
+const { unPinFiles, unpinContinuationSiblings } = require("./tags-ipfs.module");
 const jwt = require("jsonwebtoken");
 
 /**
@@ -165,7 +165,7 @@ const leaseTag = async (params, authUser) => {
  * @param {Object} authUser
  */
 const searchTag = async (params, authUser) => {
-    const { tagName, domain, key, value, environment, type, domainConfig, duration } = params;
+    const { tagName, domain, key, value, environment, type, domainConfig, duration, includeAllAddressPages } = params;
 
     try {
         const _domainConfig = domainConfig || getDomainConfig(domain);
@@ -180,6 +180,7 @@ const searchTag = async (params, authUser) => {
                 type: type || "both",
                 domainConfig: _domainConfig,
                 duration: duration || "1",
+                includeAllAddressPages,
             },
             authUser
         );
@@ -209,7 +210,7 @@ const decryptTag = async (params, authUser) => {
 
     const domainConfig = getDomainConfig(domain);
 
-    const searchResult = await searchTag({ tagName, domain, domainConfig, environment: "all" }, authUser);
+    const searchResult = await searchTag({ tagName, domain, domainConfig, environment: "all", includeAllAddressPages: true }, authUser);
 
     if (searchResult.available) return searchResult;
 
@@ -252,7 +253,7 @@ const decryptTag = async (params, authUser) => {
         password,
     });
 
-    if (tagsToAdd.length) {
+    if (tagsToAdd.length || tagObject.publicData?._needsPinSplit) {
         const { ipfs, arweave } = await updateTags(tagObject, tagsToAdd);
 
         tagObject.updatedIpfs = ipfs;
@@ -556,6 +557,9 @@ const deleteTag = async (params, authUser) => {
     const deletedFiles = [];
 
     if (ipfsID) {
+        const publicData = searchResult.tagObject.publicData || {};
+        const canonicalName = publicData.tagName || publicData.zelfName || `${tagName}.${domain}`;
+        deletedFiles.push(await unpinContinuationSiblings(canonicalName));
         deletedFiles.push(await unPinFiles([ipfsID]));
     }
 

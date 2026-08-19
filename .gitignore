@@ -61,3 +61,6 @@ checkoutContracts/.solc-out-*/
 
 # Local Seventh Sense refresh repro pack (face + script, not for the repo)
 scripts/sensecrypt-refresh-repro/
+
+# Offline-scan QR samples (generated locally, not for the repo)
+scripts/qr-scan-samples/

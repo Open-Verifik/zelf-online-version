@@ -38,9 +38,23 @@ describe("Human Authn onboarding progress API", () => {
 			expect(response.body.data).toHaveProperty("playCreate");
 			expect(response.body.data).toHaveProperty("playPreview");
 			expect(response.body.data).toHaveProperty("playDecrypt");
-			expect(response.body.data.playCreate.complete).toBe(false);
-			expect(response.body.data.playPreview.complete).toBe(false);
-			expect(response.body.data.playDecrypt.complete).toBe(false);
+			expect(typeof response.body.data.playCreate.complete).toBe("boolean");
+			expect(typeof response.body.data.playPreview.complete).toBe("boolean");
+			expect(typeof response.body.data.playDecrypt.complete).toBe("boolean");
+		});
+
+		it("session JWT without email resolves the default staff license domain", async () => {
+			const token = await createSessionToken();
+
+			const response = await request(API_BASE_URL)
+				.get("/api/human-authn/onboarding-progress")
+				.set("Origin", "https://test.example.com")
+				.set("Authorization", `Bearer ${token}`)
+				.expect(200);
+
+			expect(typeof response.body.data.domainName).toBe("string");
+			expect(response.body.data.domainName.length).toBeGreaterThan(0);
+			expect(response.body.data.domainName).toBe("zelf");
 		});
 	});
 });

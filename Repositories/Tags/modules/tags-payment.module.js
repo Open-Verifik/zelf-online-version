@@ -15,7 +15,7 @@ const config = require("../../../Core/config");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const { generateQRFromZelfProof, QRZelfProofExtractor } = require("./qr-zelfproof-extractor.module");
-const { buildAddressKeyvalues } = require("./tags-addresses.module");
+const { resolveEncryptVersion, stampExtraParamsVersion } = require("./tags-addresses.module");
 
 const envTruthy = (v) => {
     if (v == null || v === "") return false;
@@ -1030,19 +1030,21 @@ const buildMetadata = (params, tagObject, domainConfig) => {
     const metadata = {
         [storageKey]: tagObject.fullTagName,
         domain,
-        extraParams: {
-            origin: tagObject.publicData.origin || "online",
-            price,
-            duration: tagObject.publicData.duration ? `${Number(tagObject.publicData.duration) + Number(duration)}` : duration,
-            registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-            renewedAt: tagObject.publicData.type === "mainnet" ? moment().format("YYYY-MM-DD HH:mm:ss") : undefined,
-            expiresAt: moment(tagObject.publicData.expiresAt).add(duration, "year").format("YYYY-MM-DD HH:mm:ss"),
-            type: "mainnet",
-            hasPassword: tagObject.publicData.hasPassword,
-            eventID: params.eventID || undefined,
-            eventPrice: params.eventPrice || undefined,
-        },
-        ...buildAddressKeyvalues(tagObject.publicData),
+        extraParams: stampExtraParamsVersion(
+            {
+                origin: tagObject.publicData.origin || "online",
+                price,
+                duration: tagObject.publicData.duration ? `${Number(tagObject.publicData.duration) + Number(duration)}` : duration,
+                registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+                renewedAt: tagObject.publicData.type === "mainnet" ? moment().format("YYYY-MM-DD HH:mm:ss") : undefined,
+                expiresAt: moment(tagObject.publicData.expiresAt).add(duration, "year").format("YYYY-MM-DD HH:mm:ss"),
+                type: "mainnet",
+                hasPassword: tagObject.publicData.hasPassword,
+                eventID: params.eventID || undefined,
+                eventPrice: params.eventPrice || undefined,
+            },
+            resolveEncryptVersion(tagObject.publicData)
+        ),
     };
 
     if (tagObject.publicData.referralTagName) {
@@ -1123,19 +1125,19 @@ const storeInWalrus = async (tagObject, domainConfig, metadata) => {
 };
 
 const storeInIPFS = async (tagObject, domainConfig, metadata) => {
-    const deletedIpfsRecord = await TagsIpfsModule.deleteFiles([tagObject.ipfsId || tagObject.id]);
+    await TagsIpfsModule.unpinContinuationSiblings(tagObject.fullTagName);
+    await TagsIpfsModule.deleteFiles([tagObject.ipfsId || tagObject.id]);
 
-    tagObject.ipfs = await TagsIpfsModule.insert(
+    tagObject.ipfs = await TagsIpfsModule.insertSearchablePins(
         {
             base64: tagObject.zelfProofQRCode,
             name: tagObject.fullTagName,
-            metadata,
+            reserved: metadata,
+            addresses: tagObject.publicData,
             pinIt: true,
         },
         { pro: true },
     );
-
-    tagObject.ipfs = TagsIpfsModule.formatRecord(tagObject.ipfs);
 
     const ipfsRec = tagObject.ipfs;
     if (ipfsRec?.id != null && ipfsRec.id !== "") {

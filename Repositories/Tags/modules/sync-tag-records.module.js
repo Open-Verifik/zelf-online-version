@@ -10,25 +10,9 @@ const TagsArweaveModule = require("./tags-arweave.module");
 const TagsIPFSModule = require("./tags-ipfs.module");
 const moment = require("moment");
 const { getDomainConfig } = require("../config/supported-domains");
-const { buildAddressKeyvalues } = require("./tags-addresses.module");
+const { SEARCHABLE_ADDRESS_FIELDS, resolveEncryptVersion, stampExtraParamsVersion } = require("./tags-addresses.module");
 
-/**
- * Address fields are packed into chunked keyvalues by `buildAddressKeyvalues`,
- * not stored as standalone Pinata keyvalues. Anything in this set must NOT be
- * promoted to a top-level metadata key by the `tagsToAdd` loop below.
- */
-const ADDRESS_FIELDS_HANDLED_BY_BUNDLE = new Set([
-    "ethAddress",
-    "solanaAddress",
-    "btcAddress",
-    "arweaveAddress",
-    "suiAddress",
-    "xlmAddress",
-    "dotAddress",
-    "ksmAddress",
-    "tonAddress",
-    "aptosAddress",
-]);
+const ADDRESS_FIELDS_HANDLED_BY_PAGES = new Set(SEARCHABLE_ADDRESS_FIELDS);
 
 /**
  * Sync Tag Records Module for Tags
@@ -116,7 +100,8 @@ const initTagUpdates = async (tagObject, secretKeys) => {
 };
 
 const updateTags = async (tagObject, tagsToAdd) => {
-    if (!tagsToAdd.length || !tagObject.zelfProofQRCode) return {};
+    const needsPinSplit = Boolean(tagObject.publicData?._needsPinSplit);
+    if ((!tagsToAdd.length && !needsPinSplit) || !tagObject.zelfProofQRCode) return {};
 
     const domainConfig = getDomainConfig(tagObject.publicData.domain || "zelf");
 
@@ -128,19 +113,23 @@ const updateTags = async (tagObject, tagsToAdd) => {
 
     if (!tagObject.publicData.expiresAt) tagObject.publicData.expiresAt = moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss");
 
-    const extraParams = {
-        hasPassword: tagObject.publicData.hasPassword,
-        origin: tagObject.publicData.origin || "online",
-        registeredAt: moment(tagObject.publicData.registeredAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss") || undefined,
-        expiresAt: moment(tagObject.publicData.expiresAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss") || undefined,
-        price: tagObject.publicData.price || undefined,
-        duration: tagObject.publicData.duration || undefined,
-        referralTagName: tagObject.publicData.referralTagName || undefined,
-        referralSolanaAddress: tagObject.publicData.referralSolanaAddress || undefined,
-    };
+    const extraParams = stampExtraParamsVersion(
+        {
+            hasPassword: tagObject.publicData.hasPassword,
+            origin: tagObject.publicData.origin || "online",
+            registeredAt: moment(tagObject.publicData.registeredAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss") || undefined,
+            expiresAt: moment(tagObject.publicData.expiresAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss") || undefined,
+            price: tagObject.publicData.price || undefined,
+            duration: tagObject.publicData.duration || undefined,
+            referralTagName: tagObject.publicData.referralTagName || undefined,
+            referralSolanaAddress: tagObject.publicData.referralSolanaAddress || undefined,
+        },
+        resolveEncryptVersion(tagObject.publicData)
+    );
 
     const metadata = {
         [tagKey]: tagName,
+        domain: tagObject.publicData.domain || "zelf",
         extraParams,
         type: tagObject.publicData.type || (tagName.includes("hold") ? "hold" : "mainnet"),
     };
@@ -148,24 +137,19 @@ const updateTags = async (tagObject, tagsToAdd) => {
     for (let index = 0; index < tagsToAdd.length; index++) {
         const tag = tagsToAdd[index];
 
-        // Address fields are folded into the chunked address keyvalues below,
-        // so they must not be added as top-level metadata keys.
-        if (ADDRESS_FIELDS_HANDLED_BY_BUNDLE.has(tag.name)) continue;
+        if (ADDRESS_FIELDS_HANDLED_BY_PAGES.has(tag.name)) continue;
 
         metadata[tag.name] = tag.value;
     }
-
-    Object.assign(metadata, buildAddressKeyvalues(tagObject.publicData));
 
     metadata.extraParams = JSON.stringify(metadata.extraParams);
 
     let arweave = {};
 
-    // unpin the current IPFS hash
+    await TagsIPFSModule.unpinContinuationSiblings(tagName);
     if (tagObject.id) await TagsIPFSModule.unPinFiles([tagObject.ipfsId || tagObject.id]);
 
     if (metadata.type === "mainnet") {
-        // save in Arweave as well
         arweave = await TagsArweaveModule.tagRegistration(zelfProofQRCode, {
             hasPassword: metadata.hasPassword,
             zelfProof: tagObject.publicData?.zelfProof,
@@ -174,11 +158,12 @@ const updateTags = async (tagObject, tagsToAdd) => {
         });
     }
 
-    const ipfs = await TagsIPFSModule.tagRegistration(
+    const ipfs = await TagsIPFSModule.insertSearchablePins(
         {
             base64: zelfProofQRCode,
             name: tagName,
-            metadata,
+            reserved: metadata,
+            addresses: tagObject.publicData,
             pinIt: true,
         },
         { pro: true },

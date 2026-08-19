@@ -61,6 +61,10 @@ describe("Lease Tags API Integration Tests - Real Server", () => {
 			expect(response.body.data).toHaveProperty("zelfProof");
 			expect(response.body.data).toHaveProperty("zelfProofQRCode");
 			expect(response.body.data).toHaveProperty("ipfs");
+			const publicData = response.body.data.tagObject?.publicData || response.body.data.ipfs?.[0]?.publicData || {};
+			if (publicData && Object.keys(publicData).length) {
+				expect(Number(publicData.v)).toBe(3);
+			}
 		});
 
 		it("should return validation error when tagName is missing", async () => {

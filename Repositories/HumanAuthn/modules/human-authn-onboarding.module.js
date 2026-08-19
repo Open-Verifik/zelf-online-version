@@ -3,24 +3,43 @@ const { getMyLicense } = require("../../License/modules/license.module");
 
 const STEP_FIELDS = ["playCreate", "playPreview", "playDecrypt"];
 
+/** Session JWTs from POST /api/sessions have no email; Play Area still needs a license domain. */
+const DEFAULT_ONBOARDING_EMAIL = "miguel@zelf.world";
+const DEFAULT_ONBOARDING_DOMAIN = "zelf";
+
 const emptyProgress = () => ({
 	playCreate: { complete: false },
 	playPreview: { complete: false },
 	playDecrypt: { complete: false },
 });
 
-const getStaffEmail = (authUser) => authUser?.email || authUser?.staffEmail || null;
+const getStaffEmail = (authUser) => authUser?.email || authUser?.staffEmail || DEFAULT_ONBOARDING_EMAIL;
+
+const withOnboardingEmail = (authUser) => ({
+	...authUser,
+	email: authUser?.email || authUser?.staffEmail || DEFAULT_ONBOARDING_EMAIL,
+	ownerEmail: authUser?.ownerEmail,
+	accountType: authUser?.accountType,
+});
 
 const resolveDomainName = async (authUser) => {
 	if (!authUser) return null;
 
 	try {
-		const { myLicense } = await getMyLicense(authUser, true);
-		return myLicense?.domainConfig?.name || null;
+		const { myLicense } = await getMyLicense(withOnboardingEmail(authUser), true);
+		const name =
+			myLicense?.domainConfig?.name ||
+			myLicense?.publicData?.domain ||
+			myLicense?.publicData?.domainName ||
+			null;
+
+		if (name) return String(name).replace(/\.license$/i, "");
 	} catch (error) {
 		console.error("HumanAuthn onboarding: failed to resolve domain", error.message);
-		return null;
 	}
+
+	// Staff default email has no licenseOwner index rows; Play Area uses the official TLD.
+	return DEFAULT_ONBOARDING_DOMAIN;
 };
 
 /**

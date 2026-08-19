@@ -3,12 +3,17 @@ const {
     ADDRESS_CHUNK_KEYS,
     TOP_LEVEL_ADDRESS_FIELDS,
     SHORT_STORAGE_TO_APP,
+    CONTINUATION_LINK_KEY,
+    CONTINUATION_LINK_KEY_2,
     buildAddressBundle,
     buildTopLevelAddressKeyvalues,
     serializeAddressBundleToPinataKeyvalues,
     buildAddressKeyvalues,
+    buildSearchablePinPages,
     mergeAddressKeyvaluesIntoPublicData,
     getAllChainAddresses,
+    resolveEncryptVersion,
+    stampExtraParamsVersion,
 } = require("../../Repositories/Tags/modules/tags-addresses.module");
 
 const sampleAddresses = {
@@ -320,6 +325,95 @@ describe("tags-addresses.module", () => {
         test("does not include empty fields", () => {
             const result = getAllChainAddresses({ ethAddress: "" });
             expect(result).toEqual({});
+        });
+    });
+
+    describe("buildSearchablePinPages", () => {
+        const allAddresses = {
+            ...sampleAddresses,
+            dotAddress: "DOT000000000000000000000000000000000001",
+            ksmAddress: "KSM000000000000000000000000000000000001",
+        };
+
+        test("typical reserved set puts 6 addresses on primary and 4 on _tagName", () => {
+            const pages = buildSearchablePinPages({
+                reserved: {
+                    tagName: "miguel.zelf",
+                    domain: "zelf",
+                    extraParams: { type: "mainnet", v: 4 },
+                },
+                addresses: allAddresses,
+                tagName: "miguel.zelf",
+            });
+
+            expect(Object.keys(pages.primary.keyvalues)).toHaveLength(9);
+            expect(pages.primary.keyvalues.ethAddress).toBe(allAddresses.ethAddress);
+            expect(pages.primary.keyvalues.tonAddress).toBe(allAddresses.tonAddress);
+            expect(pages.primary.keyvalues.arweaveAddress).toBeUndefined();
+            expect(pages.continuations).toHaveLength(1);
+            expect(pages.continuations[0].name).toBe("_miguel.zelf");
+            expect(pages.continuations[0].keyvalues[CONTINUATION_LINK_KEY]).toBe("miguel.zelf");
+            expect(pages.continuations[0].keyvalues.arweaveAddress).toBe(allAddresses.arweaveAddress);
+            expect(pages.continuations[0].keyvalues.ksmAddress).toBe(allAddresses.ksmAddress);
+            expect(pages.continuations[0].keyvalues[CONTINUATION_LINK_KEY_2]).toBeUndefined();
+        });
+
+        test("referral keys reduce the primary address budget", () => {
+            const pages = buildSearchablePinPages({
+                reserved: {
+                    tagName: "miguel.zelf",
+                    domain: "zelf",
+                    extraParams: { type: "mainnet", v: 3 },
+                    referral: JSON.stringify({ tagName: "ref.zelf" }),
+                    referralTagName: "ref.zelf",
+                },
+                addresses: allAddresses,
+                tagName: "miguel.zelf",
+            });
+
+            expect(Object.keys(pages.primary.keyvalues).length).toBeLessThanOrEqual(9);
+            expect(pages.primary.keyvalues.referralTagName).toBe("ref.zelf");
+            expect(pages.continuations[0].keyvalues.tonAddress || pages.primary.keyvalues.tonAddress).toBeDefined();
+            expect(pages.continuations[0].keyvalues[CONTINUATION_LINK_KEY]).toBe("miguel.zelf");
+        });
+
+        test("uses __tagName only when more than 8 overflow addresses remain", () => {
+            const pages = buildSearchablePinPages({
+                reserved: {
+                    tagName: "miguel.zelf",
+                    domain: "zelf",
+                    extraParams: { v: 4 },
+                    a: "1",
+                    b: "2",
+                    c: "3",
+                    d: "4",
+                    e: "5",
+                    f: "6",
+                },
+                addresses: allAddresses,
+                tagName: "miguel.zelf",
+            });
+
+            expect(Object.keys(pages.primary.keyvalues)).toHaveLength(9);
+            expect(pages.continuations).toHaveLength(2);
+            expect(pages.continuations[0].keyvalues[CONTINUATION_LINK_KEY]).toBe("miguel.zelf");
+            expect(pages.continuations[1].name).toBe("__miguel.zelf");
+            expect(pages.continuations[1].keyvalues[CONTINUATION_LINK_KEY_2]).toBe("miguel.zelf");
+        });
+    });
+
+    describe("encrypt version stamps", () => {
+        test("keeps 3.1.6 rewrites on v 3", () => {
+            expect(resolveEncryptVersion({ zelfEncryptVersion: "3.1.6" })).toBe(3);
+            expect(resolveEncryptVersion({ v: 3 })).toBe(3);
+            expect(stampExtraParamsVersion({ origin: "online" }, 3).v).toBe(3);
+            expect(stampExtraParamsVersion({ v: 3, zelfEncryptVersion: "4" }, 3).zelfEncryptVersion).toBeUndefined();
+        });
+
+        test("stamps v 4 only when the encrypt stack is v4", () => {
+            expect(resolveEncryptVersion({ v: 4 })).toBe(4);
+            expect(resolveEncryptVersion({ zelfEncryptVersion: "4" })).toBe(4);
+            expect(stampExtraParamsVersion({}, 4).v).toBe(4);
         });
     });
 });

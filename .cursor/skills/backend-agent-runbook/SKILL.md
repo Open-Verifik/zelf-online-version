@@ -68,6 +68,15 @@ For a test file that expects another port, export that same `PORT` before starti
 - v4 Face Certificates: `https://v4.zelf.world` has Face PKI (`pki_private_key`) only. Proofs stay unsigned so Android/iOS can encrypt/decrypt offline. Do not embed `ISSUERS_PUBLIC_KEY` on ZNS or Zelf ID APKs. Koa: `/api/face-certificates` (402) and `/api/my-face-certificates` (JWT). Root cert: `GET /api/face-certificates/root-certificate`. Focused check: `npm run test:face-certificates`. 3.1.6 stays unsigned.
 - Focused check: `npm run test:zelf-ids`.
 
+### zSend (encrypt to someone else)
+
+- `Repositories/ZSend/` builds on Face Certificates: `/api/zsend` (directory lookup) and `/api/my-zsend` (publish, send, open). Both JWT, registered in `Routes/protected-repositories.js`.
+- Purpose ids: `zsend:<tagName>` for files, `zmail:<tagName>` for messages. Read them from `GET /api/zsend/purpose-id`; do not hardcode the format.
+- Certificate PEMs live in Mongo (`models/zsend-certificate.model.js`), not tag `publicData` — Pinata caps metadata at 9 keyvalues of 250 chars.
+- Envelopes hold a Face-Certificate-wrapped content key plus AES-GCM-256 parameters and a ciphertext pointer. Never accept plaintext or a raw content key.
+- Recipient authorization comes from the directory, not the JWT `tagName`: `POST /api/sessions` accepts any `tagName` unproven.
+- Focused check: `PORT=3003 npm run test:zsend`. Client contract: `Repositories/ZSend/CLIENT.md`.
+
 ### BlockDAG and NFT flows
 
 - Check `Repositories/BlockDAG/`, especially the public/protected route split and the smart-contract folder under `Repositories/BlockDAG/smart-contracts/`.

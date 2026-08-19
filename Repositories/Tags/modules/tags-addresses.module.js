@@ -1,50 +1,23 @@
 /**
- * Tags Addresses Module
+ * Pinata metadata: 9 custom keyvalues, 250 chars per key/value, one-key filter.
  *
- * Centralizes how chain addresses are packed into Pinata `keyvalues` and merged
- * back when reading. Pinata limits each metadata key/value to 250 characters
- * and caps the number of custom keyvalues per pin, so most chains are folded
- * into one or more JSON blobs (`addresses`, `addresses2`, `addresses3`).
- *
- * Searchable fields stay as top-level keyvalues so Pinata's `keyvalues` filter
- * can match on them directly:
- *   - `ethAddress`
- *   - `solanaAddress`
- *
- * Storage shape inside the chunked JSON uses **short keys** to save space; on
- * read they expand to canonical app field names (`*Address`):
- *   - `btc` → `btcAddress`
- *   - `arweave` → `arweaveAddress`
- *   - `sui` → `suiAddress`
- *   - `xlm` → `xlmAddress`
- *   - `dot` → `dotAddress`
- *   - `ksm` → `ksmAddress`
- *   - `ton` → `tonAddress`
- *   - `aptos` → `aptosAddress`
- *
- * Legacy pins may still have full `*Address` keys inside chunk JSON; those merge
- * onto `publicData` unchanged.
+ * New writes keep addresses as standalone searchable keys. Overflow goes on
+ * continuation pins that share the same QR and point back via `_tagName` /
+ * `__tagName`. Old packed `addresses*` blobs stay readable via merge only.
  */
 
+const PINATA_KEYVALUE_MAX_COUNT = 9;
 const PINATA_KEYVALUE_MAX_LENGTH = 250;
 const ADDRESS_CHUNK_KEYS = ["addresses", "addresses2", "addresses3"];
 const MAX_ADDRESS_CHUNKS = ADDRESS_CHUNK_KEYS.length;
 
-/**
- * Address fields that stay as their own Pinata keyvalues so they can be used
- * in `keyvalues` filter queries. Order is informational only.
- */
+const CONTINUATION_LINK_KEY = "_tagName";
+const CONTINUATION_LINK_KEY_2 = "__tagName";
+
 const TOP_LEVEL_ADDRESS_FIELDS = ["ethAddress", "solanaAddress"];
 
-/**
- * Stable order in which fields are packed into the chunked JSON. Top-level
- * fields above are intentionally NOT in this list.
- */
 const ADDRESS_FIELDS_ORDER = ["btc", "arweave", "sui", "xlm", "dot", "ksm", "ton", "aptos"];
 
-/**
- * Chunk JSON key → canonical app field name (expanded on merge).
- */
 const SHORT_STORAGE_TO_APP = {
     btc: "btcAddress",
     arweave: "arweaveAddress",
@@ -67,7 +40,6 @@ const APP_TO_SHORT_STORAGE = {
     aptosAddress: "aptos",
 };
 
-/** Canonical app field names exposed on `publicData`. */
 const APP_ADDRESS_FIELDS = [
     ...TOP_LEVEL_ADDRESS_FIELDS,
     "btcAddress",
@@ -80,6 +52,36 @@ const APP_ADDRESS_FIELDS = [
     "aptosAddress",
 ];
 
+const SEARCHABLE_ADDRESS_FIELDS = [
+    "ethAddress",
+    "solanaAddress",
+    "btcAddress",
+    "suiAddress",
+    "xlmAddress",
+    "tonAddress",
+    "arweaveAddress",
+    "aptosAddress",
+    "dotAddress",
+    "ksmAddress",
+];
+
+const STANDALONE_ADDRESS_FIELDS = TOP_LEVEL_ADDRESS_FIELDS;
+const PACKED_ONLY_ADDRESS_FIELDS = SEARCHABLE_ADDRESS_FIELDS.filter((field) => !STANDALONE_ADDRESS_FIELDS.includes(field));
+const ADDRESS_KEYVALUE_CHUNKS = ADDRESS_CHUNK_KEYS;
+const PRIMARY_RESERVED_KEYS = ["zelfName", "tagName", "domain", "extraParams"];
+
+const ADDRESS_KEY_ALIASES = {
+    eth: "ethAddress",
+    ethereum: "ethAddress",
+    sol: "solanaAddress",
+    solana: "solanaAddress",
+    bitcoin: "btcAddress",
+    stellar: "xlmAddress",
+    polkadot: "dotAddress",
+    kusama: "ksmAddress",
+    ...SHORT_STORAGE_TO_APP,
+};
+
 const _isUsableString = (value) => typeof value === "string" && value.trim() !== "";
 
 const _readAddressFromSource = (source, chunkKey) => {
@@ -91,14 +93,6 @@ const _readAddressFromSource = (source, chunkKey) => {
     return null;
 };
 
-/**
- * Build the canonical address bundle (storage-key shape) for the chunked JSON
- * keyvalues. Top-level searchable fields (`ethAddress`, `solanaAddress`) are
- * intentionally excluded — see {@link buildTopLevelAddressKeyvalues}.
- *
- * @param {Object} source - Object that may contain any of the address fields
- * @returns {Object} Bundle keyed by short chunk labels
- */
 const buildAddressBundle = (source) => {
     if (!source || typeof source !== "object") return {};
 
@@ -112,10 +106,6 @@ const buildAddressBundle = (source) => {
     return bundle;
 };
 
-/**
- * Returns top-level Pinata keyvalues for the searchable address fields,
- * omitting any that are empty.
- */
 const buildTopLevelAddressKeyvalues = (source) => {
     if (!source || typeof source !== "object") return {};
 
@@ -128,16 +118,6 @@ const buildTopLevelAddressKeyvalues = (source) => {
     return out;
 };
 
-/**
- * Pack a bundle into up to three JSON-string keyvalues, each ≤ 250 characters.
- * Returns an object like `{ addresses: "...", addresses2: "..." }` ready to be
- * merged into Pinata metadata.
- *
- * @param {Object} bundle - Output of `buildAddressBundle`
- * @returns {Object} Keyvalues subset to merge into the Pinata metadata
- * @throws {Error} If a single field exceeds the per-keyvalue limit, or the
- *                 bundle requires more than {@link MAX_ADDRESS_CHUNKS} chunks.
- */
 const serializeAddressBundleToPinataKeyvalues = (bundle) => {
     if (!bundle || typeof bundle !== "object") return {};
 
@@ -194,9 +174,8 @@ const serializeAddressBundleToPinataKeyvalues = (bundle) => {
 };
 
 /**
- * Convenience wrapper used by every Pinata write path. Returns the merged set
- * of keyvalues to spread into the metadata: top-level `ethAddress` /
- * `solanaAddress` for search, plus chunked `addresses[N]` for everything else.
+ * Read-only compat for old packed pins. New writes must use
+ * {@link buildSearchablePinPages} instead.
  */
 const buildAddressKeyvalues = (source) => ({
     ...buildTopLevelAddressKeyvalues(source),
@@ -216,16 +195,6 @@ const _parseChunk = (raw) => {
     }
 };
 
-/**
- * Mutates `publicData`: parses each `addresses[N]` chunk, merges the contained
- * fields onto the root, expands short chunk keys to canonical `*Address` names,
- * and removes the chunk keys. Top-level `ethAddress` / `solanaAddress` pass
- * through. Legacy chunk JSON may still use full `*Address` keys; those are
- * merged as-is.
- *
- * @param {Object} publicData - Public data object as returned from Pinata
- * @returns {Object} The same `publicData` reference, mutated in place
- */
 const mergeAddressKeyvaluesIntoPublicData = (publicData) => {
     if (!publicData || typeof publicData !== "object") return publicData;
 
@@ -249,11 +218,6 @@ const mergeAddressKeyvaluesIntoPublicData = (publicData) => {
     return publicData;
 };
 
-/**
- * Returns a flat object containing every chain address under its canonical app
- * field name, sourced from a `publicData`-shaped object. Useful when callers
- * want a single "all addresses" view without mutating the input.
- */
 const getAllChainAddresses = (publicData) => {
     if (!publicData || typeof publicData !== "object") return {};
 
@@ -275,19 +239,193 @@ const getAllChainAddresses = (publicData) => {
     return out;
 };
 
+const resolveAddressKey = (key) => ADDRESS_KEY_ALIASES[String(key || "").toLowerCase()] || key;
+
+const normalizeAddressMap = (source = {}) => {
+    const addresses = {};
+
+    if (!source || typeof source !== "object") return addresses;
+
+    for (const field of SEARCHABLE_ADDRESS_FIELDS) {
+        const value = source[field];
+        if (_isUsableString(value)) addresses[field] = value.trim();
+    }
+
+    return addresses;
+};
+
+const isPackedAddressPublicData = (source = {}) => ADDRESS_CHUNK_KEYS.some((chunkKey) => Boolean(source?.[chunkKey]));
+
+const isContinuationPublicData = (source = {}) => Boolean(source?.[CONTINUATION_LINK_KEY] || source?.[CONTINUATION_LINK_KEY_2]);
+
+const getContinuationCanonicalName = (source = {}) => source?.[CONTINUATION_LINK_KEY] || source?.[CONTINUATION_LINK_KEY_2] || null;
+
+const continuationPinName = (tagName, pageIndex) => {
+    const prefix = pageIndex === 0 ? "_" : "__";
+    return `${prefix}${tagName}`;
+};
+
+const resolveEncryptVersion = (source = {}) => {
+    const raw = source.v ?? source.zelfEncryptVersion ?? source.encryptVersion;
+    const parsed = Number.parseInt(String(raw ?? ""), 10);
+    return parsed === 4 ? 4 : 3;
+};
+
+const stampExtraParamsVersion = (extraParams = {}, version) => {
+    const parsed =
+        typeof extraParams === "string"
+            ? (() => {
+                  try {
+                      return JSON.parse(extraParams);
+                  } catch (_error) {
+                      return {};
+                  }
+              })()
+            : { ...(extraParams || {}) };
+
+    parsed.v = Number(version) === 4 ? 4 : 3;
+    delete parsed.zelfEncryptVersion;
+    return parsed;
+};
+
+const collectReservedKeyvalues = (reserved = {}) => {
+    const keyvalues = {};
+
+    for (const [key, value] of Object.entries(reserved || {})) {
+        if (value === undefined || value === null || value === "") continue;
+        if (SEARCHABLE_ADDRESS_FIELDS.includes(key)) continue;
+        if (ADDRESS_CHUNK_KEYS.includes(key)) continue;
+        if (key === CONTINUATION_LINK_KEY || key === CONTINUATION_LINK_KEY_2) continue;
+        keyvalues[key] = typeof value === "object" ? JSON.stringify(value) : String(value);
+    }
+
+    return keyvalues;
+};
+
+const collectAddressEntries = (addresses = {}) => {
+    const normalized = normalizeAddressMap(addresses);
+    const entries = [];
+
+    for (const field of SEARCHABLE_ADDRESS_FIELDS) {
+        if (!normalized[field]) continue;
+        entries.push([field, normalized[field]]);
+    }
+
+    return entries;
+};
+
+/**
+ * Split reserved metadata + addresses into a primary pin and overflow pages.
+ * Primary always keeps the domain storage key, domain, and extraParams.
+ */
+const buildSearchablePinPages = ({ reserved = {}, addresses = {}, tagName } = {}) => {
+    const reservedKeyvalues = collectReservedKeyvalues(reserved);
+    const addressEntries = collectAddressEntries(addresses);
+    const reservedCount = Object.keys(reservedKeyvalues).length;
+    const primaryAddressBudget = Math.max(0, PINATA_KEYVALUE_MAX_COUNT - reservedCount);
+
+    const primaryAddresses = addressEntries.slice(0, primaryAddressBudget);
+    const overflow = addressEntries.slice(primaryAddressBudget);
+
+    const primaryKeyvalues = { ...reservedKeyvalues };
+    for (const [key, value] of primaryAddresses) {
+        primaryKeyvalues[key] = value;
+    }
+
+    const pages = {
+        primary: {
+            name: tagName,
+            keyvalues: primaryKeyvalues,
+        },
+        continuations: [],
+    };
+
+    const pageSize = PINATA_KEYVALUE_MAX_COUNT - 1;
+    const linkKeys = [CONTINUATION_LINK_KEY, CONTINUATION_LINK_KEY_2];
+
+    for (let pageIndex = 0; pageIndex < linkKeys.length && overflow.length > pageIndex * pageSize; pageIndex += 1) {
+        const slice = overflow.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+        const keyvalues = {
+            [linkKeys[pageIndex]]: tagName,
+        };
+
+        for (const [key, value] of slice) {
+            keyvalues[key] = value;
+        }
+
+        pages.continuations.push({
+            name: continuationPinName(tagName, pageIndex),
+            keyvalues,
+            linkKey: linkKeys[pageIndex],
+        });
+    }
+
+    return pages;
+};
+
+const extractAddressKeyvaluesFromPublicData = (source = {}) => {
+    const expanded = {};
+
+    if (source && typeof source === "object") {
+        for (const chunkKey of ADDRESS_CHUNK_KEYS) {
+            const chunk = _parseChunk(source[chunkKey]);
+            if (!chunk) continue;
+
+            for (const [rawKey, value] of Object.entries(chunk)) {
+                if (!_isUsableString(value)) continue;
+                expanded[resolveAddressKey(rawKey)] = value.trim();
+            }
+        }
+    }
+
+    return normalizeAddressMap({
+        ...expanded,
+        ...(source || {}),
+    });
+};
+
+const mergeContinuationAddresses = (target = {}, source = {}) => {
+    for (const field of SEARCHABLE_ADDRESS_FIELDS) {
+        if (source[field] && !target[field]) target[field] = source[field];
+    }
+    return target;
+};
+
+const omitAddressKeyvalues = (metadata = {}) => collectReservedKeyvalues(metadata);
+
 module.exports = {
-    PINATA_KEYVALUE_MAX_LENGTH,
     ADDRESS_CHUNK_KEYS,
-    MAX_ADDRESS_CHUNKS,
     ADDRESS_FIELDS_ORDER,
+    ADDRESS_KEYVALUE_CHUNKS,
     APP_ADDRESS_FIELDS,
-    TOP_LEVEL_ADDRESS_FIELDS,
-    SHORT_STORAGE_TO_APP,
     APP_TO_SHORT_STORAGE,
+    CONTINUATION_LINK_KEY,
+    CONTINUATION_LINK_KEY_2,
+    MAX_ADDRESS_CHUNKS,
+    PACKED_ONLY_ADDRESS_FIELDS,
+    PINATA_KEYVALUE_MAX_COUNT,
+    PINATA_KEYVALUE_MAX_LENGTH,
+    PRIMARY_RESERVED_KEYS,
+    SEARCHABLE_ADDRESS_FIELDS,
+    SHORT_STORAGE_TO_APP,
+    STANDALONE_ADDRESS_FIELDS,
+    TOP_LEVEL_ADDRESS_FIELDS,
     buildAddressBundle,
-    buildTopLevelAddressKeyvalues,
-    serializeAddressBundleToPinataKeyvalues,
     buildAddressKeyvalues,
-    mergeAddressKeyvaluesIntoPublicData,
+    buildSearchablePinPages,
+    buildTopLevelAddressKeyvalues,
+    collectReservedKeyvalues,
+    continuationPinName,
+    extractAddressKeyvaluesFromPublicData,
     getAllChainAddresses,
+    getContinuationCanonicalName,
+    isContinuationPublicData,
+    isPackedAddressPublicData,
+    mergeAddressKeyvaluesIntoPublicData,
+    mergeContinuationAddresses,
+    normalizeAddressMap,
+    omitAddressKeyvalues,
+    resolveEncryptVersion,
+    serializeAddressBundleToPinataKeyvalues,
+    stampExtraParamsVersion,
 };

@@ -2,7 +2,17 @@ const IPFS = require("../../../Core/ipfs");
 const config = require("../../../Core/config");
 const { getDomainConfig } = require("../config/supported-domains");
 const { generateStorageKey } = require("./domain-registry.module");
-const { mergeAddressKeyvaluesIntoPublicData } = require("./tags-addresses.module");
+const {
+    CONTINUATION_LINK_KEY,
+    CONTINUATION_LINK_KEY_2,
+    buildSearchablePinPages,
+    extractAddressKeyvaluesFromPublicData,
+    getContinuationCanonicalName,
+    isContinuationPublicData,
+    isPackedAddressPublicData,
+    mergeAddressKeyvaluesIntoPublicData,
+    mergeContinuationAddresses,
+} = require("./tags-addresses.module");
 
 /**
  * Tags IPFS Module
@@ -24,15 +34,13 @@ const { mergeAddressKeyvaluesIntoPublicData } = require("./tags-addresses.module
  * @returns {Object} - IPFS data
  */
 const get = async (data) => {
-	const { cid, tagName, domain, key, value, expires, domainConfig } = data;
+	const { cid, tagName, domain, key, value, expires, domainConfig, includeAllAddressPages } = data;
 
 	if (cid) return await IPFS.retrieve(cid, expires);
 
 	let result = [];
 
 	if (tagName) {
-		// Generate domain-specific storage key
-
 		const storageKey = domainConfig ? domainConfig.tags.storage.keyPrefix : generateStorageKey(domain);
 
 		result = await IPFS.filter(storageKey, tagName);
@@ -40,7 +48,29 @@ const get = async (data) => {
 		result = await IPFS.filter(key, value);
 	}
 
-	return _formatSearchResults(result);
+	const formatted = _formatSearchResults(result).filter((row) => {
+		if (!isContinuationPublicData(row.publicData)) return true;
+		return Boolean(key && value);
+	});
+
+	const resolved = [];
+
+	for (const row of formatted) {
+		if (isContinuationPublicData(row.publicData)) {
+			const primary = await _resolveContinuationToPrimary(row);
+			resolved.push(includeAllAddressPages ? await _mergeAllContinuationPages(primary) : primary);
+			continue;
+		}
+
+		if (includeAllAddressPages) {
+			resolved.push(await _mergeAllContinuationPages(row));
+			continue;
+		}
+
+		resolved.push(row);
+	}
+
+	return resolved;
 };
 
 const _formatRecord = (item) => {
@@ -76,6 +106,10 @@ const _formatRecord = (item) => {
 	}
 
 	if (formattedResult?.publicData) {
+		if (isPackedAddressPublicData(formattedResult.publicData)) {
+			formattedResult.publicData._needsPinSplit = true;
+		}
+
 		mergeAddressKeyvaluesIntoPublicData(formattedResult.publicData);
 	}
 
@@ -107,6 +141,52 @@ const _formatRecord = (item) => {
 	}
 
 	return formattedResult;
+};
+
+const _lookupPrimaryByCanonicalName = async (canonicalName) => {
+	if (!canonicalName) return null;
+
+	const byTagName = await IPFS.filter("tagName", canonicalName);
+	if (byTagName?.[0]) return _formatRecord(byTagName[0]);
+
+	const byZelfName = await IPFS.filter("zelfName", canonicalName);
+	if (byZelfName?.[0]) return _formatRecord(byZelfName[0]);
+
+	return null;
+};
+
+const _resolveContinuationToPrimary = async (continuationRow) => {
+	const canonicalName = getContinuationCanonicalName(continuationRow.publicData);
+	const primary = await _lookupPrimaryByCanonicalName(canonicalName);
+
+	if (!primary) return continuationRow;
+
+	mergeContinuationAddresses(primary.publicData, continuationRow.publicData);
+	return primary;
+};
+
+const _mergeAllContinuationPages = async (primaryRow) => {
+	let record = primaryRow;
+
+	if (isContinuationPublicData(record.publicData)) {
+		record = await _resolveContinuationToPrimary(record);
+	}
+
+	const canonicalName =
+		getContinuationCanonicalName(record.publicData) ||
+		record.publicData?.tagName ||
+		record.publicData?.zelfName ||
+		record.name;
+
+	if (!canonicalName) return record;
+
+	for (const linkKey of [CONTINUATION_LINK_KEY, CONTINUATION_LINK_KEY_2]) {
+		const rows = await IPFS.filter(linkKey, canonicalName);
+		if (!rows?.[0]) continue;
+		mergeContinuationAddresses(record.publicData, _formatRecord(rows[0]).publicData);
+	}
+
+	return record;
 };
 
 const _formatSearchResults = (result) => {
@@ -181,6 +261,72 @@ const insert = async (data, authUser) => {
 };
 
 /**
+ * Pin a primary record plus any overflow address pages that share the same QR.
+ * @param {Object} data
+ * @param {string} data.base64
+ * @param {Object} data.reserved
+ * @param {Object} data.addresses
+ * @param {string} data.name
+ * @param {boolean} data.pinIt
+ * @param {Object} authUser
+ * @returns {Object} formatted primary pin
+ */
+const insertSearchablePins = async (data, authUser) => {
+	const { base64, reserved, addresses, name, pinIt } = data;
+	const pages = buildSearchablePinPages({
+		reserved,
+		addresses: addresses || extractAddressKeyvaluesFromPublicData(data.addressSource || {}),
+		tagName: name,
+	});
+
+	const primary = await insert(
+		{
+			base64,
+			name: pages.primary.name,
+			metadata: pages.primary.keyvalues,
+			pinIt,
+		},
+		authUser
+	);
+
+	for (const page of pages.continuations) {
+		await insert(
+			{
+				base64,
+				name: page.name,
+				metadata: page.keyvalues,
+				pinIt,
+			},
+			authUser
+		);
+	}
+
+	const formatted = _formatRecord(primary);
+	for (const page of pages.continuations) {
+		mergeContinuationAddresses(formatted.publicData, page.keyvalues);
+	}
+	return formatted;
+};
+
+const unpinContinuationSiblings = async (canonicalName) => {
+	if (!canonicalName) return null;
+
+	const ids = [];
+
+	for (const linkKey of [CONTINUATION_LINK_KEY, CONTINUATION_LINK_KEY_2]) {
+		const rows = await IPFS.filter(linkKey, canonicalName);
+		for (const row of rows || []) {
+			const id = row.ipfs_pin_hash || row.IpfsHash || row.id;
+			if (id) ids.push(id);
+		}
+	}
+
+	if (!ids.length) return null;
+
+	return unPinFiles(ids);
+};
+
+/**
  * Insert tag data into IPFS
  * @param {Object} data - Tag data
  * @param {string} data.base64 - Base64 encoded data
@@ -246,12 +392,12 @@ const searchByDomain = async (params, authUser) => {
 		const records = await IPFS.filter("name", namePattern, paginationOptions);
 		const formatted = _formatSearchResults(records);
 		const domainLower = String(domain).toLowerCase();
-		return formatted.filter((row) => _rowBelongsToDomain(row, domainLower));
+		return formatted.filter((row) => !isContinuationPublicData(row.publicData) && _rowBelongsToDomain(row, domainLower));
 	}
 
 	const records = await IPFS.filter("domain", domain, paginationOptions);
 
-	return _formatSearchResults(records);
+	return _formatSearchResults(records).filter((row) => !isContinuationPublicData(row.publicData));
 };
 
 /**
@@ -465,8 +611,10 @@ module.exports = {
 	get,
 	show,
 	insert,
+	insertSearchablePins,
 	tagRegistration,
 	unPinFiles,
+	unpinContinuationSiblings,
 	searchByDomain,
 	searchByStorageKey,
 	getHoldDomain,

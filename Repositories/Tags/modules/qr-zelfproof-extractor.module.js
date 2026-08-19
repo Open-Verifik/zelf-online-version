@@ -255,12 +255,54 @@ async function extractZelfProofFromQR(base64Image) {
 }
 
 /**
+ * QR version-40 byte-mode capacities (ISO). Prefer the strongest ECC that still
+ * fits so 3.1.6 proofs stay on H and default v4 proofs (~1325 bytes) still encode.
+ * SenseCrypt's own /encrypt-qr-code drops to L once H/Q/M overflow.
+ */
+const QR_BYTE_CAPACITY = Object.freeze({
+	H: 1273,
+	Q: 1663,
+	M: 2331,
+	L: 2953,
+});
+const QR_ECC_STRONGEST_FIRST = Object.freeze(["H", "Q", "M", "L"]);
+
+/**
+ * Strongest error-correction level that can hold `byteCount` bytes in one QR.
+ * @param {number} byteCount raw SensePrint length
+ * @returns {"H"|"Q"|"M"|"L"|null} `null` when even L cannot hold it (over 2953)
+ */
+function errorCorrectionLevelForProofBytes(byteCount) {
+	const n = Number(byteCount) || 0;
+	for (const level of QR_ECC_STRONGEST_FIRST) {
+		if (n <= QR_BYTE_CAPACITY[level]) return level;
+	}
+	return null;
+}
+
+/**
+ * ECC levels to try: requested first (if valid), then H → Q → M → L.
+ * The `qrcode` library can sit a few bytes under the ISO max, so we fall
+ * through instead of trusting the capacity table alone.
+ * @param {string} [requested]
+ * @returns {string[]}
+ */
+function errorCorrectionLevelsToTry(requested) {
+	const all = [...QR_ECC_STRONGEST_FIRST];
+	if (requested && all.includes(requested)) {
+		return [requested, ...all.filter((level) => level !== requested)];
+	}
+	return all;
+}
+
+/**
  * Computes optimal QR pixel size based on ZelfProof binary byte length.
  * Larger ZelfProofs produce denser QR codes that require more pixels per module
  * to remain reliably scannable on mobile devices (≥3.125 px/module recommended).
  *
- * Formula: estimate QR version from byte count (H-level capacity ≈ byteCount/32),
- * then size = modules × 3.125, clamped to [320, 640].
+ * Formula: estimate QR version from byte count, then size = modules × px/module.
+ * 3.1.6 (H): 3.125 px/module, clamped to [320, 640].
+ * v4 past H: 4.52 px/module so a version-40 QR (177 modules) renders at 800px.
  *
  * @param {number} byteCount - Length of the raw ZelfProof buffer
  * @returns {number} - Recommended pixel width/height
@@ -268,7 +310,10 @@ async function extractZelfProofFromQR(base64Image) {
 function getOptimalQRSize(byteCount) {
 	const version = Math.max(1, Math.min(40, Math.ceil(byteCount / 32)));
 	const modules = 17 + 4 * version;
-	return Math.max(320, Math.min(640, Math.ceil(modules * 3.125)));
+	const pastH = byteCount > QR_BYTE_CAPACITY.H;
+	const pixelsPerModule = pastH ? 4.52 : 3.125;
+	const max = pastH ? 800 : 640;
+	return Math.max(320, Math.min(max, Math.ceil(modules * pixelsPerModule)));
 }
 
 /**
@@ -276,10 +321,14 @@ function getOptimalQRSize(byteCount) {
  * Encodes the raw binary data (byte mode) so the QR is identical to the original.
  * Image size is computed automatically from the ZelfProof byte length.
  *
+ * Error correction defaults to the strongest level that still fits (H for 3.1.6,
+ * Q/M/L for larger v4 proofs). If an explicit level cannot encode, lower levels
+ * are tried so a default v4 SensePrint does not return null.
+ *
  * @param {string} zelfProof - Base64-encoded ZelfProof
  * @param {Object} [options]
  * @param {number} [options.size] - Width/height in px (default: auto via getOptimalQRSize)
- * @param {string} [options.errorCorrectionLevel="H"] - QR error correction level
+ * @param {string} [options.errorCorrectionLevel] preferred ECC; falls back if too small
  * @param {number} [options.margin=2] - Quiet zone modules around the QR code
  * @returns {Promise<string|null>} - data:image/png;base64,... or null on failure
  */
@@ -289,22 +338,32 @@ async function generateQRFromZelfProof(zelfProof, options = {}) {
 		console.warn("qrcode module not available, cannot generate QR from ZelfProof");
 		return null;
 	}
-	try {
-		const buffer = Buffer.from(zelfProof, "base64");
-		const size = options.size ?? getOptimalQRSize(buffer.length);
-		const { errorCorrectionLevel = "H", margin = 2 } = options;
 
-		const dataUrl = await QRCode.toDataURL([{ data: buffer, mode: "byte" }], {
-			type: "png",
-			width: size,
-			margin,
-			errorCorrectionLevel,
-		});
-		return dataUrl;
-	} catch (error) {
-		console.error("generateQRFromZelfProof failed:", error.message);
-		return null;
+	const buffer = Buffer.from(zelfProof, "base64");
+	const size = options.size ?? getOptimalQRSize(buffer.length);
+	const { margin = 2 } = options;
+	const levels = errorCorrectionLevelsToTry(options.errorCorrectionLevel);
+
+	let lastError = null;
+	for (const errorCorrectionLevel of levels) {
+		try {
+			return await QRCode.toDataURL([{ data: buffer, mode: "byte" }], {
+				type: "png",
+				width: size,
+				margin,
+				errorCorrectionLevel,
+			});
+		} catch (error) {
+			lastError = error;
+		}
 	}
+
+	console.error(
+		"generateQRFromZelfProof failed:",
+		lastError?.message || "QR capacity exceeded",
+		{ bytes: buffer.length, tried: levels }
+	);
+	return null;
 }
 
 module.exports = {
@@ -312,4 +371,6 @@ module.exports = {
 	extractZelfProofFromQR,
 	generateQRFromZelfProof,
 	getOptimalQRSize,
+	errorCorrectionLevelForProofBytes,
+	QR_BYTE_CAPACITY,
 };

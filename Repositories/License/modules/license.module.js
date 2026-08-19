@@ -324,9 +324,10 @@ const _loadMyLicenseForAccount = async (jwt, withJSON, ownershipCredentials) => 
     }
 
     let myRecords = [];
-    // Search for all licenses with the same zelfProof
-    if (metadata.accountEmail) {
-        myRecords = await IPFS.get({ key: "licenseOwner", value: metadata.accountEmail });
+    // Owner clients index on accountEmail. Staff clients do not — use the org owner.
+    const licenseOwnerEmail = metadata.accountEmail || metadata.staffOwnerEmail || jwt.ownerEmail;
+    if (licenseOwnerEmail) {
+        myRecords = await IPFS.get({ key: "licenseOwner", value: licenseOwnerEmail });
     }
 
     const myLicenses = [];

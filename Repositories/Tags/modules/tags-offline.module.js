@@ -7,7 +7,7 @@ const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const TagsRegistrationModule = require("./tags-registration.module");
 const { extractZelfProofFromQR, generateQRFromZelfProof } = require("./qr-zelfproof-extractor.module");
-const { buildAddressKeyvalues } = require("./tags-addresses.module");
+const { resolveEncryptVersion, stampExtraParamsVersion } = require("./tags-addresses.module");
 
 const _getExtraPublicData = async (password, zelfProof, syncPublicData) => {
     if (!password || !zelfProof || !syncPublicData) {
@@ -80,16 +80,19 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
         throw error;
     }
 
-    const extraParams = {
-        origin: tagObject.publicData.origin || "online",
-        registeredAt: moment(tagObject.publicData.registeredAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss"),
-        expiresAt: moment(tagObject.publicData.expiresAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss"),
-        price: tagObject.publicData.price || undefined,
-        duration: tagObject.publicData.duration || undefined,
-        hasPassword: tagObject.publicData.hasPassword || undefined,
-        referralTagName: tagObject.publicData.referralTagName || undefined,
-        referralSolanaAddress: tagObject.publicData.referralSolanaAddress || undefined,
-    };
+    const extraParams = stampExtraParamsVersion(
+        {
+            origin: tagObject.publicData.origin || "online",
+            registeredAt: moment(tagObject.publicData.registeredAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss"),
+            expiresAt: moment(tagObject.publicData.expiresAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss"),
+            price: tagObject.publicData.price || undefined,
+            duration: tagObject.publicData.duration || undefined,
+            hasPassword: tagObject.publicData.hasPassword || undefined,
+            referralTagName: tagObject.publicData.referralTagName || undefined,
+            referralSolanaAddress: tagObject.publicData.referralSolanaAddress || undefined,
+        },
+        resolveEncryptVersion(tagObject.publicData)
+    );
 
     const metadata = {
         [tagKey]: tagObject.publicData[tagKey],
@@ -115,19 +118,18 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
 
     metadata.extraParams = JSON.stringify(metadata.extraParams);
 
-    Object.assign(metadata, buildAddressKeyvalues(addressSource));
-
     if (ipfsHash) {
+        await TagsIPFSModule.unpinContinuationSiblings(tagObject.publicData[tagKey]);
         await TagsIPFSModule.deleteFiles([ipfsRecord.id]);
-        // delay 1 seconds
         await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
-    const ipfs = await TagsIPFSModule.insert(
+    const ipfs = await TagsIPFSModule.insertSearchablePins(
         {
             base64: tagObject.zelfProofQRCode,
             name: tagObject.publicData[tagKey],
-            metadata,
+            reserved: metadata,
+            addresses: addressSource,
             pinIt: true,
         },
         { pro: true }
