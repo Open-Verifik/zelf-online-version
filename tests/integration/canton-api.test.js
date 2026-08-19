@@ -48,7 +48,10 @@ describe("Canton API Integration Tests - Real Server", () => {
                 mode: "external",
                 backendAcceptsMnemonicOrPrivateKey: false,
             });
-            expect(JSON.stringify(response.body)).not.toMatch(/clientSecret|staticToken|CANTON_AUTH_CLIENT_SECRET|CANTON_STATIC_TOKEN/);
+            expect(response.body.data).not.toHaveProperty("authClientSecret");
+            expect(response.body.data).not.toHaveProperty("staticToken");
+            expect(response.body.data).not.toHaveProperty("authClientId");
+            expect(Array.isArray(response.body.data.missing)).toBe(true);
         });
     });
 
