@@ -5,7 +5,8 @@ alwaysApply: true
 
 # Docs And URLs
 
--   Use `https://v3.zelf.world` for public API documentation examples.
+-   Use `https://v3.zelf.world` for Tags and other v3.6 public API documentation examples.
+-   Use `https://v4.zelf.world` for Zelf ID (`/api/zelf-ids`) documentation examples. Do not write `https://v3.zelf.world/api/zelf-ids/...`.
 -   Use localhost URLs only for local testing, and prefer an explicit `PORT` over relying on repository fallbacks.
 -   Public API docs belong in `zelf-documentation/docs/api/`.
 -   Include the auth flow when documenting protected endpoints: session creation, JWT extraction, then authenticated API calls.
@@ -19,6 +20,7 @@ alwaysApply: true
 <!-- Prefer -->
 
 https://v3.zelf.world/api/tags/search
+https://v4.zelf.world/api/zelf-ids/search
 ```
 
 ```md

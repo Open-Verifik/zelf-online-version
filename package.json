@@ -37,6 +37,7 @@
         "test:solana-transfer": "jest tests/integration/solana-token-transfer.test.js --verbose --no-coverage",
         "test:blogs": "jest --config jest.integration.http.config.js tests/integration/blogs-api.test.js --verbose --no-coverage",
         "test:zelf-ids": "jest --config jest.integration.http.config.js tests/integration/zelf-ids-api.test.js --verbose --no-coverage",
+        "test:zelf-ids-payment": "jest tests/unit/zelf-id-plan.module.test.js tests/unit/zelf-ids-payment.module.test.js --verbose --no-coverage && jest --config jest.integration.http.config.js tests/integration/zelf-ids-payment-api.test.js --verbose --no-coverage",
         "status:check": "node scripts/run-status-check.js",
         "status:check:zelf-ids": "node scripts/run-status-check.js --suite=zelf-ids",
         "audit:ipfs-pay-balances": "node scripts/audit-ipfs-pay-tags-balances.js",

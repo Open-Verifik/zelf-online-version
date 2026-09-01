@@ -22,13 +22,21 @@ const { initTagUpdates, updateTags } = require("../../Tags/modules/sync-tag-reco
 
 const { generateHoldDomain } = require("../../Tags/modules/domain-registry.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
-const TagsRegistrationModule = require("../../Tags/modules/tags-registration.module");
+const ZelfIdsRegistrationModule = require("./zelf-ids-registration.module");
 const { extractZelfProofFromQR } = require("../../Tags/modules/qr-zelfproof-extractor.module");
 const SessionModule = require("../../Session/modules/session.module");
 const QRZelfProofExtractor = require("../../Tags/modules/qr-zelfproof-extractor.module");
 const ArweaveModule = require("../../Arweave/modules/arweave.module");
 const { unPinFiles, unpinContinuationSiblings } = require("../../Tags/modules/tags-ipfs.module");
 const jwt = require("jsonwebtoken");
+const {
+    resolveZelfIdPlan,
+    resolveComplimentaryPlan,
+    requiresHoldReservation,
+    isUnpaidExpiredReservation,
+    effectivePlan,
+    getZelfIdPrice,
+} = require("./zelf-id-plan.module");
 
 /**
  * Force the shared ZelfProof client onto `/zelf-v4`.
@@ -141,11 +149,7 @@ const leaseTag = async (params, authUser) => {
 
     await ZelfIdPartsModule.generateZelfProof(dataToEncrypt, tagObject);
 
-    if (tagObject.price === 0) {
-        await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, securityType, authUser);
-    } else {
-        await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, securityType, authUser);
-    }
+    await persistZelfIdLease(tagObject, referralTagObject, domainConfig, securityType, authUser);
 
     if (!tagObject.zelfProof && tagObject.ipfs?.publicData?.zelfProof) {
         tagObject.zelfProof = tagObject.ipfs.publicData.zelfProof;
@@ -217,15 +221,24 @@ const searchTag = async (params, authUser) => {
             authUser
         );
 
-        if (result.ipfs?.length) {
-            for (let index = 0; index < result.ipfs.length; index++) {
-                const element = result.ipfs[index];
+        const released = applyExpiredPlanDowngrade(
+            await releaseExpiredUnpaidReservation(result, {
+                tagName,
+                domain,
+                domainConfig: _domainConfig,
+                duration: duration || "1",
+            })
+        );
+
+        if (released.ipfs?.length) {
+            for (let index = 0; index < released.ipfs.length; index++) {
+                const element = released.ipfs[index];
                 delete element.zelfProof;
                 delete element.zelfProofQRCode;
             }
         }
 
-        return result;
+        return released;
     } catch (error) {
         console.error({ error });
         throw error;
@@ -434,15 +447,124 @@ const leaseConfirmation = async (params) => {
     };
 };
 
+/**
+ * Persist a Zelf ID lease: 6+ characters confirm as free; short names with price > 0 get a 5-hour hold.
+ * A leftover `$0` quote confirms as complimentary premium (6+) or unlimited (1–5).
+ * @param {Object} tagObject
+ * @param {Object|null} referralTagObject
+ * @param {Object} domainConfig
+ * @param {string} securityType
+ * @param {Object} authUser
+ */
+const persistZelfIdLease = async (tagObject, referralTagObject, domainConfig, securityType, authUser) => {
+    const tagName = tagObject.tagName || tagObject.zelfName;
+    const tagKey = domainConfig.getTagKey?.() || "tagName";
+    const referralBare = (
+        referralTagObject?.publicData?.[tagKey] ||
+        referralTagObject?.publicData?.tagName ||
+        referralTagObject?.publicData?.zelfName ||
+        ""
+    )
+        .toString()
+        .split(".")[0];
+    const priced = getZelfIdPrice({
+        tagName,
+        duration: `${tagObject.duration || "1"}`,
+        referralTagName: referralBare ? `${referralBare}.${domainConfig.name}` : "",
+        domainConfig,
+    });
+
+    tagObject.price = priced.price;
+    tagObject.reward = priced.reward;
+    tagObject.discount = priced.discount;
+    tagObject.discountType = priced.discountType;
+
+    const quotePrice = Number(priced.price);
+
+    if (requiresHoldReservation(tagName) && quotePrice > 0) {
+        await ZelfIdsRegistrationModule.reserveZelfId(tagObject, referralTagObject, domainConfig, securityType, authUser);
+        return;
+    }
+
+    if (!requiresHoldReservation(tagName)) {
+        tagObject.price = 0;
+    }
+
+    const complimentary = resolveComplimentaryPlan({ tagName, price: quotePrice });
+
+    await ZelfIdsRegistrationModule.confirmZelfId(tagObject, referralTagObject, domainConfig, securityType, authUser, {
+        plan: complimentary || resolveZelfIdPlan({ tagName }),
+    });
+};
+
+const applyExpiredPlanDowngrade = (result) => {
+    const publicData = result?.tagObject?.publicData;
+    if (!publicData) return result;
+
+    const plan = effectivePlan(publicData);
+    if (plan === publicData.plan) return result;
+
+    result.tagObject.publicData = { ...publicData, plan };
+    return result;
+};
+
+/**
+ * Unpin an unpaid reservation whose window has passed and mark the name available.
+ * Paid mainnet records are left alone.
+ * @param {Object} result - search result
+ * @param {Object} context
+ * @returns {Promise<Object>}
+ */
+const releaseExpiredUnpaidReservation = async (result, context = {}) => {
+    const publicData = result?.tagObject?.publicData || {};
+
+    if (!isUnpaidExpiredReservation(publicData)) {
+        return result;
+    }
+
+    const ipfsId = result.tagObject.id || result.tagObject.ipfsId;
+    const canonicalName = publicData.tagName || publicData.zelfName || context.tagName;
+
+    try {
+        if (canonicalName) {
+            await unpinContinuationSiblings(canonicalName);
+        }
+
+        if (ipfsId) {
+            await unPinFiles([ipfsId]);
+        }
+    } catch (error) {
+        console.error({ releaseExpiredUnpaidReservation: error });
+    }
+
+    const available = {
+        ...result,
+        available: true,
+        tagObject: undefined,
+        ipfs: [],
+        arweave: [],
+    };
+
+    delete available.tagObject;
+
+    if (context.domainConfig) {
+        available.price = getZelfIdPrice({
+            tagName: context.tagName,
+            duration: context.duration || "1",
+            domainConfig: context.domainConfig,
+        });
+    }
+
+    return available;
+};
+
 const _findDuplicatedTag = async (tagName, domain, domainConfig) => {
-    const searchParams = {
+    const result = await searchTag({
         tagName,
         domain,
         domainConfig,
         environment: "all",
-    };
-
-    const result = await TagsSearchModule.searchTag(searchParams);
+    });
 
     if (result.available === false) {
         const error = new Error("409:tag_already_exists");
@@ -594,6 +716,8 @@ module.exports = {
     deleteTag,
     getDomainConfig,
     generateDomainHoldDomain,
+    persistZelfIdLease,
+    releaseExpiredUnpaidReservation,
     _findDuplicatedTag,
     _validateReferral,
     _createWalletsFromPhrase,

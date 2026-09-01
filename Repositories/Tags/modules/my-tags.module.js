@@ -1138,4 +1138,5 @@ module.exports = {
     sendEmailReceipt,
     getMyReferrals,
     claimReferralReward,
+    confirmPayUniqueAddress,
 };

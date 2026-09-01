@@ -21,7 +21,13 @@ module.exports = (server) => {
 
     server.get(`${PATH}/wallet-balances`, Middleware.walletBalancesValidation, Controller.getWalletBalances);
 
+    server.get(`${PATH}/payment-options`, Middleware.paymentOptionsValidation, Middleware.paymentOptionsReducedFeeGate, Controller.paymentOptions);
+
+    server.post(`${PATH}/payment-confirmation`, Middleware.paymentConfirmationValidation, Controller.paymentConfirmation);
+
     server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseTag);
+
+    server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOffline);
 
     server.post(`${PATH}/lease-recovery`, Middleware.leaseRecoveryValidation, Controller.leaseRecovery);
 

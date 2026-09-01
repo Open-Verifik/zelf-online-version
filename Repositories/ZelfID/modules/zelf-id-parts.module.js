@@ -3,6 +3,7 @@ const { encrypt, preview, encryptQRCode } = require("../../ZelfProof/modules/zel
 const { generateQRFromZelfProof } = require("../../Tags/modules/qr-zelfproof-extractor.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
 const config = require("../../../Core/config");
+const { getZelfIdPrice } = require("./zelf-id-plan.module");
 
 const withV4 = (data) => ({ ...data, stack: "v4" });
 
@@ -119,8 +120,39 @@ const generateQRCode = async (params) => {
     };
 };
 
+/**
+ * Same wallet assignment as Tags, then stamp the license quote and plan.
+ * Short names are unlimited only; long names lease free unless they pay later.
+ */
+const assignProperties = (tagObject, dataToEncrypt, addresses, payload, domainConfig) => {
+    TagsPartsModule.assignProperties(tagObject, dataToEncrypt, addresses, payload, domainConfig);
+
+    const tagKey = domainConfig.tags?.storage?.keyPrefix || "tagName";
+    const referralTagName = (
+        payload.referralTagObject?.publicData?.[tagKey] ||
+        payload.referralTagObject?.publicData?.tagName ||
+        payload.referralTagObject?.publicData?.zelfName ||
+        ""
+    )
+        .toString()
+        .split(".")[0];
+
+    const priced = getZelfIdPrice({
+        tagName: tagObject[tagKey] || tagObject.tagName || tagObject.zelfName,
+        duration: `${payload.duration || tagObject.duration || "1"}`,
+        referralTagName: referralTagName ? `${referralTagName}.${domainConfig.name}` : "",
+        domainConfig,
+    });
+
+    tagObject.price = priced.price;
+    tagObject.reward = priced.reward;
+    tagObject.discount = priced.discount;
+    tagObject.discountType = priced.discountType;
+};
+
 module.exports = {
     ...TagsPartsModule,
+    assignProperties,
     generateZelfProof,
     encryptParams,
     previewTag,

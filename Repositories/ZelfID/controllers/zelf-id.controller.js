@@ -8,6 +8,8 @@ const { errorHandler } = require("../../../Core/http-handler");
 const configuration = require("../../../Core/config");
 const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const TagWalletBalancesModule = require("../../Tags/modules/tag-wallet-balances.module");
+const MyZelfIdModule = require("../modules/my-zelf-id.module");
+const ZelfIdsOfflineModule = require("../modules/zelf-ids-offline.module");
 
 /**
  * Keep full pin name (e.g. user.zelfpay) for IPFS lookup; middleware only supplies registry TLD + local name.
@@ -114,6 +116,28 @@ const leaseTag = async (ctx) => {
         };
 
         const data = await Module.leaseTag(requestData, ctx.state.user);
+
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
+
+        ctx.status = _exception.status;
+
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
+};
+
+const leaseOffline = async (ctx) => {
+    try {
+        const { extractedDomain, extractedName } = ctx.state;
+
+        const requestData = {
+            ...ctx.request.body,
+            tagName: resolveFullTagNameForRequest(ctx.request.body.tagName, extractedName, extractedDomain),
+            domain: extractedDomain,
+        };
+
+        const data = await ZelfIdsOfflineModule.leaseOffline(requestData, ctx.state.user);
 
         ctx.body = { data };
     } catch (error) {
@@ -388,10 +412,43 @@ const getWalletBalances = async (ctx, next) => {
     await next();
 };
 
+const paymentOptions = async (ctx) => {
+    try {
+        const { tagName, domain, duration, plan } = ctx.request.query;
+        const reducedFeeRequested = Boolean(ctx.state.reducedFeeRequested);
+        const data = await MyZelfIdModule.getPaymentOptions(tagName, domain, duration, ctx.state.user, {
+            reducedFeeRequested,
+            requestedPlan: plan,
+        });
+
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
+
+        ctx.status = _exception.status;
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
+};
+
+const paymentConfirmation = async (ctx) => {
+    try {
+        const { tagName, domain, network, token } = ctx.request.body;
+        const data = await MyZelfIdModule.verifyPaymentConfirmation(tagName, domain, network, token);
+
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
+
+        ctx.status = _exception.status;
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
+};
+
 module.exports = {
     searchTag,
     searchTagsByDomain,
     leaseTag,
+    leaseOffline,
     leaseRecovery,
     previewTag,
     previewZelfProof,
@@ -405,4 +462,6 @@ module.exports = {
     getDomains,
     getDomain,
     getWalletBalances,
+    paymentOptions,
+    paymentConfirmation,
 };

@@ -59,9 +59,9 @@ For a test file that expects another port, export that same `PORT` before starti
 
 ### ZelfID (online, ZelfEncrypt v4)
 
-- `/api/zelf-ids` is owned by `Repositories/ZelfID/` (not a Tags alias).
+- `/api/zelf-ids` is owned by `Repositories/ZelfID/` (not a Tags alias). Public host is `https://v4.zelf.world` (for example `GET https://v4.zelf.world/api/zelf-ids/search`). Do not document it on `https://v3.zelf.world`.
 - Online encrypt/decrypt/preview go to `ZELF_PROOF_V4_URL` (default `https://v4.zelf.world`) + `ZELF_PROOF_V4_PATH_PREFIX` (default `/zelf-v4`).
-- `/api/tags` stays on `ZELF_PROOF_URL` + `/zelf` (ZelfEncrypt 3.1.6 on `https://v3.zelf.world`). Offline lease is only `POST /api/tags/lease-offline`.
+- `/api/tags` stays on `ZELF_PROOF_URL` + `/zelf` (ZelfEncrypt 3.1.6 on `https://v3.zelf.world`). Tags offline lease stays `POST /api/tags/lease-offline`. Zelf ID offline lease is `POST /api/zelf-ids/lease-offline` (v4 `previewHumanAuthn`).
 - Raw encrypt/decrypt/preview: `/api/zelf-proof` → 3.1.6 on v3; `/api/human-authn` → v4 on `https://v4.zelf.world` (`Repositories/HumanAuthn/`).
 - Upgrade 3.1.6 → v4: `POST /api/human-authn/upgrade` (402) and `POST /api/jwt/human-authn/upgrade` (dev JWT). Upstream `https://v4.zelf.world/zelf-v4/upgrade`. Focused check: `npm run test:encrypt-compat`.
 - Development-only JWT mirrors (no ZNS payment): `/api/jwt/zelf-proof` and `/api/jwt/human-authn`. Gated on `config.env === "development"`. Focused check: `npm run test:jwt-dev`. Never enable on `v3.zelf.world`.
@@ -97,7 +97,7 @@ For a test file that expects another port, export that same `PORT` before starti
 ### Docs work
 
 - Public API docs belong in `zelf-documentation/docs/api/`.
-- Public examples must use `https://v3.zelf.world`, not localhost.
+- Public examples: Tags / v3.6 use `https://v3.zelf.world`. Zelf ID (`/api/zelf-ids`) uses `https://v4.zelf.world`. Do not use localhost in published docs.
 
 ## Maintenance
 

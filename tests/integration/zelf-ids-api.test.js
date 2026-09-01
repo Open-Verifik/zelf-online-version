@@ -1,11 +1,12 @@
 // Zelf IDs API Integration Tests — live server, real v4, no mocks.
 // /api/zelf-ids is owned by Repositories/ZelfID (ZelfEncrypt v4 / /zelf-v4).
 // Proofs and QRs used later in this file come from this run's lease/encrypt responses.
-// Offline lease stays on /api/tags/lease-offline (Tags / ZelfEncrypt 3.1.6).
+// Offline lease is POST /api/zelf-ids/lease-offline (v4 Human Authn preview).
 const request = require("supertest");
 const fs = require("fs");
 const path = require("path");
 const sharp = require("sharp");
+const moment = require("moment");
 require("dotenv").config();
 
 const {
@@ -26,6 +27,7 @@ const RECOVERY_MNEMONIC =
 	"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
 const uniqueTagName = () => `zid${Math.floor(Math.random() * 100000).toString().padStart(5, "0")}`;
+const shortUniqueTagName = () => `z${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}`;
 
 const previewPublicData = (body = {}) =>
 	body.preview?.publicData || body.preview?.cleartext_data || body.publicData || {};
@@ -231,6 +233,7 @@ describe("Zelf IDs API Integration Tests", () => {
             expect(Number(publicData.v)).toBe(4);
             expect(typeof zelfProof).toBe("string");
             expect(zelfProof.length).toBeGreaterThan(0);
+            expect(leasedData.walrus).toBeFalsy();
         });
 
         it("leased QR is a PNG, 800px when past H, and scans back to the same proof", async () => {
@@ -497,16 +500,88 @@ describe("Zelf IDs API Integration Tests", () => {
         });
     });
 
-    // ─── 5. Offline lease is not on ZelfID ──────────────────────────────
-    describe("5. Lease Offline not on /api/zelf-ids", () => {
-        it("POST /zelf-ids/lease-offline — should not exist (legacy lives on /api/tags)", async () => {
-            const response = await request(API_BASE_URL)
+    // ─── 5. Lease offline on /api/zelf-ids ──────────────────────────────
+    describe("5. Lease Offline on /api/zelf-ids", () => {
+        jest.setTimeout(180000);
+
+        let offlineName;
+
+        it("POST /zelf-ids/lease-offline — 409 without tagName or proof", async () => {
+            const missingName = await request(API_BASE_URL)
                 .post(`${ZELF_IDS_PATH}/lease-offline`)
-                .set("Origin", "https://test.example.com")
+                .set("Origin", ORIGIN)
                 .set("Authorization", `Bearer ${authToken}`)
                 .send({});
 
-            expect(response.status).toBe(404);
+            expect(missingName.status).toBe(409);
+            expect(missingName.body).toHaveProperty("validationError");
+
+            const missingProof = await request(API_BASE_URL)
+                .post(`${ZELF_IDS_PATH}/lease-offline`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({ tagName: uniqueTagName(), domain: TEST_DOMAIN });
+
+            expect(missingProof.status).toBe(409);
+            expect(missingProof.body).toHaveProperty("validationError");
+        });
+
+        it("POST /zelf-ids/lease-offline — leases a v4 proof as zelfIDObject", async () => {
+            offlineName = uniqueTagName();
+
+            const encryptResponse = await request(API_BASE_URL)
+                .post(`${JWT_HUMAN_AUTHN}/encrypt`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    faceBase64,
+                    publicData: {
+                        tagName: `${offlineName}.${TEST_DOMAIN}`,
+                        domain: TEST_DOMAIN,
+                    },
+                    metadata: { mnemonic: RECOVERY_MNEMONIC },
+                    identifier: `zid_off_${Date.now()}`,
+                    os: "DESKTOP",
+                    livenessLevel: "REGULAR",
+                    requireLiveness: false,
+                    password: TEST_PASSWORD,
+                });
+
+            expect(encryptResponse.status).toBe(200);
+            expect(typeof encryptResponse.body.zelfID).toBe("string");
+
+            const offlineResponse = await request(API_BASE_URL)
+                .post(`${ZELF_IDS_PATH}/lease-offline`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    tagName: offlineName,
+                    domain: TEST_DOMAIN,
+                    zelfProof: encryptResponse.body.zelfID,
+                });
+
+            expect(offlineResponse.status).toBe(200);
+            expect(offlineResponse.body.data).toHaveProperty("zelfIDObject");
+            const publicData = offlineResponse.body.data.zelfIDObject.publicData || {};
+            expect(publicData.origin).toBe("offline");
+            expect(Number(publicData.v)).toBe(4);
+            expect(publicData.plan).toBe("free");
+            expect(offlineResponse.body.data.walrus).toBeFalsy();
+        });
+
+        afterAll(async () => {
+            if (!offlineName || !authToken) return;
+            await request(API_BASE_URL)
+                .delete(`${ZELF_IDS_PATH}/delete`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    tagName: offlineName,
+                    domain: TEST_DOMAIN,
+                    faceBase64,
+                    password: TEST_PASSWORD,
+                    removePGP: true,
+                });
         });
     });
 
@@ -754,6 +829,148 @@ describe("Zelf IDs API Integration Tests", () => {
                 .send({});
 
             expect(response.status).toBe(403);
+        });
+    });
+
+    // ─── 11. Plan categories (5h reserve, yearly dates, no Walrus) ─────
+    describe("11. Plan categories", () => {
+        jest.setTimeout(180000);
+
+        let reservedName;
+        let reservedPublicData;
+
+        it("POST /zelf-ids/lease — long name is free mainnet, never .hold", async () => {
+            const longName = uniqueTagName();
+
+            const leaseResponse = await request(API_BASE_URL)
+                .post(`${ZELF_IDS_PATH}/lease`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    tagName: longName,
+                    domain: TEST_DOMAIN,
+                    faceBase64,
+                    password: TEST_PASSWORD,
+                    type: "create",
+                    os: "DESKTOP",
+                    removePGP: true,
+                });
+
+            expect(leaseResponse.status).toBe(200);
+            expect(leaseResponse.body.data.tagObject.publicData.type).toBe("mainnet");
+            expect(leaseResponse.body.data.tagObject.publicData.plan).toBe("free");
+            expect(leaseResponse.body.data.walrus).toBeFalsy();
+
+            const yearsUntilExpiry = moment(leaseResponse.body.data.tagObject.publicData.expiresAt).diff(moment(), "month", true);
+            expect(yearsUntilExpiry).toBeGreaterThanOrEqual(11);
+
+            await request(API_BASE_URL)
+                .delete(`${ZELF_IDS_PATH}/delete`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    tagName: longName,
+                    domain: TEST_DOMAIN,
+                    faceBase64,
+                    password: TEST_PASSWORD,
+                });
+        });
+
+        it("POST /zelf-ids/lease — short paid name is a 5-hour .zelf.hold reservation", async () => {
+            reservedName = shortUniqueTagName();
+
+            const leaseResponse = await request(API_BASE_URL)
+                .post(`${ZELF_IDS_PATH}/lease`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    tagName: reservedName,
+                    domain: TEST_DOMAIN,
+                    faceBase64,
+                    password: TEST_PASSWORD,
+                    type: "create",
+                    os: "DESKTOP",
+                    removePGP: true,
+                });
+
+            expect(leaseResponse.status).toBe(200);
+
+            reservedPublicData = leaseResponse.body.data.tagObject.publicData;
+            expect(reservedPublicData.type).toBe("hold");
+            expect(leaseResponse.body.data.walrus).toBeFalsy();
+
+            const expiresAt = moment(reservedPublicData.expiresAt);
+            const hoursUntilExpiry = expiresAt.diff(moment(), "hour", true);
+            expect(hoursUntilExpiry).toBeGreaterThan(4);
+            expect(hoursUntilExpiry).toBeLessThanOrEqual(5.1);
+        });
+
+        it("GET /zelf-ids/search — unexpired reservation is not available", async () => {
+            const response = await request(API_BASE_URL)
+                .get(`${ZELF_IDS_PATH}/search`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .query({ tagName: reservedName, domain: TEST_DOMAIN, os: "DESKTOP" });
+
+            expect(response.status).toBe(200);
+            expect(response.body.data.available).toBe(false);
+            expect(response.body.data.tagObject.publicData.type).toBe("hold");
+        });
+
+        it("POST /zelf-ids/lease — duplicate unexpired reservation is 409", async () => {
+            const response = await request(API_BASE_URL)
+                .post(`${ZELF_IDS_PATH}/lease`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    tagName: reservedName,
+                    domain: TEST_DOMAIN,
+                    faceBase64,
+                    password: TEST_PASSWORD,
+                    type: "create",
+                    os: "DESKTOP",
+                    removePGP: true,
+                });
+
+            expect(response.status).toBe(409);
+            expect(`${response.body.code || ""} ${response.body.message || ""}`).toMatch(/Conflict|tag_already_exists|already exists/i);
+        });
+
+        it("GET /zelf-ids/payment-options — 409 without tagName/duration", async () => {
+            const response = await request(API_BASE_URL)
+                .get(`${ZELF_IDS_PATH}/payment-options`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`);
+
+            expect(response.status).toBe(409);
+            expect(response.body).toHaveProperty("validationError");
+        });
+
+        it("POST /zelf-ids/payment-confirmation — 409 without token", async () => {
+            const response = await request(API_BASE_URL)
+                .post(`${ZELF_IDS_PATH}/payment-confirmation`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({ tagName: reservedName, domain: TEST_DOMAIN, network: "ETH" });
+
+            expect(response.status).toBe(409);
+            expect(response.body).toHaveProperty("validationError");
+        });
+
+        it("GET /zelf-ids/payment-options — reserved name returns unique addresses and a JWT", async () => {
+            const response = await request(API_BASE_URL)
+                .get(`${ZELF_IDS_PATH}/payment-options`)
+                .set("Origin", ORIGIN)
+                .set("Authorization", `Bearer ${authToken}`)
+                .query({ tagName: reservedName, domain: TEST_DOMAIN, duration: "1" });
+
+            expect(response.status).toBe(200);
+            expect(response.body.data.tagName).toBe(`${reservedName}.${TEST_DOMAIN}`);
+            expect(response.body.data.tagPayName).toBe(`${reservedName}.${TEST_DOMAIN}pay`);
+            expect(response.body.data.paymentAddress.solanaAddress).toBeTruthy();
+            expect(response.body.data.paymentAddress.btcAddress).toBeTruthy();
+            expect(typeof response.body.data.signedDataPrice).toBe("string");
+            expect(response.body.data.duration).toBe(1);
         });
     });
 });

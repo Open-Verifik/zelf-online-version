@@ -2,7 +2,6 @@ const ZelfIdModule = require("./zelf-id.module");
 const ZelfIdPartsModule = require("./zelf-id-parts.module");
 const { decrypt } = require("../../ZelfProof/modules/zelf-proof.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
-const TagsRegistrationModule = require("../../Tags/modules/tags-registration.module");
 
 const withV4 = (data) => ({ ...data, stack: "v4" });
 
@@ -99,11 +98,7 @@ const leaseRecovery = async (payload, authUser) => {
 
     const securityType = password ? (/^\d{6}$/.test(password) ? "pin" : "password") : null;
 
-    if (tagObject.price === 0) {
-        await TagsRegistrationModule.confirmFreeTag(tagObject, referralTagObject, domainConfig, securityType, authUser);
-    } else {
-        await TagsRegistrationModule.saveHoldTagInIPFS(tagObject, referralTagObject, domainConfig, securityType, authUser);
-    }
+    await ZelfIdModule.persistZelfIdLease(tagObject, referralTagObject, domainConfig, securityType, authUser);
 
     const pgp = await ZelfIdPartsModule.generatePGPKeys(
         dataToEncrypt,
