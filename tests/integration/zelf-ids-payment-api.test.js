@@ -1,5 +1,13 @@
 // Live Zelf ID payment quotes and unpaid confirmation.
 // Face: Core/assets/selfie_girl.jpg. Hits /api/zelf-ids (v4), not /api/my-tags.
+//
+// A completed-payment case is intentionally not fabricated here. Each quote creates
+// fresh one-time deposit addresses and a session cutoff, so reaching `confirmed: true`
+// requires sending real funds (or paying a live Stripe Checkout), waiting on external
+// indexers, and then permanently rewriting IPFS/Arweave state. An old transaction
+// cannot satisfy a fresh address/session, and injecting provider success would violate
+// this repository's no-mocking policy. The deterministic tests below therefore cover
+// signed-quote ownership/expiry gates and the real unpaid provider path.
 const request = require("supertest");
 const fs = require("fs");
 const path = require("path");
@@ -189,6 +197,47 @@ describe("Zelf IDs payment API", () => {
 
 		expect(response.status).toBe(409);
 		expect(`${response.body.code || ""} ${response.body.message || ""}`).toMatch(/avax_use_smart_contract_confirmation/i);
+	});
+
+	it("POST /zelf-ids/payment-confirmation — rejects a valid quote used for another name", async () => {
+		const response = await request(API_BASE_URL)
+			.post(`${ZELF_IDS_PATH}/payment-confirmation`)
+			.set("Origin", ORIGIN)
+			.set("Authorization", `Bearer ${authToken}`)
+			.send({
+				tagName: uniqueTagName(),
+				domain: TEST_DOMAIN,
+				network: "ETH",
+				token: paymentQuote.signedDataPrice,
+			});
+
+		expect(response.status).toBe(403);
+		expect(`${response.body.code || ""} ${response.body.message || ""}`).toMatch(/tag_not_owned/i);
+	});
+
+	it("POST /zelf-ids/payment-confirmation — rejects an expired signed quote before provider lookup", async () => {
+		expect(process.env.JWT_SECRET).toBeTruthy();
+		const expiredToken = jwt.sign(
+			{
+				...jwt.decode(paymentQuote.signedDataPrice),
+				ttl: moment().subtract(1, "minute").unix(),
+			},
+			process.env.JWT_SECRET
+		);
+
+		const response = await request(API_BASE_URL)
+			.post(`${ZELF_IDS_PATH}/payment-confirmation`)
+			.set("Origin", ORIGIN)
+			.set("Authorization", `Bearer ${authToken}`)
+			.send({
+				tagName: reservedName,
+				domain: TEST_DOMAIN,
+				network: "ETH",
+				token: expiredToken,
+			});
+
+		expect(response.status).toBe(409);
+		expect(response.body.validationError).toBe("token_expired");
 	});
 
 	it("POST /zelf-ids/stripe-checkout — 401 without auth", async () => {

@@ -89,12 +89,10 @@ The collection supports testing with different domains:
 ```
 
 ### Payment Methods
-Each domain supports different payment methods:
+The collection documents the currently supported payment methods:
 
-- **coinbase** - Coinbase Commerce
 - **crypto** - Cryptocurrency payments
-- **wallet** - User wallet payments
-- **enterprise** - Enterprise billing (bdag only)
+- **stripe** - Credit and debit card payments
 
 ### Currencies
 Supported currencies vary by domain:
@@ -168,7 +166,7 @@ Supported currencies vary by domain:
   "paymentInfo": {
     "amount": 85,
     "currency": "USD",
-    "paymentMethod": "coinbase",
+    "paymentMethod": "crypto",
     "duration": "yearly"
   }
 }
@@ -187,7 +185,7 @@ Supported currencies vary by domain:
   "description": "Avalanche community domain",
   "features": ["biometric", "wallet", "payment", "transfer", "renewal"],
   "payment": {
-    "methods": ["coinbase", "crypto", "wallet"],
+    "methods": ["crypto", "stripe"],
     "currencies": ["USD", "AVAX", "BTC", "ETH"],
     "discounts": {
       "yearly": 0.15,
