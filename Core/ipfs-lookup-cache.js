@@ -25,6 +25,7 @@ const keys = {
 	myLicense: (email, withJSON) => `myLicense:${normalize(email)}:${withJSON ? "json" : "plain"}`,
 	myLicensePrefix: (email) => `myLicense:${normalize(email)}:`,
 	subscription: (domain) => `subscription:${normalize(domain)}`,
+	licenseDomain: (domain) => `licenseDomain:${normalize(domain)}`,
 };
 
 const getOrLoad = async (key, loader) => {
@@ -53,6 +54,11 @@ const getOrLoad = async (key, loader) => {
 	inflight.set(key, promise);
 
 	return promise;
+};
+
+const set = (key, value) => {
+	if (isEmpty(value)) return false;
+	return cache.set(key, value);
 };
 
 const del = (key) => cache.del(key);
@@ -93,6 +99,7 @@ const invalidateLicense = ({ emails = [], domains = [] } = {}) => {
 
 	for (const domain of domains.filter(Boolean)) {
 		del(keys.subscription(domain));
+		del(keys.licenseDomain(domain));
 	}
 };
 
@@ -100,6 +107,7 @@ module.exports = {
 	TTL_SECONDS,
 	keys,
 	getOrLoad,
+	set,
 	del,
 	delByPrefix,
 	peek,

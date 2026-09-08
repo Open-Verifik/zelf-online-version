@@ -13,6 +13,14 @@ const {
 	effectivePlan,
 	isUnpaidExpiredReservation,
 	resolveV4PaymentStamp,
+	resolvePaidExpiresAt,
+	resolvePaidDurationStamp,
+	hasActivePaidLease,
+	normalizePaymentDuration,
+	paymentDurationYears,
+	isHoldName,
+	isUnpaidReservation,
+	FREE_EXPIRATION_YEARS,
 	getZelfIdPrice,
 } = require("../../Repositories/ZelfID/modules/zelf-id-plan.module");
 
@@ -35,6 +43,7 @@ const licenseDomain = (priceByName = {}) => ({
 		if (referralTagName && String(referralTagName).includes("vip")) price = 0;
 		else if (referralTagName) price = Math.round(price * 0.9 * 100) / 100;
 		if (`${duration}` === "2") price = price * 2;
+		if (`${duration}` === "lifetime") price = price * 10;
 		return licenseQuote(price, { duration: `${duration}`, length: bare.length });
 	},
 });
@@ -76,8 +85,8 @@ describe("zelf-id-plan.module", () => {
 		expect(getBareNameLength("mik.zelf")).toBe(3);
 	});
 
-	test("resolveComplimentaryPlan: $0 is premium for 6+ and unlimited for 1–5", () => {
-		expect(resolveComplimentaryPlan({ tagName: "zid12345.zelf", price: 0 })).toBe("premium");
+	test("resolveComplimentaryPlan: $0 stays free for 6+ and unlimited for 1–5", () => {
+		expect(resolveComplimentaryPlan({ tagName: "zid12345.zelf", price: 0 })).toBeUndefined();
 		expect(resolveComplimentaryPlan({ tagName: "mik.zelf", price: 0 })).toBe("unlimited");
 		expect(resolveComplimentaryPlan({ tagName: "zid12345.zelf", price: 24 })).toBeUndefined();
 		expect(resolveComplimentaryPlan({ tagName: "mik.zelf", price: 40 })).toBeUndefined();
@@ -146,6 +155,78 @@ describe("zelf-id-plan.module", () => {
 			requestedPlan: "unlimited",
 		});
 		expect(unlimited.plan).toBe("unlimited");
+		expect(unlimited.price).toBe(24);
+	});
+
+	test("getZelfIdPrice uses planPricing when the license has Premium/Unlimited tables", () => {
+		const { Domain } = require("../../Repositories/Tags/modules/domain.class");
+		const domain = new Domain({
+			name: "zelf",
+			tags: {
+				payment: {
+					pricingTable: {
+						"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
+					},
+					planPricing: {
+						premium: {
+							"6-15": { 1: 29, 2: 50, 3: 70, 4: 88, 5: 100, lifetime: 290 },
+						},
+						unlimited: {
+							"6-15": { 1: 99, 2: 180, 3: 250, 4: 310, 5: 360, lifetime: 990 },
+						},
+					},
+					rewardPrice: 10,
+					whitelist: {},
+				},
+			},
+		});
+
+		expect(domain._lookupTablePrice(domain._pricingTableForPlan(), 8, "1")).toBe(24);
+		expect(domain._lookupTablePrice(domain._pricingTableForPlan("premium"), 8, "1")).toBe(29);
+		expect(domain._lookupTablePrice(domain._pricingTableForPlan("unlimited"), 8, "3")).toBe(250);
+
+		const domainConfig = {
+			getPrice: (tagName, duration, referralTagName, options = {}) => {
+				const cell = domain._lookupTablePrice(domain._pricingTableForPlan(options.plan), String(tagName).split(".")[0].length, `${duration}`);
+				return licenseQuote(cell, { duration: `${duration}` });
+			},
+		};
+
+		const fallback = getZelfIdPrice({ tagName: "zid12345.zelf", duration: "1", domainConfig });
+		expect(fallback.price).toBe(24);
+
+		const premium = getZelfIdPrice({
+			tagName: "zid12345.zelf",
+			duration: "1",
+			domainConfig,
+			requestedPlan: "premium",
+		});
+		expect(premium.price).toBe(29);
+		expect(premium.plan).toBe("premium");
+
+		const unlimited = getZelfIdPrice({
+			tagName: "zid12345.zelf",
+			duration: "3",
+			domainConfig,
+			requestedPlan: "unlimited",
+		});
+		expect(unlimited.price).toBe(250);
+		expect(unlimited.plan).toBe("unlimited");
+
+		const withoutPlanTables = new Domain({
+			name: "zelf",
+			tags: {
+				payment: {
+					pricingTable: {
+						"6-15": { 1: 24, 2: 43, 3: 61, 4: 77, 5: 90, lifetime: 360 },
+					},
+					rewardPrice: 10,
+					whitelist: {},
+				},
+			},
+		});
+		expect(withoutPlanTables._lookupTablePrice(withoutPlanTables._pricingTableForPlan("premium"), 8, "1")).toBe(24);
+		expect(withoutPlanTables._lookupTablePrice(withoutPlanTables._pricingTableForPlan("unlimited"), 8, "1")).toBe(24);
 	});
 
 	test("getZelfIdPrice requires a license getPrice", () => {
@@ -222,5 +303,246 @@ describe("zelf-id-plan.module", () => {
 		expect(resolveV4PaymentStamp({ tagName: "longname", encryptVersion: 4 }).plan).toBe("premium");
 
 		expect(resolveV4PaymentStamp({ tagName: "legacy", encryptVersion: 3 })).toEqual({});
+	});
+
+	test("normalizePaymentDuration maps 999 to lifetime", () => {
+		expect(normalizePaymentDuration("999")).toBe("lifetime");
+		expect(normalizePaymentDuration(999)).toBe("lifetime");
+		expect(normalizePaymentDuration("lifetime")).toBe("lifetime");
+		expect(normalizePaymentDuration("4")).toBe("4");
+		expect(paymentDurationYears("lifetime")).toBe(100);
+		expect(paymentDurationYears("3")).toBe(3);
+	});
+
+	test("free 6–27 registrations use a 100-year sentinel", () => {
+		expect(FREE_EXPIRATION_YEARS).toBe(100);
+		expect(getBareNameLength("abcdef")).toBe(6);
+		expect(getBareNameLength("a".repeat(27))).toBe(27);
+		expect(getBareNameLength("abcde")).toBe(5);
+		expect(getBareNameLength("a".repeat(28))).toBe(28);
+		expect(allowedPlansForName("abcdef.zelf")).toEqual(["free", "premium", "unlimited"]);
+		expect(allowedPlansForName("a".repeat(27))).toEqual(["free", "premium", "unlimited"]);
+		expect(allowedPlansForName("abcde")).toEqual(["unlimited"]);
+		expect(allowedPlansForName("a".repeat(28))).toEqual([]);
+	});
+
+	test("getZelfIdPrice: complimentary long names stay free; lifetime uses the 10-year license key", () => {
+		const domainConfig = licenseDomain({ zid12345: 24 });
+
+		const complimentary = getZelfIdPrice({
+			tagName: "zid12345.zelf",
+			duration: "1",
+			referralTagName: "vip.zelf",
+			domainConfig,
+		});
+		expect(complimentary.price).toBe(0);
+		expect(complimentary.plan).toBe("free");
+
+		const lifetime = getZelfIdPrice({
+			tagName: "zid12345.zelf",
+			duration: "999",
+			domainConfig,
+			requestedPlan: "premium",
+		});
+		expect(lifetime.price).toBe(240);
+		expect(lifetime.plan).toBe("premium");
+	});
+
+	test("resolvePaidExpiresAt: free and expired reset from now; active paid yearly adds", () => {
+		const freeNow = resolvePaidExpiresAt({
+			publicData: { plan: "free", type: "mainnet", expiresAt: moment().add(99, "year").format("YYYY-MM-DD HH:mm:ss") },
+			duration: "2",
+		});
+		expect(moment(freeNow).diff(moment(), "year", true)).toBeGreaterThanOrEqual(1.9);
+		expect(moment(freeNow).diff(moment(), "year", true)).toBeLessThan(3);
+
+		const stored = moment().add(8, "month").format("YYYY-MM-DD HH:mm:ss");
+		const renewed = resolvePaidExpiresAt({
+			publicData: { plan: "premium", type: "mainnet", expiresAt: stored },
+			duration: "3",
+		});
+		expect(moment(renewed).diff(moment(stored, "YYYY-MM-DD HH:mm:ss"), "year", true)).toBeGreaterThanOrEqual(2.9);
+
+		const expiredReset = resolvePaidExpiresAt({
+			publicData: {
+				plan: "premium",
+				type: "mainnet",
+				expiresAt: moment().subtract(2, "month").format("YYYY-MM-DD HH:mm:ss"),
+			},
+			duration: "1",
+		});
+		expect(moment(expiredReset).diff(moment(), "month", true)).toBeGreaterThanOrEqual(11);
+
+		const lifetime = resolvePaidExpiresAt({
+			publicData: { plan: "premium", type: "mainnet", expiresAt: stored },
+			duration: "lifetime",
+		});
+		expect(moment(lifetime).diff(moment(), "year", true)).toBeGreaterThanOrEqual(99);
+	});
+
+	test("explicit plan wins over the 50-year fallback; missing plan with 50+ years resets", () => {
+		const far = moment().add(80, "year").format("YYYY-MM-DD HH:mm:ss");
+		const explicitPaid = resolvePaidExpiresAt({
+			publicData: { plan: "premium", type: "mainnet", expiresAt: far },
+			duration: "1",
+		});
+		expect(moment(explicitPaid).diff(moment(far, "YYYY-MM-DD HH:mm:ss"), "year", true)).toBeGreaterThanOrEqual(0.9);
+
+		const missingPlan = resolvePaidExpiresAt({
+			publicData: { type: "mainnet", expiresAt: far, tagName: "legacyname.zelf" },
+			duration: "1",
+		});
+		expect(moment(missingPlan).diff(moment(), "year", true)).toBeGreaterThanOrEqual(0.9);
+		expect(moment(missingPlan).diff(moment(), "year", true)).toBeLessThan(2);
+	});
+
+	test("legacy holds never infer premium and keep hold naming variants", () => {
+		expect(isHoldName("alice.zelf.hold")).toBe(true);
+		expect(isHoldName("alice.hold.zelf")).toBe(true);
+		expect(isHoldName("alice.zelf")).toBe(false);
+		expect(isUnpaidReservation({ type: "hold", tagName: "alice.zelf.hold" })).toBe(true);
+		expect(isUnpaidReservation({ type: "reserved", tagName: "alice.zelf" })).toBe(true);
+		expect(isUnpaidReservation({ status: "hold", tagName: "alice.zelf" })).toBe(true);
+		expect(effectivePlan({ type: "hold", tagName: "abcdef.zelf.hold" })).toBeUndefined();
+
+		const holdExpiry = resolvePaidExpiresAt({
+			publicData: {
+				type: "hold",
+				tagName: "alice.zelf.hold",
+				expiresAt: moment().add(29, "day").format("YYYY-MM-DD HH:mm:ss"),
+			},
+			duration: "1",
+		});
+		expect(moment(holdExpiry).diff(moment(), "month", true)).toBeGreaterThanOrEqual(11);
+	});
+
+	test("planless mainnet infers premium/unlimited; expired planless is free", () => {
+		expect(
+			effectivePlan({
+				type: "mainnet",
+				tagName: "abcdef.zelf",
+				expiresAt: moment().add(6, "month").format("YYYY-MM-DD HH:mm:ss"),
+			})
+		).toBe("premium");
+		expect(
+			effectivePlan({
+				type: "mainnet",
+				tagName: "mik.zelf",
+				expiresAt: moment().add(6, "month").format("YYYY-MM-DD HH:mm:ss"),
+			})
+		).toBe("unlimited");
+		expect(
+			effectivePlan({
+				type: "mainnet",
+				tagName: "abcdef.zelf",
+				expiresAt: moment().subtract(1, "day").format("YYYY-MM-DD HH:mm:ss"),
+			})
+		).toBe("free");
+	});
+
+	test("resolvePaidDurationStamp resets free→paid and adds active yearly", () => {
+		expect(
+			resolvePaidDurationStamp({
+				publicData: { plan: "free", duration: "1", type: "mainnet" },
+				duration: "2",
+			})
+		).toBe("2");
+		expect(
+			resolvePaidDurationStamp({
+				publicData: { plan: "premium", duration: "2", type: "mainnet" },
+				duration: "3",
+			})
+		).toBe("5");
+		expect(
+			resolvePaidDurationStamp({
+				publicData: { plan: "premium", duration: "2", type: "mainnet" },
+				duration: "lifetime",
+			})
+		).toBe("lifetime");
+	});
+
+	test("v4miguelunittest1.zelf resets from now when free or planless v3.6", () => {
+		const leftover = "2027-09-01 21:00:00";
+		const freeStamp = resolvePaidExpiresAt({
+			publicData: {
+				tagName: "v4miguelunittest1.zelf",
+				plan: "free",
+				type: "mainnet",
+				expiresAt: leftover,
+			},
+			duration: "1",
+		});
+		expect(hasActivePaidLease({ tagName: "v4miguelunittest1.zelf", plan: "free", type: "mainnet", expiresAt: leftover })).toBe(false);
+		expect(moment(freeStamp).diff(moment(), "year", true)).toBeGreaterThanOrEqual(0.9);
+		expect(moment(freeStamp).diff(moment(), "year", true)).toBeLessThan(2);
+		expect(moment(freeStamp).format("YYYY-MM-DD")).not.toBe("2028-09-01");
+
+		const planlessFree = resolvePaidExpiresAt({
+			publicData: {
+				tagName: "v4miguelunittest1.zelf",
+				type: "mainnet",
+				duration: "1",
+				price: 0,
+				expiresAt: leftover,
+			},
+			duration: "1",
+		});
+		expect(moment(planlessFree).diff(moment(), "year", true)).toBeGreaterThanOrEqual(0.9);
+		expect(moment(planlessFree).diff(moment(), "year", true)).toBeLessThan(2);
+		expect(
+			resolvePaidDurationStamp({
+				publicData: { tagName: "v4miguelunittest1.zelf", type: "mainnet", duration: "1", price: 0, expiresAt: leftover },
+				duration: "1",
+			})
+		).toBe("1");
+	});
+
+	test("v4miguelunittest2.zelf adds onto stored expiry for v4 premium or v3.6 paid", () => {
+		const stored = moment().add(8, "month").format("YYYY-MM-DD HH:mm:ss");
+		expect(
+			hasActivePaidLease({
+				tagName: "v4miguelunittest2.zelf",
+				plan: "premium",
+				type: "mainnet",
+				expiresAt: stored,
+			})
+		).toBe(true);
+
+		const v4Paid = resolvePaidExpiresAt({
+			publicData: {
+				tagName: "v4miguelunittest2.zelf",
+				plan: "premium",
+				type: "mainnet",
+				expiresAt: stored,
+			},
+			duration: "1",
+		});
+		expect(moment(v4Paid).diff(moment(stored, "YYYY-MM-DD HH:mm:ss"), "year", true)).toBeGreaterThanOrEqual(0.9);
+
+		const v36Paid = resolvePaidExpiresAt({
+			publicData: {
+				tagName: "v4miguelunittest2.zelf",
+				type: "mainnet",
+				duration: "1",
+				price: 24,
+				renewedAt: "2026-03-01 12:00:00",
+				expiresAt: stored,
+			},
+			duration: "1",
+		});
+		expect(moment(v36Paid).diff(moment(stored, "YYYY-MM-DD HH:mm:ss"), "year", true)).toBeGreaterThanOrEqual(0.9);
+		expect(
+			resolvePaidDurationStamp({
+				publicData: {
+					tagName: "v4miguelunittest2.zelf",
+					type: "mainnet",
+					duration: "1",
+					price: 24,
+					renewedAt: "2026-03-01 12:00:00",
+					expiresAt: stored,
+				},
+				duration: "1",
+			})
+		).toBe("2");
 	});
 });

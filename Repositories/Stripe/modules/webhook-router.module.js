@@ -78,6 +78,16 @@ const routeWebhook = async (event) => {
 		return await SubscriptionModule.webhookHandler(event);
 	}
 
+	if (source === "zelf-id-lease") {
+		const ZelfIdsStripeModule = require("../../ZelfID/modules/zelf-ids-stripe.module");
+
+		if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+			return await ZelfIdsStripeModule.confirmFromCheckoutEvent(event);
+		}
+
+		return { status: "skipped", reason: "unhandled_zelf_id_lease_event", eventType: event.type };
+	}
+
 	// Dashboard source or missing source routes to Stripe module (admin panel)
 	return await StripeModule.processWebhookEvent(event);
 };

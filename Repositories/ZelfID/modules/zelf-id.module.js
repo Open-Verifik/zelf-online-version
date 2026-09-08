@@ -18,7 +18,8 @@ const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module"
 const OfflineProofModule = require("../../Mina/offline-proof");
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
-const { initTagUpdates, updateTags } = require("../../Tags/modules/sync-tag-records.module");
+const { initTagUpdates, updateTags, upgradeLegacyProofAndRepin } = require("../../Tags/modules/sync-tag-records.module");
+const { resolveEncryptVersion } = require("../../Tags/modules/tags-addresses.module");
 
 const { generateHoldDomain } = require("../../Tags/modules/domain-registry.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
@@ -107,6 +108,9 @@ const leaseTag = async (params, authUser) => {
         securityType = /^\d{6}$/.test(password) ? "pin" : "password";
     }
 
+    const proofSecurityType =
+        securityType === "pin" ? "pin" : securityType === "password" || securityType === "securePassword" ? "password" : "";
+
     const { eth, btc, solana, sui, stellar, polkadot, kusama, ton, aptos, zkProof, mnemonic, arweave } = await _createWalletsFromPhrase({
         ...params,
         mnemonic: decryptedParams.mnemonic,
@@ -119,6 +123,7 @@ const leaseTag = async (params, authUser) => {
             btcAddress: btc.address,
             [tagKey]: tagName,
             domain,
+            ...(proofSecurityType ? { st: proofSecurityType } : {}),
         }),
         metadata: {
             mnemonic,
@@ -268,15 +273,26 @@ const decryptTag = async (params, authUser) => {
 
     const { face, password } = await _decryptParams(params, authUser);
 
-    const decryptedZelfProof = await decrypt(
-        withV4({
-            addServerPassword: Boolean(params.addServerPassword),
-            faceBase64: face,
-            password,
-            zelfProof: tagObject?.zelfProof,
-            hasPassword: tagObject.publicData.hasPassword,
-        })
-    );
+    const decryptPayload = {
+        addServerPassword: Boolean(params.addServerPassword),
+        faceBase64: face,
+        password,
+        zelfProof: tagObject?.zelfProof,
+        hasPassword: tagObject.publicData.hasPassword,
+    };
+
+    let needsLegacyUpgrade = resolveEncryptVersion(tagObject.publicData) !== 4;
+    let decryptedZelfProof;
+
+    if (needsLegacyUpgrade) {
+        decryptedZelfProof = await decrypt(decryptPayload);
+    } else {
+        decryptedZelfProof = await decrypt(withV4(decryptPayload));
+        if (decryptedZelfProof.error) {
+            decryptedZelfProof = await decrypt(decryptPayload);
+            if (!decryptedZelfProof.error) needsLegacyUpgrade = true;
+        }
+    }
 
     if (decryptedZelfProof.error) {
         const error = new Error(decryptedZelfProof.error.code);
@@ -300,7 +316,17 @@ const decryptTag = async (params, authUser) => {
         password,
     });
 
-    if (tagsToAdd.length || tagObject.publicData?._needsPinSplit) {
+    if (needsLegacyUpgrade) {
+        const { ipfs, arweave: updatedArweave } = await upgradeLegacyProofAndRepin(tagObject, {
+            faceBase64: face,
+            password,
+            addServerPassword: Boolean(params.addServerPassword),
+            tagsToAdd,
+        });
+
+        tagObject.updatedIpfs = ipfs;
+        tagObject.updatedArweave = updatedArweave;
+    } else if (tagsToAdd.length || tagObject.publicData?._needsPinSplit) {
         const { ipfs, arweave: updatedArweave } = await updateTags(tagObject, tagsToAdd);
 
         tagObject.updatedIpfs = ipfs;
@@ -449,7 +475,7 @@ const leaseConfirmation = async (params) => {
 
 /**
  * Persist a Zelf ID lease: 6+ characters confirm as free; short names with price > 0 get a 5-hour hold.
- * A leftover `$0` quote confirms as complimentary premium (6+) or unlimited (1–5).
+ * A leftover `$0` quote confirms as complimentary unlimited for short names; long names stay free.
  * @param {Object} tagObject
  * @param {Object|null} referralTagObject
  * @param {Object} domainConfig
@@ -679,13 +705,19 @@ const deleteTag = async (params, authUser) => {
 
     const ipfsID = searchResult.tagObject.id;
 
-    const decryptedZelfProof = await decrypt(
-        withV4({
-            faceBase64,
-            password,
-            zelfProof,
-        })
-    );
+    const publicData = searchResult.tagObject.publicData || {};
+    const decryptPayload = { faceBase64, password, zelfProof };
+    let decryptedZelfProof =
+        resolveEncryptVersion(publicData) === 4
+            ? await decrypt(withV4(decryptPayload))
+            : await decrypt(decryptPayload);
+
+    if (decryptedZelfProof.error) {
+        decryptedZelfProof =
+            resolveEncryptVersion(publicData) === 4
+                ? await decrypt(decryptPayload)
+                : await decrypt(withV4(decryptPayload));
+    }
 
     if (decryptedZelfProof.error) {
         const error = new Error(decryptedZelfProof.error.code);
@@ -696,7 +728,6 @@ const deleteTag = async (params, authUser) => {
     const deletedFiles = [];
 
     if (ipfsID) {
-        const publicData = searchResult.tagObject.publicData || {};
         const canonicalName = publicData.tagName || publicData.zelfName || `${tagName}.${domain}`;
         deletedFiles.push(await unpinContinuationSiblings(canonicalName));
         deletedFiles.push(await unPinFiles([ipfsID]));

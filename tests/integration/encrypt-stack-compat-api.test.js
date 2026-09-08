@@ -194,4 +194,64 @@ describe("3.1.6 / v4 encrypt compatibility and upgrade", () => {
             expect(payload.metadata).toMatchObject(METADATA);
         });
     });
+
+    describe("POST /api/tags/decrypt upgrades a 3.1.6 lease", () => {
+        const sampleFaceFromJSON = require("../../config/0012589021.json");
+        jest.setTimeout(180000);
+
+        it("re-pins v=4 and stamps a plan for non-hold names", async () => {
+            const tagName = `decryptupg${Math.floor(Math.random() * 100000)
+                .toString()
+                .padStart(5, "0")}`;
+
+            const leaseResponse = await auth(request(API_BASE_URL).post("/api/tags/lease")).send({
+                tagName,
+                domain: "zelf",
+                faceBase64: sampleFaceFromJSON.faceBase64,
+                password: "testpassword123",
+                type: "create",
+                os: "DESKTOP",
+                removePGP: true,
+            });
+
+            expect(leaseResponse.status).toBe(200);
+            const leased = leaseResponse.body.data;
+            const leasedProof = leased?.zelfProof || leased?.tagObject?.zelfProof;
+            if (!leasedProof) {
+                throw new Error(`lease missing zelfProof: ${JSON.stringify(leaseResponse.body)}`);
+            }
+            expect(Number(leased.publicData?.v || leased.tagObject?.publicData?.v) === 4).toBe(false);
+
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+
+            const decryptResponse = await auth(request(API_BASE_URL).post("/api/tags/decrypt")).send({
+                tagName,
+                domain: "zelf",
+                faceBase64: sampleFaceFromJSON.faceBase64,
+                password: "testpassword123",
+                os: "DESKTOP",
+                removePGP: true,
+            });
+
+            expect(decryptResponse.status).toBe(200);
+            const publicData = decryptResponse.body.data.publicData;
+            expect(Number(publicData.v)).toBe(4);
+            const isHold =
+                publicData.type === "hold" ||
+                /\.hold(\.|$)/i.test(String(publicData.tagName || publicData.zelfName || ""));
+            if (isHold) {
+                expect(publicData.plan).toBeUndefined();
+            } else {
+                expect(["free", "premium", "unlimited"]).toContain(publicData.plan);
+            }
+            expect(decryptResponse.body.data.zelfProof).not.toBe(leasedProof);
+
+            await auth(request(API_BASE_URL).delete("/api/tags/delete")).send({
+                tagName,
+                domain: "zelf",
+                faceBase64: sampleFaceFromJSON.faceBase64,
+                password: "testpassword123",
+            });
+        }, 180000);
+    });
 });

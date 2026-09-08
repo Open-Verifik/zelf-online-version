@@ -6,7 +6,10 @@ const jwt = require("jsonwebtoken");
 const config = require("../../../Core/config");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
 const { coerceInitiatedAtUnix } = require("../../Tags/modules/tag-pay-session-tx.util");
-const { throwPaymentConfirmationTagNotFound } = require("../../Tags/modules/tag-smart-contract-payment.module");
+const {
+    throwPaymentConfirmationTagNotFound,
+    verifySmartContractPayment: verifyTagsSmartContractPayment,
+} = require("../../Tags/modules/tag-smart-contract-payment.module");
 const { confirmPayUniqueAddress } = require("../../Tags/modules/my-tags.module");
 const ZelfIdModule = require("./zelf-id.module");
 const ZelfIdsPaymentModule = require("./zelf-ids-payment.module");
@@ -52,6 +55,8 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
             amountReceived: paymentConfirmation.amountReceived,
             paymentConfirmation,
             publicData: tagObject.publicData,
+            expiresAt: tagObject.publicData?.expiresAt || null,
+            tagObject,
         };
     }
 
@@ -68,7 +73,7 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
         };
     }
 
-    await addDurationToTag(
+    const extension = await addDurationToTag(
         {
             tagName: tagObject.publicData[domainConfig.getTagKey()].split(".")[0],
             price: amountToPay,
@@ -80,8 +85,13 @@ const verifyPaymentConfirmation = async (tagName, domain, network, token) => {
         tagObject
     );
 
+    if (extension.expiresAt && tagObject.publicData) {
+        tagObject.publicData.expiresAt = extension.expiresAt;
+    }
+
     return {
-        tagObject,
+        tagObject: extension.tagObject || tagObject,
+        expiresAt: extension.expiresAt || tagObject.publicData?.expiresAt || null,
         confirmed: true,
         amountReceived: paymentConfirmation.amountReceived,
     };
@@ -136,8 +146,12 @@ const addDurationToTag = async (params, tagObject) => {
 const getPaymentOptions = (tagName, domain, duration, authUser, requestOptions = {}) =>
     ZelfIdsPaymentModule.getPaymentOptions(tagName, domain, duration, authUser, requestOptions);
 
+const verifySmartContractPayment = (tagName, domain, token, txHash, network) =>
+    verifyTagsSmartContractPayment(tagName, domain, token, txHash, network);
+
 module.exports = {
     verifyPaymentConfirmation,
+    verifySmartContractPayment,
     addDurationToTag,
     getPaymentOptions,
 };

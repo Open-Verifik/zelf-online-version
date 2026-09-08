@@ -197,7 +197,7 @@ const _verifyWithProvider = async (sessionIdOrCode) => {
             isPaid: false,
             details: {
                 method: "unsupported",
-                status: "coinbase_removed",
+                status: "unsupported_provider",
             },
         };
     }

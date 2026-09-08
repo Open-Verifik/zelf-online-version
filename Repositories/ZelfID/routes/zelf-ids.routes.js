@@ -25,6 +25,16 @@ module.exports = (server) => {
 
     server.post(`${PATH}/payment-confirmation`, Middleware.paymentConfirmationValidation, Controller.paymentConfirmation);
 
+    server.post(
+        `${PATH}/smart-contract-payment-confirmation`,
+        Middleware.smartContractPaymentConfirmationValidation,
+        Controller.smartContractPaymentConfirmation
+    );
+
+    server.post(`${PATH}/stripe-checkout`, Middleware.stripeCheckoutValidation, Controller.stripeCheckout);
+
+    server.get(`${PATH}/stripe-session`, Middleware.stripeSessionValidation, Controller.stripeSession);
+
     server.post(`${PATH}/lease`, Middleware.leaseValidation, Controller.leaseTag);
 
     server.post(`${PATH}/lease-offline`, Middleware.leaseOfflineValidation, Controller.leaseOffline);

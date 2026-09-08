@@ -132,6 +132,21 @@ describe("Decrypt Tag API Integration Tests - Complete Flow", () => {
 			const metadata = decryptResponse.body.data.metadata;
 			expect(metadata).toHaveProperty("mnemonic");
 
+			expect(Number(publicData.v)).toBe(4);
+			const isHold =
+				publicData.type === "hold" ||
+				/\.hold(\.|$)/i.test(String(publicData.tagName || publicData.zelfName || ""));
+			if (isHold) {
+				expect(publicData.plan).toBeUndefined();
+			} else {
+				expect(["free", "premium", "unlimited"]).toContain(publicData.plan);
+			}
+			expect(decryptResponse.body.data.zelfProof).toBeTruthy();
+			const leasedProof = leasedTagData.zelfProof || leasedTagData.tagObject?.zelfProof;
+			if (leasedProof) {
+				expect(decryptResponse.body.data.zelfProof).not.toBe(leasedProof);
+			}
+
 			console.log(`✅ Step 2: Successfully decrypted tag ${sampleTagName}.${sampleDomain}`);
 
 			// Step 3: Delete the tag

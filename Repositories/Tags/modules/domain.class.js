@@ -40,6 +40,7 @@ class Domain {
                 rewardPrice: domainData.tags?.payment?.rewardPrice || 10,
                 whitelist: domainData.tags?.payment.whitelist || {},
                 pricingTable: domainData.tags?.payment.pricingTable || {},
+                planPricing: domainData.tags?.payment?.planPricing || {},
             },
             storage: {
                 keyPrefix: domainData.tags?.storage?.keyPrefix || "tagName",
@@ -91,6 +92,8 @@ class Domain {
 
         /** Optional second document URL (official license JSON on IPFS); not exposed in toJSON */
         this.themeSettingsUrl = typeof domainData.themeSettingsUrl === "string" ? domainData.themeSettingsUrl : "";
+        this.updatedAt = domainData.updatedAt || domainData.metadata?.updatedAt || "";
+        this.ipfsCid = domainData.ipfsCid || "";
     }
 
     /**
@@ -111,12 +114,42 @@ class Domain {
     }
 
     /**
-     * Get domain price for specific tag length and duration
-     * @param {number} tagLength - Length of tag name
-     * @param {string} duration - Duration ('1', '2', '3', '4', '5', 'lifetime')
-     * @returns {number} - Price in cents
+     * License table for a Zelf ID plan, or the Tags default table.
+     * @param {"premium"|"unlimited"|string} [plan]
+     * @returns {Object}
      */
-    getPrice(tagName, duration = "1", referralTagName = "") {
+    _pricingTableForPlan(plan) {
+        const fallback = this.tags?.payment?.pricingTable || {};
+        if (plan !== "premium" && plan !== "unlimited") return fallback;
+
+        const planTable = this.tags?.payment?.planPricing?.[plan];
+        if (planTable && typeof planTable === "object" && Object.keys(planTable).length > 0) {
+            return planTable;
+        }
+
+        return fallback;
+    }
+
+    /**
+     * @param {Object} table
+     * @param {number} length
+     * @param {string} duration
+     * @returns {number|undefined}
+     */
+    _lookupTablePrice(table, length, duration) {
+        if (length >= 6 && length <= 15) return table?.["6-15"]?.[duration];
+        return table?.[length]?.[duration];
+    }
+
+    /**
+     * Get domain price for specific tag length and duration
+     * @param {string} tagName - Tag name
+     * @param {string} duration - Duration ('1', '2', '3', '4', '5', 'lifetime')
+     * @param {string} [referralTagName]
+     * @param {{ plan?: "premium"|"unlimited" }} [options] - Zelf ID plan table; Tags ignore this
+     * @returns {Object} - Quote in USD
+     */
+    getPrice(tagName, duration = "1", referralTagName = "", options = {}) {
         if (!tagName) {
             return {
                 duration,
@@ -136,20 +169,25 @@ class Domain {
         referralTagName = (referralTagName || "").replace(".hold", "");
 
         const length = splitTagName[0].length;
+        const plan = options && typeof options === "object" ? options.plan : undefined;
+        const fallbackTable = this.tags?.payment?.pricingTable || {};
+        const table = this._pricingTableForPlan(plan);
 
-        if (!this.tags?.payment?.pricingTable) return 0;
+        if (!fallbackTable && !table) return 0;
 
         if (!["1", "2", "3", "4", "5", "lifetime"].includes(`${duration}`))
             throw new Error("Invalid duration. Use '1', '2', '3', '4', '5' or 'lifetime'.");
 
-        let price = 24;
+        let price = this._lookupTablePrice(table, length, duration);
+        if (price == null && table !== fallbackTable) {
+            price = this._lookupTablePrice(fallbackTable, length, duration);
+        }
 
-        if (length >= 6 && length <= 15) {
-            price = this.tags?.payment.pricingTable["6-15"]?.[duration];
-        } else if (this.tags?.payment.pricingTable[length]) {
-            price = this.tags?.payment.pricingTable[length][duration];
-        } else {
-            throw new Error("Invalid name length. Length must be between 1 and 27.");
+        if (price == null) {
+            if (length < 1 || length > 27) {
+                throw new Error("Invalid name length. Length must be between 1 and 27.");
+            }
+            price = 24;
         }
 
         // Adjust price for development environment
@@ -330,6 +368,8 @@ class Domain {
             limits: this.limits,
             metadata: this.metadata,
             themeSettings: this.themeSettings, // Include complete themeSettings in JSON output
+            updatedAt: this.updatedAt || "",
+            ipfsCid: this.ipfsCid || "",
         };
     }
 

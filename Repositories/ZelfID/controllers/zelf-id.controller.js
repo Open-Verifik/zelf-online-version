@@ -10,6 +10,7 @@ const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const TagWalletBalancesModule = require("../../Tags/modules/tag-wallet-balances.module");
 const MyZelfIdModule = require("../modules/my-zelf-id.module");
 const ZelfIdsOfflineModule = require("../modules/zelf-ids-offline.module");
+const ZelfIdsStripeModule = require("../modules/zelf-ids-stripe.module");
 
 /**
  * Keep full pin name (e.g. user.zelfpay) for IPFS lookup; middleware only supplies registry TLD + local name.
@@ -444,6 +445,56 @@ const paymentConfirmation = async (ctx) => {
     }
 };
 
+const smartContractPaymentConfirmation = async (ctx) => {
+    try {
+        const { tagName, domain, token, txHash, network } = ctx.request.body;
+        const data = await MyZelfIdModule.verifySmartContractPayment(tagName, domain, token, txHash, network);
+
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
+
+        ctx.status = _exception.status;
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
+};
+
+const stripeCheckout = async (ctx) => {
+    try {
+        const { tagName, domain, duration, plan, token, locale, email } = ctx.request.body;
+        const data = await ZelfIdsStripeModule.createStripeCheckout({
+            tagName,
+            domain,
+            duration,
+            plan,
+            token,
+            locale,
+            email,
+        });
+
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
+
+        ctx.status = _exception.status;
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
+};
+
+const stripeSession = async (ctx) => {
+    try {
+        const { sessionId } = ctx.request.query;
+        const data = await ZelfIdsStripeModule.confirmFromSessionId(sessionId);
+
+        ctx.body = { data };
+    } catch (error) {
+        const _exception = errorHandler(error, ctx);
+
+        ctx.status = _exception.status;
+        ctx.body = { message: _exception.message, code: _exception.code };
+    }
+};
+
 module.exports = {
     searchTag,
     searchTagsByDomain,
@@ -464,4 +515,7 @@ module.exports = {
     getWalletBalances,
     paymentOptions,
     paymentConfirmation,
+    smartContractPaymentConfirmation,
+    stripeCheckout,
+    stripeSession,
 };

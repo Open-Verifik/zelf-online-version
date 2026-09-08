@@ -9,6 +9,16 @@ const DefaultLicenseValues = require("./default-license.values");
 const { Domain } = require("../../Tags/modules/domain.class");
 const { initCacheInstance } = require("../../../cache/manager");
 const IpfsLookupCache = require("../../../Core/ipfs-lookup-cache");
+const { upsertCachedDomain } = require("../../Tags/config/supported-domains");
+const {
+    asLicenseJson,
+    licenseCid,
+    mergeLicenseMap,
+    preferLicense,
+    resolveLicenseRecord,
+} = require("./license-cache.util");
+
+const lastSeededByDomain = {};
 
 // Initialize cache with 2 hour TTL and check period of 10 minutes (see cache/manager.js stdTTL)
 const licenseCache = initCacheInstance();
@@ -92,27 +102,23 @@ const loadCache = () => {
 };
 
 /**
- * Save licenses to cache
- * @param {Array} licenses - License data to cache
+ * Save licenses to cache by merging into the existing domain map.
+ * Pinata reloads must not replace a newer seeded write.
+ * @param {Array|Object} licenses - License JSON list or map
  */
 const saveCache = (licenses) => {
     try {
-        // Check if we need to update the cache (avoid unnecessary operations)
-        const existingCache = loadCache();
-        if (existingCache && JSON.stringify(existingCache) === JSON.stringify(licenses)) {
-            return;
+        const incoming = Array.isArray(licenses) ? licenses : licenses && typeof licenses === "object" ? Object.values(licenses) : [];
+        const merged = reapplySeededLicenses(mergeLicenseMap(loadCache() || {}, incoming));
+
+        licenseCache.set("official-licenses", merged);
+
+        for (const license of Object.values(merged)) {
+            upsertCachedDomain(license);
         }
 
-        const licensesMap = licenses.reduce((acc, license) => {
-            acc[license.name.toLowerCase()] = license;
-            return acc;
-        }, {});
-
-        // Save to memory cache with automatic expiration
-        licenseCache.set("official-licenses", licensesMap);
-
         console.info(
-            `Official licenses cached successfully (${licenses.length} licenses, TTL: ${licenseCache.getTtl("official-licenses") ? Math.round((licenseCache.getTtl("official-licenses") - Date.now()) / 1000) : "N/A"
+            `Official licenses cached successfully (${Object.keys(merged).length} licenses, TTL: ${licenseCache.getTtl("official-licenses") ? Math.round((licenseCache.getTtl("official-licenses") - Date.now()) / 1000) : "N/A"
             }s)`
         );
     } catch (error) {
@@ -125,6 +131,49 @@ const saveCache = (licenses) => {
  */
 const clearCache = () => {
     licenseCache.del("official-licenses");
+};
+
+/**
+ * Patch official-licenses memory after a write so getPrice does not wait on Pinata.
+ * @param {Object} licenseData - License JSON saved to IPFS
+ */
+const upsertOfficialLicenseCache = (licenseData) => {
+    if (!licenseData?.name) return;
+
+    const key = String(licenseData.name).toLowerCase();
+    const next = asLicenseJson(preferLicense(loadCache()?.[key], licenseData));
+    lastSeededByDomain[key] = next;
+
+    const cached = loadCache() || {};
+    cached[key] = next;
+    licenseCache.set("official-licenses", cached);
+    upsertCachedDomain(next);
+};
+
+const reapplySeededLicenses = (map) => {
+    const next = { ...(map || {}) };
+    for (const [name, seeded] of Object.entries(lastSeededByDomain)) {
+        next[name] = asLicenseJson(preferLicense(next[name], seeded));
+    }
+    return next;
+};
+
+const preferredCidForDomain = (domain) => {
+    if (!domain) return "";
+    const seeded = IpfsLookupCache.peek(IpfsLookupCache.keys.licenseDomain(domain));
+    const remembered = lastSeededByDomain[String(domain).toLowerCase()];
+    return licenseCid(seeded) || licenseCid(remembered);
+};
+
+const domainFromLicenseRecords = (records = []) => {
+    const first = records[0];
+    return first?.publicData?.licenseDomain || first?.domainConfig?.name || first?.name || "";
+};
+
+const selectLicenseFromRecords = (records) => {
+    const domain = domainFromLicenseRecords(records);
+    const seeded = domain ? IpfsLookupCache.peek(IpfsLookupCache.keys.licenseDomain(domain)) : null;
+    return resolveLicenseRecord(records, preferredCidForDomain(domain), seeded);
 };
 
 /**
@@ -149,11 +198,14 @@ const searchLicense = async (query, user) => {
     const includeTheme = parseIncludeThemeSettings(includeThemeSettings);
 
     if (domain) {
+        const seeded = IpfsLookupCache.peek(IpfsLookupCache.keys.licenseDomain(domain));
+        if (seeded) return seeded;
+
         const existingLicense = await IPFS.get({ key: "licenseDomain", value: domain });
 
         if (!existingLicense.length) throw new Error("404:license_not_found");
 
-        const licenseRecord = existingLicense[0];
+        const licenseRecord = resolveLicenseRecord(existingLicense, preferredCidForDomain(domain), seeded);
 
         // Fetch the complete JSON content from IPFS URL if requested
         if (withJSON) {
@@ -271,11 +323,13 @@ const _getMyLicenseForStaffWithCredentials = async (jwt, withJSON, ownershipCred
         }
     }
 
-    if (withJSON && myLicenses.length) {
-        try {
-            const jsonResponse = await axios.get(myLicenses[0].url);
+    const selectedLicense = selectLicenseFromRecords(myLicenses);
 
-            myLicenses[0].domainConfig = jsonResponse.data;
+    if (withJSON && selectedLicense?.url && !selectedLicense.domainConfig) {
+        try {
+            const jsonResponse = await axios.get(selectedLicense.url);
+
+            selectedLicense.domainConfig = jsonResponse.data;
         } catch (error) {
             console.error("Error getting json from url:", error);
             throw error;
@@ -285,7 +339,7 @@ const _getMyLicenseForStaffWithCredentials = async (jwt, withJSON, ownershipCred
     const ownerClient = await ClientModule.get({ email: orgOwnerEmail });
 
     return {
-        myLicense: myLicenses.length ? myLicenses[0] : null,
+        myLicense: selectedLicense,
         zelfAccount: ownerClient || client,
         accountZelfProof,
         accountJSON,
@@ -338,14 +392,13 @@ const _loadMyLicenseForAccount = async (jwt, withJSON, ownershipCredentials) => 
         }
     }
 
-    let jsonResponse = null;
+    const selectedLicense = selectLicenseFromRecords(myLicenses);
 
-    // get the json from the url
-    if (withJSON && myLicenses.length) {
+    if (withJSON && selectedLicense?.url && !selectedLicense.domainConfig) {
         try {
-            jsonResponse = await axios.get(myLicenses[0].url);
+            const jsonResponse = await axios.get(selectedLicense.url);
 
-            myLicenses[0].domainConfig = jsonResponse.data;
+            selectedLicense.domainConfig = jsonResponse.data;
         } catch (error) {
             console.error("Error getting json from url:", error);
             throw error;
@@ -353,7 +406,7 @@ const _loadMyLicenseForAccount = async (jwt, withJSON, ownershipCredentials) => 
     }
 
     return {
-        myLicense: myLicenses.length ? myLicenses[0] : null,
+        myLicense: selectedLicense,
         zelfAccount: client,
         accountZelfProof,
         accountJSON,
@@ -539,6 +592,7 @@ const createOrUpdateLicense = async (body, jwt) => {
             domain: body.domain,
             owner: jwt.email,
             zelfProof: accountZelfProof,
+            updatedAt: new Date().toISOString(),
         };
 
         const jsonData = JSON.stringify(licenseMetadata, null, 2);
@@ -561,9 +615,32 @@ const createOrUpdateLicense = async (body, jwt) => {
             { pro: true }
         );
 
+        licenseMetadata.ipfsCid = licenseCid(license);
+
         IpfsLookupCache.invalidateLicense({
             emails: [jwt.email, jwt.ownerEmail, zelfAccount?.publicData?.accountEmail],
             domains: [body.domain, myLicense?.publicData?.domain, myLicense?.domainConfig?.name],
+        });
+
+        const freshRecord = {
+            ...license,
+            domainConfig: licenseMetadata,
+            publicData: {
+                ...(license.publicData || {}),
+                type: "license",
+                licenseDomain: body.domain,
+                licenseOwner: jwt.email,
+            },
+        };
+
+        _seedLicenseReadCaches({
+            emails: [jwt.email, jwt.ownerEmail, zelfAccount?.publicData?.accountEmail],
+            domain: body.domain,
+            previousDomains: [myLicense?.publicData?.domain, myLicense?.domainConfig?.name],
+            freshRecord,
+            zelfAccount,
+            accountZelfProof,
+            licenseMetadata,
         });
 
         return {
@@ -575,6 +652,31 @@ const createOrUpdateLicense = async (body, jwt) => {
         console.error("Create/Update license error:", error);
         throw error;
     }
+};
+
+/**
+ * After a license write, serve the new JSON immediately.
+ * Pinata metadata search and the 2-hour official-licenses TTL otherwise keep the old cells.
+ */
+const _seedLicenseReadCaches = ({ emails = [], domain, previousDomains = [], freshRecord, zelfAccount, accountZelfProof, licenseMetadata } = {}) => {
+    const payload = {
+        myLicense: freshRecord,
+        zelfAccount,
+        accountZelfProof,
+        accountJSON: null,
+    };
+
+    for (const email of emails.filter(Boolean)) {
+        IpfsLookupCache.set(IpfsLookupCache.keys.myLicense(email, true), payload);
+        IpfsLookupCache.set(IpfsLookupCache.keys.myLicense(email, false), payload);
+    }
+
+    const domains = [domain, ...(previousDomains || [])].filter(Boolean);
+    for (const name of domains) {
+        IpfsLookupCache.set(IpfsLookupCache.keys.licenseDomain(name), freshRecord);
+    }
+
+    upsertOfficialLicenseCache(licenseMetadata);
 };
 
 /**
@@ -590,6 +692,9 @@ const deleteLicense = async (params, authUser) => {
         const { myLicense } = await getMyLicense(authUser, false, { faceBase64, masterPassword });
 
         if (!myLicense) throw new Error("404:license_not_found");
+
+        const deletedDomain = String(myLicense?.publicData?.licenseDomain || myLicense?.domainConfig?.name || "").toLowerCase();
+        if (deletedDomain) delete lastSeededByDomain[deletedDomain];
 
         // Unpin from IPFS
         const deletedFiles = await IPFS.unPinFiles([myLicense.id]);
@@ -673,10 +778,9 @@ const loadOfficialLicenses = async (force = false) => {
         const results = await Promise.all(licensePromises);
         const licenses = results.filter((license) => license !== null);
 
-        // Save to cache with automatic expiration
         saveCache(licenses);
 
-        return licenses;
+        return loadCache() || mergeLicenseMap({}, licenses);
     } catch (error) {
         console.error("Error loading official licenses:", error);
 
@@ -809,6 +913,7 @@ module.exports = {
     getUserZelfProof,
     deleteLicense,
     loadOfficialLicenses,
+    upsertOfficialLicenseCache,
     syncLicenseWithStripe,
     saveSubscriptionRecord,
     // Cache management functions

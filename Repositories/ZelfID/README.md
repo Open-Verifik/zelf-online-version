@@ -8,7 +8,7 @@ v4 proofs from that host stay **unsigned** so Android/iOS can encrypt/decrypt of
 
 `POST /lease-offline` pins an existing v4 proof (string and/or QR). Preview is **`previewHumanAuthn`** (Human Authn / `/zelf-v4`). Tags offline lease stays on `/api/tags/lease-offline`.
 
-Names of 6–27 characters lease as `free` (no `.hold`) and can later buy a yearly **premium** or **unlimited** plan via `GET /payment-options?plan=` then `POST /payment-confirmation` — not `/api/my-tags`. Names of 5 characters or fewer are **unlimited only**; the yearly price comes from the domain license pricing table. A `$0` referral is a complimentary year of unlimited. Unpaid short names use a **5-hour** `name.domain.hold` pin. When a year ends, the name stays and the plan reads as `free`. See public docs: [Migration v4 changelog](https://docs.zelf.world/docs/changelog/2026-08-31-zelf-id-migration-v4) and [Unit tests](https://docs.zelf.world/docs/api/zelf-ids/unit-tests).
+Names of 6–27 characters lease as `free` (no `.hold`) with a **100-year** internal `expiresAt` sentinel (UI: **No expiration**). A `$0` referral/complimentary quote on those names stays **free**. They can later buy **1–5 years** or **Lifetime** of **premium** or **unlimited** via `GET /payment-options?plan=` then `POST /payment-confirmation` or `POST /smart-contract-payment-confirmation` — not `/api/my-tags`. Lifetime charges the license 10-year price and stamps 100 years from today. Free → paid resets expiration from now; active paid yearly adds to the stored expiry; expired paid adds from today. Names of 5 characters or fewer are **unlimited only**. New unpaid short names use a **5-hour** `name.domain.hold` pin. Legacy Tags holds keep their original stored expiry (often 30 days). When a paid term ends, the name stays and the plan reads as `free`. See public docs: [Migration v4 changelog](https://docs.zelf.world/docs/changelog/2026-08-31-zelf-id-migration-v4) and [Unit tests](https://docs.zelf.world/docs/api/zelf-ids/unit-tests).
 
 Registered in `Routes/protected-repositories.js`.
 
@@ -24,6 +24,7 @@ Registered in `Routes/protected-repositories.js`.
 | GET | `/wallet-balances` | optional address query fields |
 | GET | `/payment-options` | `tagName`, `domain`, `duration` |
 | POST | `/payment-confirmation` | `tagName`, `network`, `token`; optional `domain` |
+| POST | `/smart-contract-payment-confirmation` | `tagName`, `network` (`AVAX_SC` / `BSC_SC` / `ETH_SC` / `POLYGON_SC` / `BASE_SC` / `BLOCKDAG_SC`), `token`, `txHash`; optional `domain` |
 | POST | `/lease` | `tagName`, `domain`, `faceBase64`, `type` (`create`\|`import`), `os` |
 | POST | `/lease-offline` | `tagName`, `domain`, plus `zelfProof` and/or `zelfProofQRCode` |
 | POST | `/lease-recovery` | `zelfProof`, `tagName`, `domain`, `faceBase64`, `password`, `os` |

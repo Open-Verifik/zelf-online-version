@@ -18,7 +18,15 @@ const { createEthWallet } = require("../../Wallet/modules/eth");
 const { createBTCWallet } = require("../../Wallet/modules/btc");
 const { createSolanaWallet } = require("../../Wallet/modules/solana");
 const { generateMnemonic } = require("../../Wallet/modules/helpers");
-const { resolveV4PaymentStamp, getZelfIdPrice } = require("./zelf-id-plan.module");
+const {
+    resolveV4PaymentStamp,
+    resolvePaidExpiresAt,
+    resolvePaidDurationStamp,
+    resolveUpgradePlan,
+    normalizePaymentDuration,
+    getCanonicalMainnetName,
+    getZelfIdPrice,
+} = require("./zelf-id-plan.module");
 const ZelfIdPartsModule = require("./zelf-id-parts.module");
 
 const envTruthy = (v) => {
@@ -388,38 +396,30 @@ const attachEvmPayQuote = ({
 };
 
 const buildMetadata = (params, tagObject, domainConfig) => {
-    tagObject.fullTagName = `${params.tagName}.${params.domain}`;
+    const domain = tagObject.publicData.domain || params.domain || "zelf";
+    tagObject.fullTagName = getCanonicalMainnetName(params.tagName || tagObject.publicData.tagName || tagObject.publicData.zelfName, domain);
 
     const storageKey = domainConfig.getTagKey();
-    const domain = tagObject.publicData.domain || params.domain || "zelf";
     const price = params.price || tagObject.publicData.price;
-    const duration = params.duration || tagObject.publicData.duration;
+    const duration = normalizePaymentDuration(params.duration || tagObject.publicData.duration);
     const encryptVersion = resolveEncryptVersion(tagObject.publicData);
-    const isHold = tagObject.publicData.type === "hold";
-    const durationYears = Number(duration) || 1;
     const requestedPlan = params.plan || params.requestedPlan;
     const v4Stamp = resolveV4PaymentStamp({
         tagName: params.tagName || tagObject.fullTagName,
         encryptVersion,
-        isHold,
-        durationYears,
+        duration,
         requestedPlan,
+        publicData: tagObject.publicData,
     });
-    const plan = requestedPlan
-        ? resolveV4PaymentStamp({ tagName: params.tagName, encryptVersion: 4, requestedPlan }).plan
-        : v4Stamp.plan;
+    const plan = resolveUpgradePlan({ tagName: params.tagName || tagObject.fullTagName, requestedPlan }) || v4Stamp.plan;
 
     const extraParams = {
         origin: tagObject.publicData.origin || "online",
         price,
-        duration: tagObject.publicData.duration ? `${Number(tagObject.publicData.duration) + Number(duration)}` : duration,
+        duration: resolvePaidDurationStamp({ publicData: tagObject.publicData, duration }),
         registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
         renewedAt: tagObject.publicData.type === "mainnet" ? moment().format("YYYY-MM-DD HH:mm:ss") : undefined,
-        expiresAt:
-            v4Stamp.expiresAt ||
-            (tagObject.publicData.expiresAt
-                ? moment(tagObject.publicData.expiresAt).add(durationYears, "year").format("YYYY-MM-DD HH:mm:ss")
-                : moment().add(durationYears, "year").format("YYYY-MM-DD HH:mm:ss")),
+        expiresAt: v4Stamp.expiresAt || resolvePaidExpiresAt({ publicData: tagObject.publicData, duration }),
         type: "mainnet",
         hasPassword: tagObject.publicData.hasPassword,
         eventID: params.eventID || undefined,
@@ -430,7 +430,7 @@ const buildMetadata = (params, tagObject, domainConfig) => {
     const metadata = {
         [storageKey]: tagObject.fullTagName,
         domain,
-        extraParams: stampExtraParamsVersion(extraParams, 4),
+        extraParams: stampExtraParamsVersion(extraParams, encryptVersion),
     };
 
     if (tagObject.publicData.referralTagName) {
@@ -457,9 +457,10 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
 
     const tagObject = tagData.tagObject;
     const requestedPlan = requestOptions.requestedPlan || requestOptions.plan;
+    const normalizedDuration = normalizePaymentDuration(duration);
     const priceDetails = getZelfIdPrice({
         tagName,
-        duration,
+        duration: normalizedDuration,
         referralTagName: tagObject.publicData.referralTagName,
         domainConfig,
         requestedPlan,
@@ -578,14 +579,19 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
         expiresAt: tagObject.publicData.expiresAt,
         initiatedAt: moment().unix(),
         ttl: moment().add("2", "hours").unix(),
-        duration: parseInt(duration || 1),
+        duration: normalizedDuration === "lifetime" ? "lifetime" : parseInt(normalizedDuration || 1),
         count: parseInt(renewTagPayObject.publicData?.count),
         publicData: renewTagPayObject.publicData,
-        plan: resolveV4PaymentStamp({
-            tagName,
-            encryptVersion: 4,
-            requestedPlan: requestedPlan || priceDetails.plan,
-        }).plan,
+        plan:
+            resolveUpgradePlan({
+                tagName,
+                requestedPlan: requestedPlan || priceDetails.plan,
+            }) ||
+            resolveV4PaymentStamp({
+                tagName,
+                encryptVersion: resolveEncryptVersion(tagObject.publicData),
+                requestedPlan: requestedPlan || priceDetails.plan,
+            }).plan,
         allowedPlans: priceDetails.allowedPlans,
         payment: {
             registeredAt: renewTagPayObject.publicData?.registeredAt,

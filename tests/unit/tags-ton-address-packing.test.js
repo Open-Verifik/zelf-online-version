@@ -27,6 +27,13 @@ jest.mock("../../Repositories/Session/modules/session.module", () => ({
 	})),
 }));
 
+jest.mock("../../Repositories/Tags/modules/tags-ipfs.module", () => ({
+	hydrateContinuationAddresses: jest.fn(async (publicData) => publicData),
+	unpinContinuationSiblings: jest.fn(async () => null),
+	unPinFiles: jest.fn(async () => null),
+	insertSearchablePins: jest.fn(async () => ({})),
+}));
+
 jest.mock("../../Repositories/Tags/config/supported-domains", () => ({
 	getDomainConfig: () => ({
 		name: "zelf",
@@ -36,7 +43,13 @@ jest.mock("../../Repositories/Tags/config/supported-domains", () => ({
 }));
 
 const TagsPartsModule = require("../../Repositories/Tags/modules/tags-parts.module");
-const { initTagUpdates } = require("../../Repositories/Tags/modules/sync-tag-records.module");
+const {
+	buildRepinExtraParams,
+	initTagUpdates,
+	V4_OVERFLOW_ADDRESS_FIELDS,
+} = require("../../Repositories/Tags/modules/sync-tag-records.module");
+const { createAptosWallet } = require("../../Repositories/Wallet/modules/aptos");
+const TagsIPFSModule = require("../../Repositories/Tags/modules/tags-ipfs.module");
 const { createEthWallet } = require("../../Repositories/Wallet/modules/eth");
 const { createBTCWallet } = require("../../Repositories/Wallet/modules/btc");
 const { createSolanaWallet } = require("../../Repositories/Wallet/modules/solana");
@@ -48,8 +61,10 @@ const ArweaveModule = require("../../Repositories/Arweave/modules/arweave.module
 const {
 	PINATA_KEYVALUE_MAX_LENGTH,
 	ADDRESS_CHUNK_KEYS,
+	CONTINUATION_LINK_KEY,
 	TOP_LEVEL_ADDRESS_FIELDS,
 	buildAddressKeyvalues,
+	buildSearchablePinPages,
 	mergeAddressKeyvaluesIntoPublicData,
 } = require("../../Repositories/Tags/modules/tags-addresses.module");
 
@@ -64,7 +79,7 @@ const mockDomainConfig = {
 
 /** Mirrors TagsModule._createWalletsFromPhrase without loading tags.module. */
 const createWalletsFromPhrase = async (mnemonic) => {
-	const [eth, btc, solana, sui, polkadot, kusama, ton, arweave] = await Promise.all([
+	const [eth, btc, solana, sui, polkadot, kusama, ton, arweave, aptos] = await Promise.all([
 		createEthWallet(mnemonic),
 		createBTCWallet(mnemonic),
 		createSolanaWallet(mnemonic),
@@ -73,9 +88,10 @@ const createWalletsFromPhrase = async (mnemonic) => {
 		createKusamaWallet(mnemonic),
 		createTonWallet(mnemonic),
 		ArweaveModule.generateWalletFromMnemonic(mnemonic),
+		createAptosWallet(mnemonic),
 	]);
 	const stellar = createStellarWallet(mnemonic);
-	return { eth, btc, solana, sui, stellar, polkadot, kusama, ton, arweave };
+	return { eth, btc, solana, sui, stellar, polkadot, kusama, ton, arweave, aptos };
 };
 
 const sourceFromWallets = (wallets, { includeTon = true } = {}) => {
@@ -88,6 +104,7 @@ const sourceFromWallets = (wallets, { includeTon = true } = {}) => {
 		xlmAddress: wallets.stellar.address,
 		dotAddress: wallets.polkadot.address,
 		ksmAddress: wallets.kusama.address,
+		aptosAddress: wallets.aptos.address,
 	};
 	if (includeTon) source.tonAddress = wallets.ton.address;
 	return source;
@@ -299,6 +316,136 @@ describe("TON tag address packing (publish safety)", () => {
 
 			expect(tagsToAdd.find((t) => t.name === "tonAddress")).toBeUndefined();
 			expect(tagObject.publicData.tonAddress).toBe(EXPECTED_TON_ADDRESS);
+		});
+	});
+
+	describe("Test F — v4 overflow pins must not re-pin or drop st", () => {
+		const secretKeys = {
+			mnemonic: KNOWN_MNEMONIC,
+			zkProof: "mock-zk",
+			solanaSecretKey: "mock-sol-secret",
+			arweavePrivateKey: "mock-arweave-secret",
+			password: "test",
+		};
+
+		beforeEach(() => {
+			TagsIPFSModule.hydrateContinuationAddresses.mockImplementation(async (publicData) => publicData);
+		});
+
+		const v4PrimaryOnlyPublicData = () => {
+			const addresses = sourceFromWallets(wallets, { includeTon: true });
+			const pages = buildSearchablePinPages({
+				reserved: {
+					tagName: "v4miguel1.zelf",
+					domain: "zelf",
+					extraParams: JSON.stringify({ type: "mainnet", v: 4, st: "pin", plan: "free", hasPassword: "true" }),
+				},
+				addresses,
+				tagName: "v4miguel1.zelf",
+			});
+
+			expect(pages.continuations).toHaveLength(1);
+			expect(pages.primary.keyvalues.aptosAddress).toBeUndefined();
+			expect(pages.continuations[0].keyvalues[CONTINUATION_LINK_KEY]).toBe("v4miguel1.zelf");
+
+			return {
+				pages,
+				publicData: {
+					v: 4,
+					st: "pin",
+					plan: "free",
+					hasPassword: "true",
+					origin: "online",
+					type: "mainnet",
+					registeredAt: "2026-09-01 21:00:00",
+					expiresAt: "2027-09-01 21:00:00",
+					...pages.primary.keyvalues,
+				},
+			};
+		};
+
+		it("does not add aptos/dot/ksm when they only live on the continuation pin", async () => {
+			const { publicData } = v4PrimaryOnlyPublicData();
+			const { tagsToAdd } = await initTagUpdates({ publicData }, secretKeys);
+
+			for (const field of V4_OVERFLOW_ADDRESS_FIELDS) {
+				expect(tagsToAdd.find((t) => t.name === field)).toBeUndefined();
+			}
+			expect(tagsToAdd).toHaveLength(0);
+		});
+
+		it("still produces no tagsToAdd after continuation pages are merged onto publicData", async () => {
+			const { pages, publicData } = v4PrimaryOnlyPublicData();
+
+			TagsIPFSModule.hydrateContinuationAddresses.mockImplementation(async (pd) => {
+				Object.assign(pd, pages.continuations[0].keyvalues);
+				delete pd[CONTINUATION_LINK_KEY];
+				return pd;
+			});
+
+			const { tagsToAdd } = await initTagUpdates({ publicData }, secretKeys);
+
+			expect(publicData.aptosAddress).toBe(wallets.aptos.address);
+			expect(publicData.dotAddress).toBe(wallets.polkadot.address);
+			expect(publicData.ksmAddress).toBe(wallets.kusama.address);
+			expect(tagsToAdd).toHaveLength(0);
+		});
+
+		it("keeps st and plan when extraParams is rebuilt for a re-pin", () => {
+			const extraParams = buildRepinExtraParams({
+				v: 4,
+				st: "pin",
+				plan: "free",
+				hasPassword: "true",
+				origin: "online",
+				registeredAt: "2026-09-01 21:00:00",
+				expiresAt: "2027-09-01 21:00:00",
+				price: 0,
+				duration: 1,
+			});
+
+			expect(extraParams.st).toBe("pin");
+			expect(extraParams.plan).toBe("free");
+			expect(extraParams.hasPassword).toBe("true");
+			expect(extraParams.v).toBe(4);
+		});
+
+		it("infers premium for planless 6+ mainnet and skips plan on holds", () => {
+			const mainnet = buildRepinExtraParams({
+				type: "mainnet",
+				tagName: "abcdef.zelf",
+				hasPassword: "true",
+				origin: "online",
+				registeredAt: "2026-09-01 21:00:00",
+				expiresAt: "2027-09-01 21:00:00",
+			});
+			expect(mainnet.plan).toBe("premium");
+			expect(mainnet.v).toBe(3);
+
+			const expired = buildRepinExtraParams({
+				type: "mainnet",
+				tagName: "abcdef.zelf",
+				expiresAt: "2020-01-01 00:00:00",
+			});
+			expect(expired.plan).toBe("free");
+
+			const hold = buildRepinExtraParams({
+				type: "hold",
+				tagName: "abcdef.zelf.hold",
+				expiresAt: "2026-10-01 12:00:00",
+			});
+			expect(hold.plan).toBeUndefined();
+
+			const forcedV4 = buildRepinExtraParams(
+				{
+					type: "mainnet",
+					tagName: "abcdef.zelf",
+					expiresAt: "2027-09-01 21:00:00",
+				},
+				{ encryptVersion: 4 }
+			);
+			expect(forcedV4.v).toBe(4);
+			expect(forcedV4.plan).toBe("premium");
 		});
 	});
 });

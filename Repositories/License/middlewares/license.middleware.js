@@ -75,6 +75,34 @@ const schemas = {
 							}),
 						)
 						.required(),
+					planPricing: object({
+						premium: object()
+							.pattern(
+								/^(\d+|\d+-\d+)$/,
+								object({
+									1: number().min(0),
+									2: number().min(0),
+									3: number().min(0),
+									4: number().min(0),
+									5: number().min(0),
+									lifetime: number().min(0),
+								}),
+							)
+							.optional(),
+						unlimited: object()
+							.pattern(
+								/^(\d+|\d+-\d+)$/,
+								object({
+									1: number().min(0),
+									2: number().min(0),
+									3: number().min(0),
+									4: number().min(0),
+									5: number().min(0),
+									lifetime: number().min(0),
+								}),
+							)
+							.optional(),
+					}).optional(),
 				}).required(),
 				storage: object({
 					keyPrefix: string().required(),

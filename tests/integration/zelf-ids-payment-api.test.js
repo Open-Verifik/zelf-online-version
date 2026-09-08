@@ -17,6 +17,8 @@ const faceBase64 = fs.readFileSync(selfieImagePath, "base64");
 
 const uniqueTagName = () => `zid${Math.floor(Math.random() * 100000).toString().padStart(5, "0")}`;
 const shortUniqueTagName = () => `z${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}`;
+const { buildMetadata } = require("../../Repositories/ZelfID/modules/zelf-ids-payment.module");
+const { resolvePaidExpiresAt } = require("../../Repositories/ZelfID/modules/zelf-id-plan.module");
 
 describe("Zelf IDs payment API", () => {
 	jest.setTimeout(180000);
@@ -24,6 +26,7 @@ describe("Zelf IDs payment API", () => {
 	let authToken;
 	let reservedName;
 	let paymentQuote;
+	const leasedLongNames = [];
 
 	beforeAll(async () => {
 		expect(fs.existsSync(selfieImagePath)).toBe(true);
@@ -44,17 +47,22 @@ describe("Zelf IDs payment API", () => {
 	});
 
 	afterAll(async () => {
-		if (!reservedName || !authToken) return;
-		await request(API_BASE_URL)
-			.delete(`${ZELF_IDS_PATH}/delete`)
-			.set("Origin", ORIGIN)
-			.set("Authorization", `Bearer ${authToken}`)
-			.send({
-				tagName: reservedName,
-				domain: TEST_DOMAIN,
-				faceBase64,
-				password: TEST_PASSWORD,
-			});
+		if (!authToken) return;
+		const names = [...leasedLongNames, reservedName].filter(Boolean);
+		await Promise.all(
+			names.map((tagName) =>
+				request(API_BASE_URL)
+					.delete(`${ZELF_IDS_PATH}/delete`)
+					.set("Origin", ORIGIN)
+					.set("Authorization", `Bearer ${authToken}`)
+					.send({
+						tagName,
+						domain: TEST_DOMAIN,
+						faceBase64,
+						password: TEST_PASSWORD,
+					})
+			)
+		);
 	});
 
 	it("POST /zelf-ids/lease — selfie face creates a 5-hour paid reservation", async () => {
@@ -183,6 +191,56 @@ describe("Zelf IDs payment API", () => {
 		expect(`${response.body.code || ""} ${response.body.message || ""}`).toMatch(/avax_use_smart_contract_confirmation/i);
 	});
 
+	it("POST /zelf-ids/stripe-checkout — 401 without auth", async () => {
+		const response = await request(API_BASE_URL)
+			.post(`${ZELF_IDS_PATH}/stripe-checkout`)
+			.set("Origin", ORIGIN)
+			.send({
+				tagName: reservedName,
+				domain: TEST_DOMAIN,
+				duration: "1",
+				plan: "unlimited",
+				token: paymentQuote.signedDataPrice,
+			});
+
+		expect(response.status).toBe(401);
+	});
+
+	it("POST /zelf-ids/stripe-checkout — 409 without token", async () => {
+		const response = await request(API_BASE_URL)
+			.post(`${ZELF_IDS_PATH}/stripe-checkout`)
+			.set("Origin", ORIGIN)
+			.set("Authorization", `Bearer ${authToken}`)
+			.send({
+				tagName: reservedName,
+				domain: TEST_DOMAIN,
+				duration: "1",
+				plan: "unlimited",
+			});
+
+		expect(response.status).toBe(409);
+		expect(response.body).toHaveProperty("validationError");
+	});
+
+	it("GET /zelf-ids/stripe-session — 401 without auth", async () => {
+		const response = await request(API_BASE_URL)
+			.get(`${ZELF_IDS_PATH}/stripe-session`)
+			.set("Origin", ORIGIN)
+			.query({ sessionId: "cs_test_missing" });
+
+		expect(response.status).toBe(401);
+	});
+
+	it("GET /zelf-ids/stripe-session — 409 without sessionId", async () => {
+		const response = await request(API_BASE_URL)
+			.get(`${ZELF_IDS_PATH}/stripe-session`)
+			.set("Origin", ORIGIN)
+			.set("Authorization", `Bearer ${authToken}`);
+
+		expect(response.status).toBe(409);
+		expect(response.body).toHaveProperty("validationError");
+	});
+
 	it("POST /zelf-ids/payment-confirmation — unpaid unique address stays unconfirmed", async () => {
 		const response = await request(API_BASE_URL)
 			.post(`${ZELF_IDS_PATH}/payment-confirmation`)
@@ -197,5 +255,99 @@ describe("Zelf IDs payment API", () => {
 
 		expect(response.status).toBe(200);
 		expect(response.body.data.confirmed).toBe(false);
+	});
+
+	it("lease v4migut1* with selfie — free stamp resets from now on premium upgrade", async () => {
+		const tagName = `v4migut1${Date.now().toString().slice(-6)}`;
+		leasedLongNames.push(tagName);
+
+		const leaseResponse = await request(API_BASE_URL)
+			.post(`${ZELF_IDS_PATH}/lease`)
+			.set("Origin", ORIGIN)
+			.set("Authorization", `Bearer ${authToken}`)
+			.send({
+				tagName,
+				domain: TEST_DOMAIN,
+				faceBase64,
+				password: TEST_PASSWORD,
+				type: "create",
+				os: "DESKTOP",
+				removePGP: true,
+			});
+
+		expect(leaseResponse.status).toBe(200);
+		const publicData = leaseResponse.body.data.tagObject.publicData;
+		expect(publicData.type).toBe("mainnet");
+		expect(publicData.plan).toBe("free");
+		expect(Number(publicData.v)).toBe(4);
+		expect(moment(publicData.expiresAt).diff(moment(), "year", true)).toBeGreaterThan(50);
+
+		const optionsResponse = await request(API_BASE_URL)
+			.get(`${ZELF_IDS_PATH}/payment-options`)
+			.set("Origin", ORIGIN)
+			.set("Authorization", `Bearer ${authToken}`)
+			.query({ tagName, domain: TEST_DOMAIN, duration: "1", plan: "premium" });
+
+		expect(optionsResponse.status).toBe(200);
+		expect(optionsResponse.body.data.signedDataPrice).toBeDefined();
+
+		const stamp = resolvePaidExpiresAt({ publicData, duration: "1" });
+		expect(moment(stamp).diff(moment(), "year", true)).toBeGreaterThanOrEqual(0.9);
+		expect(moment(stamp).diff(moment(), "year", true)).toBeLessThan(2);
+
+		const extra = JSON.parse(
+			buildMetadata(
+				{ tagName, domain: TEST_DOMAIN, duration: 1, price: 24, plan: "premium" },
+				{ publicData },
+				{ getTagKey: () => "tagName" }
+			).metadata.extraParams
+		);
+		expect(extra.plan).toBe("premium");
+		expect(extra.duration).toBe("1");
+		expect(moment(extra.expiresAt).diff(moment(), "year", true)).toBeLessThan(2);
+	});
+
+	it("lease v4migut2* overlay — v3.6 paid evidence adds onto stored expiry", async () => {
+		const tagName = `v4migut2${Date.now().toString().slice(-6)}`;
+		leasedLongNames.push(tagName);
+
+		const leaseResponse = await request(API_BASE_URL)
+			.post(`${ZELF_IDS_PATH}/lease`)
+			.set("Origin", ORIGIN)
+			.set("Authorization", `Bearer ${authToken}`)
+			.send({
+				tagName,
+				domain: TEST_DOMAIN,
+				faceBase64,
+				password: TEST_PASSWORD,
+				type: "create",
+				os: "DESKTOP",
+				removePGP: true,
+			});
+
+		expect(leaseResponse.status).toBe(200);
+		const stored = moment().add(8, "month").format("YYYY-MM-DD HH:mm:ss");
+		const publicData = {
+			...leaseResponse.body.data.tagObject.publicData,
+			plan: undefined,
+			duration: "1",
+			price: 24,
+			renewedAt: "2026-03-01 12:00:00",
+			expiresAt: stored,
+		};
+		delete publicData.plan;
+
+		const stamp = resolvePaidExpiresAt({ publicData, duration: "1" });
+		expect(moment(stamp).diff(moment(stored, "YYYY-MM-DD HH:mm:ss"), "year", true)).toBeGreaterThanOrEqual(0.9);
+
+		const extra = JSON.parse(
+			buildMetadata(
+				{ tagName, domain: TEST_DOMAIN, duration: 1, price: 24, plan: "premium" },
+				{ publicData },
+				{ getTagKey: () => "tagName" }
+			).metadata.extraParams
+		);
+		expect(extra.duration).toBe("2");
+		expect(moment(extra.expiresAt).diff(moment(stored, "YYYY-MM-DD HH:mm:ss"), "year", true)).toBeGreaterThanOrEqual(0.9);
 	});
 });

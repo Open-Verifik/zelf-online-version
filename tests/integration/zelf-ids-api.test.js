@@ -78,6 +78,26 @@ describe("Zelf IDs API Integration Tests", () => {
 
             expect(response.status).toBe(200);
             expect(response.body).toHaveProperty("data");
+
+            const config = response.body.data;
+            const payment = config?.tags?.payment || {};
+            expect(payment).toHaveProperty("pricingTable");
+            const { Domain } = require("../../Repositories/Tags/modules/domain.class");
+            const domain = new Domain(config);
+            const fallback = domain.getPrice("abcdef.zelf", "1", "");
+            const premium = domain.getPrice("abcdef.zelf", "1", "", { plan: "premium" });
+            const unlimited = domain.getPrice("abcdef.zelf", "1", "", { plan: "unlimited" });
+            const planPricing = payment.planPricing || {};
+            const hasPlanTables =
+                planPricing.premium &&
+                Object.keys(planPricing.premium).length > 0 &&
+                planPricing.unlimited &&
+                Object.keys(planPricing.unlimited).length > 0;
+            if (!hasPlanTables) {
+                expect(premium.price).toBe(fallback.price);
+                expect(unlimited.price).toBe(fallback.price);
+            }
+            expect(fallback.price).toBeGreaterThanOrEqual(0);
         });
 
         it("GET /zelf-ids/domains/notarealtld — should return 404", async () => {
@@ -861,8 +881,8 @@ describe("Zelf IDs API Integration Tests", () => {
             expect(leaseResponse.body.data.tagObject.publicData.plan).toBe("free");
             expect(leaseResponse.body.data.walrus).toBeFalsy();
 
-            const yearsUntilExpiry = moment(leaseResponse.body.data.tagObject.publicData.expiresAt).diff(moment(), "month", true);
-            expect(yearsUntilExpiry).toBeGreaterThanOrEqual(11);
+            const yearsUntilExpiry = moment(leaseResponse.body.data.tagObject.publicData.expiresAt).diff(moment(), "year", true);
+            expect(yearsUntilExpiry).toBeGreaterThanOrEqual(99);
 
             await request(API_BASE_URL)
                 .delete(`${ZELF_IDS_PATH}/delete`)

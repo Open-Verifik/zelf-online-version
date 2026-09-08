@@ -14,7 +14,8 @@ const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module"
 const OfflineProofModule = require("../../Mina/offline-proof");
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
-const { initTagUpdates, updateTags } = require("./sync-tag-records.module");
+const { initTagUpdates, updateTags, upgradeLegacyProofAndRepin } = require("./sync-tag-records.module");
+const { resolveEncryptVersion } = require("./tags-addresses.module");
 
 const { generateHoldDomain } = require("./domain-registry.module");
 const { getDomainConfig } = require("../config/supported-domains");
@@ -253,7 +254,19 @@ const decryptTag = async (params, authUser) => {
         password,
     });
 
-    if (tagsToAdd.length || tagObject.publicData?._needsPinSplit) {
+    const needsLegacyUpgrade = resolveEncryptVersion(tagObject.publicData) !== 4;
+
+    if (needsLegacyUpgrade) {
+        const { ipfs, arweave } = await upgradeLegacyProofAndRepin(tagObject, {
+            faceBase64: face,
+            password,
+            addServerPassword: Boolean(params.addServerPassword),
+            tagsToAdd,
+        });
+
+        tagObject.updatedIpfs = ipfs;
+        tagObject.updatedArweave = arweave;
+    } else if (tagsToAdd.length || tagObject.publicData?._needsPinSplit) {
         const { ipfs, arweave } = await updateTags(tagObject, tagsToAdd);
 
         tagObject.updatedIpfs = ipfs;
@@ -542,22 +555,29 @@ const deleteTag = async (params, authUser) => {
 
     const ipfsID = searchResult.tagObject.id;
 
-    const decryptedZelfProof = await decrypt({
-        faceBase64,
-        password,
-        zelfProof,
-    });
+    const publicData = searchResult.tagObject.publicData || {};
+    const decryptPayload = { faceBase64, password, zelfProof };
+    const decryptedZelfProof =
+        resolveEncryptVersion(publicData) === 4
+            ? await decrypt({ ...decryptPayload, stack: "v4" })
+            : await decrypt(decryptPayload);
 
     if (decryptedZelfProof.error) {
-        const error = new Error(decryptedZelfProof.error.code);
-        error.status = 409;
-        throw error;
+        const fallback =
+            resolveEncryptVersion(publicData) === 4
+                ? await decrypt(decryptPayload)
+                : await decrypt({ ...decryptPayload, stack: "v4" });
+
+        if (fallback.error) {
+            const error = new Error(decryptedZelfProof.error.code);
+            error.status = 409;
+            throw error;
+        }
     }
 
     const deletedFiles = [];
 
     if (ipfsID) {
-        const publicData = searchResult.tagObject.publicData || {};
         const canonicalName = publicData.tagName || publicData.zelfName || `${tagName}.${domain}`;
         deletedFiles.push(await unpinContinuationSiblings(canonicalName));
         deletedFiles.push(await unPinFiles([ipfsID]));

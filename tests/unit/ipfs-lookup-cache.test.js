@@ -72,6 +72,35 @@ describe("ipfs-lookup-cache", () => {
 		expect(IpfsLookupCache.peek("subscription:sui")).toBeUndefined();
 	});
 
+	it("set stores a value that peek and getOrLoad can read", async () => {
+		const stored = { myLicense: { domainConfig: { name: "zelf" } } };
+
+		IpfsLookupCache.set(IpfsLookupCache.keys.myLicense("miguel@sui.com", true), stored);
+
+		expect(IpfsLookupCache.peek(IpfsLookupCache.keys.myLicense("miguel@sui.com", true))).toEqual(stored);
+
+		let calls = 0;
+		const cached = await IpfsLookupCache.getOrLoad(IpfsLookupCache.keys.myLicense("miguel@sui.com", true), async () => {
+			calls += 1;
+			return { missed: true };
+		});
+
+		expect(cached).toEqual(stored);
+		expect(calls).toBe(0);
+	});
+
+	it("invalidateLicense clears myLicense and licenseDomain keys", async () => {
+		IpfsLookupCache.set(IpfsLookupCache.keys.myLicense("miguel@sui.com", true), { json: true });
+		IpfsLookupCache.set(IpfsLookupCache.keys.licenseDomain("zelf"), { domainConfig: { name: "zelf" } });
+		IpfsLookupCache.set(IpfsLookupCache.keys.subscription("zelf"), { domain: "zelf" });
+
+		IpfsLookupCache.invalidateLicense({ emails: ["miguel@sui.com"], domains: ["zelf"] });
+
+		expect(IpfsLookupCache.peek(IpfsLookupCache.keys.myLicense("miguel@sui.com", true))).toBeUndefined();
+		expect(IpfsLookupCache.peek(IpfsLookupCache.keys.licenseDomain("zelf"))).toBeUndefined();
+		expect(IpfsLookupCache.peek(IpfsLookupCache.keys.subscription("zelf"))).toBeUndefined();
+	});
+
 	it("deletes keys by prefix and leaves others intact", async () => {
 		await IpfsLookupCache.getOrLoad(IpfsLookupCache.keys.myLicense("miguel@sui.com", true), async () => ({ json: true }));
 		await IpfsLookupCache.getOrLoad(IpfsLookupCache.keys.myLicense("miguel@sui.com", false), async () => ({ json: false }));

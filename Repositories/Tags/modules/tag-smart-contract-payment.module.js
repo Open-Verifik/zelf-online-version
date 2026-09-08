@@ -587,7 +587,18 @@ async function verifyBlockdagChainOrFail({ normalizedHash, expectedContract, sc,
 }
 
 async function extendTagAfterSmartContractPay({ domainConfig, domain, tokenDecoded, amountToPay, tagObject }) {
-    const { addDurationToTag } = require("./my-tags.module");
+    const { resolveEncryptVersion } = require("./tags-addresses.module");
+    const encryptVersion = resolveEncryptVersion(tagObject.publicData);
+    const isZelfId =
+        Number(encryptVersion) === 4 ||
+        Boolean(tokenDecoded.plan) ||
+        tagObject.publicData?.plan === "free" ||
+        tagObject.publicData?.plan === "premium" ||
+        tagObject.publicData?.plan === "unlimited";
+
+    const addDurationToTag = isZelfId
+        ? require("../../ZelfID/modules/my-zelf-id.module").addDurationToTag
+        : require("./my-tags.module").addDurationToTag;
 
     await addDurationToTag(
         {
@@ -595,6 +606,7 @@ async function extendTagAfterSmartContractPay({ domainConfig, domain, tokenDecod
             price: amountToPay,
             domain,
             duration: tokenDecoded.duration || 1,
+            plan: tokenDecoded.plan,
             domainConfig,
         },
         tagObject,

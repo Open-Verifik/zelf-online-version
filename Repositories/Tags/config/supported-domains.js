@@ -3,6 +3,7 @@ const { initCacheInstance } = require("../../../cache/manager");
 const { cache } = require("joi");
 const axios = require("../../../Core/axios").getEncryptionInstance();
 const IPFS = require("../../../Repositories/IPFS/modules/ipfs.module");
+const { asLicenseJson, mergeLicenseMap, preferLicense } = require("../../License/modules/license-cache.util");
 
 // Initialize cache for dynamic domains with 2 hour TTL (see cache/manager.js stdTTL)
 const domainsCache = initCacheInstance();
@@ -246,6 +247,25 @@ const loadCache = () => {
 };
 
 /**
+ * Replace one domain in the in-memory official-licenses cache after a license save.
+ * Pinata search lags; checkout must not wait on a 2-hour TTL.
+ * @param {Object} licenseData - License JSON (same shape as IPFS domain file)
+ */
+const upsertCachedDomain = (licenseData) => {
+    if (!licenseData?.name) return;
+
+    try {
+        const key = String(licenseData.name).toLowerCase();
+        const cached = loadCache() || {};
+        const chosen = asLicenseJson(preferLicense(cached[key], licenseData));
+        cached[key] = new Domain(chosen);
+        domainsCache.set("official-licenses", cached);
+    } catch (error) {
+        console.error("Error upserting cached domain:", error);
+    }
+};
+
+/**
  * Save domains to cache
  * @param {Object} domains - Domain objects to cache
  */
@@ -316,19 +336,25 @@ const loadDynamicDomains = async (licenses = null, force = false) => {
 
         const dynamicDomains = {};
 
+        const incoming = [];
         for (const license of officialLicenses) {
             try {
                 const licenseData = await _loadLicenseJSON(license.url);
-                if (licenseData.name) {
-                    dynamicDomains[licenseData.name.toLowerCase()] = new Domain(licenseData);
-                }
+                if (licenseData.name) incoming.push(licenseData);
             } catch (error) {
                 console.error(`Error loading license ${license.id}:`, error.message);
-                // Continue with other licenses
             }
         }
 
-        // Save to cache with automatic expiration
+        const existingJson = {};
+        for (const [name, domain] of Object.entries(loadCache() || {})) {
+            existingJson[name] = asLicenseJson(domain);
+        }
+        const merged = mergeLicenseMap(existingJson, incoming);
+        for (const [name, license] of Object.entries(merged)) {
+            dynamicDomains[name] = new Domain(license);
+        }
+
         saveCache(dynamicDomains);
 
         console.info(`Loaded ${Object.keys(dynamicDomains).length} dynamic domains from IPFS successfully`);
@@ -355,11 +381,14 @@ const getSupportedDomains = (licenses = null) => {
         const licenseList = Array.isArray(licenses) ? licenses : licenses && typeof licenses === "object" ? Object.values(licenses) : null;
 
         if (licenseList && licenseList.length > 0) {
+            const existingJson = {};
+            for (const [name, domain] of Object.entries(loadCache() || {})) {
+                existingJson[name] = asLicenseJson(domain);
+            }
+            const merged = mergeLicenseMap(existingJson, licenseList);
             const dynamicDomains = {};
-            for (const license of licenseList) {
-                if (license && license.name) {
-                    dynamicDomains[license.name.toLowerCase()] = new Domain(license);
-                }
+            for (const [name, license] of Object.entries(merged)) {
+                dynamicDomains[name] = new Domain(license);
             }
             if (Object.keys(dynamicDomains).length > 0) {
                 saveCache(dynamicDomains);
@@ -427,6 +456,7 @@ module.exports = {
     getDomainLimits,
     validateDomainName,
     loadDynamicDomains,
+    upsertCachedDomain,
     isWalrusStorageSupported,
     isIPFSStorageSupported,
     isArweaveStorageSupported,

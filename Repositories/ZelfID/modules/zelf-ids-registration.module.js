@@ -6,7 +6,7 @@ const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
 const TagsArweaveModule = require("../../Tags/modules/tags-arweave.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
 const { PINATA_KEYVALUE_MAX_LENGTH, resolveEncryptVersion, stampExtraParamsVersion } = require("../../Tags/modules/tags-addresses.module");
-const { ZELF_ID_RESERVATION_HOURS, getBareName, getReservationPinName } = require("./zelf-id-plan.module");
+const { ZELF_ID_RESERVATION_HOURS, FREE_EXPIRATION_YEARS, getBareName, getReservationPinName } = require("./zelf-id-plan.module");
 
 const cleanExtraParamsForPinata = (extraParams) => {
     if (!extraParams || typeof extraParams !== "object") return extraParams;
@@ -60,15 +60,18 @@ const confirmZelfId = async (tagObject, referralTagObject, domainConfig, securit
     const domain = tagObject.domain || "zelf";
     const tagName = `${getBareName(tagObject[storageKey] || tagObject.tagName || tagObject.zelfName)}.${domain}`;
 
+    const plan = options.plan || "free";
+    const expirationYears = plan === "free" ? FREE_EXPIRATION_YEARS : 1;
+
     const extraParams = {
         origin: tagObject.origin || "online",
         price: tagObject.price,
-        duration: 1,
+        duration: expirationYears,
         registeredAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-        expiresAt: moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss"),
+        expiresAt: moment().add(expirationYears, "year").format("YYYY-MM-DD HH:mm:ss"),
         type: "mainnet",
         hasPassword: tagObject.hasPassword,
-        plan: options.plan,
+        plan,
     };
 
     const metadata = {

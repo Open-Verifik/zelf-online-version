@@ -69,7 +69,6 @@ const update = async (previousIpfsPinHash, data, authUser) => {
 		zelfProof: metadata.zelfProof,
 		referralZelfName: metadata.referralZelfName,
 		referralSolanaAddress: metadata.referralSolanaAddress,
-		coinbase_hosted_url: metadata.coinbase_hosted_url,
 	});
 };
 

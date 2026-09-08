@@ -131,13 +131,12 @@ const _formatRecord = (item) => {
 
 	// Legacy: historical IPFS payloads stored Coinbase Commerce checkout JSON as `coinBase`.
 	if (formattedResult?.publicData?.coinBase) {
-		const coinBase = JSON.parse(formattedResult.publicData.coinBase);
-
-		formattedResult.publicData.coinbase_hosted_url = coinBase.hosted_url;
-
-		formattedResult.publicData.coinbase_expires_at = coinBase.expires_at;
-
 		delete formattedResult.publicData.coinBase;
+	}
+
+	if (formattedResult?.publicData) {
+		delete formattedResult.publicData.coinbase_hosted_url;
+		delete formattedResult.publicData.coinbase_expires_at;
 	}
 
 	return formattedResult;
@@ -187,6 +186,27 @@ const _mergeAllContinuationPages = async (primaryRow) => {
 	}
 
 	return record;
+};
+
+/**
+ * Copy overflow-page addresses onto primary publicData when `_tagName` / `__tagName` pins exist.
+ * Decrypt backfill must see aptos/dot/ksm that lease already wrote on continuation pages.
+ * @param {Object} publicData
+ * @returns {Promise<Object>}
+ */
+const hydrateContinuationAddresses = async (publicData) => {
+	if (!publicData || typeof publicData !== "object") return publicData;
+
+	try {
+		await _mergeAllContinuationPages({
+			publicData,
+			name: publicData.tagName || publicData.zelfName,
+		});
+	} catch {
+		/* keep primary publicData if continuation lookup fails */
+	}
+
+	return publicData;
 };
 
 const _formatSearchResults = (result) => {
@@ -609,6 +629,7 @@ const sortDedupeIpfsSearchResults = (rows) => {
 
 module.exports = {
 	get,
+	hydrateContinuationAddresses,
 	show,
 	insert,
 	insertSearchablePins,

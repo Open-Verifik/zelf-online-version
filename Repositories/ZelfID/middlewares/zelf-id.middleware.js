@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const moment = require("moment");
 const config = require("../../../Core/config");
 const TagsMiddleware = require("../../Tags/middlewares/tags.middleware");
+const TagsMyMiddleware = require("../../Tags/middlewares/my-tags.middleware");
 const ZelfIdsPaymentModule = require("../modules/zelf-ids-payment.module");
 
 const TAG_PAY_REDUCED_FEE_HEADER = "x-zelf-tag-pay-reduced-fee";
@@ -61,9 +62,26 @@ const paymentSchemas = {
         duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
         plan: stringEnum(["premium", "unlimited"]).optional(),
     },
+    stripeCheckout: {
+        tagName: string().required(),
+        domain: string(),
+        duration: stringEnum(["1", "2", "3", "4", "5", "lifetime"]).required(),
+        plan: stringEnum(["premium", "unlimited", "free"]).optional(),
+        token: string().required(),
+        locale: string(),
+        email: string(),
+    },
+    stripeSession: {
+        sessionId: string().required(),
+    },
 };
 
 const paymentOptionsValidation = async (ctx, next) => {
+    const duration = `${ctx.request.query.duration ?? ""}`.trim();
+    if (duration === "999") {
+        ctx.request.query = { ...ctx.request.query, duration: "lifetime" };
+    }
+
     const valid = validate(paymentSchemas.paymentOptions, ctx.request.query);
 
     if (valid.error) {
@@ -90,6 +108,44 @@ const paymentOptionsReducedFeeGate = async (ctx, next) => {
     const honored = ZelfIdsPaymentModule.isTagPayReducedFeeClientHeaderHonored();
 
     ctx.state.reducedFeeRequested = Boolean(headerWantsReduced && honored);
+
+    await next();
+};
+
+const stripeCheckoutValidation = async (ctx, next) => {
+    const duration = `${ctx.request.body?.duration ?? ""}`.trim();
+    if (duration === "999") {
+        ctx.request.body = { ...ctx.request.body, duration: "lifetime" };
+    }
+
+    const valid = validate(paymentSchemas.stripeCheckout, ctx.request.body);
+
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
+
+    const { tagName, domain } = ctx.request.body;
+    const domainValidation = await TagsMiddleware.validateDomainAndName(domain, tagName);
+
+    if (!domainValidation.valid) {
+        ctx.status = 409;
+        ctx.body = { validationError: domainValidation.error };
+        return;
+    }
+
+    await next();
+};
+
+const stripeSessionValidation = async (ctx, next) => {
+    const valid = validate(paymentSchemas.stripeSession, ctx.request.query);
+
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
 
     await next();
 };
@@ -155,4 +211,7 @@ module.exports = {
     paymentOptionsValidation,
     paymentOptionsReducedFeeGate,
     paymentConfirmationValidation,
+    stripeCheckoutValidation,
+    stripeSessionValidation,
+    smartContractPaymentConfirmationValidation: TagsMyMiddleware.smartContractPaymentConfirmationValidation,
 };
