@@ -416,11 +416,21 @@ const fetchTransactionsFromRPC = async (address) => {
 
     if (!response || response.error) {
         const errorCode = response?.error?.code;
+
+        // -32601 es "method not found". `getAddressTxs` no es un metodo del estandar
+        // JSON-RPC de EVM y la red no lo expone, asi que este camino se toma siempre.
+        // Antes se logueaba "Returning empty transactions" pero igual se lanzaba, con
+        // lo cual el fallo se propagaba y tumbaba toda la consulta de la red: el saldo
+        // tampoco se mostraba, aunque se hubiera obtenido sin problema.
+        //
+        // Devolver una lista vacia degrada de forma correcta: la wallet muestra el
+        // saldo y el historial queda vacio, en vez de no mostrar nada.
         if (errorCode === -32601) {
-            console.log(`BlockDAG RPC: getAddressTxs method not available. Returning empty transactions.`);
-        } else {
-            console.error("RPC error:", response?.data?.error || "Unknown error");
+            console.log("BlockDAG: el nodo no expone getAddressTxs; historial vacio.");
+            return [];
         }
+
+        console.error("RPC error:", response?.data?.error || "Unknown error");
         throw new Error(response?.data?.error?.message || "RPC request failed");
     }
 
