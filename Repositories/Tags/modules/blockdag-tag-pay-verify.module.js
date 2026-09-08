@@ -44,8 +44,6 @@ async function verifyBlockdagZelfTagPayTx({
 
     const receipt = await provider.getTransactionReceipt(normalizedHash);
 
-    console.log({ receipt, normalizedHash, expectedContract, sc, tagNameFull, prices })
-
     if (!receipt || Number(receipt.status) !== 1) {
         const scan = await findPaidEventByPaymentId(provider, expectedContract, sc.paymentId, tagNameFull);
         if (!scan.found) {
