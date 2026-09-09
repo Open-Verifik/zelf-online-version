@@ -486,10 +486,10 @@ const fetchBDAGPrice = async () => {
             return response.data.price.toString();
         }
 
-        return "0.05"; // Default fallback if API structure changes
+        return "0.00001805"; // Default fallback if API structure changes
     } catch (error) {
         console.log("BlockDAG price fetch failed, using default:", error.message);
-        return "0.05"; // Placeholder price
+        return "0.00001805"; // Placeholder price
     }
 };
 

@@ -116,7 +116,7 @@ const polNativeDisplayAmountFromWei = (weiBn) => {
 const calculateCryptoValue = async (token = "ETH", price_) => {
     try {
         const FALLBACK_PRICES = {
-            BDAG: "0.05",
+            BDAG: "0.00001805",
         };
 
         let tokenPrice;

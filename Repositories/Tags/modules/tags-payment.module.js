@@ -821,7 +821,7 @@ const calculateCryptoValue = async (token = "ETH", price_) => {
     try {
         // Special handling for tokens not available on Binance
         const FALLBACK_PRICES = {
-            BDAG: "0.05", // string to avoid IEEE 754 noise in decimalStringForParseUnits
+            BDAG: "0.00001805", // string to avoid IEEE 754 noise in decimalStringForParseUnits
         };
 
         let tokenPrice;
