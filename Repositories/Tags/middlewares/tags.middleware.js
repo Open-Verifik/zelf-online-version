@@ -107,13 +107,23 @@ const schemas = {
 };
 
 /**
+ * Registry TLDs are stored without a leading dot (`zelf`, not `.zelf`).
+ * @param {string} d - domain from query/body
+ * @returns {string}
+ */
+const stripLeadingDot = (d) => {
+    if (!d) return d;
+    return String(d).replace(/^\./, "");
+};
+
+/**
  * Map client/domain typos like "zelfpay" → "zelf" when the pay-suffix is not a real registry TLD.
  * @param {string} d - lowercase domain from query/body
  * @returns {string} - registry TLD for validation and config lookup
  */
 const normalizeRegistryDomain = (d) => {
     if (!d) return d;
-    const lower = String(d).toLowerCase();
+    const lower = stripLeadingDot(String(d).toLowerCase());
     if (isDomainActive(lower)) return lower;
     if (lower.endsWith("pay") && lower.length > 3) {
         const base = lower.slice(0, -3);
@@ -178,14 +188,28 @@ const extractDomainAndName = (tagName, domain) => {
 const validateDomainAndName = async (domain, name) => {
     if (!domain) return { valid: false, error: "Domain is required" };
 
-    // Check if domain is active
-    const isActive = await isDomainActive(domain);
+    const registryDomain = stripLeadingDot(String(domain).toLowerCase());
 
-    if (!isActive) return { valid: false, error: `Domain '${domain}' is not supported or inactive` };
+    let isActive = isDomainActive(registryDomain);
 
-    // Validate name against domain rules
+    // Search validation reads an in-memory license cache that can be empty on a
+    // fresh worker or after TTL expiry. Load official licenses before 409ing.
+    if (!isActive) {
+        try {
+            const { loadOfficialLicenses } = require("../../License/modules/license.module");
+            const { getSupportedDomains } = require("../config/supported-domains");
+            const licenses = await loadOfficialLicenses();
+            getSupportedDomains(licenses);
+            isActive = isDomainActive(registryDomain);
+        } catch (error) {
+            console.error("Failed to refresh official licenses for domain validation:", error);
+        }
+    }
+
+    if (!isActive) return { valid: false, error: `Domain '${registryDomain}' is not supported or inactive` };
+
     if (name) {
-        const nameValidation = await validateDomainName(domain, name);
+        const nameValidation = await validateDomainName(registryDomain, name);
 
         if (!nameValidation.valid) {
             return nameValidation;
