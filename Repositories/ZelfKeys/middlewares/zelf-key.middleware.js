@@ -9,6 +9,8 @@ const SUPPORTED_CATEGORIES = ["password", "notes", "credit_card", "contact", "zo
 
 const schemas = {
 	password: {
+		// Nombre opcional para reconocer la credencial en el listado (#507).
+		alias: string().optional().allow("").max(50),
 		website: string().required(),
 		username: string().required(),
 		password: string().required(),
