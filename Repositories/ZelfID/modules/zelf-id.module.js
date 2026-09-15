@@ -188,11 +188,11 @@ const leaseTag = async (params, authUser) => {
             config.env === "production"
                 ? undefined
                 : {
-                      mnemonic,
-                      arweavePrivateKey: arweave.privateKey,
-                      stellarSecretKey: stellar.secretKey,
-                      substrateSecretKey: polkadot.secretKey,
-                  },
+                    mnemonic,
+                    arweavePrivateKey: arweave.privateKey,
+                    stellarSecretKey: stellar.secretKey,
+                    substrateSecretKey: polkadot.secretKey,
+                },
     };
 };
 
@@ -282,17 +282,7 @@ const decryptTag = async (params, authUser) => {
     };
 
     let needsLegacyUpgrade = resolveEncryptVersion(tagObject.publicData) !== 4;
-    let decryptedZelfProof;
-
-    if (needsLegacyUpgrade) {
-        decryptedZelfProof = await decrypt(decryptPayload);
-    } else {
-        decryptedZelfProof = await decrypt(withV4(decryptPayload));
-        if (decryptedZelfProof.error) {
-            decryptedZelfProof = await decrypt(decryptPayload);
-            if (!decryptedZelfProof.error) needsLegacyUpgrade = true;
-        }
-    }
+    const decryptedZelfProof = await decrypt(withV4(decryptPayload));
 
     if (decryptedZelfProof.error) {
         const error = new Error(decryptedZelfProof.error.code);
@@ -352,12 +342,12 @@ const decryptTag = async (params, authUser) => {
         metadata:
             config.env === "development"
                 ? {
-                      mnemonic,
-                      zkProof,
-                      solanaSecretKey,
-                      arweavePrivateKey: arweave.privateKey,
-                      substrateSecretKey: (await createPolkadotWallet(mnemonic)).secretKey,
-                  }
+                    mnemonic,
+                    zkProof,
+                    solanaSecretKey,
+                    arweavePrivateKey: arweave.privateKey,
+                    substrateSecretKey: (await createPolkadotWallet(mnemonic)).secretKey,
+                }
                 : undefined,
     };
 };
@@ -707,17 +697,7 @@ const deleteTag = async (params, authUser) => {
 
     const publicData = searchResult.tagObject.publicData || {};
     const decryptPayload = { faceBase64, password, zelfProof };
-    let decryptedZelfProof =
-        resolveEncryptVersion(publicData) === 4
-            ? await decrypt(withV4(decryptPayload))
-            : await decrypt(decryptPayload);
-
-    if (decryptedZelfProof.error) {
-        decryptedZelfProof =
-            resolveEncryptVersion(publicData) === 4
-                ? await decrypt(decryptPayload)
-                : await decrypt(withV4(decryptPayload));
-    }
+    const decryptedZelfProof = await decrypt(withV4(decryptPayload));
 
     if (decryptedZelfProof.error) {
         const error = new Error(decryptedZelfProof.error.code);
