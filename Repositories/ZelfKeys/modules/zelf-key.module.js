@@ -56,6 +56,9 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
             };
 
             typePayload.publicData = {
+                // Va en publicData, igual que website y username, para poder mostrarlo
+                // en el listado sin descifrar la credencial. Si no viene, no se guarda.
+                alias: data.alias && `${data.alias}`.trim() ? `${data.alias}`.trim() : undefined,
                 category: `${fullTagName}_password`,
                 folder: data.folder && data.insideFolder ? data.folder : undefined,
                 keyOwner: fullTagName,
