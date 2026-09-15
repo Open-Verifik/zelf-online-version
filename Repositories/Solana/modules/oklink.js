@@ -13,6 +13,28 @@ const moment = require("moment");
 /** Wrapped SOL mint — must not be labeled native SOL alongside lamports balance */
 const WSOL_MINT = "So11111111111111111111111111111111111111112";
 
+const emptyTokenHoldings = () => ({
+    total: 0,
+    balance: 0,
+    fiatBalance: 0,
+    tokens: [],
+});
+
+const emptyTransactions = (query = {}) => ({
+    pagination: {
+        records: "0",
+        pages: query.page || 0,
+        page: query.page || 0,
+    },
+    transactions: [],
+});
+
+const logOklinkError = (scope, error) => {
+    const status = error.response?.status;
+    const msg = error.response?.data?.msg || error.response?.data?.message || error.message;
+    console.error(`oklink ${scope}:`, status || "", msg || error);
+};
+
 const getAddress = async (params) => {
     try {
         const address = params.id;
@@ -55,7 +77,7 @@ const getAddress = async (params) => {
             },
         };
 
-        data.tokenHoldings = await getTokens({ id: address }, { page: 0, show: 10 });
+        data.tokenHoldings = (await getTokens({ id: address }, { page: 0, show: 10 })) || emptyTokenHoldings();
 
         let hasSolToken = false;
 
@@ -84,13 +106,13 @@ const getAddress = async (params) => {
             });
         }
 
-        const { transactions } = await getTransactions({ id: address }, { page: 0, show: 10 });
+        const txResult = (await getTransactions({ id: address }, { page: 0, show: 10 })) || emptyTransactions({ page: 0 });
 
-        data.transactions = transactions;
+        data.transactions = txResult.transactions;
 
         return data;
     } catch (error) {
-        console.error(error);
+        logOklinkError("getAddress", error);
         return null;
     }
 };
@@ -141,13 +163,13 @@ const getTokens = async (params, query) => {
                 });
             }
         } catch (exception) {
-            console.error({ exception });
+            logOklinkError("getTokens:map", exception);
         }
 
         return tokenHoldings;
     } catch (error) {
-        console.error(error);
-        return null;
+        logOklinkError("getTokens", error);
+        return emptyTokenHoldings();
     }
 };
 
@@ -169,6 +191,7 @@ const getTransaction = async (params, query) => {
 
         return data.data;
     } catch (error) {
+        logOklinkError("getTransaction", error);
         return null;
     }
 };
@@ -223,7 +246,8 @@ const getTransactions = async (params, query) => {
             transactions: formattedTransactions,
         };
     } catch (error) {
-        return null;
+        logOklinkError("getTransactions", error);
+        return emptyTransactions(query);
     }
 };
 
