@@ -227,6 +227,7 @@ const decryptTag = async (params, authUser) => {
         password,
         zelfProof: tagObject?.zelfProof,
         hasPassword: tagObject.publicData.hasPassword,
+        stack: "v4",
     });
 
     if (decryptedZelfProof.error) {
@@ -557,22 +558,12 @@ const deleteTag = async (params, authUser) => {
 
     const publicData = searchResult.tagObject.publicData || {};
     const decryptPayload = { faceBase64, password, zelfProof };
-    const decryptedZelfProof =
-        resolveEncryptVersion(publicData) === 4
-            ? await decrypt({ ...decryptPayload, stack: "v4" })
-            : await decrypt(decryptPayload);
+    const decryptedZelfProof = await decrypt({ ...decryptPayload, stack: "v4" });
 
     if (decryptedZelfProof.error) {
-        const fallback =
-            resolveEncryptVersion(publicData) === 4
-                ? await decrypt(decryptPayload)
-                : await decrypt({ ...decryptPayload, stack: "v4" });
-
-        if (fallback.error) {
-            const error = new Error(decryptedZelfProof.error.code);
-            error.status = 409;
-            throw error;
-        }
+        const error = new Error(decryptedZelfProof.error.code);
+        error.status = 409;
+        throw error;
     }
 
     const deletedFiles = [];
