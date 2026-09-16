@@ -70,8 +70,13 @@ const rpcCall = async (method, params, { retried401 = false, useFallbackNode = f
 		return data.result;
 	} catch (err) {
 		if (!useFallbackNode && !retried401 && isNaasNodeUnauthorizedError(err)) {
-			await refreshNaasCatalogAfterUnauthorized();
-			return rpcCall(method, params, { retried401: true });
+			try {
+				await refreshNaasCatalogAfterUnauthorized();
+				return rpcCall(method, params, { retried401: true });
+			} catch (refreshErr) {
+				console.error("solana naas catalog refresh:", refreshErr?.message || refreshErr);
+				return rpcCall(method, params, { retried401: true, useFallbackNode: true });
+			}
 		}
 		if (!useFallbackNode) {
 			console.error("solana naas node:", err?.message || err);
