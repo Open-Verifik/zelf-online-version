@@ -6,6 +6,7 @@ const {
 	refreshNaasCatalogAfterUnauthorized,
 	isNaasNodeUnauthorizedError,
 } = require("../../../Core/naas-gateway-catalog");
+const config = require("../../../Core/config");
 const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { getKnownSplDisplay, WSOL_MINT } = require("./solana-spl-known-metadata");
@@ -19,11 +20,30 @@ const SPL_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 /** Cap SPL rows bundled into address overview (full list via GET …/token/:id with pagination). */
 const MAX_SPL_IN_ADDRESS_OVERVIEW = 200;
 
+/**
+ * Nodo de NaaS, con el RPC de config como respaldo.
+ *
+ * Cuando el catalogo de NaaS no resuelve (o el nodo responde error), `getAddress`
+ * devolvia null y el dashboard terminaba mostrando saldo 0 para billeteras que si
+ * tienen fondos en la cadena. El respaldo mantiene la lectura funcionando.
+ */
 const solanaBookBase = async () => getNaasNodeUrl(NAAS_CHAIN.SOLANA);
 
+const solanaFallbackBase = () => config.solana?.rpcUrl || "https://api.mainnet-beta.solana.com";
+
 let rpcSeq = 0;
-const rpcCall = async (method, params, { retried401 = false } = {}) => {
-	const url = await solanaBookBase();
+const rpcCall = async (method, params, { retried401 = false, useFallbackNode = false } = {}) => {
+	let url;
+	if (useFallbackNode) {
+		url = solanaFallbackBase();
+	} else {
+		try {
+			url = await solanaBookBase();
+		} catch (err) {
+			console.error("solana naas catalog:", err?.message || err);
+			return rpcCall(method, params, { retried401, useFallbackNode: true });
+		}
+	}
 	const id = ++rpcSeq;
 	try {
 		const { data } = await instance.post(
@@ -43,9 +63,13 @@ const rpcCall = async (method, params, { retried401 = false } = {}) => {
 		}
 		return data.result;
 	} catch (err) {
-		if (!retried401 && isNaasNodeUnauthorizedError(err)) {
+		if (!useFallbackNode && !retried401 && isNaasNodeUnauthorizedError(err)) {
 			await refreshNaasCatalogAfterUnauthorized();
 			return rpcCall(method, params, { retried401: true });
+		}
+		if (!useFallbackNode) {
+			console.error("solana naas node:", err?.message || err);
+			return rpcCall(method, params, { retried401, useFallbackNode: true });
 		}
 		throw err;
 	}
