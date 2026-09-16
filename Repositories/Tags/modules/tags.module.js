@@ -14,7 +14,7 @@ const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module"
 const OfflineProofModule = require("../../Mina/offline-proof");
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
-const { initTagUpdates, updateTags, upgradeLegacyProofAndRepin } = require("./sync-tag-records.module");
+const { initTagUpdates, updateTags, tryUpgradeLegacyProofAndRepin } = require("./sync-tag-records.module");
 const { resolveEncryptVersion } = require("./tags-addresses.module");
 
 const { generateHoldDomain } = require("./domain-registry.module");
@@ -151,12 +151,12 @@ const leaseTag = async (params, authUser) => {
             config.env === "production"
                 ? undefined
                 : {
-                      // for development porposes so we can visualize the arweave private key and the mnemonic for testing.
-                      mnemonic,
-                      arweavePrivateKey: arweave.privateKey,
-                      stellarSecretKey: stellar.secretKey,
-                      substrateSecretKey: polkadot.secretKey,
-                  },
+                    // for development porposes so we can visualize the arweave private key and the mnemonic for testing.
+                    mnemonic,
+                    arweavePrivateKey: arweave.privateKey,
+                    stellarSecretKey: stellar.secretKey,
+                    substrateSecretKey: polkadot.secretKey,
+                },
     };
 };
 
@@ -257,17 +257,24 @@ const decryptTag = async (params, authUser) => {
 
     const needsLegacyUpgrade = resolveEncryptVersion(tagObject.publicData) !== 4;
 
+    let upgradedLegacy = false;
+
     if (needsLegacyUpgrade) {
-        const { ipfs, arweave } = await upgradeLegacyProofAndRepin(tagObject, {
+        const upgraded = await tryUpgradeLegacyProofAndRepin(tagObject, {
             faceBase64: face,
             password,
             addServerPassword: Boolean(params.addServerPassword),
             tagsToAdd,
         });
 
-        tagObject.updatedIpfs = ipfs;
-        tagObject.updatedArweave = arweave;
-    } else if (tagsToAdd.length || tagObject.publicData?._needsPinSplit) {
+        if (upgraded.upgraded) {
+            tagObject.updatedIpfs = upgraded.ipfs;
+            tagObject.updatedArweave = upgraded.arweave;
+            upgradedLegacy = true;
+        }
+    }
+
+    if (!upgradedLegacy && (tagsToAdd.length || tagObject.publicData?._needsPinSplit)) {
         const { ipfs, arweave } = await updateTags(tagObject, tagsToAdd);
 
         tagObject.updatedIpfs = ipfs;
@@ -293,12 +300,12 @@ const decryptTag = async (params, authUser) => {
         metadata:
             config.env === "development"
                 ? {
-                      mnemonic,
-                      zkProof,
-                      solanaSecretKey,
-                      arweavePrivateKey: arweave.privateKey,
-                      substrateSecretKey: (await createPolkadotWallet(mnemonic)).secretKey,
-                  }
+                    mnemonic,
+                    zkProof,
+                    solanaSecretKey,
+                    arweavePrivateKey: arweave.privateKey,
+                    substrateSecretKey: (await createPolkadotWallet(mnemonic)).secretKey,
+                }
                 : undefined,
     };
 };

@@ -289,6 +289,26 @@ const upgradeLegacyProofAndRepin = async (tagObject, params = {}) => {
     return { upgraded: true, ipfs, arweave };
 };
 
+/**
+ * Same as {@link upgradeLegacyProofAndRepin}, but never throws.
+ * Decrypt already succeeded; a failed 3.1.6 → v4 refresh must not fail the request.
+ *
+ * @param {Object} tagObject
+ * @param {Object} [params]
+ * @returns {Promise<{ upgraded: boolean, ipfs?: Object, arweave?: Object }>}
+ */
+const tryUpgradeLegacyProofAndRepin = async (tagObject, params = {}) => {
+    try {
+        return await upgradeLegacyProofAndRepin(tagObject, params);
+    } catch (error) {
+        console.error({
+            tryUpgradeLegacyProofAndRepin: error.code || error.message,
+            status: error.status,
+        });
+        return { upgraded: false };
+    }
+};
+
 module.exports = {
     V4_LEASE_ADDRESS_FIELDS,
     V4_OVERFLOW_ADDRESS_FIELDS,
@@ -297,4 +317,5 @@ module.exports = {
     isV4LeaseComplete,
     updateTags,
     upgradeLegacyProofAndRepin,
+    tryUpgradeLegacyProofAndRepin,
 };

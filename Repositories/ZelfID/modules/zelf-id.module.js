@@ -18,7 +18,7 @@ const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module"
 const OfflineProofModule = require("../../Mina/offline-proof");
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
-const { initTagUpdates, updateTags, upgradeLegacyProofAndRepin } = require("../../Tags/modules/sync-tag-records.module");
+const { initTagUpdates, updateTags, tryUpgradeLegacyProofAndRepin } = require("../../Tags/modules/sync-tag-records.module");
 const { resolveEncryptVersion } = require("../../Tags/modules/tags-addresses.module");
 
 const { generateHoldDomain } = require("../../Tags/modules/domain-registry.module");
@@ -306,17 +306,24 @@ const decryptTag = async (params, authUser) => {
         password,
     });
 
+    let upgradedLegacy = false;
+
     if (needsLegacyUpgrade) {
-        const { ipfs, arweave: updatedArweave } = await upgradeLegacyProofAndRepin(tagObject, {
+        const upgraded = await tryUpgradeLegacyProofAndRepin(tagObject, {
             faceBase64: face,
             password,
             addServerPassword: Boolean(params.addServerPassword),
             tagsToAdd,
         });
 
-        tagObject.updatedIpfs = ipfs;
-        tagObject.updatedArweave = updatedArweave;
-    } else if (tagsToAdd.length || tagObject.publicData?._needsPinSplit) {
+        if (upgraded.upgraded) {
+            tagObject.updatedIpfs = upgraded.ipfs;
+            tagObject.updatedArweave = upgraded.arweave;
+            upgradedLegacy = true;
+        }
+    }
+
+    if (!upgradedLegacy && (tagsToAdd.length || tagObject.publicData?._needsPinSplit)) {
         const { ipfs, arweave: updatedArweave } = await updateTags(tagObject, tagsToAdd);
 
         tagObject.updatedIpfs = ipfs;

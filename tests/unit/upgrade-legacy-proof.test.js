@@ -36,7 +36,7 @@ jest.mock("../../Repositories/Tags/config/supported-domains", () => ({
 
 const { upgrade } = require("../../Repositories/ZelfProof/modules/zelf-proof.module");
 const { generateQRFromZelfProof } = require("../../Repositories/Tags/modules/qr-zelfproof-extractor.module");
-const { upgradeLegacyProofAndRepin, buildRepinExtraParams } = require("../../Repositories/Tags/modules/sync-tag-records.module");
+const { upgradeLegacyProofAndRepin, tryUpgradeLegacyProofAndRepin, buildRepinExtraParams } = require("../../Repositories/Tags/modules/sync-tag-records.module");
 
 describe("upgradeLegacyProofAndRepin", () => {
 	test("upgrades the proof, stamps v=4 and premium for planless mainnet", async () => {
@@ -93,5 +93,21 @@ describe("upgradeLegacyProofAndRepin", () => {
 		expect(tagObject.publicData.v).toBe(4);
 		expect(tagObject.publicData.plan).toBeUndefined();
 		expect(buildRepinExtraParams(tagObject.publicData).plan).toBeUndefined();
+	});
+
+	test("tryUpgradeLegacyProofAndRepin does not throw when upgrade fails", async () => {
+		upgrade.mockRejectedValueOnce(Object.assign(new Error("VERIFICATION FAILED."), { code: "ERR_VERIFICATION_FAILED", status: 500 }));
+
+		const tagObject = {
+			id: "old-pin",
+			zelfProof: "legacy-316-proof",
+			publicData: { tagName: "abcdef.zelf", domain: "zelf" },
+		};
+
+		const result = await tryUpgradeLegacyProofAndRepin(tagObject, { faceBase64: "face" });
+
+		expect(result).toEqual({ upgraded: false });
+		expect(tagObject.zelfProof).toBe("legacy-316-proof");
+		expect(tagObject.publicData.v).toBeUndefined();
 	});
 });
