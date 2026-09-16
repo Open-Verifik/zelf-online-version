@@ -47,7 +47,8 @@ const show = async (request, response) => {
  */
 const create = async (ctx) => {
 	try {
-		const origin = ctx.request.header.origin || null;
+		const origin =
+			ctx.request.header.origin || ctx.request.header["x-zelf-origin"] || "https://zelf.world";
 		const referer = ctx.request.header.referer || null;
 		const clientIp = ctx.request.ip;
 		const userAgent = ctx.request.header["user-agent"] || null;
@@ -62,7 +63,7 @@ const create = async (ctx) => {
 			X-Forwarded-For: ${forwardedFor}
 		`);
 
-		if (process.env.NODE_ENV === "production" && (!origin || !clientIp)) {
+		if (process.env.NODE_ENV === "production" && !clientIp) {
 			ctx.status = 403;
 
 			ctx.body = { error: "rejected" };
