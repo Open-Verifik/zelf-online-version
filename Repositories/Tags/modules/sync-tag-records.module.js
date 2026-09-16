@@ -10,7 +10,7 @@ const TagsArweaveModule = require("./tags-arweave.module");
 const TagsIPFSModule = require("./tags-ipfs.module");
 const moment = require("moment");
 const { getDomainConfig } = require("../config/supported-domains");
-const { SEARCHABLE_ADDRESS_FIELDS, resolveEncryptVersion, stampExtraParamsVersion } = require("./tags-addresses.module");
+const { SEARCHABLE_ADDRESS_FIELDS, cleanExtraParamsForPinata, resolveEncryptVersion, stampExtraParamsVersion } = require("./tags-addresses.module");
 const { upgrade } = require("../../ZelfProof/modules/zelf-proof.module");
 const { generateQRFromZelfProof } = require("./qr-zelfproof-extractor.module");
 const { effectivePlan, isUnpaidReservation } = require("../../ZelfID/modules/zelf-id-plan.module");
@@ -62,8 +62,7 @@ const buildRepinExtraParams = (publicData = {}, options = {}) => {
                 : undefined,
             price: publicData.price || undefined,
             duration: publicData.duration || undefined,
-            referralTagName: publicData.referralTagName || undefined,
-            referralSolanaAddress: publicData.referralSolanaAddress || undefined,
+            type: publicData.type || undefined,
         },
         version
     );
@@ -184,7 +183,7 @@ const updateTags = async (tagObject, tagsToAdd, options = {}) => {
 
     if (!tagObject.publicData.expiresAt) tagObject.publicData.expiresAt = moment().add(1, "year").format("YYYY-MM-DD HH:mm:ss");
 
-    const extraParams = buildRepinExtraParams(tagObject.publicData);
+    const extraParams = cleanExtraParamsForPinata(buildRepinExtraParams(tagObject.publicData));
 
     const metadata = {
         [tagKey]: tagName,
@@ -192,6 +191,14 @@ const updateTags = async (tagObject, tagsToAdd, options = {}) => {
         extraParams,
         type: tagObject.publicData.type || (tagName.includes("hold") ? "hold" : "mainnet"),
     };
+
+    if (tagObject.publicData.referralTagName) {
+        metadata.referral = JSON.stringify({
+            tagName: tagObject.publicData.referralTagName,
+            solanaAddress: tagObject.publicData.referralSolanaAddress,
+        });
+        metadata.referralTagName = tagObject.publicData.referralTagName;
+    }
 
     for (let index = 0; index < tagsToAdd.length; index++) {
         const tag = tagsToAdd[index];
@@ -232,6 +239,26 @@ const updateTags = async (tagObject, tagsToAdd, options = {}) => {
         ipfs,
         arweave,
     };
+};
+
+/**
+ * Same as {@link updateTags}, but never throws. Decrypt already succeeded.
+ *
+ * @param {Object} tagObject
+ * @param {Array} tagsToAdd
+ * @param {Object} [options]
+ * @returns {Promise<{ ipfs?: Object, arweave?: Object }>}
+ */
+const tryUpdateTags = async (tagObject, tagsToAdd, options = {}) => {
+    try {
+        return await updateTags(tagObject, tagsToAdd, options);
+    } catch (error) {
+        console.error({
+            tryUpdateTags: error.code || error.message,
+            status: error.status,
+        });
+        return {};
+    }
 };
 
 /**
@@ -316,6 +343,7 @@ module.exports = {
     initTagUpdates,
     isV4LeaseComplete,
     updateTags,
+    tryUpdateTags,
     upgradeLegacyProofAndRepin,
     tryUpgradeLegacyProofAndRepin,
 };

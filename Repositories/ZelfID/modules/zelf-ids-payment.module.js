@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const { keccak256, solidityPacked, parseUnits, getAddress } = require("ethers");
 const config = require("../../../Core/config");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
-const { resolveEncryptVersion, stampExtraParamsVersion } = require("../../Tags/modules/tags-addresses.module");
+const { cleanExtraParamsForPinata, resolveEncryptVersion, stampExtraParamsVersion } = require("../../Tags/modules/tags-addresses.module");
 const TagsIpfsModule = require("../../Tags/modules/tags-ipfs.module");
 const TagsArweaveModule = require("../../Tags/modules/tags-arweave.module");
 const TagsSearchModule = require("../../Tags/modules/tags-search.module");
@@ -443,7 +443,7 @@ const buildMetadata = (params, tagObject, domainConfig) => {
         metadata.referral = JSON.stringify(metadata.referral);
     }
 
-    metadata.extraParams = JSON.stringify(metadata.extraParams);
+    metadata.extraParams = JSON.stringify(cleanExtraParamsForPinata(metadata.extraParams));
 
     return { metadata, fullTagName: tagObject.fullTagName };
 };

@@ -14,7 +14,7 @@ const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module"
 const OfflineProofModule = require("../../Mina/offline-proof");
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
-const { initTagUpdates, updateTags, tryUpgradeLegacyProofAndRepin } = require("./sync-tag-records.module");
+const { initTagUpdates, tryUpdateTags, tryUpgradeLegacyProofAndRepin } = require("./sync-tag-records.module");
 const { resolveEncryptVersion } = require("./tags-addresses.module");
 
 const { generateHoldDomain } = require("./domain-registry.module");
@@ -275,7 +275,7 @@ const decryptTag = async (params, authUser) => {
     }
 
     if (!upgradedLegacy && (tagsToAdd.length || tagObject.publicData?._needsPinSplit)) {
-        const { ipfs, arweave } = await updateTags(tagObject, tagsToAdd);
+        const { ipfs, arweave } = await tryUpdateTags(tagObject, tagsToAdd);
 
         tagObject.updatedIpfs = ipfs;
         tagObject.updatedArweave = arweave;

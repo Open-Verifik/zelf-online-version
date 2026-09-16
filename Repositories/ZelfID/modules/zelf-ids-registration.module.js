@@ -5,33 +5,8 @@ const moment = require("moment");
 const TagsIPFSModule = require("../../Tags/modules/tags-ipfs.module");
 const TagsArweaveModule = require("../../Tags/modules/tags-arweave.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
-const { PINATA_KEYVALUE_MAX_LENGTH, resolveEncryptVersion, stampExtraParamsVersion } = require("../../Tags/modules/tags-addresses.module");
+const { cleanExtraParamsForPinata, resolveEncryptVersion, stampExtraParamsVersion } = require("../../Tags/modules/tags-addresses.module");
 const { ZELF_ID_RESERVATION_HOURS, FREE_EXPIRATION_YEARS, getBareName, getReservationPinName } = require("./zelf-id-plan.module");
-
-const cleanExtraParamsForPinata = (extraParams) => {
-    if (!extraParams || typeof extraParams !== "object") return extraParams;
-
-    const cleaned = { ...extraParams };
-
-    if (cleaned.st && typeof cleaned.st === "object") {
-        const checkLength = (obj) => JSON.stringify(obj).length;
-
-        if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
-
-        const { domain, ethAddress, tagName, iat, ...st1 } = cleaned.st;
-        cleaned.st = st1;
-        if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
-
-        const { ip, ...st2 } = cleaned.st;
-        cleaned.st = st2;
-        if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
-
-        const { session, ...st3 } = cleaned.st;
-        cleaned.st = st3;
-    }
-
-    return cleaned;
-};
 
 const attachReferral = (metadata, referralTagObject, storageKey) => {
     if (!referralTagObject) return;

@@ -10,6 +10,8 @@ const {
     serializeAddressBundleToPinataKeyvalues,
     buildAddressKeyvalues,
     buildSearchablePinPages,
+    cleanExtraParamsForPinata,
+    collectReservedKeyvalues,
     mergeAddressKeyvaluesIntoPublicData,
     getAllChainAddresses,
     resolveEncryptVersion,
@@ -414,6 +416,71 @@ describe("tags-addresses.module", () => {
             expect(resolveEncryptVersion({ v: 4 })).toBe(4);
             expect(resolveEncryptVersion({ zelfEncryptVersion: "4" })).toBe(4);
             expect(stampExtraParamsVersion({}, 4).v).toBe(4);
+        });
+    });
+
+    describe("Pinata 250-char keyvalues", () => {
+        test("keeps only known extraParams keys and a short security type", () => {
+            const cleaned = cleanExtraParamsForPinata({
+                hasPassword: "true",
+                origin: "online",
+                registeredAt: "2026-01-16 20:32:43",
+                expiresAt: "2028-11-14 23:25:33",
+                price: 1.8,
+                duration: "3",
+                plan: "premium",
+                v: 3,
+                st: "password",
+                ethAddress: "0xabc",
+                solanaAddress: "SoL",
+                referralTagName: "ref.zelf",
+                referralSolanaAddress: "SoLref",
+                zelfProof: "x".repeat(80),
+            });
+
+            expect(cleaned).toEqual({
+                hasPassword: "true",
+                origin: "online",
+                registeredAt: "2026-01-16 20:32:43",
+                expiresAt: "2028-11-14 23:25:33",
+                price: 1.8,
+                duration: "3",
+                plan: "premium",
+                v: 3,
+                st: "password",
+            });
+            expect(JSON.stringify(cleaned).length).toBeLessThanOrEqual(PINATA_KEYVALUE_MAX_LENGTH);
+        });
+
+        test("drops a session JWT or object from st", () => {
+            expect(
+                cleanExtraParamsForPinata({
+                    hasPassword: "true",
+                    origin: "online",
+                    v: 4,
+                    st: "a".repeat(300),
+                }).st
+            ).toBeUndefined();
+            expect(
+                cleanExtraParamsForPinata({
+                    hasPassword: "true",
+                    origin: "online",
+                    v: 4,
+                    st: { session: "jwt", ip: "1.1.1.1" },
+                }).st
+            ).toBeUndefined();
+        });
+
+        test("collectReservedKeyvalues omits values longer than 250 characters", () => {
+            const keyvalues = collectReservedKeyvalues({
+                tagName: "miguel.zelf",
+                domain: "zelf",
+                extraParams: JSON.stringify({ st: "a".repeat(300) }),
+            });
+
+            expect(keyvalues.tagName).toBe("miguel.zelf");
+            expect(keyvalues.domain).toBe("zelf");
+            expect(keyvalues.extraParams).toBeUndefined();
         });
     });
 });

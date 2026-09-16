@@ -70,6 +70,28 @@ const PACKED_ONLY_ADDRESS_FIELDS = SEARCHABLE_ADDRESS_FIELDS.filter((field) => !
 const ADDRESS_KEYVALUE_CHUNKS = ADDRESS_CHUNK_KEYS;
 const PRIMARY_RESERVED_KEYS = ["zelfName", "tagName", "domain", "extraParams"];
 
+/** Lease / payment / re-pin fields that belong in the `extraParams` JSON. */
+const EXTRA_PARAMS_ALLOWED_KEYS = [
+    "hasPassword",
+    "origin",
+    "registeredAt",
+    "renewedAt",
+    "expiresAt",
+    "price",
+    "duration",
+    "type",
+    "plan",
+    "v",
+    "st",
+    "eventID",
+    "eventPrice",
+];
+
+const EXTRA_PARAMS_SECURITY_TYPES = new Set(["pin", "password", "securePassword"]);
+
+/** Drop these first when the allow-listed JSON is still over 250 chars. */
+const EXTRA_PARAMS_OPTIONAL_KEYS = ["eventID", "eventPrice", "renewedAt", "price", "duration"];
+
 const ADDRESS_KEY_ALIASES = {
     eth: "ethAddress",
     ethereum: "ethAddress",
@@ -271,6 +293,47 @@ const resolveEncryptVersion = (source = {}) => {
     return parsed === 4 ? 4 : 3;
 };
 
+const pickAllowedExtraParams = (extraParams = {}) => {
+    const picked = {};
+
+    for (const key of EXTRA_PARAMS_ALLOWED_KEYS) {
+        const value = extraParams[key];
+        if (value === undefined || value === null || value === "") continue;
+        picked[key] = value;
+    }
+
+    if (picked.st != null && !EXTRA_PARAMS_SECURITY_TYPES.has(String(picked.st))) {
+        delete picked.st;
+    }
+
+    return picked;
+};
+
+/**
+ * Keep `extraParams` to the known lease schema and under Pinata's 250-char cap.
+ * Addresses, referral, session JWTs, and other publicData do not belong here.
+ * @param {Object} extraParams
+ * @returns {Object}
+ */
+const cleanExtraParamsForPinata = (extraParams) => {
+    if (!extraParams || typeof extraParams !== "object") return extraParams;
+
+    const cleaned = pickAllowedExtraParams(extraParams);
+    const checkLength = (obj) => JSON.stringify(obj).length;
+
+    if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
+
+    for (const key of EXTRA_PARAMS_OPTIONAL_KEYS) {
+        if (!(key in cleaned)) continue;
+        delete cleaned[key];
+        if (checkLength(cleaned) <= PINATA_KEYVALUE_MAX_LENGTH) return cleaned;
+    }
+
+    return cleaned;
+};
+
+const serializePinataValue = (value) => (typeof value === "object" ? JSON.stringify(value) : String(value));
+
 const stampExtraParamsVersion = (extraParams = {}, version) => {
     const parsed =
         typeof extraParams === "string"
@@ -285,7 +348,7 @@ const stampExtraParamsVersion = (extraParams = {}, version) => {
 
     parsed.v = Number(version) === 4 ? 4 : 3;
     delete parsed.zelfEncryptVersion;
-    return parsed;
+    return pickAllowedExtraParams(parsed);
 };
 
 const collectReservedKeyvalues = (reserved = {}) => {
@@ -296,7 +359,12 @@ const collectReservedKeyvalues = (reserved = {}) => {
         if (SEARCHABLE_ADDRESS_FIELDS.includes(key)) continue;
         if (ADDRESS_CHUNK_KEYS.includes(key)) continue;
         if (key === CONTINUATION_LINK_KEY || key === CONTINUATION_LINK_KEY_2) continue;
-        keyvalues[key] = typeof value === "object" ? JSON.stringify(value) : String(value);
+        if (key.length > PINATA_KEYVALUE_MAX_LENGTH) continue;
+
+        const serialized = serializePinataValue(value);
+        if (serialized.length > PINATA_KEYVALUE_MAX_LENGTH) continue;
+
+        keyvalues[key] = serialized;
     }
 
     return keyvalues;
@@ -308,6 +376,7 @@ const collectAddressEntries = (addresses = {}) => {
 
     for (const field of SEARCHABLE_ADDRESS_FIELDS) {
         if (!normalized[field]) continue;
+        if (normalized[field].length > PINATA_KEYVALUE_MAX_LENGTH) continue;
         entries.push([field, normalized[field]]);
     }
 
@@ -394,6 +463,8 @@ const mergeContinuationAddresses = (target = {}, source = {}) => {
 const omitAddressKeyvalues = (metadata = {}) => collectReservedKeyvalues(metadata);
 
 module.exports = {
+    EXTRA_PARAMS_ALLOWED_KEYS,
+    EXTRA_PARAMS_SECURITY_TYPES,
     ADDRESS_CHUNK_KEYS,
     ADDRESS_FIELDS_ORDER,
     ADDRESS_KEYVALUE_CHUNKS,
@@ -414,6 +485,7 @@ module.exports = {
     buildAddressKeyvalues,
     buildSearchablePinPages,
     buildTopLevelAddressKeyvalues,
+    cleanExtraParamsForPinata,
     collectReservedKeyvalues,
     continuationPinName,
     extractAddressKeyvaluesFromPublicData,

@@ -15,7 +15,7 @@ const config = require("../../../Core/config");
 const WalrusModule = require("../../Walrus/modules/walrus.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const { generateQRFromZelfProof, QRZelfProofExtractor } = require("./qr-zelfproof-extractor.module");
-const { resolveEncryptVersion, stampExtraParamsVersion } = require("./tags-addresses.module");
+const { cleanExtraParamsForPinata, resolveEncryptVersion, stampExtraParamsVersion } = require("./tags-addresses.module");
 
 const envTruthy = (v) => {
     if (v == null || v === "") return false;
@@ -1058,7 +1058,7 @@ const buildMetadata = (params, tagObject, domainConfig) => {
         metadata.referral = JSON.stringify(metadata.referral);
     }
 
-    metadata.extraParams = JSON.stringify(metadata.extraParams);
+    metadata.extraParams = JSON.stringify(cleanExtraParamsForPinata(metadata.extraParams));
 
     return { metadata, fullTagName: tagObject.fullTagName };
 };
