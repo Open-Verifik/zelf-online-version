@@ -29,7 +29,13 @@ const MAX_SPL_IN_ADDRESS_OVERVIEW = 200;
  */
 const solanaBookBase = async () => getNaasNodeUrl(NAAS_CHAIN.SOLANA);
 
-const solanaFallbackBase = () => config.solana?.rpcUrl || "https://api.mainnet-beta.solana.com";
+/**
+ * Se prefiere el nodo del proxy protegido (`/api/protected/rpc/solana`), que en
+ * produccion si responde: es el que usa la extension para leer saldos. El de
+ * `config.solana` queda de segundo porque puede no estar configurado.
+ */
+const solanaFallbackBase = () =>
+	config.extension?.rpc?.chains?.solana?.rpcUrl || config.solana?.rpcUrl || "https://api.mainnet-beta.solana.com";
 
 let rpcSeq = 0;
 const rpcCall = async (method, params, { retried401 = false, useFallbackNode = false } = {}) => {
