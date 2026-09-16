@@ -76,3 +76,80 @@ describe("parsedTokenAccountsToHoldings", () => {
 		expect(result.tokens).toHaveLength(0);
 	});
 });
+
+describe("rpcCall fallback when NaaS 401 and catalog refresh fails", () => {
+	const mockPost = jest.fn();
+	const mockRefresh = jest.fn();
+	const naasUrl = "https://solana.twnodes.com/naas/session/expired-token";
+	const fallbackUrl = "https://fallback-rpc.example.com";
+
+	beforeEach(() => {
+		jest.resetModules();
+		mockPost.mockReset();
+		mockRefresh.mockReset();
+		mockRefresh.mockRejectedValue(new Error("naas_catalog_invalid_response"));
+
+		jest.doMock("../../Core/axios", () => ({
+			getCleanInstance: () => ({ post: mockPost }),
+		}));
+		jest.doMock("../../Core/helpers", () => ({
+			generateRandomUserAgent: () => "test-agent",
+		}));
+		jest.doMock("../../Core/naas-gateway-catalog", () => ({
+			getNaasNodeUrl: jest.fn().mockResolvedValue(naasUrl),
+			NAAS_CHAIN: { SOLANA: "solana" },
+			refreshNaasCatalogAfterUnauthorized: mockRefresh,
+			isNaasNodeUnauthorizedError: (err) => err?.response?.status === 401,
+		}));
+		jest.doMock("../../Core/config", () => ({
+			solana: { rpcUrl: fallbackUrl },
+			extension: undefined,
+		}));
+		jest.doMock("../../Repositories/binance/modules/binance.module", () => ({
+			getTickerPrice: jest.fn().mockResolvedValue({ price: 100 }),
+		}));
+		jest.doMock("../../Repositories/Solana/modules/jupiter-spl-metadata.module", () => ({
+			enrichSplTokenRowsWithJupiter: jest.fn().mockResolvedValue(undefined),
+		}));
+	});
+
+	it("getTransactions uses fallback RPC instead of throwing when catalog refresh fails", async () => {
+		const sig = { signature: "sig1", slot: 123, blockTime: 1700000000, err: null };
+		mockPost
+			.mockRejectedValueOnce({ response: { status: 401 } })
+			.mockResolvedValueOnce({ data: { jsonrpc: "2.0", id: 2, result: [sig] } });
+
+		const { getTransactions } = require("../../Repositories/Solana/modules/solana-source-a-rpc.module");
+		const wallet = "8rG2cQUELobaZXjtZajpkaB6FFgK5egsXWfVy885Q6nt";
+		const result = await getTransactions({ id: wallet }, { page: 0, show: 10 });
+
+		expect(mockRefresh).toHaveBeenCalledTimes(1);
+		expect(mockPost).toHaveBeenCalledTimes(2);
+		expect(mockPost.mock.calls[0][0]).toBe(naasUrl);
+		expect(mockPost.mock.calls[1][0]).toBe(fallbackUrl);
+		expect(result.transactions).toHaveLength(1);
+		expect(result.transactions[0].hash).toBe("sig1");
+	});
+
+	it("getAddress uses fallback RPC for balance when catalog refresh fails", async () => {
+		const lamports = 1_500_000_000;
+		const naas401 = { response: { status: 401 } };
+		mockPost
+			.mockRejectedValueOnce(naas401)
+			.mockResolvedValueOnce({ data: { jsonrpc: "2.0", id: 2, result: { value: lamports } } })
+			.mockRejectedValueOnce(naas401)
+			.mockResolvedValueOnce({ data: { jsonrpc: "2.0", id: 4, result: { value: [] } } })
+			.mockRejectedValueOnce(naas401)
+			.mockResolvedValueOnce({ data: { jsonrpc: "2.0", id: 6, result: [] } });
+
+		const { getAddress } = require("../../Repositories/Solana/modules/solana-source-a-rpc.module");
+		const wallet = "8rG2cQUELobaZXjtZajpkaB6FFgK5egsXWfVy885Q6nt";
+		const result = await getAddress({ id: wallet });
+
+		expect(mockRefresh).toHaveBeenCalledTimes(3);
+		expect(result).not.toBeNull();
+		expect(result.balance).toBe("1.5");
+		expect(mockPost.mock.calls.every((call) => call[0] === naasUrl || call[0] === fallbackUrl)).toBe(true);
+		expect(mockPost.mock.calls.filter((call) => call[0] === fallbackUrl)).toHaveLength(3);
+	});
+});
