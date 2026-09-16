@@ -8,6 +8,14 @@ const moment = require("moment");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 
 /**
+ * oklink raspa el sitio de OKLink con selectores de CSS. Cuando la pagina cambia (o
+ * bloquea el raspado) devuelve saldo 0 y sin tokens para billeteras que si tienen
+ * fondos, que es lo que reportaron los clientes. En ese caso se lee el nodo.
+ */
+const looksEmpty = (response) =>
+	!response || (!parseFloat(response.balance) && !(response.tokenHoldings?.tokens || []).some((token) => parseFloat(token.amount)));
+
+/**
  * @param {*} params
  */
 const getAddress = async (params) => {
@@ -32,11 +40,22 @@ const getAddress = async (params) => {
 		case "oklink":
 			response = await oklink.getAddress(params);
 			source = "oklink";
+			if (looksEmpty(response)) {
+				try {
+					const saResult = await solanaSourceA.getAddress(params);
+					if (!looksEmpty(saResult)) {
+						response = saResult;
+						source = "sourceA";
+					}
+				} catch (e) {
+					console.error("solana sourceA getAddress:", e?.message || e);
+				}
+			}
 			break;
 		default:
 			try {
 				const saResult = await solanaSourceA.getAddress(params);
-				if (saResult) {
+				if (!looksEmpty(saResult)) {
 					response = saResult;
 					source = "sourceA";
 					break;
