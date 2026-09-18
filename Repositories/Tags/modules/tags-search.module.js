@@ -98,27 +98,25 @@ const searchTag = async (params, authUser) => {
             domain,
         };
 
-        // If results found, return the first one
-        if (arweaveResults.length > 0) {
-            combinedResults.tagObject = { ...arweaveResults[0] };
-        }
-
+        // Assign tagObject: prioritize IPFS as canonical source of truth; Arweave is archival / fallback
         if (ipfsResults.length > 0) {
-            if (!combinedResults.tagObject) {
-                combinedResults.tagObject = { ...ipfsResults[0] };
-            } else if (arweaveResults.length > 0) {
-                const arPd = combinedResults.tagObject.publicData || {};
-                const ipfsPd = ipfsResults[0].publicData || {};
-
-                combinedResults.tagObject = {
-                    ...combinedResults.tagObject,
-                    publicData: { ...arPd, ...ipfsPd },
-                };
-            }
-
+            combinedResults.tagObject = { ...ipfsResults[0] };
             combinedResults.tagObject.ipfsId = ipfsResults[0].id;
             const ipfsUrl = typeof ipfsResults[0].url === "string" && ipfsResults[0].url.trim() !== "" ? ipfsResults[0].url.trim() : "";
             if (ipfsUrl) combinedResults.tagObject.ipfsContentUrl = ipfsUrl;
+
+            // Having two copies is nice, but not required: enrich with Arweave metadata if present
+            if (arweaveResults.length > 0) {
+                const arPd = arweaveResults[0].publicData || {};
+                const ipfsPd = combinedResults.tagObject.publicData || {};
+
+                combinedResults.tagObject.publicData = { ...arPd, ...ipfsPd };
+                if (arweaveResults[0].id) combinedResults.tagObject.arweaveId = arweaveResults[0].id;
+                if (arweaveResults[0].url) combinedResults.tagObject.arweaveUrl = arweaveResults[0].url;
+            }
+        } else if (arweaveResults.length > 0) {
+            // Only Arweave copy is available (one copy is enough)
+            combinedResults.tagObject = { ...arweaveResults[0] };
         }
 
         if (combinedResults.available && domainConfig) {
@@ -133,6 +131,7 @@ const searchTag = async (params, authUser) => {
             combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64First([
                 combinedResults.tagObject.ipfsContentUrl,
                 combinedResults.tagObject.url,
+                combinedResults.tagObject.arweaveUrl,
             ]);
         }
 

@@ -75,6 +75,49 @@ describe("tags-search.module - timeouts and early IPFS resolution", () => {
         expect(result.tagObject.ipfsId).toBe("ipfs-123");
     });
 
+    it("properly assigns tagObject from IPFS as canonical source, enriching with Arweave when both respond", async () => {
+        const ipfsResult = [
+            {
+                id: "ipfs-canonical",
+                name: "canonical.zelf",
+                url: "https://ipfs.zelf.world/ipfs/QmCanonical",
+                cid: "QmCanonical",
+                publicData: { tagName: "canonical.zelf", ipfsField: "ipfsValue", sharedField: "fromIPFS" },
+            },
+        ];
+        const arweaveResult = [
+            {
+                id: "ar-tx-supplementary",
+                url: "https://arweave.net/txSupplementary",
+                publicData: { tagName: "canonical.zelf", arweaveField: "arValue", sharedField: "fromArweave" },
+            },
+        ];
+
+        jest.spyOn(TagsIPFSModule, "get").mockResolvedValue(ipfsResult);
+        jest.spyOn(TagsArweaveModule, "searchByStorageKey").mockResolvedValue(arweaveResult);
+        jest.spyOn(TagsPartsModule, "urlToBase64First").mockResolvedValue("data:image/png;base64,mockqr");
+
+        const result = await TagsSearchModule.searchTag({
+            tagName: "canonical.zelf",
+            domain: "zelf",
+            domainConfig: mockDomainConfig,
+            environment: "all",
+            type: "both",
+        });
+
+        // IPFS is canonical
+        expect(result.tagObject.id).toBe("ipfs-canonical");
+        expect(result.tagObject.ipfsId).toBe("ipfs-canonical");
+        expect(result.tagObject.cid).toBe("QmCanonical");
+        expect(result.tagObject.ipfsContentUrl).toBe("https://ipfs.zelf.world/ipfs/QmCanonical");
+        // Arweave enriches supplementary info
+        expect(result.tagObject.arweaveId).toBe("ar-tx-supplementary");
+        expect(result.tagObject.arweaveUrl).toBe("https://arweave.net/txSupplementary");
+        // IPFS publicData takes precedence over Arweave on collision, while retaining unique Arweave fields
+        expect(result.tagObject.publicData.sharedField).toBe("fromIPFS");
+        expect(result.tagObject.publicData.arweaveField).toBe("arValue");
+    });
+
     it("does not break the call when Arweave times out or errors", async () => {
         const ipfsResult = [
             {
