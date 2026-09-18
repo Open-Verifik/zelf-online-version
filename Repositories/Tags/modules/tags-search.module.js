@@ -4,7 +4,7 @@ const { getDomainConfiguration, isDomainActive } = require("./domain-registry.mo
 const TagsPartsModule = require("./tags-parts.module");
 const { QRZelfProofExtractor, generateQRFromZelfProof } = require("./qr-zelfproof-extractor.module");
 
-const DEFAULT_IPFS_TIMEOUT_MS = Number(process.env.TAGS_SEARCH_IPFS_TIMEOUT_MS) || 6000;
+const DEFAULT_IPFS_TIMEOUT_MS = Number(process.env.TAGS_SEARCH_IPFS_TIMEOUT_MS) || 12000;
 const DEFAULT_ARWEAVE_TIMEOUT_MS = Number(process.env.TAGS_SEARCH_ARWEAVE_TIMEOUT_MS) || 3000;
 const ARWEAVE_FAST_GRACE_MS = Number(process.env.TAGS_SEARCH_ARWEAVE_FAST_GRACE_MS) || 500;
 
@@ -31,6 +31,15 @@ const searchTag = async (params, authUser) => {
     let domainConfig = params.domainConfig || getDomainConfiguration(domain);
 
     try {
+        /**
+         * Si la busqueda en IPFS se pasa del tiempo o falla, devuelve una lista vacia.
+         * Eso antes se confundia con "el nombre no existe" y se respondia que estaba
+         * disponible aunque ya estuviera registrado: es lo que reporto QA cuando una
+         * wallet creada en Android aparecia como libre desde iOS.
+         */
+        let ipfsIncompleto = false;
+        let arweaveIncompleto = false;
+
         const shouldSearchIpfs = ["ipfs", "all"].includes(environment);
         const shouldSearchArweave = ["arweave", "all"].includes(environment) && ["both", "mainnet"].includes(type);
 
@@ -39,8 +48,12 @@ const searchTag = async (params, authUser) => {
 
         if (shouldSearchIpfs && shouldSearchArweave) {
             // Concurrently start both IPFS and Arweave searches
-            const ipfsPromise = searchWithTimeout(searchIPFS(params, authUser), DEFAULT_IPFS_TIMEOUT_MS, "IPFS");
-            const arweavePromise = searchWithTimeout(searchArweave(params, authUser), DEFAULT_ARWEAVE_TIMEOUT_MS, "Arweave");
+            const ipfsPromise = searchWithTimeout(searchIPFS(params, authUser), DEFAULT_IPFS_TIMEOUT_MS, "IPFS", () => {
+                ipfsIncompleto = true;
+            });
+            const arweavePromise = searchWithTimeout(searchArweave(params, authUser), DEFAULT_ARWEAVE_TIMEOUT_MS, "Arweave", () => {
+                arweaveIncompleto = true;
+            });
 
             // Wait for IPFS first
             ipfsRaw = await ipfsPromise;
@@ -61,18 +74,25 @@ const searchTag = async (params, authUser) => {
                 arweaveResults = await arweavePromise;
             }
         } else if (shouldSearchIpfs) {
-            ipfsRaw = await searchWithTimeout(searchIPFS(params, authUser), DEFAULT_IPFS_TIMEOUT_MS, "IPFS");
+            ipfsRaw = await searchWithTimeout(searchIPFS(params, authUser), DEFAULT_IPFS_TIMEOUT_MS, "IPFS", () => {
+                ipfsIncompleto = true;
+            });
         } else if (shouldSearchArweave) {
-            arweaveResults = await searchWithTimeout(searchArweave(params, authUser), DEFAULT_ARWEAVE_TIMEOUT_MS, "Arweave");
+            arweaveResults = await searchWithTimeout(searchArweave(params, authUser), DEFAULT_ARWEAVE_TIMEOUT_MS, "Arweave", () => {
+                arweaveIncompleto = true;
+            });
         }
 
         const ipfsResults = TagsIPFSModule.sortDedupeIpfsSearchResults(ipfsRaw);
+
+        const searchIncomplete = ipfsIncompleto || (shouldSearchArweave && ipfsResults.length === 0 && arweaveIncompleto);
 
         // Combine results
         const combinedResults = {
             ipfs: ipfsResults,
             arweave: arweaveResults,
-            available: ipfsResults.length === 0 && arweaveResults.length === 0,
+            available: !searchIncomplete && ipfsResults.length === 0 && arweaveResults.length === 0,
+            searchIncomplete: searchIncomplete || undefined,
             tagName,
             domain,
         };
@@ -191,7 +211,7 @@ const searchIPFS = async (params, authUser) => {
         return ipfsRecords;
     } catch (error) {
         console.error("Error searching IPFS:", error);
-        return [];
+        throw error;
     }
 };
 
@@ -224,7 +244,7 @@ const searchArweave = async (params, authUser) => {
         return TagsArweaveModule.searchByStorageKey({ key: "domain", value: domain, domainConfig: _domainConfig }, authUser);
     } catch (error) {
         console.error("Error searching Arweave:", error);
-        return [];
+        throw error;
     }
 };
 
@@ -474,7 +494,7 @@ const searchAllDomains = async (params, authUser) => {
 /**
  * Helper to wrap a promise with a timeout
  */
-const searchWithTimeout = async (promise, ms, name) => {
+const searchWithTimeout = async (promise, ms, name, onError) => {
     let timeoutId;
     try {
         const timeoutPromise = new Promise((_, reject) => {
@@ -491,6 +511,10 @@ const searchWithTimeout = async (promise, ms, name) => {
         return result;
     } catch (error) {
         if (timeoutId) clearTimeout(timeoutId);
+
+        // El llamador necesita distinguir "no hay resultados" de "la busqueda fallo":
+        // con la lista vacia a secas, un nombre ya registrado se reportaba disponible.
+        if (typeof onError === "function") onError(error);
 
         if (error.message === "SEARCH_TIMEOUT") {
             console.warn(`${name} search timed out after ${ms}ms - continuing with other results`);

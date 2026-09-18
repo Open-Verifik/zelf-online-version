@@ -127,7 +127,7 @@ describe("tags-search.module - timeouts and early IPFS resolution", () => {
         expect(result.tagObject.id).toBe("ar-789");
     });
 
-    it("marks available=true when neither IPFS nor Arweave finds the tag", async () => {
+    it("marks available=true when neither IPFS nor Arweave finds the tag and searches completed cleanly", async () => {
         jest.spyOn(TagsIPFSModule, "get").mockResolvedValue([]);
         jest.spyOn(TagsArweaveModule, "searchByStorageKey").mockResolvedValue([]);
 
@@ -140,7 +140,43 @@ describe("tags-search.module - timeouts and early IPFS resolution", () => {
         });
 
         expect(result.available).toBe(true);
+        expect(result.searchIncomplete).toBeUndefined();
         expect(result.price).toBeDefined();
+    });
+
+    it("marks available=false and searchIncomplete=true when IPFS search fails or times out (issue #528)", async () => {
+        // IPFS search fails (e.g. Pinata timeout or network error)
+        jest.spyOn(TagsIPFSModule, "get").mockRejectedValue(new Error("SEARCH_TIMEOUT"));
+        jest.spyOn(TagsArweaveModule, "searchByStorageKey").mockResolvedValue([]);
+
+        const result = await TagsSearchModule.searchTag({
+            tagName: "timeouttag.zelf",
+            domain: "zelf",
+            domainConfig: mockDomainConfig,
+            environment: "all",
+            type: "both",
+        });
+
+        // Must NEVER report available=true if IPFS failed to respond!
+        expect(result.available).toBe(false);
+        expect(result.searchIncomplete).toBe(true);
+    });
+
+    it("marks available=false and searchIncomplete=true when Arweave search fails and IPFS found nothing", async () => {
+        jest.spyOn(TagsIPFSModule, "get").mockResolvedValue([]);
+        jest.spyOn(TagsArweaveModule, "searchByStorageKey").mockRejectedValue(new Error("SEARCH_TIMEOUT"));
+
+        const result = await TagsSearchModule.searchTag({
+            tagName: "arweavetimeout.zelf",
+            domain: "zelf",
+            domainConfig: mockDomainConfig,
+            environment: "all",
+            type: "both",
+        });
+
+        // Must not report available=true if Arweave search failed to verify existence
+        expect(result.available).toBe(false);
+        expect(result.searchIncomplete).toBe(true);
     });
 
     it("queries .hold and mainnet in parallel without switch fallthrough in searchIPFS", async () => {
