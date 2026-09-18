@@ -1,4 +1,8 @@
+const existingNodeEnv = process.env.NODE_ENV;
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env"), override: true });
+if (existingNodeEnv) {
+    process.env.NODE_ENV = existingNodeEnv;
+}
 
 const API_ROOT = "/api";
 const splitCsv = (value) =>
@@ -31,9 +35,8 @@ const stripeDashboardUrlBase = String(
 const ARWEAVE_DEFAULT_PUBLIC_GATEWAY_URL = "https://arweave.net";
 const ARWEAVE_DEFAULT_GRAPHQL_GATEWAYS = [
     "https://arweave.net",
-    "https://zigza.xyz",
-    "https://mipenode.pro",
-    "https://ar11.innostack.xyz",
+    "https://arweave-search.goldsky.com",
+    "https://turbo-gateway.com",
     "https://ardrive.net",
 ];
 const ARWEAVE_DEFAULT_ARNS_GATEWAY_HOST = "arweave.net";
@@ -176,10 +179,10 @@ const configuration = {
         transactionId: process.env.ARWEAVE_TRANSACTION_ID,
     },
     pinata: {
-        apiKey: process.env.PINATA_API_KEY,
-        secretKey: process.env.PINATA_API_SECRET,
-        jwt: process.env.PINATA_JWT,
-        gatewayUrl: process.env.PINATA_GATEWAY_URL,
+        apiKey: process.env.PINATA_API_KEY || process.env.__PINATA_API_KEY || process.env["2_PINATA_API_KEY"],
+        secretKey: process.env.PINATA_API_SECRET || process.env.__PINATA_API_SECRET || process.env["2_PINATA_API_SECRET"],
+        jwt: process.env.PINATA_JWT || process.env.__PINATA_JWT || process.env["2_PINATA_JWT"],
+        gatewayUrl: process.env.PINATA_GATEWAY_URL || process.env.__PINATA_GATEWAY_URL || process.env["2_PINATA_GATEWAY_URL"],
         // VaultLegacy relay uses _prefixed env vars (dev/alternate Pinata account)
         vaultLegacy: {
             apiKey: process.env._PINATA_API_KEY,

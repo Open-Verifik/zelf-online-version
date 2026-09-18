@@ -7,6 +7,7 @@ const { getAllSupportedDomains } = require("../../Tags/modules/domain-registry.m
 const { errorHandler } = require("../../../Core/http-handler");
 const configuration = require("../../../Core/config");
 const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
+const { resolveEncryptVersion } = require("../../Tags/modules/tags-addresses.module");
 const TagWalletBalancesModule = require("../../Tags/modules/tag-wallet-balances.module");
 const MyZelfIdModule = require("../modules/my-zelf-id.module");
 const ZelfIdsOfflineModule = require("../modules/zelf-ids-offline.module");
@@ -62,18 +63,18 @@ const searchTag = async (ctx) => {
 
         let data = await Module.searchTag(requestData, ctx.state.user);
 
-        if (data.tagObject?.publicData && !data.tagObject.publicData.hasPassword && data.tagObject.zelfProof) {
-            const previewData = await ZelfProofModule.preview(
-                {
+        if (
+            data.tagObject?.zelfProof &&
+            ZelfProofModule.shouldBackfillHasPassword(data.tagObject.publicData, resolveEncryptVersion(data.tagObject.publicData))
+        ) {
+            try {
+                data.preview = await ZelfProofModule.previewWithLegacyFallback({
                     zelfProof: data.tagObject.zelfProof,
-                    stack: "v4",
-                },
-                ctx.state.user,
-            );
-
-            data.preview = previewData;
-
-            if (data.preview) data.tagObject.publicData.hasPassword = `${Boolean(data.preview.passwordLayer === "WithPassword")}`;
+                });
+                ZelfProofModule.applyPreviewHasPassword(data.tagObject, data.preview);
+            } catch (_error) {
+                // Search still succeeds when preview cannot read an old proof.
+            }
         }
 
         ctx.body = { data };

@@ -141,7 +141,7 @@ const generateQRCode = async (params, authUser) => {
  */
 const urlToBase64 = async (url) => {
     try {
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: AbortSignal.timeout(3500) });
 
         if (!response.ok) {
             console.warn(`urlToBase64: HTTP ${response.status} for ${url}`);

@@ -83,7 +83,7 @@ describe("arweave-gateway.module", () => {
 		expect(edges).toHaveLength(1);
 		expect(axios.post).toHaveBeenCalledTimes(2);
 		expect(axios.post.mock.calls[0][0]).toBe("https://arweave.net/graphql");
-		expect(axios.post.mock.calls[1][0]).toBe("https://zigza.xyz/graphql");
+		expect(axios.post.mock.calls[1][0]).toBe("https://arweave-search.goldsky.com/graphql");
 	});
 
 	it("postGraphql throws after all gateways fail", async () => {

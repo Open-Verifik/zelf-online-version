@@ -4,6 +4,10 @@ const { getDomainConfiguration, isDomainActive } = require("./domain-registry.mo
 const TagsPartsModule = require("./tags-parts.module");
 const { QRZelfProofExtractor, generateQRFromZelfProof } = require("./qr-zelfproof-extractor.module");
 
+const DEFAULT_IPFS_TIMEOUT_MS = Number(process.env.TAGS_SEARCH_IPFS_TIMEOUT_MS) || 6000;
+const DEFAULT_ARWEAVE_TIMEOUT_MS = Number(process.env.TAGS_SEARCH_ARWEAVE_TIMEOUT_MS) || 3000;
+const ARWEAVE_FAST_GRACE_MS = Number(process.env.TAGS_SEARCH_ARWEAVE_FAST_GRACE_MS) || 500;
+
 /**
  * Tags Search Module
  *
@@ -27,11 +31,40 @@ const searchTag = async (params, authUser) => {
     let domainConfig = params.domainConfig || getDomainConfiguration(domain);
 
     try {
-        // Search in both IPFS and Arweave
-        const [ipfsRaw, arweaveResults] = await Promise.all([
-            ["ipfs", "all"].includes(environment) ? searchWithTimeout(searchIPFS(params, authUser), 12000, "IPFS") : [],
-            ["arweave", "all"].includes(environment) && ["both", "mainnet"].includes(type) ? searchArweave(params, authUser) : [],
-        ]);
+        const shouldSearchIpfs = ["ipfs", "all"].includes(environment);
+        const shouldSearchArweave = ["arweave", "all"].includes(environment) && ["both", "mainnet"].includes(type);
+
+        let ipfsRaw = [];
+        let arweaveResults = [];
+
+        if (shouldSearchIpfs && shouldSearchArweave) {
+            // Concurrently start both IPFS and Arweave searches
+            const ipfsPromise = searchWithTimeout(searchIPFS(params, authUser), DEFAULT_IPFS_TIMEOUT_MS, "IPFS");
+            const arweavePromise = searchWithTimeout(searchArweave(params, authUser), DEFAULT_ARWEAVE_TIMEOUT_MS, "Arweave");
+
+            // Wait for IPFS first
+            ipfsRaw = await ipfsPromise;
+
+            // If IPFS returned records, we already have our tag!
+            // Do not block on slow Arweave: give Arweave at most a short grace window, otherwise return IPFS immediately.
+            if (ipfsRaw && ipfsRaw.length > 0) {
+                let fastGraceTimer;
+                const fastGracePromise = new Promise((resolve) => {
+                    fastGraceTimer = setTimeout(() => resolve(null), ARWEAVE_FAST_GRACE_MS);
+                    if (fastGraceTimer && typeof fastGraceTimer.unref === "function") fastGraceTimer.unref();
+                });
+                const fastArweave = await Promise.race([arweavePromise, fastGracePromise]);
+                if (fastGraceTimer) clearTimeout(fastGraceTimer);
+                arweaveResults = fastArweave !== null ? fastArweave : [];
+            } else {
+                // If IPFS found nothing, wait for Arweave up to its full timeout to check if the tag is on Arweave
+                arweaveResults = await arweavePromise;
+            }
+        } else if (shouldSearchIpfs) {
+            ipfsRaw = await searchWithTimeout(searchIPFS(params, authUser), DEFAULT_IPFS_TIMEOUT_MS, "IPFS");
+        } else if (shouldSearchArweave) {
+            arweaveResults = await searchWithTimeout(searchArweave(params, authUser), DEFAULT_ARWEAVE_TIMEOUT_MS, "Arweave");
+        }
 
         const ipfsResults = TagsIPFSModule.sortDedupeIpfsSearchResults(ipfsRaw);
 
@@ -77,8 +110,8 @@ const searchTag = async (params, authUser) => {
 
         if (combinedResults.tagObject && !combinedResults.tagObject?.zelfProofQRCode) {
             combinedResults.tagObject.zelfProofQRCode = await TagsPartsModule.urlToBase64First([
-                combinedResults.tagObject.url,
                 combinedResults.tagObject.ipfsContentUrl,
+                combinedResults.tagObject.url,
             ]);
         }
 
@@ -134,15 +167,25 @@ const searchIPFS = async (params, authUser) => {
 
     try {
         switch (type) {
-            case "hold":
-                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig, includeAllAddressPages })));
-            case "mainnet":
-                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig, includeAllAddressPages })));
-            default:
-                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig, includeAllAddressPages })));
-
-                // now also query adding .hold to the tagName
-                ipfsRecords.push(...(await TagsIPFSModule.get({ tagName: `${_tagName}.hold`, key, value, domainConfig, includeAllAddressPages })));
+            case "hold": {
+                const holdRecords = await TagsIPFSModule.get({ tagName: `${_tagName}.hold`, key, value, domainConfig, includeAllAddressPages });
+                ipfsRecords.push(...holdRecords);
+                break;
+            }
+            case "mainnet": {
+                const mainnetRecords = await TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig, includeAllAddressPages });
+                ipfsRecords.push(...mainnetRecords);
+                break;
+            }
+            case "both":
+            default: {
+                const [mainnetRecords, holdRecords] = await Promise.all([
+                    TagsIPFSModule.get({ tagName: _tagName, key, value, domainConfig, includeAllAddressPages }),
+                    TagsIPFSModule.get({ tagName: `${_tagName}.hold`, key, value, domainConfig, includeAllAddressPages }),
+                ]);
+                ipfsRecords.push(...mainnetRecords, ...holdRecords);
+                break;
+            }
         }
 
         return ipfsRecords;
@@ -209,8 +252,8 @@ const searchHoldDomain = async (params, authUser) => {
     try {
         // Search for hold domain in both IPFS and Arweave
         const [ipfsResults, arweaveResults] = await Promise.all([
-            searchWithTimeout(TagsIPFSModule.getHoldDomain({ domain, name }, authUser), 12000, "IPFS"),
-            TagsArweaveModule.getHoldDomain({ domain, name }, authUser),
+            searchWithTimeout(TagsIPFSModule.getHoldDomain({ domain, name }, authUser), DEFAULT_IPFS_TIMEOUT_MS, "IPFS"),
+            searchWithTimeout(TagsArweaveModule.getHoldDomain({ domain, name }, authUser), DEFAULT_ARWEAVE_TIMEOUT_MS, "Arweave"),
         ]);
 
         // Combine results
@@ -295,8 +338,8 @@ const searchByStorageKey = async (params, authUser) => {
     try {
         // Search in both IPFS and Arweave
         const [ipfsResults, arweaveResults] = await Promise.all([
-            TagsIPFSModule.searchByStorageKey({ domain, name }, authUser),
-            TagsArweaveModule.searchByStorageKey({ domain, name }, authUser),
+            searchWithTimeout(TagsIPFSModule.searchByStorageKey({ domain, name }, authUser), DEFAULT_IPFS_TIMEOUT_MS, "IPFS"),
+            searchWithTimeout(TagsArweaveModule.searchByStorageKey({ domain, name }, authUser), DEFAULT_ARWEAVE_TIMEOUT_MS, "Arweave"),
         ]);
 
         // Combine results
@@ -362,8 +405,8 @@ const getDomainStats = async (domain, authUser) => {
     try {
         // Get statistics from both IPFS and Arweave
         const [ipfsStats, arweaveStats] = await Promise.all([
-            TagsIPFSModule.getDomainStats(domain, authUser),
-            TagsArweaveModule.getDomainStats(domain, authUser),
+            searchWithTimeout(TagsIPFSModule.getDomainStats(domain, authUser), DEFAULT_IPFS_TIMEOUT_MS, "IPFS"),
+            searchWithTimeout(TagsArweaveModule.getDomainStats(domain, authUser), DEFAULT_ARWEAVE_TIMEOUT_MS, "Arweave"),
         ]);
 
         // Combine statistics
@@ -438,6 +481,7 @@ const searchWithTimeout = async (promise, ms, name) => {
             timeoutId = setTimeout(() => {
                 reject(new Error("SEARCH_TIMEOUT"));
             }, ms);
+            if (timeoutId && typeof timeoutId.unref === "function") timeoutId.unref();
         });
 
         // Use Promise.race to race the actual search against the timeout

@@ -44,6 +44,26 @@ const get = async (data) => {
 		const storageKey = domainConfig ? domainConfig.tags.storage.keyPrefix : generateStorageKey(domain);
 
 		result = await IPFS.filter(storageKey, tagName);
+
+		// Fallback for legacy tags: tags pinned under ZNS or older schemas used 'zelfName' or Pinata file 'name'
+		if (!result.length && storageKey !== "zelfName") {
+			result = await IPFS.filter("zelfName", tagName);
+		}
+
+		if (!result.length) {
+			const byName = await IPFS.filter("name", tagName);
+			const lowerTag = tagName.toLowerCase();
+			result = (byName || []).filter((item) => {
+				const n = String(item.name || "").toLowerCase();
+				return (
+					n === lowerTag ||
+					n === `${lowerTag}.hold` ||
+					n === `${lowerTag}.png` ||
+					n.startsWith(`${lowerTag}_`) ||
+					n.startsWith(`${lowerTag}.`)
+				);
+			});
+		}
 	} else if (key && value) {
 		result = await IPFS.filter(key, value);
 	}
@@ -137,6 +157,10 @@ const _formatRecord = (item) => {
 	if (formattedResult?.publicData) {
 		delete formattedResult.publicData.coinbase_hosted_url;
 		delete formattedResult.publicData.coinbase_expires_at;
+
+		if (!formattedResult.publicData.tagName && formattedResult.publicData.zelfName) {
+			formattedResult.publicData.tagName = formattedResult.publicData.zelfName;
+		}
 	}
 
 	return formattedResult;

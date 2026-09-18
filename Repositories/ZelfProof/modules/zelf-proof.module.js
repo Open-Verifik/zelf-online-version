@@ -217,7 +217,7 @@ const encryptQRCode = async (data) => {
  * @param {string} data.faceBase64
  * @param {string} [data.os="DESKTOP"]
  * @param {string} [data.password]
- * @param {string|boolean} [data.hasPassword] if `"false"`, password is omitted
+ * @param {string|boolean} [data.hasPassword] informational only; a provided password is always forwarded
  * @param {string} [data.verifierKey]
  * @param {boolean} [data.addServerPassword]
  * @returns {Promise<Object>} upstream decrypt payload (`publicData`, `metadata`, …)
@@ -225,8 +225,6 @@ const encryptQRCode = async (data) => {
  */
 const decrypt = async (data) => {
     if (!data.zelfProof) throw new Error("400:missing_zelf_proof");
-
-    if (data.hasPassword == "false") data.password = undefined;
 
     try {
         const { client, prefix } = resolveZelfEncryptStack(data);
@@ -250,6 +248,65 @@ const decrypt = async (data) => {
 
         throw _error;
     }
+};
+
+const passwordLayerRequiresPassword = (layer) => {
+    if (layer === "WithPassword" || layer === "Password") return true;
+    if (layer === "WithoutPassword" || layer === "NoPassword") return false;
+
+    return undefined;
+};
+
+const hasPasswordFromPasswordLayer = (layer) => {
+    const required = passwordLayerRequiresPassword(layer);
+
+    if (required === true) return "true";
+    if (required === false) return "false";
+
+    return "";
+};
+
+const shouldBackfillHasPassword = (publicData, encryptVersion) => {
+    if (!publicData) return false;
+    if (!publicData.hasPassword) return true;
+
+    return Number(encryptVersion) !== 4 && String(publicData.hasPassword) === "false";
+};
+
+const applyPreviewHasPassword = (tagObject, preview) => {
+    if (!tagObject?.publicData || !preview) return tagObject;
+
+    const flag = hasPasswordFromPasswordLayer(preview.passwordLayer);
+
+    if (flag) tagObject.publicData.hasPassword = flag;
+    if (preview.publicData?.st && !tagObject.publicData.st) {
+        tagObject.publicData.st = preview.publicData.st;
+    }
+
+    return tagObject;
+};
+
+const previewWithLegacyFallback = async (data = {}) => {
+    const { stack: _stack, ...rest } = data;
+    let v4Preview = null;
+
+    try {
+        v4Preview = await preview({ ...rest, stack: "v4" });
+        if (v4Preview?.passwordLayer) return v4Preview;
+    } catch (_error) {
+        v4Preview = null;
+    }
+
+    try {
+        const legacyPreview = await preview(rest);
+
+        if (legacyPreview) return legacyPreview;
+    } catch (error) {
+        if (v4Preview) return v4Preview;
+        throw error;
+    }
+
+    return v4Preview;
 };
 
 /**
@@ -475,5 +532,10 @@ module.exports = {
     encryptQRCode,
     decrypt,
     preview,
+    previewWithLegacyFallback,
+    passwordLayerRequiresPassword,
+    hasPasswordFromPasswordLayer,
+    shouldBackfillHasPassword,
+    applyPreviewHasPassword,
     upgrade,
 };

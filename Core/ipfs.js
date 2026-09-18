@@ -2,8 +2,18 @@ require("dotenv").config();
 const FormData = require("form-data");
 const axios = require("axios");
 
-const prefix = process.env.NODE_ENV === "development" ? "_" : "";
-const pinataGateway = process.env[`${prefix}PINATA_GATEWAY_URL`];
+const pinataEnv = process.env.PINATA_ENV || process.env.IPFS_ENV || process.env.NODE_ENV || "development";
+const prefix = pinataEnv === "development" ? "_" : "";
+const pinataGateway =
+    process.env[`${prefix}PINATA_GATEWAY_URL`] ||
+    process.env.PINATA_GATEWAY_URL ||
+    process.env.__PINATA_GATEWAY_URL ||
+    process.env["2_PINATA_GATEWAY_URL"];
+const pinataJwt =
+    process.env[`${prefix}PINATA_JWT`] ||
+    process.env.PINATA_JWT ||
+    process.env.__PINATA_JWT ||
+    process.env["2_PINATA_JWT"];
 const os = process.env.ENVOS;
 
 /**
@@ -135,7 +145,7 @@ const normalizePinataResponse = (response) => {
 
 // Use JWT authentication for new SDK v2.5.0
 const web3Instance = new pinataWeb3.PinataSDK({
-    pinataJwt: process.env[`${prefix}PINATA_JWT`],
+    pinataJwt,
     pinataGateway,
 });
 
@@ -253,8 +263,16 @@ const pinFileWindows = async (base64Image, filename = "image.png", mimeType = "i
         throw err;
     }
 
-    const PINATA_API_KEY = process.env[`${prefix}PINATA_API_KEY`];
-    const PINATA_SECRET_API_KEY = process.env[`${prefix}PINATA_API_SECRET`];
+    const PINATA_API_KEY =
+        process.env[`${prefix}PINATA_API_KEY`] ||
+        process.env.PINATA_API_KEY ||
+        process.env.__PINATA_API_KEY ||
+        process.env["2_PINATA_API_KEY"];
+    const PINATA_SECRET_API_KEY =
+        process.env[`${prefix}PINATA_API_SECRET`] ||
+        process.env.PINATA_API_SECRET ||
+        process.env.__PINATA_API_SECRET ||
+        process.env["2_PINATA_API_SECRET"];
 
     try {
         const formData = new FormData();

@@ -14,7 +14,7 @@ const { createStellarWallet } = require("../../Wallet/modules/stellar");
 const { createPolkadotWallet, createKusamaWallet } = require("../../Wallet/modules/polkadot-kusama");
 const { createTonWallet } = require("../../Wallet/modules/ton");
 const { createAptosWallet } = require("../../Wallet/modules/aptos");
-const { decrypt, preview } = require("../../ZelfProof/modules/zelf-proof.module");
+const { decrypt, preview, previewWithLegacyFallback, applyPreviewHasPassword } = require("../../ZelfProof/modules/zelf-proof.module");
 const OfflineProofModule = require("../../Mina/offline-proof");
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
@@ -380,12 +380,12 @@ const previewTag = async (params, authUser) => {
 
     const zelfProof = await extractZelfProofFromQR(tagObject.zelfProofQRCode);
 
-    const previewResult = await preview(
-        withV4({
-            zelfProof,
-            addServerPassword: Boolean(params.addServerPassword),
-        })
-    );
+    const previewResult = await previewWithLegacyFallback({
+        zelfProof,
+        addServerPassword: Boolean(params.addServerPassword),
+    });
+
+    applyPreviewHasPassword(searchResult.tagObject, previewResult);
 
     return { preview: previewResult, tagObject: searchResult.tagObject };
 };
