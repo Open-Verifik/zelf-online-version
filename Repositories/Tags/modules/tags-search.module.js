@@ -27,9 +27,21 @@ const searchTag = async (params, authUser) => {
     let domainConfig = params.domainConfig || getDomainConfiguration(domain);
 
     try {
+        /**
+         * Si la busqueda en IPFS se pasa del tiempo o falla, devuelve una lista vacia.
+         * Eso antes se confundia con "el nombre no existe" y se respondia que estaba
+         * disponible aunque ya estuviera registrado: es lo que reporto QA cuando una
+         * wallet creada en Android aparecia como libre desde iOS.
+         */
+        let ipfsIncompleto = false;
+
         // Search in both IPFS and Arweave
         const [ipfsRaw, arweaveResults] = await Promise.all([
-            ["ipfs", "all"].includes(environment) ? searchWithTimeout(searchIPFS(params, authUser), 12000, "IPFS") : [],
+            ["ipfs", "all"].includes(environment)
+                ? searchWithTimeout(searchIPFS(params, authUser), 12000, "IPFS", () => {
+                      ipfsIncompleto = true;
+                  })
+                : [],
             ["arweave", "all"].includes(environment) && ["both", "mainnet"].includes(type) ? searchArweave(params, authUser) : [],
         ]);
 
@@ -39,7 +51,8 @@ const searchTag = async (params, authUser) => {
         const combinedResults = {
             ipfs: ipfsResults,
             arweave: arweaveResults,
-            available: ipfsResults.length === 0 && arweaveResults.length === 0,
+            available: !ipfsIncompleto && ipfsResults.length === 0 && arweaveResults.length === 0,
+            searchIncomplete: ipfsIncompleto || undefined,
             tagName,
             domain,
         };
@@ -431,7 +444,7 @@ const searchAllDomains = async (params, authUser) => {
 /**
  * Helper to wrap a promise with a timeout
  */
-const searchWithTimeout = async (promise, ms, name) => {
+const searchWithTimeout = async (promise, ms, name, onError) => {
     let timeoutId;
     try {
         const timeoutPromise = new Promise((_, reject) => {
@@ -447,6 +460,10 @@ const searchWithTimeout = async (promise, ms, name) => {
         return result;
     } catch (error) {
         if (timeoutId) clearTimeout(timeoutId);
+
+        // El llamador necesita distinguir "no hay resultados" de "la busqueda fallo":
+        // con la lista vacia a secas, un nombre ya registrado se reportaba disponible.
+        if (typeof onError === "function") onError(error);
 
         if (error.message === "SEARCH_TIMEOUT") {
             console.warn(`${name} search timed out after ${ms}ms - continuing with other results`);
