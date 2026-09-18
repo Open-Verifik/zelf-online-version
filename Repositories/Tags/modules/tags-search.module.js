@@ -85,14 +85,15 @@ const searchTag = async (params, authUser) => {
 
         const ipfsResults = TagsIPFSModule.sortDedupeIpfsSearchResults(ipfsRaw);
 
-        const searchIncomplete = ipfsIncompleto || (shouldSearchArweave && ipfsResults.length === 0 && arweaveIncompleto);
+        const hasAnyResult = ipfsResults.length > 0 || arweaveResults.length > 0;
+        const isIncomplete = !hasAnyResult && ((shouldSearchIpfs && ipfsIncompleto) || (shouldSearchArweave && arweaveIncompleto));
 
         // Combine results
         const combinedResults = {
             ipfs: ipfsResults,
             arweave: arweaveResults,
-            available: !searchIncomplete && ipfsResults.length === 0 && arweaveResults.length === 0,
-            searchIncomplete: searchIncomplete || undefined,
+            available: !hasAnyResult && !isIncomplete,
+            searchIncomplete: isIncomplete || undefined,
             tagName,
             domain,
         };

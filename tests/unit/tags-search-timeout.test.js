@@ -98,9 +98,38 @@ describe("tags-search.module - timeouts and early IPFS resolution", () => {
         });
 
         expect(result.available).toBe(false);
+        expect(result.searchIncomplete).toBeUndefined();
         expect(result.ipfs).toHaveLength(1);
         expect(result.arweave).toEqual([]);
         expect(result.tagObject.ipfsId).toBe("ipfs-456");
+    });
+
+    it("marks search complete (searchIncomplete=undefined) when IPFS has the tag copy even if Arweave times out", async () => {
+        const ipfsResult = [
+            {
+                id: "ipfs-one-copy",
+                name: "onecopy.zelf",
+                url: "https://ipfs.zelf.world/ipfs/QmOneCopy",
+                publicData: { tagName: "onecopy.zelf" },
+            },
+        ];
+
+        jest.spyOn(TagsIPFSModule, "get").mockResolvedValue(ipfsResult);
+        jest.spyOn(TagsArweaveModule, "searchByStorageKey").mockRejectedValue(new Error("SEARCH_TIMEOUT"));
+        jest.spyOn(TagsPartsModule, "urlToBase64First").mockResolvedValue("data:image/png;base64,mockqr");
+
+        const result = await TagsSearchModule.searchTag({
+            tagName: "onecopy.zelf",
+            domain: "zelf",
+            domainConfig: mockDomainConfig,
+            environment: "all",
+            type: "both",
+        });
+
+        // As long as we have ONE copy from IPFS, search is complete and tag is taken
+        expect(result.available).toBe(false);
+        expect(result.searchIncomplete).toBeUndefined();
+        expect(result.tagObject.ipfsId).toBe("ipfs-one-copy");
     });
 
     it("returns Arweave results if IPFS returns empty and Arweave has the tag", async () => {
