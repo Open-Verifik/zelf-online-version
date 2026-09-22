@@ -238,8 +238,20 @@ const getChart = async (data) => {
 	return klinesMap;
 };
 
+// CoinMarketCap tiene mas de una moneda por simbolo, y la busqueda de abajo se queda
+// con la primera que coincida. Para "TON" eso devolvia "TON Token" (id 6890, ~US$0.005)
+// en lugar de la moneda de la red TON (id 11419), asi que el precio y el saldo en dolares
+// de TON salian en practicamente cero en las apps. Estos ids se fijan a mano.
+const ID_POR_SIMBOLO = {
+	TON: { symbol: "TON", network: "Toncoin", idAseet: 11419 },
+};
+
 const idAseet_ = async (asset) => {
 	try {
+		if (ID_POR_SIMBOLO[asset]) {
+			return ID_POR_SIMBOLO[asset];
+		}
+
 		const cryptod = await Model.findOne(
 			{
 				"crypto.symbol": asset,
