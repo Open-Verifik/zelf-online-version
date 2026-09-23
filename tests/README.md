@@ -210,3 +210,12 @@ npm test
 - ✅ Real external service calls
 - ✅ Real database operations
 - ✅ Real API responses
+## Cross-platform tag availability regression (#528)
+
+Run `npm run test:tag-registration` with Node 24. These focused checks use the real
+availability guard and make read-only Pinata requests with intentionally invalid
+credentials to verify that provider failures cannot return `available: true`.
+The provider test runs in a temporary working directory so a developer `.env`
+cannot replace its credentials. It does not require MongoDB, start the API, or
+write registrations. Full registration and device QA still require the live
+v4 endpoint and the corresponding mobile builds.
