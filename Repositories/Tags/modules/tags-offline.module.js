@@ -1,4 +1,5 @@
 const { getDomainConfig } = require("../config/supported-domains");
+const { assertTagAvailable } = require("./tag-availability");
 const { _findDuplicatedTag, _validateReferral, previewZelfProof, searchTag } = require("./tags.module");
 const TagsPartsModule = require("./tags-parts.module");
 const { decrypt } = require("../../ZelfProof/modules/zelf-proof.module");
@@ -224,6 +225,8 @@ const leaseOfflineTag = async (params, authUser) => {
     }
 
     if (findExistingTag.tagObject) throw new Error("tag_purchased_already");
+
+    assertTagAvailable(findExistingTag);
 
     const { price, reward, discount, discountType } = domainConfig.getPrice(
         tagName,

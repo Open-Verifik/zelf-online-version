@@ -26,11 +26,13 @@ const ARWEAVE_FAST_GRACE_MS = Number(process.env.TAGS_SEARCH_ARWEAVE_FAST_GRACE_
  * @returns {Object} - Search results
  */
 const searchTag = async (params, authUser) => {
+    params = { ...params, environment: params.environment || "all", type: params.type || "both" };
     const { tagName, domain, key, value, environment, type, duration } = params;
 
     let domainConfig = params.domainConfig || getDomainConfiguration(domain);
 
     try {
+        if (!domainConfig) throw new Error("domain_configuration_unavailable");
         /**
          * Si la busqueda en IPFS se pasa del tiempo o falla, devuelve una lista vacia.
          * Eso antes se confundia con "el nombre no existe" y se respondia que estaba
@@ -40,8 +42,11 @@ const searchTag = async (params, authUser) => {
         let ipfsIncompleto = false;
         let arweaveIncompleto = false;
 
-        const shouldSearchIpfs = ["ipfs", "all"].includes(environment);
-        const shouldSearchArweave = ["arweave", "all"].includes(environment) && ["both", "mainnet"].includes(type);
+        const shouldSearchIpfs = ["ipfs", "all"].includes(environment) && Boolean(domainConfig.tags?.storage?.ipfsEnabled);
+        const shouldSearchArweave =
+            ["arweave", "all"].includes(environment) &&
+            ["both", "mainnet"].includes(type) &&
+            Boolean(domainConfig.tags?.storage?.arweaveEnabled);
 
         let ipfsRaw = [];
         let arweaveResults = [];
@@ -86,7 +91,9 @@ const searchTag = async (params, authUser) => {
         const ipfsResults = TagsIPFSModule.sortDedupeIpfsSearchResults(ipfsRaw);
 
         const hasAnyResult = ipfsResults.length > 0 || arweaveResults.length > 0;
-        const isIncomplete = !hasAnyResult && ((shouldSearchIpfs && ipfsIncompleto) || (shouldSearchArweave && arweaveIncompleto));
+        const isIncomplete =
+            !hasAnyResult &&
+            ((!shouldSearchIpfs && !shouldSearchArweave) || (shouldSearchIpfs && ipfsIncompleto) || (shouldSearchArweave && arweaveIncompleto));
 
         // Combine results
         const combinedResults = {
@@ -159,6 +166,7 @@ const searchTag = async (params, authUser) => {
 
         return {
             available: false,
+            searchIncomplete: true,
             error: error.message,
             tagName,
             domain,

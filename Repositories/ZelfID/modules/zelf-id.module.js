@@ -1,3 +1,4 @@
+const { assertTagAvailable } = require("../../Tags/modules/tag-availability");
 /**
  * ZelfID online product module (`/api/zelf-ids`). Encrypt/decrypt/preview always use ZelfEncrypt v4.
  * Field names stay `tagName` / `tagObject` for client compatibility with `/api/tags`.
@@ -589,11 +590,7 @@ const _findDuplicatedTag = async (tagName, domain, domainConfig) => {
         environment: "all",
     });
 
-    if (result.available === false) {
-        const error = new Error("409:tag_already_exists");
-        error.status = 409;
-        throw error;
-    }
+    assertTagAvailable(result);
 
     return result;
 };

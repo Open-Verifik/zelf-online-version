@@ -357,7 +357,8 @@ const filter = async (property = "name", value, options = {}) => {
             }
 
             const response = await query;
-            const files = response.files || [];
+            if (!Array.isArray(response?.files)) throw new Error("invalid_ipfs_search_response");
+            const files = response.files;
             allFiles.push(...files);
 
             pageToken = response.next_page_token || null;
@@ -369,6 +370,8 @@ const filter = async (property = "name", value, options = {}) => {
         if (!allFiles.length) return [];
         return _normalizeFiles(allFiles);
     } catch (error) {
+        // Availability checks must distinguish an empty index from a failed query.
+        if (options.throwOnError) throw error;
         console.error("Error filtering files:", error);
         return [];
     }
