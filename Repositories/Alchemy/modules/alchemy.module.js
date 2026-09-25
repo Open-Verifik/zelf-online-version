@@ -329,7 +329,12 @@ const getTransaction = async ({ domain, network, tagName, transactionHash }, aut
 };
 
 module.exports = {
+    fetchTokenMetadata,
+    formatTokenBalance,
     getBalances,
+    getBalancesForNetwork,
     getTransaction,
     getTransactions,
+    parseHexBalance,
+    rpcRequest,
 };

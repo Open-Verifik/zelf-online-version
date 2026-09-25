@@ -7,8 +7,14 @@ const https = require("https");
 
 const config = require("../../../Core/config");
 const { mapGasOracleToTrackerShape, weiHexToGwei, weiHexToEth, gasTrackerFromNetworkGwei } = require("./etherscan-gas-tracker.util");
-const { idAseet_ } = require("../../dataAnalytics/modules/dataAnalytics.module");
 const { getCleanInstance } = require("../../../Core/axios");
+const {
+    buildNativeEthHoldingRow,
+    getEthereumPortfolioViaAlchemy,
+    getEthereumPortfolioViaEthplorer,
+    isAlchemyEthereumConfigured,
+    sumFiatBalance,
+} = require("./ethereum-address-holdings.util");
 const {
     getNaasNodeUrl,
     NAAS_CHAIN,
@@ -20,7 +26,6 @@ const { get_ApiKey } = require("../../Solana/modules/oklink");
 
 const instance = getCleanInstance(1000);
 const agent = new https.Agent({ rejectUnauthorized: false });
-const apiKey = process.env.API_KEY_ETH;
 
 /** Etherscan API V2 (V1 /api deprecated as of Aug 2025) */
 const ETHERSCAN_V2_API = process.env.ETHERSCAN_V2_API || "https://api.etherscan.io/v2/api";
@@ -115,81 +120,49 @@ const fetchAddressInfoViaEthRpc = async (address, didRefresh401 = false) => {
 const getAddress = async (params) => {
     try {
         const address = params.address;
+        const { price } = await getTickerPrice({ symbol: "ETH" });
 
-        let data;
-        try {
-            const res = await instance.get(`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=${apiKey}`, {});
-            data = res.data;
-        } catch (ethplorerErr) {
-            console.error({ ethplorerError: ethplorerErr.message || ethplorerErr });
-            data = await fetchAddressInfoViaEthRpc(address);
+        let nativeEthBalance;
+        let erc20Tokens = [];
+        let totalErc20Count = 0;
+
+        if (isAlchemyEthereumConfigured()) {
+            try {
+                const portfolio = await getEthereumPortfolioViaAlchemy(address);
+                nativeEthBalance = portfolio.nativeEthBalance;
+                erc20Tokens = portfolio.tokens;
+                totalErc20Count = portfolio.totalTokenCount;
+            } catch (alchemyError) {
+                console.error({ alchemyPortfolioError: alchemyError.message || alchemyError });
+            }
         }
 
-        const { price: price } = await getTickerPrice({ symbol: "ETH" });
-
-        async function formatTokenData(tokens, params) {
-            const formattedTokens = await Promise.all(
-                tokens.map(async (token) => {
-                    const { tokenInfo, balance, rawBalance } = token;
-                    const rate = tokenInfo.price?.rate || 0;
-                    const decimals =
-                        parseInt(tokenInfo.decimals).toString().length > 3
-                            ? Number(String(parseInt(tokenInfo.decimals)).slice(0, 2))
-                            : parseInt(tokenInfo.decimals);
-                    const formattedAmount = parseFloat(rawBalance) / Math.pow(10, decimals);
-                    const fiatBalance = formattedAmount * rate;
-                    let idAseet;
-                    try {
-                        idAseet = await idAseet_(tokenInfo.symbol);
-                    } catch (error) {
-                        idAseet = {};
-                    }
-
-                    return {
-                        _amount: formattedAmount,
-                        _fiatBalance: fiatBalance.toFixed(7),
-                        _price: rate,
-                        address: tokenInfo.address,
-                        amount: formattedAmount.toFixed(12),
-                        decimals: decimals,
-                        fiatBalance: parseFloat(fiatBalance.toFixed(7)),
-                        image: `https://s2.coinmarketcap.com/static/img/coins/64x64/${idAseet.idAseet}.png`,
-                        name: tokenInfo.name,
-                        price: rate.toFixed(6),
-                        symbol: tokenInfo.symbol,
-                        tokenType: "ERC-20",
-                    };
-                })
-            );
-
-            return formattedTokens;
+        if (nativeEthBalance === undefined) {
+            try {
+                const portfolio = await getEthereumPortfolioViaEthplorer(address);
+                nativeEthBalance = portfolio.nativeEthBalance;
+                erc20Tokens = portfolio.tokens;
+                totalErc20Count = portfolio.totalTokenCount;
+            } catch (ethplorerError) {
+                console.error({ ethplorerPortfolioError: ethplorerError.message || ethplorerError });
+                const rpcFallback = await fetchAddressInfoViaEthRpc(address);
+                nativeEthBalance = rpcFallback.ETH.balance;
+                erc20Tokens = [];
+                totalErc20Count = 0;
+            }
         }
 
-        const tokens = await formatTokenData(data.tokens || []);
-
-        tokens.push({
-            amount: data.ETH.balance.toString(),
-            fiatBalance: data.ETH.balance * price,
-            image: "https://dynamic-assets.coinbase.com/dbb4b4983bde81309ddab83eb598358eb44375b930b94687ebe38bc22e52c3b2125258ffb8477a5ef22e33d6bd72e32a506c391caa13af64c00e46613c3e5806/asset_icons/4113b082d21cc5fab17fc8f2d19fb996165bcce635e6900f7fc2d57c4ef33ae9.png",
-            name: "Ethereum",
-            price: price,
-            symbol: "ETH",
-            tokenType: "ETH",
-        });
-
-        function sumFiatBalance(tokens) {
-            return tokens.reduce((total, token) => total + token.fiatBalance, 0);
-        }
+        const tokens = [...erc20Tokens, buildNativeEthHoldingRow(nativeEthBalance, price)];
         const { transactions } = await getTransactionsList({
             address,
             page: "1",
             show: "10",
         });
 
-        const fiatBalance = data.ETH.balance * price;
+        const fiatBalance = nativeEthBalance * price;
         const response = {
             address,
-            balance: data.ETH.balance,
+            balance: nativeEthBalance,
             fiatBalance,
             type: "system_account",
             account: {
@@ -198,7 +171,7 @@ const getAddress = async (params) => {
                 price,
             },
             tokenHoldings: {
-                total: tokens.length,
+                total: totalErc20Count + 1,
                 balance: sumFiatBalance(tokens).toString(),
                 tokens,
             },

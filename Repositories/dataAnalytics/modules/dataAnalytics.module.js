@@ -246,88 +246,97 @@ const ID_POR_SIMBOLO = {
 	TON: { symbol: "TON", network: "Toncoin", idAseet: 11419 },
 };
 
-const idAseet_ = async (asset) => {
-	try {
-		if (ID_POR_SIMBOLO[asset]) {
-			return ID_POR_SIMBOLO[asset];
-		}
+/** In-process symbol cache so concurrent formatters do not repeat Mongo/CMC work. */
+const idAseetMemoryCache = new Map();
+/** Single-flight map: one lookup per symbol while a prior request is still in flight. */
+const idAseetInflight = new Map();
+/** Only one CMC app-search download + Mongo upsert at a time. */
+let cmcSearchDownloadPromise = null;
 
-		const cryptod = await Model.findOne(
-			{
-				"crypto.symbol": asset,
-			},
-			{ "crypto.$": 1 }
-		);
+const formatCryptoData = (data) => {
+	const { fields, values } = data;
+	const ignoredFields = new Set(["type", "rank", "address", "search_score"]);
 
-		if (cryptod && cryptod.crypto.length > 0) {
-			const { symbol, name: network, id: idAseet } = cryptod.crypto[0];
+	return values.map((valueArray) => {
+		const obj = {};
+		fields.forEach((field, index) => {
+			if (!ignoredFields.has(field)) {
+				obj[field] = valueArray[index];
+			}
+		});
+		return obj;
+	});
+};
 
-			return {
-				symbol,
-				network,
-				idAseet,
-			};
-		}
-
-		const cryptoResponse = await instance.get(
-			"https://s3.coinmarketcap.com/generated/core/crypto/app-search.json",
-			{
+const downloadCmcSearchIndex = async () => {
+	if (!cmcSearchDownloadPromise) {
+		cmcSearchDownloadPromise = instance
+			.get("https://s3.coinmarketcap.com/generated/core/crypto/app-search.json", {
 				headers: {
 					"user-agent": "Dart/3.2 (dart:io)",
 					appversion: "4.63.1",
 					platform: "android",
 				},
-			}
-		);
-
-		const formatCryptoData = (data) => {
-			const { fields, values } = data;
-			const ignoredFields = new Set([
-				"type",
-				"rank",
-				"address",
-				"search_score",
-			]);
-
-			return values.map((valueArray) => {
-				let obj = {};
-				fields.forEach((field, index) => {
-					if (!ignoredFields.has(field)) {
-						obj[field] = valueArray[index];
-					}
-				});
-				return obj;
+			})
+			.then((cryptoResponse) => formatCryptoData(cryptoResponse.data))
+			.finally(() => {
+				cmcSearchDownloadPromise = null;
 			});
-		};
+	}
 
-		const findTokenBySymbol = (symbol) => {
-			return formatCryptoData(cryptoResponse.data).find(
-				(token) => token.symbol === symbol
-			);
-		};
+	return cmcSearchDownloadPromise;
+};
 
-		const result = findTokenBySymbol(asset);
+const resolveIdAseetFromSources = async (asset) => {
+	if (ID_POR_SIMBOLO[asset]) {
+		return ID_POR_SIMBOLO[asset];
+	}
 
-		if (!result) {
-			const error = new Error("asset_not_found");
-			error.status = 404;
-			throw error;
-		}
+	const cryptod = await Model.findOne({ "crypto.symbol": asset }, { "crypto.$": 1 });
 
-		await Model.findOneAndUpdate(
-			{},
-			{ $set: { crypto: formatCryptoData(cryptoResponse.data) } },
-			{ new: true, upsert: true }
-		);
+	if (cryptod && cryptod.crypto.length > 0) {
+		const { symbol, name: network, id: idAseet } = cryptod.crypto[0];
+		return { symbol, network, idAseet };
+	}
 
-		return {
-			symbol: result.symbol,
-			network: result.name,
-			idAseet: result.id,
-		};
-	} catch (error) {
+	const cryptoList = await downloadCmcSearchIndex();
+	const result = cryptoList.find((token) => token.symbol === asset);
+
+	if (!result) {
+		const error = new Error("asset_not_found");
+		error.status = 404;
 		throw error;
 	}
+
+	await Model.findOneAndUpdate({}, { $set: { crypto: cryptoList } }, { new: true, upsert: true });
+
+	return {
+		symbol: result.symbol,
+		network: result.name,
+		idAseet: result.id,
+	};
+};
+
+const idAseet_ = async (asset) => {
+	if (idAseetMemoryCache.has(asset)) {
+		return idAseetMemoryCache.get(asset);
+	}
+
+	if (idAseetInflight.has(asset)) {
+		return idAseetInflight.get(asset);
+	}
+
+	const lookupPromise = resolveIdAseetFromSources(asset)
+		.then((resolved) => {
+			idAseetMemoryCache.set(asset, resolved);
+			return resolved;
+		})
+		.finally(() => {
+			idAseetInflight.delete(asset);
+		});
+
+	idAseetInflight.set(asset, lookupPromise);
+	return lookupPromise;
 };
 
 module.exports = {
