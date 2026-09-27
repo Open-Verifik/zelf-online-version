@@ -91,9 +91,12 @@ const searchTag = async (params, authUser) => {
         const ipfsResults = TagsIPFSModule.sortDedupeIpfsSearchResults(ipfsRaw);
 
         const hasAnyResult = ipfsResults.length > 0 || arweaveResults.length > 0;
-        const isIncomplete =
-            !hasAnyResult &&
-            ((!shouldSearchIpfs && !shouldSearchArweave) || (shouldSearchIpfs && ipfsIncompleto) || (shouldSearchArweave && arweaveIncompleto));
+        const ipfsCompleted = shouldSearchIpfs && !ipfsIncompleto;
+        const arweaveCompleted = shouldSearchArweave && !arweaveIncompleto;
+        const anyStoreCompleted = ipfsCompleted || arweaveCompleted;
+        const noStoresEnabled = !shouldSearchIpfs && !shouldSearchArweave;
+        // SourceA OR SourceB: incomplete only when no enabled store completed successfully.
+        const isIncomplete = !hasAnyResult && (noStoresEnabled || !anyStoreCompleted);
 
         // Combine results
         const combinedResults = {
