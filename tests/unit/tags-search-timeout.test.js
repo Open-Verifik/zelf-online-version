@@ -217,24 +217,26 @@ describe("tags-search.module - timeouts and early IPFS resolution", () => {
     });
 
     it("marks available=false and searchIncomplete=true when IPFS search fails or times out (issue #528)", async () => {
-        // IPFS search fails (e.g. Pinata timeout or network error)
+        // IPFS-only: no other store to satisfy OR semantics
         jest.spyOn(TagsIPFSModule, "get").mockRejectedValue(new Error("SEARCH_TIMEOUT"));
-        jest.spyOn(TagsArweaveModule, "searchByStorageKey").mockResolvedValue([]);
 
         const result = await TagsSearchModule.searchTag({
             tagName: "timeouttag.zelf",
             domain: "zelf",
-            domainConfig: mockDomainConfig,
-            environment: "all",
+            domainConfig: {
+                ...mockDomainConfig,
+                tags: { storage: { ipfsEnabled: true, arweaveEnabled: false, keyPrefix: "tagName" } },
+            },
+            environment: "ipfs",
             type: "both",
         });
 
-        // Must NEVER report available=true if IPFS failed to respond!
+        // Must NEVER report available=true if the only enabled store failed to respond
         expect(result.available).toBe(false);
         expect(result.searchIncomplete).toBe(true);
     });
 
-    it("marks available=false and searchIncomplete=true when Arweave search fails and IPFS found nothing", async () => {
+    it("marks available=true when IPFS completes empty and Arweave times out (OR semantics)", async () => {
         jest.spyOn(TagsIPFSModule, "get").mockResolvedValue([]);
         jest.spyOn(TagsArweaveModule, "searchByStorageKey").mockRejectedValue(new Error("SEARCH_TIMEOUT"));
 
@@ -246,7 +248,43 @@ describe("tags-search.module - timeouts and early IPFS resolution", () => {
             type: "both",
         });
 
-        // Must not report available=true if Arweave search failed to verify existence
+        // IPFS answered successfully; Arweave failure must not block availability
+        expect(result.available).toBe(true);
+        expect(result.searchIncomplete).toBeUndefined();
+        expect(result.ipfs).toEqual([]);
+        expect(result.arweave).toEqual([]);
+    });
+
+    it("marks available=true when Arweave completes empty and IPFS times out (OR semantics)", async () => {
+        jest.spyOn(TagsIPFSModule, "get").mockRejectedValue(new Error("SEARCH_TIMEOUT"));
+        jest.spyOn(TagsArweaveModule, "searchByStorageKey").mockResolvedValue([]);
+
+        const result = await TagsSearchModule.searchTag({
+            tagName: "ipfstimeout.zelf",
+            domain: "zelf",
+            domainConfig: mockDomainConfig,
+            environment: "all",
+            type: "both",
+        });
+
+        expect(result.available).toBe(true);
+        expect(result.searchIncomplete).toBeUndefined();
+        expect(result.ipfs).toEqual([]);
+        expect(result.arweave).toEqual([]);
+    });
+
+    it("marks available=false and searchIncomplete=true when both IPFS and Arweave fail", async () => {
+        jest.spyOn(TagsIPFSModule, "get").mockRejectedValue(new Error("SEARCH_TIMEOUT"));
+        jest.spyOn(TagsArweaveModule, "searchByStorageKey").mockRejectedValue(new Error("SEARCH_TIMEOUT"));
+
+        const result = await TagsSearchModule.searchTag({
+            tagName: "bothfail.zelf",
+            domain: "zelf",
+            domainConfig: mockDomainConfig,
+            environment: "all",
+            type: "both",
+        });
+
         expect(result.available).toBe(false);
         expect(result.searchIncomplete).toBe(true);
     });

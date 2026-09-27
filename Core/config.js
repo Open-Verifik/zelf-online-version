@@ -34,8 +34,8 @@ const stripeDashboardUrlBase = String(
 /** Default Arweave gateway pool — override per server via .env (see arwave in configuration). */
 const ARWEAVE_DEFAULT_PUBLIC_GATEWAY_URL = "https://arweave.net";
 const ARWEAVE_DEFAULT_GRAPHQL_GATEWAYS = [
-    "https://arweave.net",
     "https://arweave-search.goldsky.com",
+    "https://arweave.net",
     "https://turbo-gateway.com",
     "https://ardrive.net",
 ];
