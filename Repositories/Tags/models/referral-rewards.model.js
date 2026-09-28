@@ -18,8 +18,8 @@ const ReferralRewardSchema = new Schema({
     status: requiredEnumField(String, ["pending", "completed", "failed"], "pending"),
     referralSolanaAddress: requiredField(String),
     attempts: requiredField(Number),
-    ipfsHash: requiredField(String),
-    arweaveId: requiredField(String),
+    ipfsHash: defaultField(String, ""),
+    arweaveId: defaultField(String, ""),
     tagPrice: requiredField(Number),
     rewardType: requiredEnumField(String, ["registration", "purchase"], "registration"),
     payload: {
@@ -37,14 +37,6 @@ ReferralRewardSchema.index({ tagName: 1, referralTagName: 1 }, { unique: true })
 
 // Add index for domain-based queries
 ReferralRewardSchema.index({ domain: 1, status: 1 });
-
-ReferralRewardSchema.pre("save", async (next) => {
-    const _this = this;
-});
-
-ReferralRewardSchema.post("save", async (next) => {
-    const _this = this;
-});
 
 /**
  * #model methods

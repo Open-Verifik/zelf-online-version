@@ -1,3 +1,4 @@
+const { tonAddressLookupValues } = require("./ton-address-lookup.util");
 const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const { getDomainConfiguration, isDomainActive } = require("./domain-registry.module");
@@ -248,7 +249,10 @@ const searchArweave = async (params, authUser) => {
         }
 
         if (key && value) {
-            return TagsArweaveModule.searchByStorageKey({ key, value, domainConfig: _domainConfig, domain });
+            const values = key === "tonAddress" ? tonAddressLookupValues(value) : [value];
+            return (await Promise.all(values.map((address) =>
+                TagsArweaveModule.searchByStorageKey({ key, value: address, domainConfig: _domainConfig, domain })
+            ))).flat();
         }
 
         // Search by domain
