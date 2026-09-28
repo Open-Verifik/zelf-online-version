@@ -538,6 +538,7 @@ const _sendReferralRewardAndUpdateRecord = async (
 
     const keyFriendName = rewardFriendKeys(friendFullTagName, rewardType)[0];
 
+    // Manual claims use processing; the legacy bulk payout worker consumes pending.
     // 1. Create record if not found (addresses from referrer's tag in IPFS)
     if (!rewardRecord) {
         rewardRecord = new ReferralRewardModel({
@@ -549,7 +550,7 @@ const _sendReferralRewardAndUpdateRecord = async (
             referralDomain: domain,
             referralSolanaAddress: referrerSolanaAddress,
             tagPrice: friendRecord.publicData?.price || 0,
-            status: "pending",
+            status: "processing",
             attempts: 0,
             payload: {},
             ipfsHash: friendRecord.ipfsHash || "",
@@ -562,10 +563,10 @@ const _sendReferralRewardAndUpdateRecord = async (
         await rewardRecord.save();
     } else {
         const locked = await ReferralRewardModel.updateOne(
-            { _id: rewardRecord._id, status: "failed" }, { $set: { status: "pending" } }
+            { _id: rewardRecord._id, status: "failed" }, { $set: { status: "processing" } }
         );
         if (locked.modifiedCount !== 1) throw new Error("reward_claim_in_progress");
-        rewardRecord.status = "pending";
+        rewardRecord.status = "processing";
     }
 
     // 2. Send ZNS to referrer's Solana address (from their tag in IPFS)
@@ -578,7 +579,7 @@ const _sendReferralRewardAndUpdateRecord = async (
 
         // A timeout may happen after broadcast. Keep the claim locked until its
         // outcome is reconciled; retrying blindly can transfer the reward twice.
-        rewardRecord.status = "pending";
+        rewardRecord.status = "processing";
 
         rewardRecord.payload = { ...rewardRecord.payload, error: error?.message || "token_transfer_failed", requiresReconciliation: true };
 
@@ -856,14 +857,14 @@ const _readReferralReward = async (friendFullTagName, referralTagName, rewardTyp
     const records = await ReferralRewardModel.find({ tagName: { $in: keys }, referralTagName });
     const ipfsReward = receipts.find(Boolean);
     const mongoRecord = records.find((record) => record.status === "completed" || record.payload?.signature)
-        || records.find((record) => record.status === "pending") || records[0];
+        || records.find((record) => ["pending", "processing"].includes(record.status)) || records[0];
     return { ipfsReward, mongoRecord, claimed: Boolean(ipfsReward || mongoRecord?.status === "completed" || mongoRecord?.payload?.signature) };
 };
 
 const _checkIfRewardAlreadyClaimed = async (friendFullTagName, referralTagName, rewardType) => {
     const result = await _readReferralReward(friendFullTagName, referralTagName, rewardType);
     if (result.claimed) throw new Error("reward_already_claimed");
-    if (result.mongoRecord?.status === "pending") throw new Error("reward_claim_in_progress");
+    if (["pending", "processing"].includes(result.mongoRecord?.status)) throw new Error("reward_claim_in_progress");
     return result.mongoRecord;
 };
 

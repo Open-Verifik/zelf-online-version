@@ -15,7 +15,7 @@ const ReferralRewardSchema = new Schema({
     solanaAddress: requiredField(String),
     referralTagName: requiredField(String),
     referralDomain: requiredField(String),
-    status: requiredEnumField(String, ["pending", "completed", "failed"], "pending"),
+    status: requiredEnumField(String, ["pending", "processing", "completed", "failed"], "pending"),
     referralSolanaAddress: requiredField(String),
     attempts: requiredField(Number),
     ipfsHash: defaultField(String, ""),
