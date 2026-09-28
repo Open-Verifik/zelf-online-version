@@ -1,3 +1,4 @@
+const { tonAddressLookupValues } = require("./ton-address-lookup.util");
 const IPFS = require("../../../Core/ipfs");
 const config = require("../../../Core/config");
 const { getDomainConfig } = require("../config/supported-domains");
@@ -65,7 +66,8 @@ const get = async (data) => {
 			});
 		}
 	} else if (key && value) {
-		result = await IPFS.filter(key, value, { throwOnError: true });
+		const values = key === "tonAddress" ? tonAddressLookupValues(value) : [value];
+		result = (await Promise.all(values.map((address) => IPFS.filter(key, address, { throwOnError: true })))).flat();
 	}
 
 	const formatted = _formatSearchResults(result).filter((row) => {

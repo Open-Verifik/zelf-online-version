@@ -7,7 +7,7 @@ const {
     isNaasNodeUnauthorizedError,
 } = require("../../../Core/naas-gateway-catalog");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
-const instance = getCleanInstance(30000);
+const instance = getCleanInstance(8000);
 const SATOSHI_TO_BTC = 100000000;
 
 /** Blockbook path after base URL, e.g. `/api/v2/address/...` — retries once on NaaS 401 */
@@ -139,16 +139,37 @@ const getBalanceFromSourceA = async (params) => {
     return buildBalanceResponse(params.id, formatBTC, price, transactions);
 };
 
-// Obtener balance de una dirección
-const getBalance = async (params) => {
-    try {
-        return await getBalanceFromSourceA(params);
-    } catch (err) {
-        console.error("Bitcoin Blockbook balance error:", err?.message || err);
-        const error = new Error("not_found");
-        error.status = 404;
-        throw error;
+// Independent Esplora fallback: a provider outage is never reported as a zero balance.
+const getBalanceFromEsplora = async (params) => {
+    for (const base of ["https://mempool.space/api", "https://blockstream.info/api"]) {
+        try {
+            const [summary, quote] = await Promise.all([
+                instance.get(`${base}/address/${params.id}`), getTickerPrice({ symbol: "BTC" })
+            ]);
+            const stats = summary.data?.chain_stats;
+            if (!stats || !Number.isSafeInteger(stats.funded_txo_sum) || !Number.isSafeInteger(stats.spent_txo_sum)) {
+                throw new Error("invalid_bitcoin_balance");
+            }
+            const balance = (stats.funded_txo_sum - stats.spent_txo_sum) / SATOSHI_TO_BTC;
+            let transactions = [], transactionsIncomplete = false;
+            try {
+                const { data } = await instance.get(`${base}/address/${params.id}/txs`);
+                transactions = data.map((tx) => extractTransactionDataFromSourceA({
+                    txid: tx.txid, fees: tx.fee, blockHeight: tx.status?.block_height,
+                    confirmations: tx.status?.confirmed ? 1 : 0,
+                    vin: tx.vin.map((input) => ({ addresses: [input.prevout?.scriptpubkey_address].filter(Boolean) })),
+                    vout: tx.vout.map((output) => ({ addresses: [output.scriptpubkey_address].filter(Boolean), value: output.value })),
+                })).filter(Boolean);
+            } catch { transactionsIncomplete = true; }
+            return { ...buildBalanceResponse(params.id, balance, quote.price, transactions), transactionsIncomplete };
+        } catch { /* A second independent indexer may still answer. */ }
     }
+    const error = new Error("bitcoin_balance_unavailable"); error.status = 502; throw error;
+};
+
+const getBalance = async (params) => {
+    try { return await getBalanceFromSourceA(params); }
+    catch { return getBalanceFromEsplora(params); }
 };
 
 module.exports = {
