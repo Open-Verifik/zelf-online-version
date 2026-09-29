@@ -98,6 +98,8 @@ const getAddress = async (params) => {
 		const balanceTon = nanotonToTonString(account.balance ?? 0);
 		const nativeFiatBalance = parseFloat((Number(balanceTon) * Number(price)).toFixed(4));
 
+        let holdingsComplete = true;
+        let historyComplete = true;
 		let jettonBalances = [];
 		try {
 			const jettons = await tonApiGet(`/accounts/${encodeAccountId(address)}/jettons`);
@@ -106,6 +108,7 @@ const getAddress = async (params) => {
 			const jettonRates = await getJettonUsdRates(jettonAddresses);
 			jettonBalances = mapJettonBalances(rawBalances, jettonRates);
 		} catch (error) {
+            holdingsComplete = false;
 			console.error("TON jettons fetch:", error.message);
 		}
 
@@ -114,6 +117,7 @@ const getAddress = async (params) => {
 			const events = await tonApiGet(`/accounts/${encodeAccountId(address)}/events`, { limit: 10 });
 			transactions = mapEventsToTransactions(events.events || [], address);
 		} catch (error) {
+            historyComplete = false;
 			console.error("TON events fetch:", error.message);
 		}
 
@@ -137,24 +141,15 @@ const getAddress = async (params) => {
 				tokens,
 			},
 			transactions,
+            historyComplete,
+            holdingsComplete,
 		};
-	} catch (error) {
-		console.error("Error in TON getAddress:", error.message);
-		return {
-			_balance: "0",
-			_fiatBalance: "0",
-			address,
-			balance: "0",
-			fiatBalance: 0,
-			account: { asset: "TON", fiatBalance: 0, price },
-			tokenHoldings: {
-				balance: "0",
-				total: 1,
-				tokens: [buildNativeTonToken("0", price, 0)],
-			},
-			transactions: [],
-		};
-	}
+    } catch (error) {
+        // A failed provider read is unknown, never evidence that an address is empty.
+        const unavailable = new Error("ton_balance_unavailable");
+        unavailable.status = error.response?.status === 429 ? 429 : 502;
+        throw unavailable;
+    }
 };
 
 const getTokens = async (params, query = {}) => {

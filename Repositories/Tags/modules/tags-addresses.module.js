@@ -240,6 +240,25 @@ const mergeAddressKeyvaluesIntoPublicData = (publicData) => {
     return publicData;
 };
 
+/**
+ * Same as mergeAddressKeyvaluesIntoPublicData but keeps the packed chunks and never
+ * overwrites an explicit field. Arweave records only carry TON/DOT/KSM inside
+ * `addresses2`, so without this their tagObject had no `tonAddress` (#540).
+ */
+const expandPackedAddresses = (publicData) => {
+    if (!publicData || typeof publicData !== "object" || !isPackedAddressPublicData(publicData)) return publicData;
+
+    const unpacked = mergeAddressKeyvaluesIntoPublicData(
+        Object.fromEntries(ADDRESS_CHUNK_KEYS.filter((chunkKey) => chunkKey in publicData).map((chunkKey) => [chunkKey, publicData[chunkKey]]))
+    );
+
+    for (const [appKey, value] of Object.entries(unpacked)) {
+        if (!_isUsableString(publicData[appKey]) && _isUsableString(value)) publicData[appKey] = value.trim();
+    }
+
+    return publicData;
+};
+
 const getAllChainAddresses = (publicData) => {
     if (!publicData || typeof publicData !== "object") return {};
 
@@ -488,6 +507,7 @@ module.exports = {
     cleanExtraParamsForPinata,
     collectReservedKeyvalues,
     continuationPinName,
+    expandPackedAddresses,
     extractAddressKeyvaluesFromPublicData,
     getAllChainAddresses,
     getContinuationCanonicalName,

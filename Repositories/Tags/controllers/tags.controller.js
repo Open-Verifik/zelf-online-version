@@ -9,6 +9,7 @@ const { errorHandler } = require("../../../Core/http-handler");
 const configuration = require("../../../Core/config");
 const ZelfProofModule = require("../../ZelfProof/modules/zelf-proof.module");
 const { resolveEncryptVersion } = require("../modules/tags-addresses.module");
+const { hasMissingOwner, applyPreviewPublicData } = require("../../Tags/modules/tag-preview-public-data");
 const TagWalletBalancesModule = require("../modules/tag-wallet-balances.module");
 
 /**
@@ -69,13 +70,15 @@ const searchTag = async (ctx) => {
 
         if (
             data.tagObject?.zelfProof &&
-            ZelfProofModule.shouldBackfillHasPassword(data.tagObject.publicData, resolveEncryptVersion(data.tagObject.publicData))
+            (hasMissingOwner(data.tagObject.publicData) ||
+                ZelfProofModule.shouldBackfillHasPassword(data.tagObject.publicData, resolveEncryptVersion(data.tagObject.publicData)))
         ) {
             try {
                 data.preview = await ZelfProofModule.previewWithLegacyFallback({
                     zelfProof: data.tagObject.zelfProof,
                 });
                 ZelfProofModule.applyPreviewHasPassword(data.tagObject, data.preview);
+                applyPreviewPublicData(data.tagObject, data.preview);
             } catch (_error) {
                 // Search still succeeds when preview cannot read an old proof.
             }

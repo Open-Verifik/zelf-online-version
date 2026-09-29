@@ -10,6 +10,7 @@
         "test:e2e": "jest tests/e2e",
         "test:ci": "jest --ci --coverage --watchAll=false",
         "test:lease": "jest tests/integration/leaseTags-api.test.js --verbose --no-coverage",
+        "test:tag-registration": "node --test tests/regression/tag-availability.test.cjs tests/regression/tag-search-provider-failure.test.cjs",
         "test:search-tag": "jest tests/integration/searchTags-api.test.js --verbose --no-coverage",
         "test:preview-tag": "jest tests/integration/previewTags-api.test.js --verbose --no-coverage",
         "test:search-by-domain": "jest tests/integration/searchByDomain-api.test.js --verbose --no-coverage",

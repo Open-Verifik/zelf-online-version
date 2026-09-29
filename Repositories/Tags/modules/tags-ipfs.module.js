@@ -1,3 +1,4 @@
+const { addressLookupValues } = require("./ton-address-lookup.util");
 const IPFS = require("../../../Core/ipfs");
 const config = require("../../../Core/config");
 const { getDomainConfig } = require("../config/supported-domains");
@@ -43,15 +44,15 @@ const get = async (data) => {
 	if (tagName) {
 		const storageKey = domainConfig ? domainConfig.tags.storage.keyPrefix : generateStorageKey(domain);
 
-		result = await IPFS.filter(storageKey, tagName);
+		result = await IPFS.filter(storageKey, tagName, { throwOnError: true });
 
 		// Fallback for legacy tags: tags pinned under ZNS or older schemas used 'zelfName' or Pinata file 'name'
 		if (!result.length && storageKey !== "zelfName") {
-			result = await IPFS.filter("zelfName", tagName);
+			result = await IPFS.filter("zelfName", tagName, { throwOnError: true });
 		}
 
 		if (!result.length) {
-			const byName = await IPFS.filter("name", tagName);
+			const byName = await IPFS.filter("name", tagName, { throwOnError: true });
 			const lowerTag = tagName.toLowerCase();
 			result = (byName || []).filter((item) => {
 				const n = String(item.name || "").toLowerCase();
@@ -65,7 +66,8 @@ const get = async (data) => {
 			});
 		}
 	} else if (key && value) {
-		result = await IPFS.filter(key, value);
+		const values = addressLookupValues(key, value);
+		result = (await Promise.all(values.map((address) => IPFS.filter(key, address, { throwOnError: true })))).flat();
 	}
 
 	const formatted = _formatSearchResults(result).filter((row) => {
@@ -169,10 +171,10 @@ const _formatRecord = (item) => {
 const _lookupPrimaryByCanonicalName = async (canonicalName) => {
 	if (!canonicalName) return null;
 
-	const byTagName = await IPFS.filter("tagName", canonicalName);
+	const byTagName = await IPFS.filter("tagName", canonicalName, { throwOnError: true });
 	if (byTagName?.[0]) return _formatRecord(byTagName[0]);
 
-	const byZelfName = await IPFS.filter("zelfName", canonicalName);
+	const byZelfName = await IPFS.filter("zelfName", canonicalName, { throwOnError: true });
 	if (byZelfName?.[0]) return _formatRecord(byZelfName[0]);
 
 	return null;

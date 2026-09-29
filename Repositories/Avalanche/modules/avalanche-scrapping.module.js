@@ -15,58 +15,59 @@ const agent = new https.Agent({ rejectUnauthorized: false });
  * Obtiene el balance de una direcci?n en Avalanche
  * @param {Object} params - Contiene el id (direcci?n)
  */
+const config = require("../../../Core/config");
+const { formatEther } = require("ethers");
+const { getTickerPrice } = require("../../binance/modules/binance.module");
+const { mapRouteScanHolding } = require("./avalanche-balance.util");
+
+const nativeBalance = async (address) => {
+    const endpoints = [...new Set([config.rpc?.chains?.avalanche?.rpcUrl, config.avalanche?.rpcUrl,
+        "https://api.avax.network/ext/bc/C/rpc"].filter(Boolean))];
+    for (const endpoint of endpoints) {
+        try {
+            const { data } = await axios.post(endpoint,
+                { jsonrpc: "2.0", id: 1, method: "eth_getBalance", params: [address, "latest"] }, { timeout: 8000 });
+            if (data.error || !/^0x[0-9a-f]+$/i.test(data.result || "")) throw new Error("invalid_rpc_balance");
+            return formatEther(BigInt(data.result));
+        } catch { /* Try the independent public C-chain node. */ }
+    }
+    const error = new Error("avalanche_balance_unavailable"); error.status = 502; throw error;
+};
+
 const getBalance = async (params) => {
-	try {
-		// Obtener balance nativo
-		const { data } = await instance.get(`https://glacier-api.avax.network/v1/chains/43114/addresses/${params.id}/balances:getNative`, {
-			headers: { "user-agent": generateRandomUserAgent() },
-		});
+    const [balance, tokenHoldings, history, quote] = await Promise.all([
+        nativeBalance(params.id), getTokens(params, { show: "200" }),
+        getTransactionsList({ id: params.id, page: "0", show: "100" })
+            .then((transactions) => ({ transactions, incomplete: false }))
+            .catch(() => ({ transactions: [], incomplete: true })),
+        getTickerPrice({ symbol: "AVAX" }).catch(() => ({ price: "0" })),
+    ]);
+    const price = String(quote.price);
+    const fiatBalance = Number(balance) * Number(price);
+    tokenHoldings.tokens.unshift({ amount: balance, decimals: 18, fiatBalance,
+        image: "https://cdn.zelf.world/icons/ic_avax.png", name: "Avalanche", price, symbol: "AVAX", tokenType: "AVAX" });
+    return { _balance: Number(balance), address: params.id, balance, decimals: 18, fiatBalance,
+        account: { asset: "AVAX", fiatBalance: String(fiatBalance), price }, tokenHoldings,
+        transactions: history.transactions, transactionsIncomplete: history.incomplete };
+};
 
-		// Obtener tokens y transacciones
-		let tokenHoldings = await getTokens({ id: params.id }, { show: "200" });
+const getTokensFromRouteScan = async (address) => {
+    const tokens = [];
+    let next;
+    for (let page = 0; page < 20; page++) {
+        const { data } = await instance.get(`https://api.routescan.io/v2/network/mainnet/evm/43114/address/${address}/erc20-holdings`,
+            { params: { limit: 100, ...(next ? { next } : {}) }, timeout: 8000 });
+        if (!Array.isArray(data.items)) throw new Error("invalid_avalanche_holdings");
+        tokens.push(...data.items.map(mapRouteScanHolding));
+        next = data.link?.nextToken;
+        if (!next) return { balance: String(tokens.reduce((sum, token) => sum + token.fiatBalance, 0)), total: tokens.length, tokens };
+    }
+    throw new Error("avalanche_holdings_pagination_incomplete");
+};
 
-		// Convert native AVAX balance from raw format to proper decimal format
-		const avaxDecimals = data.nativeTokenBalance.decimals;
-		const avaxAmount = (Number(data.nativeTokenBalance.balance) / Math.pow(10, avaxDecimals)).toFixed(avaxDecimals);
-
-		tokenHoldings.tokens.push({
-			amount: avaxAmount,
-			decimals: avaxDecimals,
-			fiatBalance: data.nativeTokenBalance?.balanceValue?.value.toString(),
-			image: data.nativeTokenBalance.logoUri,
-			name: "Avalanche",
-			price: data.nativeTokenBalance?.price?.value.toString(),
-			symbol: "AVAX",
-			tokenType: "AVAX",
-		});
-
-		const transactions = await getTransactionsList({
-			id: params.id,
-			page: "0",
-			show: "100",
-		});
-
-		return {
-			_balance: parseFloat(
-				(Number(data.nativeTokenBalance.balance) / 10 ** data.nativeTokenBalance.decimals).toFixed(data.nativeTokenBalance.decimals)
-			),
-			address: params.id,
-			balance: (Number(data.nativeTokenBalance.balance) / 10 ** data.nativeTokenBalance.decimals).toFixed(data.nativeTokenBalance.decimals),
-			decimals: data.nativeTokenBalance.decimals,
-			fiatBalance: data.nativeTokenBalance?.balanceValue?.value || 0,
-			image: data.nativeTokenBalance.logoUri,
-			account: {
-				asset: "AVAX",
-				fiatBalance: data.nativeTokenBalance?.balanceValue?.value.toString(),
-				price: data.nativeTokenBalance?.price?.value.toString(),
-			},
-			tokenHoldings,
-			transactions,
-		};
-	} catch (error) {
-		console.error({ error });
-		throw error;
-	}
+const getTokens = async (params, query) => {
+    try { return await getTokensFromGlacier(params, query); }
+    catch { return getTokensFromRouteScan(params.id); }
 };
 
 /**
@@ -74,11 +75,11 @@ const getBalance = async (params) => {
  * @param {Object} params - Contiene el id (direcci?n)
  * @param {Object} query - Par?metros adicionales
  */
-const getTokens = async (params, query) => {
+const getTokensFromGlacier = async (params, query) => {
 	// Obtener tokens ERC20
 	const { data } = await instance.get(
 		`https://glacier-api.avax.network/v1/chains/43114/addresses/${params.id}/balances:listErc20?pageSize=100&filterSpamTokens=true`,
-		{ headers: { "user-agent": generateRandomUserAgent() } }
+		{ headers: { "user-agent": generateRandomUserAgent() }, timeout: 5000 }
 	);
 
 	// Obtener conteo total de tokens (RouteScan is optional - fall back to Glacier count if unavailable)
@@ -139,6 +140,7 @@ const getTransactionsList = async (params) => {
 	}&address=${id}&nonzeroValue=false&t=${t}`;
 
 	const { data } = await axios.get(url, {
+        timeout: 8000,
 		httpsAgent: agent,
 		headers: {
 			"X-Apikey": get_ApiKey().getApiKey(),

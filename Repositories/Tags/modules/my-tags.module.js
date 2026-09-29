@@ -1,3 +1,4 @@
+const { referralName, rewardFriendKeys, findReferralRecord, groupReferralRecords, explicitReferralPrice } = require("./referral-reward.util");
 const config = require("../../../Core/config");
 const { searchTag } = require("./tags.module");
 const TagsSearchModule = require("./tags-search.module");
@@ -502,7 +503,7 @@ const sendEmailReceipt = async (tagName, domain, network, email, token) => {
  * 1. Create reward record if not found (status "pending").
  * 2. Call giveTokensAfterPurchase to send ZNS.
  * 3. On success: set status "completed", receipt fields (completedAt, payload, attempts++), save. Return { signature, rewardAmount }.
- * 4. On failure: set status "failed", payload.error, attempts++, save. Throw so user can retry later.
+ * 4. On uncertain transfer failure: retain the pending lock until reconciliation.
  * @param {Object|null} rewardRecord - Existing record or null to create one
  * @param {string} friendFullTagName - Friend's full tag (e.g. one5024.sui)
  * @param {string} friendDomain - Friend's domain
@@ -512,7 +513,7 @@ const sendEmailReceipt = async (tagName, domain, network, email, token) => {
  * @param {Object} friendRecord - IPFS/Arweave record for the friend's tag
  * @param {number} rewardAmount - ZNS amount to send
  * @returns {Promise<{ signature: string, rewardAmount: number }>}
- * @throws {Error} "token_transfer_failed" when giveTokensAfterPurchase fails (record is updated to "failed", attempts incremented)
+ * @throws {Error} "token_transfer_failed" when giveTokensAfterPurchase fails (record stays pending for reconciliation, attempts incremented)
  */
 const _sendReferralRewardAndUpdateRecord = async (
     rewardRecord,
@@ -535,9 +536,9 @@ const _sendReferralRewardAndUpdateRecord = async (
         throw err;
     }
 
-    const tagNameOnly = friendFullTagName.split(".")[0];
-    const keyFriendName = rewardType === "registration" ? `${tagNameOnly}.hold` : friendFullTagName;
+    const keyFriendName = rewardFriendKeys(friendFullTagName, rewardType)[0];
 
+    // Manual claims use processing; the legacy bulk payout worker consumes pending.
     // 1. Create record if not found (addresses from referrer's tag in IPFS)
     if (!rewardRecord) {
         rewardRecord = new ReferralRewardModel({
@@ -549,13 +550,23 @@ const _sendReferralRewardAndUpdateRecord = async (
             referralDomain: domain,
             referralSolanaAddress: referrerSolanaAddress,
             tagPrice: friendRecord.publicData?.price || 0,
-            status: "pending",
+            status: "processing",
             attempts: 0,
             payload: {},
             ipfsHash: friendRecord.ipfsHash || "",
             arweaveId: friendRecord.arweaveId || "",
             rewardType,
         });
+    }
+
+    if (rewardRecord.isNew) {
+        await rewardRecord.save();
+    } else {
+        const locked = await ReferralRewardModel.updateOne(
+            { _id: rewardRecord._id, status: "failed" }, { $set: { status: "processing" } }
+        );
+        if (locked.modifiedCount !== 1) throw new Error("reward_claim_in_progress");
+        rewardRecord.status = "processing";
     }
 
     // 2. Send ZNS to referrer's Solana address (from their tag in IPFS)
@@ -566,9 +577,11 @@ const _sendReferralRewardAndUpdateRecord = async (
     } catch (error) {
         console.error("Error sending referral reward:", error);
 
-        rewardRecord.status = "failed";
+        // A timeout may happen after broadcast. Keep the claim locked until its
+        // outcome is reconciled; retrying blindly can transfer the reward twice.
+        rewardRecord.status = "processing";
 
-        rewardRecord.payload = { ...rewardRecord.payload, error: error?.message || "token_transfer_failed" };
+        rewardRecord.payload = { ...rewardRecord.payload, error: error?.message || "token_transfer_failed", requiresReconciliation: true };
 
         rewardRecord.attempts += 1;
 
@@ -580,6 +593,12 @@ const _sendReferralRewardAndUpdateRecord = async (
 
         throw err;
     }
+
+    // Record the on-chain signature before IPFS. A receipt outage must not pay twice.
+    rewardRecord.status = "completed";
+    rewardRecord.payload = { ...rewardRecord.payload, signature, rewardAmount };
+    rewardRecord.attempts += 1;
+    await rewardRecord.save();
 
     // 3. Success: store receipt in IPFS and update MongoDB
     const ipfsCid = await _storeReferralRewardReceipt({
@@ -618,8 +637,7 @@ const _storeReferralRewardReceipt = async ({
     rewardType,
 }) => {
     const rewardDate = moment().format("YYYY-MM-DD");
-    const tagNameOnly = friendFullTagName.split(".")[0];
-    const keyFriendName = rewardType === "registration" ? `${tagNameOnly}.hold` : friendFullTagName;
+    const keyFriendName = rewardFriendKeys(friendFullTagName, rewardType)[0];
     const rewardPrimaryKey = `referral_${keyFriendName}_${referralTagName}`;
 
     const rewardData = {
@@ -760,9 +778,7 @@ const _findReferralRecordInStorage = async (referralTagName, friendFullTagName, 
 
     const records = [...ipfsRecords, ...arweaveRecords];
 
-    const targetName = rewardType === "registration" ? `${friendFullTagName}.hold` : friendFullTagName;
-
-    const friendRecord = records.find((r) => (r.publicData?.tagName || r.publicData?.zelfName) === targetName);
+    const friendRecord = findReferralRecord(records, friendFullTagName, rewardType);
 
     if (!friendRecord) throw new Error("referral_not_found");
 
@@ -807,9 +823,9 @@ const _calculateReferralRewardAmount = (friendRecord, domainConfig, rewardType =
     }
 
     // Purchase reward: 10% of tag price
-    let tagPrice = friendRecord.publicData?.price || friendRecord.metadata?.extraParams?.price || 0;
+    let tagPrice = explicitReferralPrice(friendRecord);
 
-    if (!tagPrice) {
+    if (tagPrice === null) {
         const registeredAt = friendRecord.publicData?.registeredAt || friendRecord.metadata?.extraParams?.registeredAt;
         const expiresAt = friendRecord.publicData?.expiresAt || friendRecord.metadata?.extraParams?.expiresAt;
         const duration = _durationFromRegisteredAndExpires(registeredAt, expiresAt);
@@ -834,25 +850,22 @@ const _calculateReferralRewardAmount = (friendRecord, domainConfig, rewardType =
  * @param {string} referralTagName - Referrer's full tag
  * @param {string} rewardType - "registration" or "purchase"
  */
+const _readReferralReward = async (friendFullTagName, referralTagName, rewardType) => {
+    const keys = rewardFriendKeys(friendFullTagName, rewardType);
+    // Do not let a storage failure authorize a second payment.
+    const receipts = (await Promise.all(keys.map((key) => IPFS.filter("rewardPrimaryKey", `referral_${key}_${referralTagName}`, { throwOnError: true })))).flat();
+    const records = await ReferralRewardModel.find({ tagName: { $in: keys }, referralTagName });
+    const ipfsReward = receipts.find(Boolean);
+    const mongoRecord = records.find((record) => record.status === "completed" || record.payload?.signature)
+        || records.find((record) => ["pending", "processing"].includes(record.status)) || records[0];
+    return { ipfsReward, mongoRecord, claimed: Boolean(ipfsReward || mongoRecord?.status === "completed" || mongoRecord?.payload?.signature) };
+};
+
 const _checkIfRewardAlreadyClaimed = async (friendFullTagName, referralTagName, rewardType) => {
-    const keyFriendName = rewardType === "registration" ? `${friendFullTagName}.hold` : friendFullTagName;
-
-    const rewardPrimaryKey = `referral_${keyFriendName}_${referralTagName}`;
-
-    const ipfsRewards = await IPFS.filter("rewardPrimaryKey", rewardPrimaryKey);
-
-    if (ipfsRewards && ipfsRewards.length > 0) throw new Error("reward_already_claimed");
-
-    // Backup: Check MongoDB
-    const rewardRecord = await ReferralRewardModel.findOne({
-        tagName: keyFriendName,
-        referralTagName: referralTagName,
-        rewardType, // Distinguish records in Mongo too
-    });
-
-    if (rewardRecord && rewardRecord.status === "completed") throw new Error("reward_already_claimed");
-
-    return rewardRecord;
+    const result = await _readReferralReward(friendFullTagName, referralTagName, rewardType);
+    if (result.claimed) throw new Error("reward_already_claimed");
+    if (["pending", "processing"].includes(result.mongoRecord?.status)) throw new Error("reward_claim_in_progress");
+    return result.mongoRecord;
 };
 
 /**
@@ -867,6 +880,8 @@ const claimReferralReward = async (tagName, domain, friendTagName, friendDomain,
     const referralTagName = tagName.includes(".") ? tagName : `${tagName}.${domain}`;
 
     const friendFullTagName = friendTagName.includes(".") ? friendTagName : `${friendTagName}.${friendDomain}`;
+
+    if (rewardType && !["registration", "purchase"].includes(rewardType)) throw new Error("400:invalid_reward_type");
 
     // 1. Verify referral exists in IPFS/Arweave
     const friendRecord = await _findReferralRecordInStorage(referralTagName, friendFullTagName, friendDomain, rewardType, authUser);
@@ -892,6 +907,7 @@ const claimReferralReward = async (tagName, domain, friendTagName, friendDomain,
     const rewardRecord = await _checkIfRewardAlreadyClaimed(friendFullTagName, referralTagName, rewardType);
 
     const rewardAmount = _calculateReferralRewardAmount(friendRecord, domainConfig, rewardType);
+    if (!Number.isFinite(rewardAmount) || rewardAmount <= 0) throw new Error("400:reward_not_eligible");
 
     const {
         signature,
@@ -946,19 +962,7 @@ const getMyReferrals = async (tagName, domain, authUser) => {
 
     const domainRecords = [...ipfsRecords, ...arweaveRecords];
 
-    const tagKey = domainConfig?.getTagKey?.() || "tagName";
-
-    const map = new Map();
-
-    for (const record of domainRecords) {
-        const name = record.publicData?.[tagKey] || record.name || record.tagName || record.publicData?.tagName || record.publicData?.zelfName;
-
-        if (!name) continue;
-
-        if (!map.has(name)) {
-            map.set(name, record);
-        }
-    }
+    const map = groupReferralRecords(domainRecords);
 
     const referrals = [];
     let totalEarnedInZNS = 0;
@@ -968,19 +972,8 @@ const getMyReferrals = async (tagName, domain, authUser) => {
 
         const type = record.publicData?.type || record.metadata?.extraParams?.type || "hold";
 
-        const tagNameOnly = name.split(".")[0];
-
-        // 1. Check Registration Reward (10 ZNS)
-        const regKeyFriendName = `${tagNameOnly}.hold`;
-        const regPrimaryKey = `referral_${regKeyFriendName}_${referralTagName}`;
-        const ipfsRegReward = (await IPFS.filter("rewardPrimaryKey", regPrimaryKey))?.[0];
-        const mongoRegRecord = await ReferralRewardModel.findOne({
-            tagName: regKeyFriendName,
-            referralTagName,
-            rewardType: "registration",
-        });
-
-        const regClaimed = !!ipfsRegReward || (mongoRegRecord && mongoRegRecord.status === "completed");
+        const { ipfsReward: ipfsRegReward, mongoRecord: mongoRegRecord, claimed: regClaimed } =
+            await _readReferralReward(name, referralTagName, "registration");
 
         const regAmount = ipfsRegReward?.publicData?.rewardAmount || mongoRegRecord?.payload?.rewardAmount || 10;
 
@@ -988,6 +981,7 @@ const getMyReferrals = async (tagName, domain, authUser) => {
 
         referrals.push({
             ...record,
+            id: `${name}:registration`,
             name,
             status: "tag_name_created",
             rewardZNS: 10,
@@ -1000,22 +994,17 @@ const getMyReferrals = async (tagName, domain, authUser) => {
 
         // 2. Check Purchase Reward (10%) - only if mainnet
         if (type === "mainnet") {
-            const purPrimaryKey = `referral_${name}_${referralTagName}`;
-            const ipfsPurReward = (await IPFS.filter("rewardPrimaryKey", purPrimaryKey))?.[0];
-            const mongoPurRecord = await ReferralRewardModel.findOne({
-                tagName: name,
-                referralTagName,
-                rewardType: "purchase", // or just null for legacy
-            });
-
-            const purClaimed = !!ipfsPurReward || (mongoPurRecord && mongoPurRecord.status === "completed");
+            const { ipfsReward: ipfsPurReward, mongoRecord: mongoPurRecord, claimed: purClaimed } =
+                await _readReferralReward(name, referralTagName, "purchase");
             const purAmountPotential = _calculateReferralRewardAmount(record, domainConfig, "purchase");
             const purAmountActual = ipfsPurReward?.publicData?.rewardAmount || mongoPurRecord?.payload?.rewardAmount || purAmountPotential;
 
             if (purClaimed) totalEarnedInZNS += Number(purAmountActual);
+            if (!purClaimed && purAmountPotential <= 0) continue;
 
             referrals.push({
                 ...record,
+                id: `${name}:purchase`,
                 name,
                 status: "tag_name_purchased",
                 rewardZNS: purAmountPotential,

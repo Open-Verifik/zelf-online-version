@@ -1,3 +1,4 @@
+const { assertTagAvailable } = require("./tag-availability");
 const moment = require("moment");
 const TagsPartsModule = require("./tags-parts.module");
 const TagsSearchModule = require("./tags-search.module");
@@ -11,7 +12,7 @@ const { createPolkadotWallet, createKusamaWallet } = require("../../Wallet/modul
 const { createTonWallet } = require("../../Wallet/modules/ton");
 const { createAptosWallet } = require("../../Wallet/modules/aptos");
 const { decrypt, preview, applyPreviewHasPassword } = require("../../ZelfProof/modules/zelf-proof.module");
-const OfflineProofModule = require("../../Mina/offline-proof");
+const OfflineProofModule = require("../../../Core/offline-proof");
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
 const { initTagUpdates, tryUpdateTags, tryUpgradeLegacyProofAndRepin } = require("./sync-tag-records.module");
@@ -427,11 +428,7 @@ const _findDuplicatedTag = async (tagName, domain, domainConfig) => {
 
     const result = await TagsSearchModule.searchTag(searchParams);
 
-    if (result.available === false) {
-        const error = new Error("409:tag_already_exists");
-        error.status = 409;
-        throw error;
-    }
+    assertTagAvailable(result);
 
     return result;
 };

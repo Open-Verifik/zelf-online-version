@@ -34,8 +34,8 @@ const stripeDashboardUrlBase = String(
 /** Default Arweave gateway pool — override per server via .env (see arwave in configuration). */
 const ARWEAVE_DEFAULT_PUBLIC_GATEWAY_URL = "https://arweave.net";
 const ARWEAVE_DEFAULT_GRAPHQL_GATEWAYS = [
-    "https://arweave.net",
     "https://arweave-search.goldsky.com",
+    "https://arweave.net",
     "https://turbo-gateway.com",
     "https://ardrive.net",
 ];
@@ -137,6 +137,14 @@ const configuration = {
     etherscan: {
         urlEtherscan: "https://api.etherscan.io/api",
         apiKey: process.env.ETHERSCAN_API_KEY || process.env.INFURA_APIKEY,
+        /** Cap ERC-20 rows in GET /api/ethereum/address (whale wallets can hold thousands). */
+        addressMaxTokens: Number(process.env.ETHEREUM_ADDRESS_MAX_TOKENS) || 150,
+        /** Drop holdings below this USD value from the address overview. */
+        addressMinFiatUsd: Number(process.env.ETHEREUM_ADDRESS_MIN_FIAT_USD) || 0.01,
+        /** Max concurrent CMC id lookups when Ethplorer fallback formats tokens. */
+        addressCmcConcurrency: Number(process.env.ETHEREUM_ADDRESS_CMC_CONCURRENCY) || 5,
+        /** Max concurrent Alchemy metadata RPC calls for capped token rows. */
+        addressMetadataConcurrency: Number(process.env.ETHEREUM_ADDRESS_METADATA_CONCURRENCY) || 5,
     },
     binance: {
         urlBinance: "https://api.binance.com/",

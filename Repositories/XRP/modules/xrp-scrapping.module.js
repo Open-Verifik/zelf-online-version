@@ -2,6 +2,50 @@ const { getCleanInstance } = require("../../../Core/axios");
 const instance = getCleanInstance(30000);
 const { generateRandomUserAgent } = require("../../../Core/helpers");
 const endpoint = `https://api-v2.solscan.io/v2`;
+const XRPSCAN_BASE = "https://api.xrpscan.com/api/v1";
+
+const xrpscanHeaders = () => ({
+	Accept: "application/json",
+	"User-Agent": generateRandomUserAgent(),
+});
+
+const isRetryableXrpscanError = (error) => {
+	const code = error?.code;
+	if (code === "ECONNABORTED" || code === "ETIMEDOUT" || code === "ECONNRESET" || code === "EAI_AGAIN" || code === "ENOTFOUND") {
+		return true;
+	}
+	const status = error?.response?.status;
+	if (status === 429) return true;
+	if (status >= 500 && status < 600) return true;
+	if (!error?.response && /timeout/i.test(error?.message || "")) return true;
+	return false;
+};
+
+const fetchXrpscan = async (path, { label = "XRP xrpscan", attempts = 3 } = {}) => {
+	let lastError;
+	for (let attempt = 1; attempt <= attempts; attempt++) {
+		try {
+			return await instance.get(`${XRPSCAN_BASE}${path}`, {
+				headers: xrpscanHeaders(),
+			});
+		} catch (error) {
+			lastError = error;
+			const status = error?.response?.status;
+			if (status === 404 || status === 400) throw error;
+			if (!isRetryableXrpscanError(error) || attempt === attempts) break;
+			const delayMs = 400 * attempt;
+			console.warn(`${label} attempt ${attempt}/${attempts} failed (${error.message}); retrying in ${delayMs}ms`);
+			await new Promise((resolve) => setTimeout(resolve, delayMs));
+		}
+	}
+	throw lastError;
+};
+
+const normalizeTransactionsPayload = (data) => {
+	if (Array.isArray(data)) return data;
+	if (data && Array.isArray(data.transactions)) return data.transactions;
+	return [];
+};
 
 /**
  * @param {*} params
@@ -43,13 +87,45 @@ const getAddress = async (params) => {
  * @param {Object} params
  * @returns
  */
-const getTransactionsList = async (params, query) => {
-	const { data } = await instance.get(`https://api.xrpscan.com/api/v1/account/${params.id}/transactions`, {
-		headers: {
-			"user-agent": generateRandomUserAgent(),
-		},
-	});
-	return { transactions: data };
+const getTransactionsList = async (params, query = {}) => {
+	const address = String(params?.id || "").trim();
+	if (!address) {
+		const error = new Error("missing_address");
+		error.status = 400;
+		throw error;
+	}
+
+	const limit = Math.min(100, Math.max(1, parseInt(String(query?.show), 10) || 25));
+	const searchParams = new URLSearchParams({ limit: String(limit) });
+	if (query?.marker) searchParams.set("marker", String(query.marker));
+
+	try {
+		const { data } = await fetchXrpscan(`/account/${encodeURIComponent(address)}/transactions?${searchParams}`, {
+			label: "XRP transactions",
+		});
+
+		const transactions = normalizeTransactionsPayload(data);
+		const marker = data && typeof data === "object" && !Array.isArray(data) ? data.marker : undefined;
+
+		return {
+			transactions,
+			...(marker ? { marker } : {}),
+		};
+	} catch (error) {
+		const status = error?.response?.status;
+		if (status === 404) {
+			return { transactions: [] };
+		}
+
+		console.error("XRP transactions fetch failed:", {
+			address,
+			status: status || null,
+			code: error?.code || null,
+			message: error?.message,
+		});
+
+		return { transactions: [] };
+	}
 };
 
 /**
@@ -93,4 +169,5 @@ module.exports = {
 	getAddress,
 	getTransactionsList,
 	getTokens,
+	normalizeTransactionsPayload,
 };

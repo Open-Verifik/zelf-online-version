@@ -1,3 +1,4 @@
+const { assertTagAvailable } = require("../../Tags/modules/tag-availability");
 /**
  * ZelfID online product module (`/api/zelf-ids`). Encrypt/decrypt/preview always use ZelfEncrypt v4.
  * Field names stay `tagName` / `tagObject` for client compatibility with `/api/tags`.
@@ -15,7 +16,7 @@ const { createPolkadotWallet, createKusamaWallet } = require("../../Wallet/modul
 const { createTonWallet } = require("../../Wallet/modules/ton");
 const { createAptosWallet } = require("../../Wallet/modules/aptos");
 const { decrypt, preview, previewWithLegacyFallback, applyPreviewHasPassword } = require("../../ZelfProof/modules/zelf-proof.module");
-const OfflineProofModule = require("../../Mina/offline-proof");
+const OfflineProofModule = require("../../../Core/offline-proof");
 const config = require("../../../Core/config");
 const { confirmPayUniqueAddress } = require("../../purchase-zelf/modules/balance-checker.module");
 const { initTagUpdates, tryUpdateTags, tryUpgradeLegacyProofAndRepin } = require("../../Tags/modules/sync-tag-records.module");
@@ -589,11 +590,7 @@ const _findDuplicatedTag = async (tagName, domain, domainConfig) => {
         environment: "all",
     });
 
-    if (result.available === false) {
-        const error = new Error("409:tag_already_exists");
-        error.status = 409;
-        throw error;
-    }
+    assertTagAvailable(result);
 
     return result;
 };

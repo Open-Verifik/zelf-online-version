@@ -1,8 +1,9 @@
 const { getDomainConfig } = require("../config/supported-domains");
+const { assertTagAvailable } = require("./tag-availability");
 const { _findDuplicatedTag, _validateReferral, previewZelfProof, searchTag } = require("./tags.module");
 const TagsPartsModule = require("./tags-parts.module");
 const { decrypt } = require("../../ZelfProof/modules/zelf-proof.module");
-const moment = require("moment");
+const { verifyAddressSyncOwnership } = require("./address-sync-ownership.util");
 const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const TagsRegistrationModule = require("./tags-registration.module");
@@ -27,6 +28,9 @@ const _getExtraPublicData = async (password, zelfProof, syncPublicData) => {
     }
     if (syncPublicData.suiAddress) {
         extraKeys.suiAddress = syncPublicData.suiAddress;
+    }
+    if (syncPublicData.tonAddress) {
+        extraKeys.tonAddress = syncPublicData.tonAddress;
     }
     if (syncPublicData.aptosAddress) {
         extraKeys.aptosAddress = syncPublicData.aptosAddress;
@@ -63,16 +67,16 @@ const _validatePassword = async (zelfProof, password) => {
     return isValidPassword;
 };
 
-const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password) => {
+const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password, signedOwnership = false) => {
     const tagObject = tagRecord.tagObject;
 
     const ipfsRecord = tagRecord.ipfs?.length ? tagRecord.ipfs[0] : null;
 
-    const ipfsHash = ipfsRecord.ipfs_pin_hash || ipfsRecord.ipfsHash || ipfsRecord.cid;
+    const ipfsHash = ipfsRecord?.ipfs_pin_hash || ipfsRecord?.ipfsHash || ipfsRecord?.cid;
 
     const arweaveHash = tagRecord.arweave?.length ? tagRecord.arweave[0].arweave_pin_hash || tagRecord.arweave[0].arweaveHash : null;
 
-    if (tagObject && (!sync || !syncPublicData || !password)) {
+    if (tagObject && (!sync || !syncPublicData || (!password && !signedOwnership))) {
         const error = new Error(`tag_purchased_already:${tagObject.publicData[tagKey]}`);
 
         error.status = 409;
@@ -83,9 +87,11 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
     const extraParams = stampExtraParamsVersion(
         {
             origin: tagObject.publicData.origin || "online",
-            registeredAt: moment(tagObject.publicData.registeredAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss"),
-            expiresAt: moment(tagObject.publicData.expiresAt).add(30, "second").format("YYYY-MM-DD HH:mm:ss"),
-            price: tagObject.publicData.price || undefined,
+            registeredAt: tagObject.publicData.registeredAt,
+            expiresAt: tagObject.publicData.expiresAt,
+            price: tagObject.publicData.price ?? undefined,
+            plan: tagObject.publicData.plan,
+            st: tagObject.publicData.st,
             duration: tagObject.publicData.duration || undefined,
             hasPassword: tagObject.publicData.hasPassword || undefined,
             referralTagName: tagObject.publicData.referralTagName || undefined,
@@ -109,20 +115,16 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
         ...tagObject.publicData,
         suiAddress: syncPublicData.suiAddress || tagObject.publicData.suiAddress,
         xlmAddress: syncPublicData.stellarAddress || syncPublicData.xlmAddress || tagObject.publicData.xlmAddress,
-        dotAddress: syncPublicData.dotAddress || tagObject.publicData.dotAddress,
-        ksmAddress: syncPublicData.ksmAddress || tagObject.publicData.ksmAddress,
+        btcAddress: syncPublicData.btcAddress || syncPublicData.bitcoinAddress || tagObject.publicData.btcAddress,
+        dotAddress: syncPublicData.dotAddress || syncPublicData.polkadotAddress || tagObject.publicData.dotAddress,
+        ksmAddress: syncPublicData.ksmAddress || syncPublicData.kusamaAddress || tagObject.publicData.ksmAddress,
+        tonAddress: tagObject.publicData.tonAddress || syncPublicData.tonAddress,
         aptosAddress: syncPublicData.aptosAddress || tagObject.publicData.aptosAddress,
     };
 
     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
     metadata.extraParams = JSON.stringify(metadata.extraParams);
-
-    if (ipfsHash) {
-        await TagsIPFSModule.unpinContinuationSiblings(tagObject.publicData[tagKey]);
-        await TagsIPFSModule.deleteFiles([ipfsRecord.id]);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
 
     const ipfs = await TagsIPFSModule.insertSearchablePins(
         {
@@ -135,6 +137,10 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
         { pro: true }
     );
 
+    if (ipfsHash && ipfsRecord.id && ipfsRecord.id !== ipfs?.id) {
+        await TagsIPFSModule.deleteFiles([ipfsRecord.id]);
+    }
+
     let arweave = null;
 
     if (metadata.type === "mainnet") {
@@ -142,12 +148,13 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
         arweave = await TagsArweaveModule.tagRegistration(tagObject.zelfProofQRCode, {
             hasPassword: metadata.hasPassword,
             zelfProof: metadata.zelfProof,
-            publicData: metadata,
+            publicData: { ...tagObject.publicData, ...addressSource, ...metadata },
         });
     }
 
     const updatedTagObject = {
         ...tagObject,
+        publicData: { ...tagObject.publicData, ...addressSource },
         ipfs,
         arweave,
         origin: "offline",
@@ -213,17 +220,24 @@ const leaseOfflineTag = async (params, authUser) => {
         throw new Error("tag_does_not_match_in_zelfProof");
     }
 
-    const findExistingTag = await searchTag({ tagName: normalizedProofTagName, domain, domainConfig, environment: "all" }, authUser);
+    const findExistingTag = await searchTag({ tagName: normalizedProofTagName, domain, domainConfig, environment: "all", includeAllAddressPages: true }, authUser);
 
     const extraPublicData = await _getExtraPublicData(password, zelfProof, syncPublicData);
 
     if (sync && findExistingTag?.tagObject) {
-        await _validatePassword(zelfProof, password);
+        const hasSignature = Boolean(syncPublicData?._syncSignature);
+        const signedOwnership = hasSignature && verifyAddressSyncOwnership(
+            normalizedProofTagName, syncPublicData, findExistingTag.tagObject.publicData?.ethAddress
+        );
+        if (hasSignature && !signedOwnership) throw new Error("401:invalid_sync_ownership");
+        if (!signedOwnership) await _validatePassword(zelfProof, password);
 
-        return await _syncOfflineTag(findExistingTag, tagKey, syncPublicData, sync, password);
+        return await _syncOfflineTag(findExistingTag, tagKey, syncPublicData, sync, password, signedOwnership);
     }
 
     if (findExistingTag.tagObject) throw new Error("tag_purchased_already");
+
+    assertTagAvailable(findExistingTag);
 
     const { price, reward, discount, discountType } = domainConfig.getPrice(
         tagName,

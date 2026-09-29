@@ -67,6 +67,7 @@ For a test file that expects another port, export that same `PORT` before starti
 - Development-only JWT mirrors (no ZNS payment): `/api/jwt/zelf-proof` and `/api/jwt/human-authn`. Gated on `config.env === "development"`. Focused check: `npm run test:jwt-dev`. Never enable on `v3.zelf.world`.
 - v4 Face Certificates: `https://v4.zelf.world` has Face PKI (`pki_private_key`) only. Proofs stay unsigned so Android/iOS can encrypt/decrypt offline. Do not embed `ISSUERS_PUBLIC_KEY` on ZNS or Zelf ID APKs. Koa: `/api/face-certificates` (402) and `/api/my-face-certificates` (JWT). Root cert: `GET /api/face-certificates/root-certificate`. Focused check: `npm run test:face-certificates`. 3.1.6 stays unsigned.
 - Focused check: `npm run test:zelf-ids`.
+- Cross-platform availability regression: `npm run test:tag-registration` (Node 24; read-only real provider failure, no API server/Mongo required).
 
 ### zSend (encrypt to someone else)
 
