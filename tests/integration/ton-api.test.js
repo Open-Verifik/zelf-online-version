@@ -75,7 +75,8 @@ describe("TON API Integration Tests - Real Server", () => {
 				.expect(200);
 
 			expect(response.body).toHaveProperty("data");
-			expect(Array.isArray(response.body.data)).toBe(true);
+			expect(Array.isArray(response.body.data.tokens)).toBe(true);
+			expect(typeof response.body.data.total).toBe("number");
 		});
 	});
 

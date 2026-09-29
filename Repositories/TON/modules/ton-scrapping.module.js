@@ -157,7 +157,13 @@ const getTokens = async (params, query = {}) => {
 	const tokens = dashboard.tokenHoldings?.tokens || [];
 	const page = Number(query.page || 0);
 	const show = Number(query.show || 10);
-	return tokens.slice(page * show, page * show + show);
+	const slice = tokens.slice(page * show, page * show + show);
+
+	return {
+		balance: dashboard.tokenHoldings?.balance || "0",
+		total: tokens.length,
+		tokens: slice,
+	};
 };
 
 const getTransactions = async (params, query = {}) => {

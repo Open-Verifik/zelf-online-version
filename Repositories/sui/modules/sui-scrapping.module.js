@@ -49,7 +49,8 @@ const getAddress = async (params) => {
 		// Safely get tokens, handle errors gracefully
 		let tokens = [];
 		try {
-			tokens = await getTokens({ id: address }, { page: "0", show: "10" });
+			const tokenHoldings = await getTokens({ id: address }, { page: "0", show: "10" });
+			tokens = tokenHoldings.tokens || [];
 		} catch (error) {
 			console.error("Error fetching tokens:", error.message);
 			tokens = [];
@@ -175,7 +176,7 @@ const getTokens = async (params, query) => {
 
 		// Handle empty or invalid response
 		if (!data || !data.data || !data.data.hits || !Array.isArray(data.data.hits)) {
-			return [];
+			return { balance: "0", total: 0, tokens: [] };
 		}
 
 		function formatCryptoData(data) {
@@ -192,10 +193,17 @@ const getTokens = async (params, query) => {
 			}));
 		}
 
-		return formatCryptoData(data.data.hits);
+		const tokens = formatCryptoData(data.data.hits);
+		const balance = tokens.reduce((sum, token) => sum + (token.fiatBalance || 0), 0);
+
+		return {
+			balance: balance.toString(),
+			total: tokens.length,
+			tokens,
+		};
 	} catch (error) {
 		console.error("Error in getTokens:", error.message);
-		return [];
+		return { balance: "0", total: 0, tokens: [] };
 	}
 };
 
