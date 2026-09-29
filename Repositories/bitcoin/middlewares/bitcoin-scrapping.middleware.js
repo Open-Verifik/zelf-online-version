@@ -8,8 +8,8 @@ const schemas = {
 		transactionHash: string().required(),
 	},
 	validateAddressTransactions: {
-		page: string().required(),
-		show: showRecords().required(),
+		page: string(),
+		show: showRecords(),
 	},
 	validateTransactionId: {
 		id: string().required(),
