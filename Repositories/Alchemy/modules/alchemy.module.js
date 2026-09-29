@@ -2,7 +2,7 @@ const { getCleanInstance } = require("../../../Core/axios");
 const { formatEther, formatUnits, getAddress, isAddress } = require("ethers");
 
 const config = require("../../../Core/config");
-const { searchTag } = require("../../Tags/modules/tags.module");
+const { searchTag } = require("../../Tags/modules/tags-search.module");
 const { getDomainConfig } = require("../../Tags/config/supported-domains");
 const { getSessionFullTagName } = require("../middlewares/alchemy.middleware");
 
