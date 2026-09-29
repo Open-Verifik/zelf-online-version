@@ -29,6 +29,14 @@ describe("Aptos live integration", () => {
         expect(["success", "pending"]).toContain(detail.status);
     });
 
+    it("returns a tokens payload with a tokens array from getTokens", async () => {
+        const holdings = await ScrappingModule.getTokens({ id: ACTIVE_MAINNET_ADDRESS }, { page: "0", show: "10" });
+
+        expect(Array.isArray(holdings.tokens)).toBe(true);
+        expect(typeof holdings.total).toBe("number");
+        expect(holdings.tokens.find((token) => token.symbol === "APT")).toBeDefined();
+    });
+
     it("estimates a real native transfer without signing or broadcasting", async () => {
         const estimate = await TransferModule.estimateTransfer({
             fromAddress: ACTIVE_MAINNET_ADDRESS,
