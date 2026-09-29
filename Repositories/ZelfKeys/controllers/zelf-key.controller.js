@@ -213,6 +213,24 @@ const listAllDataDashboard = async (ctx) => {
 };
 
 /**
+ * Count-only IPFS summary across ZelfKeys categories
+ * @param {Object} ctx - Koa context
+ */
+const summarizeData = async (ctx) => {
+	try {
+		const data = await Module.summarizeData(ctx.request.query, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
+/**
  * Delete ZelfKey
  * @param {Object} ctx - Koa context
  */
@@ -249,5 +267,6 @@ module.exports = {
 	listAllData,
 	listDataDashboard,
 	listAllDataDashboard,
+	summarizeData,
 	deleteZelfKey,
 };

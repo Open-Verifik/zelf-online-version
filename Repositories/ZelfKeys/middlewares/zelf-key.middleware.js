@@ -38,6 +38,7 @@ const schemas = {
 		masterPassword: string().optional().allow(""),
 	},
 	creditCard: {
+		alias: string().optional().allow("").max(50),
 		cardName: string().required(),
 		cardNumber: string().required(),
 		expiryMonth: stringEnum(["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]).required(),
@@ -56,6 +57,7 @@ const schemas = {
 		// Required for password/notes/cards transport encryption; accepted for all retrieve types
 		clientPublicKey: string().required(),
 		type: string().optional().allow(""),
+		v: string().optional().allow(""),
 		removePGP: boolean().optional(),
 	},
 	preview: {
@@ -276,6 +278,10 @@ const previewValidation = async (ctx, next) => {
 	await next();
 };
 
+const summaryValidation = async (_ctx, next) => {
+	await next();
+};
+
 const deleteZelfKeyValidation = async (ctx, next) => {
 	const valid = validate(schemas.delete, {
 		id: ctx.request.params.id,
@@ -304,5 +310,6 @@ module.exports = {
 	listAllValidation,
 	listDashboardValidation,
 	listAllDashboardValidation,
+	summaryValidation,
 	deleteZelfKeyValidation,
 };

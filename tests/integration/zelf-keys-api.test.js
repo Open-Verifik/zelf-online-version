@@ -179,6 +179,8 @@ describe("ZelfKeys API Integration Tests", () => {
                     website: "https://github.com",
                     username: "testuser@zelf.world",
                     password: "mySecretGitHub!123",
+                    alias: "GitHub work vault",
+                    folder: "Work",
                     faceBase64,
                     masterPassword: TEST_PASSWORD,
                     removePGP: true,
@@ -269,6 +271,8 @@ describe("ZelfKeys API Integration Tests", () => {
                     expiryYear: "2030",
                     cvv: "123",
                     bankName: "Chase",
+                    alias: "Travel card",
+                    folder: "Finance",
                     faceBase64,
                     masterPassword: TEST_PASSWORD,
                     removePGP: true,
@@ -335,6 +339,15 @@ describe("ZelfKeys API Integration Tests", () => {
             expect(response.body.data).toHaveProperty("data");
             expect(Array.isArray(response.body.data.data)).toBe(true);
             expect(response.body.data).toHaveProperty("totalCount");
+            const stored = (response.body.data.data || []).find(
+                (item) => item.publicData?.alias === "GitHub work vault"
+            );
+            if (stored) {
+                expect(stored.publicData.v).toBe("4");
+                expect(stored.publicData.folder).toBe("Work");
+                expect(stored.publicData).not.toHaveProperty("insideFolder");
+                expect(stored.publicData).not.toHaveProperty("password");
+            }
             console.log(`✅ Listed ${response.body.data.totalCount} password records`);
         });
 
@@ -371,6 +384,14 @@ describe("ZelfKeys API Integration Tests", () => {
 
             expect(response.status).toBe(200);
             expect(response.body.data).toHaveProperty("category", "credit_card");
+            const stored = (response.body.data.data || []).find((item) => item.publicData?.alias === "Travel card");
+            if (stored) {
+                expect(stored.publicData.v).toBe("4");
+                expect(stored.publicData.folder).toBe("Finance");
+                expect(stored.publicData).not.toHaveProperty("insideFolder");
+                expect(String(stored.publicData.card || "")).toContain("1111");
+                expect(String(stored.publicData.card || "")).not.toContain("4111111111111111");
+            }
             console.log(`✅ Listed ${response.body.data.totalCount} credit_card records`);
         });
 
@@ -400,6 +421,40 @@ describe("ZelfKeys API Integration Tests", () => {
                 .get(`${ZELF_KEYS_PATH}/list`)
                 .set("Origin", "https://test.example.com")
                 .query({ category: "password" });
+
+            expect(response.status).toBe(401);
+        });
+    });
+
+    describe("4b. Summary", () => {
+        it("GET /zelf-keys/summary — should return counts only", async () => {
+            const response = await request(API_BASE_URL)
+                .get(`${ZELF_KEYS_PATH}/summary`)
+                .set("Origin", "https://test.example.com")
+                .set("Authorization", `Bearer ${authToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body.data).toHaveProperty("totalCount");
+            expect(response.body.data.counts).toEqual(
+                expect.objectContaining({
+                    password: expect.any(Number),
+                    credit_card: expect.any(Number),
+                    notes: expect.any(Number),
+                    contact: expect.any(Number),
+                    zotp: expect.any(Number),
+                })
+            );
+            const serialized = JSON.stringify(response.body);
+            expect(serialized).not.toMatch(/zelfProof|zelfProofQRCode|cardNumber|cvv|publicData/);
+            expect(response.body.data.totalCount).toBe(
+                Object.values(response.body.data.counts).reduce((sum, count) => sum + count, 0)
+            );
+        });
+
+        it("GET /zelf-keys/summary — should return 401 without auth", async () => {
+            const response = await request(API_BASE_URL)
+                .get(`${ZELF_KEYS_PATH}/summary`)
+                .set("Origin", "https://test.example.com");
 
             expect(response.status).toBe(401);
         });
@@ -452,8 +507,8 @@ describe("ZelfKeys API Integration Tests", () => {
                 .send({
                     zelfProof: storedPasswordZelfProof,
                     type: "password",
+                    v: "4",
                     faceBase64,
-                    password: TEST_PASSWORD,
                     removePGP: true,
                     clientPublicKey,
                 });
@@ -480,6 +535,198 @@ describe("ZelfKeys API Integration Tests", () => {
             expect(metadata).toHaveProperty("username");
 
             console.log("✅ Password retrieved and client-decrypted successfully");
+        });
+
+        it("POST /zelf-keys/retrieve — decrypts a raw v4 proof without a version hint", async () => {
+            jest.setTimeout(60000);
+            const ZelfProofModule = require("../../Repositories/ZelfProof/modules/zelf-proof.module");
+            const { zelfProof } = await ZelfProofModule.encrypt({
+                _id: `v4_keys_${Date.now()}`,
+                addServerPassword: false,
+                faceBase64,
+                metadata: { password: "v4Secret", username: "v4-user" },
+                publicData: { type: "password", website: "v4.test", v: "4" },
+                tolerance: "REGULAR",
+                stack: "v4",
+            });
+
+            const { privateKey: clientPrivateKey, publicKey: clientPublicKey } = await openpgp.generateKey({
+                type: "ecc",
+                curve: "curve25519",
+                userIDs: [{ name: "ZelfKeys Test", email: "test@zelf.world" }],
+            });
+
+            const response = await request(API_BASE_URL)
+                .post(`${ZELF_KEYS_PATH}/retrieve`)
+                .set("Origin", "https://test.example.com")
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    zelfProof,
+                    type: "password",
+                    faceBase64,
+                    removePGP: true,
+                    clientPublicKey,
+                });
+
+            expect(response.status).toBe(200);
+            const privateKey = await openpgp.readPrivateKey({ armoredKey: clientPrivateKey });
+            const message = await openpgp.readMessage({
+                armoredMessage: response.body.data.pgp.encryptedMessage,
+            });
+            const { data: decrypted } = await openpgp.decrypt({
+                message,
+                decryptionKeys: privateKey,
+            });
+            expect(JSON.parse(decrypted)).toHaveProperty("password", "v4Secret");
+            console.log("✅ Raw v4 password retrieved without a version hint via stack fallback");
+        });
+
+        it("POST /zelf-keys/retrieve — decrypts a stored v4 password without a version hint", async () => {
+            if (!storedPasswordZelfProof) {
+                console.log("⚠️  Skipping: no stored password zelfProof available");
+                return;
+            }
+
+            const { privateKey: clientPrivateKey, publicKey: clientPublicKey } = await openpgp.generateKey({
+                type: "ecc",
+                curve: "curve25519",
+                userIDs: [{ name: "ZelfKeys Test", email: "test@zelf.world" }],
+            });
+
+            const response = await request(API_BASE_URL)
+                .post(`${ZELF_KEYS_PATH}/retrieve`)
+                .set("Origin", "https://test.example.com")
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    zelfProof: storedPasswordZelfProof,
+                    type: "password",
+                    faceBase64,
+                    removePGP: true,
+                    clientPublicKey,
+                });
+
+            expect(response.status).toBe(200);
+            const privateKey = await openpgp.readPrivateKey({ armoredKey: clientPrivateKey });
+            const message = await openpgp.readMessage({
+                armoredMessage: response.body.data.pgp.encryptedMessage,
+            });
+            const { data: decrypted } = await openpgp.decrypt({
+                message,
+                decryptionKeys: privateKey,
+            });
+            expect(JSON.parse(decrypted)).toHaveProperty("password");
+            console.log("✅ v4 password retrieved without a version hint via stack fallback");
+        });
+
+        it("POST /zelf-keys/retrieve — should decrypt a stored v4 credit card", async () => {
+            if (!storedCreditCardZelfProof) {
+                console.log("⚠️  Skipping: no stored credit card zelfProof available");
+                return;
+            }
+
+            const { privateKey: clientPrivateKey, publicKey: clientPublicKey } = await openpgp.generateKey({
+                type: "ecc",
+                curve: "curve25519",
+                userIDs: [{ name: "ZelfKeys Test", email: "test@zelf.world" }],
+            });
+
+            const response = await request(API_BASE_URL)
+                .post(`${ZELF_KEYS_PATH}/retrieve`)
+                .set("Origin", "https://test.example.com")
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    zelfProof: storedCreditCardZelfProof,
+                    type: "credit_card",
+                    v: "4",
+                    faceBase64,
+                    removePGP: true,
+                    clientPublicKey,
+                });
+
+            expect(response.status).toBe(200);
+            expect(response.body.data.pgp.encryptedMessage).toBeDefined();
+
+            const privateKey = await openpgp.readPrivateKey({ armoredKey: clientPrivateKey });
+            const message = await openpgp.readMessage({
+                armoredMessage: response.body.data.pgp.encryptedMessage,
+            });
+            const { data: decrypted } = await openpgp.decrypt({
+                message,
+                decryptionKeys: privateKey,
+            });
+            const metadata = JSON.parse(decrypted);
+            expect(metadata).toHaveProperty("cardNumber");
+            expect(metadata).toHaveProperty("cvv");
+            console.log("✅ Credit card retrieved and client-decrypted successfully");
+        });
+
+        it("POST /zelf-keys/retrieve — invalid version hint is accepted and falls back", async () => {
+            const { publicKey: clientPublicKey } = await openpgp.generateKey({
+                type: "ecc",
+                curve: "curve25519",
+                userIDs: [{ name: "ZelfKeys Test", email: "test@zelf.world" }],
+            });
+
+            const response = await request(API_BASE_URL)
+                .post(`${ZELF_KEYS_PATH}/retrieve`)
+                .set("Origin", "https://test.example.com")
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    zelfProof: storedPasswordZelfProof || "legacy-proof",
+                    type: "password",
+                    v: "99",
+                    faceBase64,
+                    removePGP: true,
+                    clientPublicKey,
+                });
+
+            expect(response.status).not.toBe(409);
+            if (storedPasswordZelfProof) {
+                expect(response.status).toBe(200);
+            }
+        });
+
+        it("POST /zelf-keys/retrieve — decrypts a legacy unstamped v3.6 proof without v", async () => {
+            jest.setTimeout(60000);
+            const ZelfProofModule = require("../../Repositories/ZelfProof/modules/zelf-proof.module");
+            const { zelfProof } = await ZelfProofModule.encrypt({
+                _id: `legacy_keys_${Date.now()}`,
+                addServerPassword: false,
+                faceBase64,
+                metadata: { password: "legacySecret", username: "legacy-user" },
+                publicData: { type: "password", website: "legacy.test" },
+                tolerance: "REGULAR",
+            });
+
+            const { privateKey: clientPrivateKey, publicKey: clientPublicKey } = await openpgp.generateKey({
+                type: "ecc",
+                curve: "curve25519",
+                userIDs: [{ name: "ZelfKeys Test", email: "test@zelf.world" }],
+            });
+
+            const response = await request(API_BASE_URL)
+                .post(`${ZELF_KEYS_PATH}/retrieve`)
+                .set("Origin", "https://test.example.com")
+                .set("Authorization", `Bearer ${authToken}`)
+                .send({
+                    zelfProof,
+                    type: "password",
+                    faceBase64,
+                    removePGP: true,
+                    clientPublicKey,
+                });
+
+            expect(response.status).toBe(200);
+            const privateKey = await openpgp.readPrivateKey({ armoredKey: clientPrivateKey });
+            const message = await openpgp.readMessage({
+                armoredMessage: response.body.data.pgp.encryptedMessage,
+            });
+            const { data: decrypted } = await openpgp.decrypt({
+                message,
+                decryptionKeys: privateKey,
+            });
+            expect(JSON.parse(decrypted)).toHaveProperty("password", "legacySecret");
+            console.log("✅ Legacy v3.6 password retrieved without a version stamp");
         });
 
         it("POST /zelf-keys/preview — should return 409 when zelfProof is missing", async () => {

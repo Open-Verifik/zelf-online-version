@@ -5,6 +5,7 @@ const Controller = require("../controllers/tags.controller");
 const Middleware = require("../middlewares/tags.middleware");
 
 const base = "/tags";
+// 3.6
 
 module.exports = (server) => {
     const PATH = config.basePath(base);

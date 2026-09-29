@@ -16,10 +16,41 @@ const {
     isIPFSStorageSupported,
 } = require("../../Tags/config/supported-domains");
 const { createNFT } = require("../../Avalanche/modules/avax-nft.module");
+const { resolveEncryptVersion } = require("../../Tags/modules/tags-addresses.module");
 
 const config = require("../../../Core/config");
 
 const TYPES_REQUIRING_TRANSPORT_ENCRYPTION = new Set(["password", "notes", "note", "credit_card", "payment-card"]);
+const V4_TYPES = new Set(["password", "credit_card"]);
+const SUPPORTED_CATEGORIES = ["password", "notes", "credit_card", "contact", "zotp"];
+
+const normalizeOptionalString = (value) => {
+    const trimmed = typeof value === "string" ? value.trim() : "";
+    return trimmed || undefined;
+};
+
+const compactPublicData = (publicData) => {
+    const next = {};
+
+    for (const [key, value] of Object.entries(publicData || {})) {
+        if (value === undefined || value === "") continue;
+        next[key] = value;
+    }
+
+    return next;
+};
+
+const withFolderMetadata = (publicData, folder) =>
+    compactPublicData({
+        ...publicData,
+        folder,
+    });
+
+const stampV4PublicData = (publicData) =>
+    compactPublicData({
+        ...publicData,
+        v: "4",
+    });
 
 const createMetadataAndPublicData = async (type, data, authToken) => {
     const identifier = authToken.tagName || authToken.identifier;
@@ -39,14 +70,16 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
                 username: `${data.username}`,
             };
 
-            typePayload.publicData = {
-                category: `${fullTagName}_zotp`,
-                folder: data.folder && data.insideFolder ? data.folder : undefined,
-                issuer: `${data.issuer}`,
-                keyOwner: fullTagName,
-                type,
-                username: `${data.username}`,
-            };
+            typePayload.publicData = withFolderMetadata(
+                {
+                    category: `${fullTagName}_zotp`,
+                    issuer: `${data.issuer}`,
+                    keyOwner: fullTagName,
+                    type,
+                    username: `${data.username}`,
+                },
+                normalizeOptionalString(data.folder),
+            );
 
             break;
         case "password":
@@ -55,31 +88,35 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
                 username: `${data.username}`,
             };
 
-            typePayload.publicData = {
-                // Va en publicData, igual que website y username, para poder mostrarlo
-                // en el listado sin descifrar la credencial. Si no viene, no se guarda.
-                alias: data.alias && `${data.alias}`.trim() ? `${data.alias}`.trim() : undefined,
-                category: `${fullTagName}_password`,
-                folder: data.folder && data.insideFolder ? data.folder : undefined,
-                keyOwner: fullTagName,
-                timestamp: `${new Date().toISOString()}`,
-                type,
-                username: data.username,
-                website: `${data.website}`,
-            };
+            typePayload.publicData = stampV4PublicData(
+                withFolderMetadata(
+                    {
+                        alias: normalizeOptionalString(data.alias),
+                        category: `${fullTagName}_password`,
+                        keyOwner: fullTagName,
+                        timestamp: `${new Date().toISOString()}`,
+                        type,
+                        username: data.username,
+                        website: `${data.website}`,
+                    },
+                    normalizeOptionalString(data.folder),
+                ),
+            );
 
             break;
         case "notes":
             typePayload.metadata = data.keyValuePairs;
 
-            typePayload.publicData = {
-                category: `${fullTagName}_notes`,
-                folder: data.folder && data.insideFolder ? data.folder : undefined,
-                keyOwner: fullTagName,
-                timestamp: `${new Date().toISOString()}`,
-                title: `${data.title}`,
-                type,
-            };
+            typePayload.publicData = withFolderMetadata(
+                {
+                    category: `${fullTagName}_notes`,
+                    keyOwner: fullTagName,
+                    timestamp: `${new Date().toISOString()}`,
+                    title: `${data.title}`,
+                    type,
+                },
+                normalizeOptionalString(data.folder),
+            );
 
             break;
         case "credit_card":
@@ -90,19 +127,24 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
                 expiryYear: `${data.expiryYear}`,
             };
 
-            typePayload.publicData = {
-                card: JSON.stringify({
-                    bankName: `${data.bankName}`,
-                    expires: `${data.expiryMonth}/${data.expiryYear.slice(-2)}`,
-                    name: `${data.cardName}`,
-                    number: `****-****-****-${data.cardNumber.slice(-4)}`,
-                }),
-                category: `${fullTagName}_credit_card`,
-                folder: data.folder && data.insideFolder ? data.folder : undefined,
-                keyOwner: fullTagName,
-                timestamp: `${new Date().toISOString()}`,
-                type,
-            };
+            typePayload.publicData = stampV4PublicData(
+                withFolderMetadata(
+                    {
+                        alias: normalizeOptionalString(data.alias),
+                        card: JSON.stringify({
+                            bankName: `${data.bankName}`,
+                            expires: `${data.expiryMonth}/${data.expiryYear.slice(-2)}`,
+                            name: `${data.cardName}`,
+                            number: `****-****-****-${data.cardNumber.slice(-4)}`,
+                        }),
+                        category: `${fullTagName}_credit_card`,
+                        keyOwner: fullTagName,
+                        timestamp: `${new Date().toISOString()}`,
+                        type,
+                    },
+                    normalizeOptionalString(data.folder),
+                ),
+            );
 
             break;
         default:
@@ -112,7 +154,7 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
     return typePayload;
 };
 
-const _store = async (publicData, metadata, faceBase64, identifier, authToken) => {
+const _store = async (publicData, metadata, faceBase64, identifier, authToken, type) => {
     const zelfKey = {
         zelfProof: null,
         zelfProofQRCode: null,
@@ -125,9 +167,12 @@ const _store = async (publicData, metadata, faceBase64, identifier, authToken) =
         metadata,
         publicData,
         tolerance: "REGULAR",
+        ...(V4_TYPES.has(type) ? { stack: "v4" } : {}),
     };
 
-    await TagsPartsModule.generateZelfProof(dataToEncrypt, zelfKey);
+    const { zelfProof } = await ZelfProofModule.encrypt(dataToEncrypt);
+    zelfKey.zelfProof = zelfProof;
+    zelfKey.zelfProofQRCode = await QRZelfProofExtractor.generateQRFromZelfProof(zelfProof);
 
     // Store ZOTP in Walrus
     if (isWalrusStorageSupported(authToken.domain, "zelfkeys")) {
@@ -288,7 +333,7 @@ const storeData = async (data, authToken) => {
 
         const identifier = `${fullTagName}_${shortTimestamp}`;
 
-        const result = await _store(publicData, metadata, faceBase64, identifier, authToken);
+        const result = await _store(publicData, metadata, faceBase64, identifier, authToken, type);
 
         return {
             ...result,
@@ -298,6 +343,26 @@ const storeData = async (data, authToken) => {
     } catch (error) {
         console.error("Error in storeData:", error);
         throw error;
+    }
+};
+
+const decryptOnStack = (payload, useV4) =>
+    ZelfProofModule.decrypt({
+        faceBase64: payload.faceBase64,
+        os: "DESKTOP",
+        password: payload.password,
+        zelfProof: payload.zelfProof,
+        ...(useV4 ? { stack: "v4" } : {}),
+    });
+
+const decryptProofWithFallback = async (payload) => {
+    const preferV4 = payload.preferV4 === true;
+
+    try {
+        return await decryptOnStack(payload, preferV4);
+    } catch (error) {
+        if (error?.code !== "ERR_PARSE_FAILED") throw error;
+        return decryptOnStack(payload, !preferV4);
     }
 };
 
@@ -328,11 +393,18 @@ const retrieveData = async (data, authToken) => {
             authToken,
         );
 
-        zelfKey = await ZelfProofModule.decrypt({
+        const version = resolveEncryptVersion({
+            v: data.v,
+            zelfEncryptVersion: data.zelfEncryptVersion,
+            encryptVersion: data.encryptVersion,
+            ...(data.publicData && typeof data.publicData === "object" ? data.publicData : {}),
+        });
+
+        zelfKey = await decryptProofWithFallback({
             faceBase64: decryptedParams.face,
-            os: "DESKTOP",
             password: decryptedParams.password,
             zelfProof,
+            preferV4: version === 4,
         });
     } catch (error) {
         console.error({ error });
@@ -605,8 +677,6 @@ const listData = async (data, authToken) => {
     }
 };
 
-const SUPPORTED_CATEGORIES = ["password", "notes", "credit_card", "contact", "zotp"];
-
 /**
  * List data for dashboard - requires identifier (user.domain), enforces staff/ownership
  * @param {string} identifier - Full tag name (e.g. miguel.zelf)
@@ -768,6 +838,35 @@ const _isValidCreditCard = (cardNumber) => {
     return sum % 10 === 0;
 };
 
+const summarizeData = async (_data, authToken) => {
+    const identifier = authToken.tagName || authToken.identifier;
+    const domain = authToken.domain || "zelf";
+    const fullTagName = TagsPartsModule.getFullTagName(identifier, domain);
+    const counts = {
+        password: 0,
+        credit_card: 0,
+        notes: 0,
+        contact: 0,
+        zotp: 0,
+    };
+
+    await Promise.all(
+        SUPPORTED_CATEGORIES.map(async (category) => {
+            const searchCategory = `${fullTagName}_${category}`;
+            const ipfsResults = await IPFS.filter("category", searchCategory);
+            const matched = Array.isArray(ipfsResults)
+                ? ipfsResults.filter((item) => (item.publicData || {}).category === searchCategory)
+                : [];
+            counts[category] = matched.length;
+        }),
+    );
+
+    return {
+        totalCount: Object.values(counts).reduce((sum, count) => sum + count, 0),
+        counts,
+    };
+};
+
 module.exports = {
     storeData,
     retrieveData,
@@ -777,5 +876,6 @@ module.exports = {
     listAllData,
     listDataForDashboard,
     listAllDataForDashboard,
+    summarizeData,
     deleteZelfKey,
 };
