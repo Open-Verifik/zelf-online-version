@@ -3,6 +3,7 @@ const TagsIPFSModule = require("./tags-ipfs.module");
 const TagsArweaveModule = require("./tags-arweave.module");
 const { getDomainConfiguration, isDomainActive } = require("./domain-registry.module");
 const TagsPartsModule = require("./tags-parts.module");
+const TagAddressIndexModule = require("./tag-address-index.module");
 const { QRZelfProofExtractor, generateQRFromZelfProof } = require("./qr-zelfproof-extractor.module");
 
 const DEFAULT_IPFS_TIMEOUT_MS = Number(process.env.TAGS_SEARCH_IPFS_TIMEOUT_MS) || 12000;
@@ -66,7 +67,8 @@ const searchTag = async (params, authUser) => {
 
             // If IPFS returned records, we already have our tag!
             // Do not block on slow Arweave: give Arweave at most a short grace window, otherwise return IPFS immediately.
-            if (ipfsRaw && ipfsRaw.length > 0) {
+            // An address-index check needs the Arweave copy: legacy TON/DOT/KSM only live there.
+            if (ipfsRaw && ipfsRaw.length > 0 && !params._waitForArweave) {
                 let fastGraceTimer;
                 const fastGracePromise = new Promise((resolve) => {
                     fastGraceTimer = setTimeout(() => resolve(null), ARWEAVE_FAST_GRACE_MS);
@@ -99,6 +101,14 @@ const searchTag = async (params, authUser) => {
         // SourceA OR SourceB: incomplete only when no enabled store completed successfully.
         const isIncomplete = !hasAnyResult && (noStoresEnabled || !anyStoreCompleted);
 
+        if (hasAnyResult) {
+            TagAddressIndexModule.indexRecords(ipfsResults, { domain, source: "ipfs" });
+            TagAddressIndexModule.indexRecords(arweaveResults, { domain, source: "arweave" });
+        } else if (key && value && !tagName && TagAddressIndexModule.supportsKey(key)) {
+            const viaIndex = await resolveByAddressIndex(params, authUser);
+            if (viaIndex) return viaIndex;
+        }
+
         // Combine results
         const combinedResults = {
             ipfs: ipfsResults,
@@ -128,6 +138,13 @@ const searchTag = async (params, authUser) => {
         } else if (arweaveResults.length > 0) {
             // Only Arweave copy is available (one copy is enough)
             combinedResults.tagObject = { ...arweaveResults[0] };
+        }
+
+        if (combinedResults.tagObject) {
+            combinedResults.tagObject.publicData = TagAddressIndexModule.hydrateMissingAddresses(
+                { ...(combinedResults.tagObject.publicData || {}) },
+                [...ipfsResults, ...arweaveResults]
+            );
         }
 
         if (combinedResults.available && domainConfig) {
@@ -176,6 +193,33 @@ const searchTag = async (params, authUser) => {
             domain,
         };
     }
+};
+
+/**
+ * Packed addresses (TON, Aptos, DOT, KSM...) of legacy records are invisible to a
+ * key/value search. The index only proposes a name; the answer is the live record,
+ * and only if it still registers this exact address (#540).
+ */
+const resolveByAddressIndex = async (params, authUser) => {
+    const { key, value } = params;
+    const candidates = await TagAddressIndexModule.findTagNames(key, value);
+
+    for (const candidate of candidates) {
+        const byName = await searchTag(
+            { ...params, tagName: candidate, key: undefined, value: undefined, _waitForArweave: true },
+            authUser
+        );
+        const record = byName?.tagObject;
+
+        if (!record || !TagAddressIndexModule.recordHasAddress(record.publicData, key, value)) continue;
+
+        const field = TagAddressIndexModule.canonicalKey(key);
+        if (field !== key && record.publicData[field] && !record.publicData[key]) record.publicData[key] = record.publicData[field];
+
+        return { ...byName, resolvedBy: "addressIndex" };
+    }
+
+    return null;
 };
 
 /**
