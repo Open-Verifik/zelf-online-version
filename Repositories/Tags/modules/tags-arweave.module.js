@@ -10,6 +10,7 @@ const {
 	fetchTxAsBase64Png,
 } = require("../../Arweave/modules/arweave-gateway.module");
 const { getDomainConfiguration } = require("./domain-registry.module");
+const { expandPackedAddresses } = require("./tags-addresses.module");
 
 const owner = config.arwave.env === "development" ? config.arwave.hold.owner : config.arwave.owner;
 
@@ -380,6 +381,8 @@ const formatSearchResults = (searchResults) => {
 		if (formattedResult.publicData.leaseExpiresAt) {
 			formattedResult.publicData.expiresAt = formattedResult.publicData.leaseExpiresAt;
 		}
+
+		expandPackedAddresses(formattedResult.publicData);
 
 		formattedResults.push(formattedResult);
 	}
