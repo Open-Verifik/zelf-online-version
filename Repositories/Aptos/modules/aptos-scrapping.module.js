@@ -388,7 +388,14 @@ const getTokens = async (params, query = {}) => {
     const pageOptions = getPageOptions(query);
     const aptPrice = await getAptUsdPrice();
     const tokens = await getAssets(address, aptPrice);
-    return tokens.slice(pageOptions.offset, pageOptions.offset + pageOptions.show);
+    const slice = tokens.slice(pageOptions.offset, pageOptions.offset + pageOptions.show);
+    const fiatBalance = tokens.reduce((sum, token) => sum + Number(token.fiatBalance || 0), 0);
+
+    return {
+        balance: String(fiatBalance),
+        total: tokens.length,
+        tokens: slice,
+    };
 };
 
 const getTransaction = async (params) => {
