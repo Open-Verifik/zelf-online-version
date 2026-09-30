@@ -1,6 +1,10 @@
 const { string, validate, showRecords, number } = require("../../../Core/JoiUtils");
+const { assertValidTonAddress } = require("../modules/ton-address.util");
 
 const schemas = {
+	validateAddress: {
+		id: string().required(),
+	},
 	validateAddressTransactions: {
 		page: string().required(),
 		show: showRecords().required(),
@@ -20,6 +24,25 @@ const schemas = {
 		jettonMaster: string().required(),
 		decimals: number().optional(),
 	},
+};
+
+const validateAddress = async (ctx, next) => {
+	const valid = validate(schemas.validateAddress, ctx.request.params);
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	try {
+		assertValidTonAddress(ctx.request.params.id);
+	} catch (error) {
+		ctx.status = error.status || 409;
+		ctx.body = { validationError: error.message };
+		return;
+	}
+
+	await next();
 };
 
 const validateAddressTransactions = async (ctx, next) => {
@@ -63,6 +86,7 @@ const sendJettonValidation = async (ctx, next) => {
 };
 
 module.exports = {
+	validateAddress,
 	validateAddressTransactions,
 	confirmPaymentValidation,
 	sendTransferValidation,
