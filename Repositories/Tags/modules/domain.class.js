@@ -310,10 +310,14 @@ class Domain {
     }
 
     /**
-     * Check if Arweave is enabled
+     * Check if Arweave is enabled.
+     * Honors SKIP_ARWEAVE for local/dev QA and ops cost control (same gate as legacy ZNS v2).
      * @returns {boolean} - True if Arweave is enabled
      */
     isArweaveEnabled() {
+        if (config.zelfProof.skipArweave) {
+            return false;
+        }
         return this.tags.storage.arweaveEnabled;
     }
 

@@ -1,3 +1,4 @@
+const config = require("../../../Core/config");
 const {
 	getSupportedDomains,
 	getDomainConfig,
@@ -138,8 +139,11 @@ const isIPFSEnabled = (domain) => {
  * @returns {boolean} - True if Arweave is enabled
  */
 const isArweaveEnabled = (domain) => {
-	const config = getDomainConfig(domain);
-	return config?.storage?.arweaveEnabled || false;
+	const domainConfig = getDomainConfig(domain);
+	if (config.zelfProof.skipArweave) {
+		return false;
+	}
+	return domainConfig?.isArweaveEnabled?.() ?? domainConfig?.tags?.storage?.arweaveEnabled ?? false;
 };
 
 /**
