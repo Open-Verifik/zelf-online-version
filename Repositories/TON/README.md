@@ -26,6 +26,8 @@ Portfolio scrapping, wallet derivation, transfers, and tag payment verification 
 
 See `.env.example`: `TON_RPC_URL`, `TON_API_KEY`, `TON_INDEXER_URL`, `TON_SERVICE_WALLET_ADDRESS`.
 
+`TON_API_KEY` is optional but recommended for production and QA: TonAPI uses it as a Bearer token and TonCenter as `X-API-Key`, which reduces anonymous rate limits (429) on balance and payment lookups.
+
 Native TON token icon: `https://cdn.zelf.world/icons/ic_ton.png`
 
 Public API examples should use `https://v3.zelf.world` in external documentation.

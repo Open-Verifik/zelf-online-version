@@ -24,6 +24,35 @@ const tonApiGet = async (path, params = {}) => {
 	return data;
 };
 
+const toTonUpstreamError = (error, fallback = "ton_balance_unavailable") => {
+	const upstreamStatus = Number(error?.response?.status || 0);
+
+	if (upstreamStatus === 400) {
+		const err = new Error("invalid_ton_address");
+		err.status = 409;
+		return err;
+	}
+	if (upstreamStatus === 403) {
+		const err = new Error("ton_api_forbidden");
+		err.status = 403;
+		return err;
+	}
+	if (upstreamStatus === 429) {
+		const err = new Error("ton_api_rate_limited");
+		err.status = 429;
+		return err;
+	}
+	if (upstreamStatus === 401) {
+		const err = new Error("ton_api_unauthorized");
+		err.status = 403;
+		return err;
+	}
+
+	const err = new Error(fallback);
+	err.status = 502;
+	return err;
+};
+
 const tonCenterPost = async (method, params = {}) => {
 	const rpcUrl = normalizeTonRpcUrl(config.ton?.rpcUrl);
 	const body = { id: "1", jsonrpc: "2.0", method, params };
@@ -58,6 +87,7 @@ const tonCenterPost = async (method, params = {}) => {
 
 module.exports = {
 	normalizeTonRpcUrl,
+	toTonUpstreamError,
 	tonApiGet,
 	tonCenterPost,
 };

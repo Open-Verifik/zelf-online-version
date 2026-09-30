@@ -1,0 +1,265 @@
+{
+  "_recordedAt": "2026-09-30T17:52:43.247Z",
+  "owner": "0xc08cb4aca429cd65f3637e9a30a94f893f74b61aedee376dcd5dd9d2afa1dd28",
+  "deposits": {
+    "_source": "POST https://api.mainnet.aptoslabs.com/v1/graphql (ACTIVITIES_QUERY of the Aptos adapter)",
+    "variables": {
+      "address": "0xc08cb4aca429cd65f3637e9a30a94f893f74b61aedee376dcd5dd9d2afa1dd28",
+      "limit": 25
+    },
+    "response": {
+      "data": {
+        "fungible_asset_activities": [
+          {
+            "transaction_version": 7429034601,
+            "transaction_timestamp": "2026-09-30T17:26:45",
+            "amount": 88835,
+            "asset_type": "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7429034601,
+            "transaction_timestamp": "2026-09-30T17:26:45",
+            "amount": 11258821,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7429034350,
+            "transaction_timestamp": "2026-09-30T17:26:44",
+            "amount": 64503,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7429034350,
+            "transaction_timestamp": "2026-09-30T17:26:44",
+            "amount": 1290077,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7429034268,
+            "transaction_timestamp": "2026-09-30T17:26:43",
+            "amount": 366870,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7429034268,
+            "transaction_timestamp": "2026-09-30T17:26:43",
+            "amount": 7337400,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7429034176,
+            "transaction_timestamp": "2026-09-30T17:26:43",
+            "amount": 161195,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7429034176,
+            "transaction_timestamp": "2026-09-30T17:26:43",
+            "amount": 3223912,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7427952214,
+            "transaction_timestamp": "2026-09-30T15:41:11",
+            "amount": 150693,
+            "asset_type": "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7427780934,
+            "transaction_timestamp": "2026-09-30T15:26:31",
+            "amount": 56967,
+            "asset_type": "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7427780934,
+            "transaction_timestamp": "2026-09-30T15:26:31",
+            "amount": 95200098,
+            "asset_type": "0xfc087a394c203d62c43eecfeba79db01441d39dd9d234131b78415626a26750e",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7427780689,
+            "transaction_timestamp": "2026-09-30T15:26:30",
+            "amount": 5010531,
+            "asset_type": "0xfc087a394c203d62c43eecfeba79db01441d39dd9d234131b78415626a26750e",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7427780689,
+            "transaction_timestamp": "2026-09-30T15:26:30",
+            "amount": 100210629,
+            "asset_type": "0xfc087a394c203d62c43eecfeba79db01441d39dd9d234131b78415626a26750e",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7426103765,
+            "transaction_timestamp": "2026-09-30T13:26:59",
+            "amount": 93726,
+            "asset_type": "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7426103765,
+            "transaction_timestamp": "2026-09-30T13:26:59",
+            "amount": 11455041,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7426103528,
+            "transaction_timestamp": "2026-09-30T13:26:58",
+            "amount": 65261,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7426103528,
+            "transaction_timestamp": "2026-09-30T13:26:58",
+            "amount": 1305231,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7426103446,
+            "transaction_timestamp": "2026-09-30T13:26:57",
+            "amount": 373679,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7426103446,
+            "transaction_timestamp": "2026-09-30T13:26:57",
+            "amount": 7473594,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7426103346,
+            "transaction_timestamp": "2026-09-30T13:26:57",
+            "amount": 163955,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7426103346,
+            "transaction_timestamp": "2026-09-30T13:26:57",
+            "amount": 3279111,
+            "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7423662529,
+            "transaction_timestamp": "2026-09-30T09:26:44",
+            "amount": 151028,
+            "asset_type": "0x05fabd1b12e39967a3c24e91b7b8f67719a6dacee74f3c8b9fb7d93e855437d2",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7423662229,
+            "transaction_timestamp": "2026-09-30T09:26:42",
+            "amount": 151028,
+            "asset_type": "0x05fabd1b12e39967a3c24e91b7b8f67719a6dacee74f3c8b9fb7d93e855437d2",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7423662229,
+            "transaction_timestamp": "2026-09-30T09:26:42",
+            "amount": 150903,
+            "asset_type": "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b",
+            "type": "0x1::fungible_asset::Withdraw",
+            "is_transaction_success": true
+          },
+          {
+            "transaction_version": 7423661862,
+            "transaction_timestamp": "2026-09-30T09:26:40",
+            "amount": 91417,
+            "asset_type": "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b",
+            "type": "0x1::fungible_asset::Deposit",
+            "is_transaction_success": true
+          }
+        ]
+      }
+    }
+  },
+  "transaction": {
+    "_source": "GET https://api.mainnet.aptoslabs.com/v1/transactions/by_version/7429034601",
+    "_note": "`changes` and `events` arrays removed for size; other fields unmodified",
+    "response": {
+      "version": "7429034601",
+      "hash": "0xf990691448b604dd21533d176317313d3325cae03503c0f5b96a386d7ec2b911",
+      "state_change_hash": "0x963390c44c9e912c00fadfc4c27d7ed1d56e2dfb66cf87ef4d707be151ba2e12",
+      "event_root_hash": "0x40d4424003758990dac4e3fa7a5f333398e2ea9680da9ea0e86ec8a7eb40fb55",
+      "state_checkpoint_hash": null,
+      "gas_used": "705",
+      "success": true,
+      "vm_status": "Executed successfully",
+      "accumulator_root_hash": "0xdde7ed91fa498b84b1ebe07f1cae1af5bf7d743b8f8eac740def295cb80e829e",
+      "sender": "0xf870a3b5879362a5887008cff396f5ab9983aa5612a27db2edce0d2c9bfa4494",
+      "sequence_number": "40805",
+      "max_gas_amount": "30000",
+      "gas_unit_price": "100",
+      "expiration_timestamp_secs": "1790789225",
+      "payload": {
+        "function": "0x333d1890e0aa3762bb256f5caeeb142431862628c63063801f44c152ef154700::vault::execute_swap_fa_to_fa",
+        "type_arguments": [],
+        "arguments": [
+          "0xc08cb4aca429cd65f3637e9a30a94f893f74b61aedee376dcd5dd9d2afa1dd28",
+          1,
+          "11258821",
+          "87889",
+          "4295048017",
+          {
+            "inner": "0xa"
+          },
+          {
+            "inner": "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b"
+          },
+          "1790789325"
+        ],
+        "type": "entry_function_payload"
+      },
+      "signature": {
+        "public_key": "0x43dbe1cbca643339ffbf6e05aac6631c46737e733be2f0fc25623d400dbc3b01",
+        "signature": "0x548c382b8a7ff9891513cfd72d98929f141d816e4d9b5e39bb53f6035e18038b168ae72cfd7e592b6a09dc02339e893eb3744ef6454377499b11b9b1365fa80e",
+        "type": "ed25519_signature"
+      },
+      "replay_protection_nonce": null,
+      "txn_limits_request": null,
+      "timestamp": "1790789205777103",
+      "type": "user_transaction"
+    }
+  }
+}

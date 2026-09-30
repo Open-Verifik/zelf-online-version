@@ -19,6 +19,15 @@ const config = require("../../../Core/config");
 const { formatEther } = require("ethers");
 const { getTickerPrice } = require("../../binance/modules/binance.module");
 const { mapRouteScanHolding } = require("./avalanche-balance.util");
+const {
+	upstreamUnavailableError,
+	normalizeTransactionLimit,
+	mapOkLinkTransaction,
+	mapRouteScanTransaction,
+	mapGlacierTransaction,
+	isOkLinkSuccess,
+	sortTransactions,
+} = require("./avalanche-transaction.util");
 
 const nativeBalance = async (address) => {
     const endpoints = [...new Set([config.rpc?.chains?.avalanche?.rpcUrl, config.avalanche?.rpcUrl,
@@ -125,22 +134,14 @@ const getTokensFromGlacier = async (params, query) => {
 	};
 };
 
-/**
- * Obtiene las transacciones de una direcci?n
- * @param {Object} params - Contiene el id (direcci?n)
- * @param {Object} query - Par?metros de paginaci?n
- */
-const getTransactionsList = async (params) => {
+const getTransactionsListFromOkLink = async (params, limit) => {
 	const t = Date.now();
+	const { id, page } = params;
 
-	const { id, page, show } = params;
-
-	const url = `https://www.oklink.com/api/explorer/v2/avaxc/addresses/${id}/transactionsByClassfy/condition?offset=${page || "0"}&limit=${
-		show || "100"
-	}&address=${id}&nonzeroValue=false&t=${t}`;
+	const url = `https://www.oklink.com/api/explorer/v2/avaxc/addresses/${id}/transactionsByClassfy/condition?offset=${page || "0"}&limit=${limit}&address=${id}&nonzeroValue=false&t=${t}`;
 
 	const { data } = await axios.get(url, {
-        timeout: 8000,
+		timeout: 8000,
 		httpsAgent: agent,
 		headers: {
 			"X-Apikey": get_ApiKey().getApiKey(),
@@ -148,24 +149,72 @@ const getTransactionsList = async (params) => {
 		},
 	});
 
-	// Formatear transacciones
-	const transactions = data.data.hits.map((tx) => ({
-		age: moment(tx.blocktime * 1000).fromNow(),
-		amount: tx.value.toFixed(4),
-		asset: "AVAX",
-		block: tx.blockHeight.toString(),
-		date: moment(tx.blocktime * 1000).format("YYYY-MM-DD HH:mm:ss"),
-		from: tx.from,
-		hash: tx.hash,
-		method: tx.method.startsWith("swap") ? "Swap" : tx.method,
-		to: tx.to,
-		traffic: tx.realValue < 0 ? "OUT" : "IN",
-		txnFee: tx.fee.toFixed(4),
-		timestamp: tx.blocktime, // Keep original timestamp for sorting
-	}));
+	if (!isOkLinkSuccess(data)) {
+		throw new Error(`oklink_transactions_unavailable_${data?.code || "invalid"}`);
+	}
 
-	// Sort by timestamp (newest first)
-	return transactions.sort((a, b) => b.timestamp - a.timestamp);
+	return sortTransactions(data.data.hits.map((tx) => mapOkLinkTransaction(tx, id)));
+};
+
+const getTransactionsListFromRouteScan = async (params, limit) => {
+	const { id } = params;
+	const { data } = await instance.get(
+		`https://api.routescan.io/v2/network/mainnet/evm/43114/address/${id}/transactions`,
+		{ params: { limit }, timeout: 8000 }
+	);
+
+	if (!Array.isArray(data?.items)) {
+		throw new Error("invalid_routescan_transactions");
+	}
+
+	return sortTransactions(data.items.map((tx) => mapRouteScanTransaction(tx, id)));
+};
+
+const getTransactionsListFromGlacier = async (params, limit) => {
+	const { id } = params;
+	const { data } = await instance.get(
+		`https://glacier-api.avax.network/v1/chains/43114/addresses/${id}/transactions`,
+		{
+			params: { pageSize: limit },
+			headers: { "user-agent": generateRandomUserAgent() },
+			timeout: 8000,
+		}
+	);
+
+	if (!Array.isArray(data?.transactions)) {
+		throw new Error("invalid_glacier_transactions");
+	}
+
+	return sortTransactions(data.transactions.map((tx) => mapGlacierTransaction(tx, id)));
+};
+
+/**
+ * Obtiene las transacciones de una direcci?n
+ * @param {Object} params - Contiene el id (direcci?n)
+ * @param {Object} query - Par?metros de paginaci?n
+ */
+const getTransactionsList = async (params) => {
+	const limit = normalizeTransactionLimit(params.show);
+	const queryParams = { ...params, show: String(limit) };
+
+	try {
+		return await getTransactionsListFromOkLink(queryParams, limit);
+	} catch (oklinkErr) {
+		console.warn("Avalanche OKLink transactions failed:", oklinkErr?.message || oklinkErr);
+
+		try {
+			return await getTransactionsListFromRouteScan(queryParams, limit);
+		} catch (routeScanErr) {
+			console.warn("Avalanche RouteScan transactions failed:", routeScanErr?.message || routeScanErr);
+
+			try {
+				return await getTransactionsListFromGlacier(queryParams, limit);
+			} catch (glacierErr) {
+				console.error("Avalanche Glacier transactions failed:", glacierErr?.message || glacierErr);
+				throw upstreamUnavailableError("avalanche_transactions_unavailable");
+			}
+		}
+	}
 };
 
 /**

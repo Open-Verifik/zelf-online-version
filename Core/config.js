@@ -711,6 +711,39 @@ const configuration = {
             ...parseWhatsAppExtraApiKeys(),
         },
     },
+    /**
+     * OneSignal REST API for server push (Repositories/TxNotifications). The app API key is
+     * IP-allowlisted to the production server, so calls from any other machine return 401.
+     */
+    oneSignal: {
+        appId: (process.env.ONESIGNAL_APP_ID || "").trim(),
+        appApiKey: (process.env.ONESIGNAL_APP_API_KEY || "").trim(),
+        apiUrl: (process.env.ONESIGNAL_API_URL || "https://api.onesignal.com").trim().replace(/\/$/, ""),
+        timeoutMs: Number(process.env.ONESIGNAL_TIMEOUT_MS) || 15000,
+    },
+    /** Push for received transfers: device registry + standalone watcher (`npm run tx-watcher`). */
+    txNotifications: {
+        /** Watcher computes pushes and writes the push log but never calls OneSignal. */
+        dryRun: process.env.TX_WATCHER_DRY_RUN === "true",
+        tickMs: Number(process.env.TX_WATCHER_TICK_MS) || 60 * 1000,
+        addressIntervalMs: Number(process.env.TX_WATCHER_ADDRESS_INTERVAL_MS) || 2 * 60 * 1000,
+        leaseMs: Number(process.env.TX_WATCHER_LEASE_MS) || 3 * 60 * 1000,
+        maxCursorsPerTick: Number(process.env.TX_WATCHER_MAX_CURSORS_PER_TICK) || 600,
+        maxIndividualPushesPerCycle: Number(process.env.TX_PUSH_MAX_INDIVIDUAL_PER_CYCLE) || 3,
+        deviceStaleDays: Number(process.env.TX_PUSH_DEVICE_STALE_DAYS) || 60,
+        requestTimeoutMs: Number(process.env.TX_WATCHER_REQUEST_TIMEOUT_MS) || 20000,
+        suiGraphqlUrl: (process.env.SUI_GRAPHQL_URL || "https://graphql.mainnet.sui.io/graphql").trim(),
+        stellarHorizonUrl: (process.env.STELLAR_HORIZON_URL || "https://horizon.stellar.org").trim().replace(/\/$/, ""),
+        bitcoinEsploraUrls: csvOrDefault(process.env.BITCOIN_ESPLORA_URLS, ["https://mempool.space/api", "https://blockstream.info/api"]),
+        blockdagScanApiUrl: (process.env.BLOCKDAG_SCAN_API_URL || "https://api.bdagscan.com/v1/api").trim().replace(/\/$/, ""),
+        /** Extra EVM JSON-RPC endpoints (CSV) tried before the configured chain RPC and the public fallback. */
+        evmRpcUrls: {
+            ethereum: splitCsv(process.env.TX_WATCHER_ETHEREUM_RPC_URLS),
+            polygon: splitCsv(process.env.TX_WATCHER_POLYGON_RPC_URLS),
+            avalanche: splitCsv(process.env.TX_WATCHER_AVALANCHE_RPC_URLS),
+            bsc: splitCsv(process.env.TX_WATCHER_BSC_RPC_URLS),
+        },
+    },
     /** ZelfBlockDagPay.sol — native BDAG tag checkout only */
     blockdag: {
         defaultCollectionAddress: process.env.BLOCKDAG_DEFAULT_COLLECTION_ADDRESS || null,

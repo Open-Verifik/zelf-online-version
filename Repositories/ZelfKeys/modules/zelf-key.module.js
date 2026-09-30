@@ -19,6 +19,9 @@ const { createNFT } = require("../../Avalanche/modules/avax-nft.module");
 const { resolveEncryptVersion } = require("../../Tags/modules/tags-addresses.module");
 
 const config = require("../../../Core/config");
+const { errorHandler } = require("../../../Core/http-handler");
+const { validate } = require("../../../Core/JoiUtils");
+const { BULK_PASSWORDS_MAX, passwordCredentialSchema } = require("../middlewares/zelf-key.middleware");
 
 const TYPES_REQUIRING_TRANSPORT_ENCRYPTION = new Set(["password", "notes", "note", "credit_card", "payment-card"]);
 const V4_TYPES = new Set(["password", "credit_card"]);
@@ -344,6 +347,111 @@ const storeData = async (data, authToken) => {
         console.error("Error in storeData:", error);
         throw error;
     }
+};
+
+const formatStoreError = (error) => {
+    const handled = errorHandler(error);
+
+    return {
+        message: handled.message,
+        code: handled.code,
+    };
+};
+
+const _storePasswordRecord = async (itemData, authToken, sharedContext, identifierSuffix = "") => {
+    const { faceBase64, face, removePGP } = sharedContext;
+
+    const decryptedSensitiveData = await TagsPartsModule.decryptPasswordParams(
+        { ...itemData, removePGP },
+        authToken,
+    );
+
+    const { metadata, publicData, fullTagName } = await createMetadataAndPublicData(
+        "password",
+        { ...itemData, faceBase64, face, ...decryptedSensitiveData },
+        authToken,
+    );
+
+    const shortTimestamp = getShortTimestamp();
+    const identifier = `${fullTagName}_${shortTimestamp}${identifierSuffix ? `_${identifierSuffix}` : ""}`;
+
+    const result = await _store(publicData, metadata, face, identifier, authToken, "password");
+
+    return {
+        ...result,
+        type: "password",
+        message: "Data stored successfully",
+    };
+};
+
+/**
+ * Bulk import website passwords with a single face + masterPassword verification.
+ * @param {Object} data
+ * @param {string} data.faceBase64
+ * @param {string} [data.masterPassword]
+ * @param {boolean} [data.removePGP]
+ * @param {Array<Object>} data.passwords - Per-credential fields (website, username, password, etc.)
+ * @param {Object} authToken
+ * @returns {Promise<Object>}
+ */
+const storePasswordsBulk = async (data, authToken) => {
+    const { faceBase64, masterPassword, removePGP, passwords } = data;
+
+    const decryptedParams = await TagsPartsModule.decryptParams(
+        {
+            password: masterPassword,
+            faceBase64,
+            removePGP,
+        },
+        authToken,
+    );
+
+    await _validateOwnership(faceBase64, masterPassword, authToken, data);
+
+    const sharedContext = {
+        faceBase64,
+        face: decryptedParams.face,
+        removePGP,
+    };
+
+    const success = [];
+    const failed = [];
+
+    for (let index = 0; index < passwords.length; index++) {
+        const item = passwords[index];
+        const valid = validate(passwordCredentialSchema, item);
+
+        if (valid.error) {
+            failed.push({
+                index,
+                message: valid.error.message.trim(),
+                code: "ValidationError",
+            });
+            continue;
+        }
+
+        try {
+            const stored = await _storePasswordRecord(item, authToken, sharedContext, `${index}`);
+            success.push({
+                index,
+                ...stored,
+            });
+        } catch (error) {
+            failed.push({
+                index,
+                ...formatStoreError(error),
+            });
+        }
+    }
+
+    return {
+        success,
+        failed,
+        total: passwords.length,
+        successCount: success.length,
+        failedCount: failed.length,
+        maxBatchSize: BULK_PASSWORDS_MAX,
+    };
 };
 
 const decryptOnStack = (payload, useV4) =>
@@ -869,6 +977,7 @@ const summarizeData = async (_data, authToken) => {
 
 module.exports = {
     storeData,
+    storePasswordsBulk,
     retrieveData,
     previewData,
     createNFTReadyData,
