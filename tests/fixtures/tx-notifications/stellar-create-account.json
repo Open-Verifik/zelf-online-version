@@ -1,0 +1,84 @@
+{
+  "_source": "GET https://horizon.stellar.org/accounts/GBIYN44IPFW73KNVWEIIZ2JD32PNPWQGWXNTSNXG4MEJSJ3BMUGLLEM5/payments?order=asc&cursor=277887012571762688&limit=3&include_failed=false",
+  "_note": "create_account: first funding of the account",
+  "_recordedAt": "2026-09-30T17:21:01.921Z",
+  "account": "GBIYN44IPFW73KNVWEIIZ2JD32PNPWQGWXNTSNXG4MEJSJ3BMUGLLEM5",
+  "response": {
+    "_links": {
+      "self": {
+        "href": "https://horizon.stellar.org/accounts/GBIYN44IPFW73KNVWEIIZ2JD32PNPWQGWXNTSNXG4MEJSJ3BMUGLLEM5/payments?cursor=277887012571762688&include_failed=false&limit=3&order=asc"
+      },
+      "next": {
+        "href": "https://horizon.stellar.org/accounts/GBIYN44IPFW73KNVWEIIZ2JD32PNPWQGWXNTSNXG4MEJSJ3BMUGLLEM5/payments?cursor=277887021161631745&include_failed=false&limit=3&order=asc"
+      },
+      "prev": {
+        "href": "https://horizon.stellar.org/accounts/GBIYN44IPFW73KNVWEIIZ2JD32PNPWQGWXNTSNXG4MEJSJ3BMUGLLEM5/payments?cursor=277887012571762689&include_failed=false&limit=3&order=desc"
+      }
+    },
+    "_embedded": {
+      "records": [
+        {
+          "_links": {
+            "self": {
+              "href": "https://horizon.stellar.org/operations/277887012571762689"
+            },
+            "transaction": {
+              "href": "https://horizon.stellar.org/transactions/9517a9b4b8b843cd0db09396aaa1ba0d471a35f5bb3af141f408929120fdffd3"
+            },
+            "effects": {
+              "href": "https://horizon.stellar.org/operations/277887012571762689/effects"
+            },
+            "succeeds": {
+              "href": "https://horizon.stellar.org/effects?order=desc&cursor=277887012571762689"
+            },
+            "precedes": {
+              "href": "https://horizon.stellar.org/effects?order=asc&cursor=277887012571762689"
+            }
+          },
+          "id": "277887012571762689",
+          "paging_token": "277887012571762689",
+          "transaction_successful": true,
+          "source_account": "GBC7NMD7UZBEEV2ONYQ73X3J6PBOCE57W574F5GIRFM7XX4L6BVGQQLU",
+          "type": "create_account",
+          "type_i": 0,
+          "created_at": "2026-09-30T17:20:42Z",
+          "transaction_hash": "9517a9b4b8b843cd0db09396aaa1ba0d471a35f5bb3af141f408929120fdffd3",
+          "starting_balance": "1.0100000",
+          "funder": "GBC7NMD7UZBEEV2ONYQ73X3J6PBOCE57W574F5GIRFM7XX4L6BVGQQLU",
+          "account": "GBIYN44IPFW73KNVWEIIZ2JD32PNPWQGWXNTSNXG4MEJSJ3BMUGLLEM5"
+        },
+        {
+          "_links": {
+            "self": {
+              "href": "https://horizon.stellar.org/operations/277887021161631745"
+            },
+            "transaction": {
+              "href": "https://horizon.stellar.org/transactions/61f91ef16f5ff15985d282e1226a336a1f7ca32111e965efc129f47b367f8ad5"
+            },
+            "effects": {
+              "href": "https://horizon.stellar.org/operations/277887021161631745/effects"
+            },
+            "succeeds": {
+              "href": "https://horizon.stellar.org/effects?order=desc&cursor=277887021161631745"
+            },
+            "precedes": {
+              "href": "https://horizon.stellar.org/effects?order=asc&cursor=277887021161631745"
+            }
+          },
+          "id": "277887021161631745",
+          "paging_token": "277887021161631745",
+          "transaction_successful": true,
+          "source_account": "GBIYN44IPFW73KNVWEIIZ2JD32PNPWQGWXNTSNXG4MEJSJ3BMUGLLEM5",
+          "type": "payment",
+          "type_i": 1,
+          "created_at": "2026-09-30T17:20:52Z",
+          "transaction_hash": "61f91ef16f5ff15985d282e1226a336a1f7ca32111e965efc129f47b367f8ad5",
+          "asset_type": "native",
+          "from": "GBIYN44IPFW73KNVWEIIZ2JD32PNPWQGWXNTSNXG4MEJSJ3BMUGLLEM5",
+          "to": "GA6FFA25GXPXDNLMNLS7EG73VT53EBHCT6VVIQQ3GE7RQNZOOGWQS7GJ",
+          "amount": "0.0010000"
+        }
+      ]
+    }
+  }
+}
