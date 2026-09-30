@@ -31,6 +31,24 @@ const storePassword = async (ctx) => {
 };
 
 /**
+ * Bulk store website passwords with one face + masterPassword verification
+ * @param {Object} ctx - Koa context
+ */
+const storePasswordsBulk = async (ctx) => {
+	try {
+		const data = await Module.storePasswordsBulk(ctx.request.body, ctx.state.user);
+
+		ctx.body = { data };
+	} catch (error) {
+		const _exception = errorHandler(error, ctx);
+
+		ctx.status = _exception.status;
+
+		ctx.body = { message: _exception.message, code: _exception.code };
+	}
+};
+
+/**
  * Store ZOTP
  * @param {Object} ctx - Koa context
  */
@@ -258,6 +276,7 @@ const deleteZelfKey = async (ctx) => {
 
 module.exports = {
 	storePassword,
+	storePasswordsBulk,
 	storeZOTP,
 	storeNotes,
 	storeCreditCard,

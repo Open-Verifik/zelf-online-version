@@ -1,0 +1,246 @@
+{
+  "_source": "POST https://graphql.mainnet.sui.io/graphql (SEED_QUERY of the Sui adapter: transactions(last: 10, filter: { affectedAddress }))",
+  "_recordedAt": "2026-09-30T17:27:42.088Z",
+  "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf",
+  "response": {
+    "data": {
+      "transactions": {
+        "pageInfo": {
+          "endCursor": "KAE6DAiD9OCcARC65KTXFg=="
+        },
+        "nodes": [
+          {
+            "digest": "7MttE45P4mLVU7SM3gxUr2ksSKYDNhkLSQ9FMoEb2vpN",
+            "sender": {
+              "address": "0xd265672730b0540ffd3569530682a0f02ef984b703457790554eb0e19329663a"
+            },
+            "effects": {
+              "status": "SUCCESS",
+              "timestamp": "2026-09-30T17:27:39.352Z",
+              "balanceChanges": {
+                "nodes": [
+                  {
+                    "owner": {
+                      "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf"
+                    },
+                    "amount": "-109880",
+                    "coinType": {
+                      "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "digest": "Gwc8fsA2tgVKxCMDoKvsZ6JoNsH3iB95sH8G6PdtuSjf",
+            "sender": {
+              "address": "0xd265672730b0540ffd3569530682a0f02ef984b703457790554eb0e19329663a"
+            },
+            "effects": {
+              "status": "SUCCESS",
+              "timestamp": "2026-09-30T17:27:39.352Z",
+              "balanceChanges": {
+                "nodes": [
+                  {
+                    "owner": {
+                      "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf"
+                    },
+                    "amount": "-109880",
+                    "coinType": {
+                      "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "digest": "6poZUHtn1tFEjuMgPEugDRKPVySr6nHeQeVwJge1JENx",
+            "sender": {
+              "address": "0xd265672730b0540ffd3569530682a0f02ef984b703457790554eb0e19329663a"
+            },
+            "effects": {
+              "status": "SUCCESS",
+              "timestamp": "2026-09-30T17:27:39.579Z",
+              "balanceChanges": {
+                "nodes": [
+                  {
+                    "owner": {
+                      "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf"
+                    },
+                    "amount": "-1908324",
+                    "coinType": {
+                      "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "digest": "FeXhaxfWhPUUtAeRruJA1EYUqyGTKF3kD9WkVgT31jA5",
+            "sender": {
+              "address": "0xd265672730b0540ffd3569530682a0f02ef984b703457790554eb0e19329663a"
+            },
+            "effects": {
+              "status": "SUCCESS",
+              "timestamp": "2026-09-30T17:27:39.816Z",
+              "balanceChanges": {
+                "nodes": [
+                  {
+                    "owner": {
+                      "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf"
+                    },
+                    "amount": "-1307148",
+                    "coinType": {
+                      "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "digest": "6fyo11ALtGTxD5o7yFZPy4wu3ZGP2RBvxdbmNJnWuWZ1",
+            "sender": {
+              "address": "0xd265672730b0540ffd3569530682a0f02ef984b703457790554eb0e19329663a"
+            },
+            "effects": {
+              "status": "SUCCESS",
+              "timestamp": "2026-09-30T17:27:39.816Z",
+              "balanceChanges": {
+                "nodes": [
+                  {
+                    "owner": {
+                      "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf"
+                    },
+                    "amount": "-729148",
+                    "coinType": {
+                      "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "digest": "4msw82FU7zpYbZz6TiocYxCDGmzGdyfTcMG5AQKPX95X",
+            "sender": {
+              "address": "0xd265672730b0540ffd3569530682a0f02ef984b703457790554eb0e19329663a"
+            },
+            "effects": {
+              "status": "SUCCESS",
+              "timestamp": "2026-09-30T17:27:40.287Z",
+              "balanceChanges": {
+                "nodes": [
+                  {
+                    "owner": {
+                      "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf"
+                    },
+                    "amount": "12195224",
+                    "coinType": {
+                      "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "digest": "6ARHPa8p4Ab4LdqULJG44wEJBrjPr23vzw7Bo4UuxG8Z",
+            "sender": {
+              "address": "0xd265672730b0540ffd3569530682a0f02ef984b703457790554eb0e19329663a"
+            },
+            "effects": {
+              "status": "SUCCESS",
+              "timestamp": "2026-09-30T17:27:40.522Z",
+              "balanceChanges": {
+                "nodes": [
+                  {
+                    "owner": {
+                      "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf"
+                    },
+                    "amount": "-726380",
+                    "coinType": {
+                      "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "digest": "CaAJTQRrQF2nDMc94Ump4YHPKZpBiVKcopECZLbHZcvy",
+            "sender": {
+              "address": "0xd265672730b0540ffd3569530682a0f02ef984b703457790554eb0e19329663a"
+            },
+            "effects": {
+              "status": "SUCCESS",
+              "timestamp": "2026-09-30T17:27:40.989Z",
+              "balanceChanges": {
+                "nodes": [
+                  {
+                    "owner": {
+                      "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf"
+                    },
+                    "amount": "-1317380",
+                    "coinType": {
+                      "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "digest": "2fnerPfXfWXx4w9MQtiCDy8f83MLXv6MX1JaDxu4FTMa",
+            "sender": {
+              "address": "0xd265672730b0540ffd3569530682a0f02ef984b703457790554eb0e19329663a"
+            },
+            "effects": {
+              "status": "SUCCESS",
+              "timestamp": "2026-09-30T17:27:40.989Z",
+              "balanceChanges": {
+                "nodes": [
+                  {
+                    "owner": {
+                      "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf"
+                    },
+                    "amount": "-1302380",
+                    "coinType": {
+                      "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "digest": "FKJFscXN8YgFdG9nqLqxU9uivVAWwuNpFoFDoAa1GedK",
+            "sender": {
+              "address": "0xd265672730b0540ffd3569530682a0f02ef984b703457790554eb0e19329663a"
+            },
+            "effects": {
+              "status": "SUCCESS",
+              "timestamp": "2026-09-30T17:27:40.989Z",
+              "balanceChanges": {
+                "nodes": [
+                  {
+                    "owner": {
+                      "address": "0x7ba661f0e68dcfa31c8c20f21d42bc0b973920ee79904bd5683c9259a9925fdf"
+                    },
+                    "amount": "-1294380",
+                    "coinType": {
+                      "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
