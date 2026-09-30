@@ -168,8 +168,15 @@ const paymentConfirmationValidation = async (ctx, next) => {
         return;
     }
 
-    // now also validate the token is valid that we encrypted with jwt
-    const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+    let tokenDecoded;
+
+    try {
+        tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+    } catch {
+        ctx.status = 409;
+        ctx.body = { validationError: "invalid_token" };
+        return;
+    }
 
     if (!tokenDecoded) {
         ctx.status = 409;
@@ -489,8 +496,15 @@ const receiptEmailValidation = async (ctx, next) => {
         return;
     }
 
-    // now also validate the token is valid that we encrypted with jwt
-    const tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+    let tokenDecoded;
+
+    try {
+        tokenDecoded = jwt.verify(token, config.JWT_SECRET);
+    } catch {
+        ctx.status = 409;
+        ctx.body = { validationError: "invalid_token" };
+        return;
+    }
 
     if (!tokenDecoded) {
         ctx.status = 409;
