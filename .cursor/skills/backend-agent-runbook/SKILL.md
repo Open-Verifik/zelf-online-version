@@ -88,6 +88,13 @@ For a test file that expects another port, export that same `PORT` before starti
 - Root Koa API does not install Hardhat. Use `contracts/` (`npm run contracts:install`, `npm run contracts:compile`).
 - BlockDAG NFT contracts: `Repositories/BlockDAG/smart-contracts/`. Avalanche ZelfKey NFT: `Avalanche/`.
 
+### Push for received transfers (TxNotifications)
+
+- Feature root: `Repositories/TxNotifications/` (device routes, models, chain adapters, OneSignal sender, watcher).
+- Watcher: `npm run tx-watcher` (loop), `npm run tx-watcher -- --once --dry-run` (one cycle, no OneSignal call). Runs as its own pm2 app in fork mode, never inside the clustered API.
+- OneSignal key is IP-allowlisted to production; local runs cannot send pushes. Use `--dry-run` and read `TxPushLogs`.
+- Focused check: `TX_NOTIFICATIONS_TEST_MONGO_URI=mongodb://127.0.0.1:27017 npm run test:tx-notifications` (unit + one Mongo-backed suite; no API server needed).
+
 ### Vault Legacy (inheritance plans)
 
 - Feature root: `Repositories/VaultLegacy/`.

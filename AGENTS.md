@@ -40,6 +40,13 @@ This is a Koa backend API with MongoDB, Mongoose, and JWT-protected routes.
 -   zSend (`Repositories/ZSend/`) is the encrypt-to-someone-else product on Face Certificates: `/api/zsend` (directory lookup) and `/api/my-zsend` (publish, send, open), both JWT via `Routes/protected-repositories.js`. Purpose ids are `zsend:<tagName>` for files and `zmail:<tagName>` for messages; clients read them from `GET /api/zsend/purpose-id` instead of hardcoding. Certificate PEMs live in Mongo, not tag `publicData` (Pinata caps keyvalues at 9 × 250 chars). Envelopes store only a Face-Certificate-wrapped content key plus an AES-GCM-256 pointer — never plaintext or a raw key. See `Repositories/ZSend/README.md` and `Repositories/ZSend/CLIENT.md`.
 -   Hardhat / Solidity for ERC-8004 lives in `contracts/` (own `package.json`). Install with `npm run contracts:install`. It is not part of the Koa API dependency tree.
 
+## Push for received transfers
+
+-   `Repositories/TxNotifications/`: `POST /api/tx-notifications/devices` and `DELETE /api/tx-notifications/devices/:pushSubscriptionId` (JWT, `Routes/protected-repositories.js`). Registration is signed with the wallet's EVM key (EIP-191, `modules/registration-signature.util.js`); only a SHA-256 of the device secret is stored.
+-   The watcher that polls chains and calls OneSignal is its own process: `npm run tx-watcher` (`--once`, `--dry-run`). Never start it inside the API: `V4` runs in pm2 cluster mode. One pm2 fork instance; a second copy idles on the Mongo lease (`TxWatcherLeases`).
+-   Env: `ONESIGNAL_APP_ID`, `ONESIGNAL_APP_API_KEY` (IP-allowlisted to the server), optional `TX_WATCHER_*` (see `.env.example`). Only curated tokens are announced (`modules/tokens.js`).
+-   Tests: `TX_NOTIFICATIONS_TEST_MONGO_URI=mongodb://127.0.0.1:27017 npm run test:tx-notifications` (unit tests use recorded mainnet fixtures in `tests/fixtures/tx-notifications/`).
+
 ## Vault Legacy demo mode
 
 -   Demo wills: `LEGACY_DEMO_MODE=true`, per-vault `isDemo` on `VaultLegacy` Mongo records, fixed `LEGACY_DEMO_LAWYER_ADDRESS`.
