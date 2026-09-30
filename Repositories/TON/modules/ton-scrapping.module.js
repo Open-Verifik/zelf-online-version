@@ -1,5 +1,6 @@
 const moment = require("moment");
-const { tonApiGet } = require("./ton-api.client");
+const { tonApiGet, toTonUpstreamError } = require("./ton-api.client");
+const { assertValidTonAddress } = require("./ton-address.util");
 const { nanotonToTonString, jettonAmountToString } = require("./ton-jetton.util");
 const { getTonUsdPrice, getJettonUsdRates, sumTokenFiatBalances, normalizeTokenKey } = require("./ton-price.util");
 
@@ -84,7 +85,7 @@ const mapEventsToTransactions = (events = [], address) =>
 		.sort((a, b) => b.timestamp - a.timestamp);
 
 const getAddress = async (params) => {
-	const address = String(params.id || "").trim();
+	const address = assertValidTonAddress(params.id);
 	let price = "0";
 
 	try {
@@ -144,12 +145,10 @@ const getAddress = async (params) => {
             historyComplete,
             holdingsComplete,
 		};
-    } catch (error) {
-        // A failed provider read is unknown, never evidence that an address is empty.
-        const unavailable = new Error("ton_balance_unavailable");
-        unavailable.status = error.response?.status === 429 ? 429 : 502;
-        throw unavailable;
-    }
+	} catch (error) {
+		if (error.status === 409) throw error;
+		throw toTonUpstreamError(error);
+	}
 };
 
 const getTokens = async (params, query = {}) => {
@@ -167,7 +166,7 @@ const getTokens = async (params, query = {}) => {
 };
 
 const getTransactions = async (params, query = {}) => {
-	const address = String(params.id || "").trim();
+	const address = assertValidTonAddress(params.id);
 	const page = String(query.page ?? "0");
 	const show = String(query.show ?? "10");
 	const limit = Number(show) || 10;

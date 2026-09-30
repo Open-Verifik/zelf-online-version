@@ -68,6 +68,7 @@ module.exports = (server) => {
     require("../Repositories/TON/routes/ton-scrapping.route")(server);
     require("../Repositories/TON/routes/ton-payment.route")(server);
     require("../Repositories/tron/routes/tron-scrapping.route")(server);
+    require("../Repositories/TxNotifications/routes/tx-notifications.routes")(server);
     require("../Repositories/Tags/routes/tags.routes")(server);
     require("../Repositories/Tags/routes/my-tags.routes")(server);
     require("../Repositories/ZelfID/routes/zelf-ids.routes")(server);

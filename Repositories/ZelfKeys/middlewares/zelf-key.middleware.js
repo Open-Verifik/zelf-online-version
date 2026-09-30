@@ -1,4 +1,4 @@
-const { string, validate, boolean, stringEnum, object } = require("../../../Core/JoiUtils");
+const { string, validate, boolean, stringEnum, object, array } = require("../../../Core/JoiUtils");
 
 /**
  * ZelfKey Middleware - Business logic validation for password manager operations
@@ -6,6 +6,19 @@ const { string, validate, boolean, stringEnum, object } = require("../../../Core
  */
 
 const SUPPORTED_CATEGORIES = ["password", "notes", "credit_card", "contact", "zotp"];
+
+/** Maximum credentials per bulk password import request. */
+const BULK_PASSWORDS_MAX = 100;
+
+const passwordCredentialSchema = {
+	alias: string().optional().allow("").max(50),
+	website: string().required(),
+	username: string().required(),
+	password: string().required(),
+	folder: string().optional().allow(""),
+	insideFolder: boolean().optional().allow(false),
+	notes: string().optional().allow(""),
+};
 
 const schemas = {
 	password: {
@@ -19,6 +32,16 @@ const schemas = {
 		notes: string().optional().allow(""),
 		faceBase64: string().required(),
 		masterPassword: string().optional().allow(""),
+	},
+	bulkPasswords: {
+		faceBase64: string().required(),
+		masterPassword: string().optional().allow(""),
+		removePGP: boolean().optional(),
+		passwords: array()
+			.items(object(passwordCredentialSchema))
+			.min(1)
+			.max(BULK_PASSWORDS_MAX)
+			.required(),
 	},
 	zotp: {
 		username: string().required(),
@@ -90,6 +113,21 @@ const schemas = {
  */
 const storePasswordValidation = async (ctx, next) => {
 	const valid = validate(schemas.password, ctx.request.body);
+
+	if (valid.error) {
+		ctx.status = 409;
+		ctx.body = { validationError: valid.error.message };
+		return;
+	}
+
+	await next();
+};
+
+/**
+ * Bulk store passwords validation middleware
+ */
+const storePasswordsBulkValidation = async (ctx, next) => {
+	const valid = validate(schemas.bulkPasswords, ctx.request.body);
 
 	if (valid.error) {
 		ctx.status = 409;
@@ -300,7 +338,10 @@ const deleteZelfKeyValidation = async (ctx, next) => {
 
 module.exports = {
 	SUPPORTED_CATEGORIES,
+	BULK_PASSWORDS_MAX,
+	passwordCredentialSchema,
 	storePasswordValidation,
+	storePasswordsBulkValidation,
 	storeZOTPValidation,
 	storeNotesValidation,
 	storeCreditCardValidation,
