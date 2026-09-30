@@ -1,3 +1,4 @@
+const config = require("../../../Core/config");
 const { Domain } = require("../modules/domain.class");
 const { initCacheInstance } = require("../../../cache/manager");
 const { cache } = require("joi");
@@ -432,11 +433,15 @@ const isIPFSStorageSupported = (domain, app) => {
 };
 
 const isArweaveStorageSupported = (domain, app) => {
-    const config = getDomainConfig(domain);
+    if (config.zelfProof.skipArweave) {
+        return false;
+    }
 
-    if (!config) return false;
+    const domainConfig = getDomainConfig(domain);
 
-    return Boolean(config[app]?.storage?.arweaveEnabled);
+    if (!domainConfig) return false;
+
+    return Boolean(domainConfig[app]?.storage?.arweaveEnabled);
 };
 
 module.exports = {

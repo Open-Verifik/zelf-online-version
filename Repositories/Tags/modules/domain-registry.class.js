@@ -1,3 +1,4 @@
+const config = require("../../../Core/config");
 const { getSupportedDomains } = require("../config/supported-domains");
 
 /**
@@ -350,6 +351,9 @@ class DomainRegistry {
 	 * @returns {boolean} - True if Arweave is enabled
 	 */
 	isArweaveEnabled(domainName) {
+		if (config.zelfProof.skipArweave) {
+			return false;
+		}
 		const domain = this.getDomain(domainName);
 		return domain && domain.storage ? domain.storage.arweaveEnabled : false;
 	}
