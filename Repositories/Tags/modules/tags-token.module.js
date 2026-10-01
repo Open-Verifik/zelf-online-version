@@ -1,90 +1,32 @@
-const config = require("../../../Core/config");
-if (config.solana?.useKit) { module.exports = require("./tags-token.module.kit"); return; }
-
-const solanaWeb3 = require("@solana/web3.js");
-const splManual = require("../../../Core/spl-token-manual");
-const { sendWithRetry } = require("../../../Core/solana-tx");
+const RewardTransfer = require("./referral-reward-transfer");
 const ReferralRewardModel = require("../models/referral-rewards.model");
 const PurchaseRewardModel = require("../models/purchase-rewards.model");
 const MongoORM = require("../../../Core/mongo-orm");
 
-let connection;
+/**
+ * Tags reward records and the purchase reward release.
+ *
+ * The ZNS transfer goes through referral-reward-transfer (one transaction that creates the
+ * receiver's token account if needed and transfers, priority fee, signed once, signature stored
+ * before the broadcast, outcome read from the chain). The previous sender here created the
+ * account in its own transaction without a priority fee, re-signed the transfer after about
+ * 38 s while the first could still land (paying twice), and read amounts under 1000 as tokens
+ * but 1000 or more as base units (a 1500 ZNS reward sent 0.000015 ZNS).
+ *
+ * Referral rewards are paid per referral by the claim flow (my-tags.module claimReferralReward);
+ * the old batch that paid 5% of grouped prices from the same collection is gone (/referral-rewards
+ * answers 410).
+ */
 
-const initConnection = async () => {
-	if (connection) return connection;
+/** Sends that did not pay before a purchase reward is marked failed for a person to review. */
+const MAX_PURCHASE_REWARD_ATTEMPTS = 5;
 
-	connection = new solanaWeb3.Connection(config.solana.rpcUrl);
-
-	await connection.getSlot();
+const _rewardError = (status, code) => {
+	const err = new Error(code);
+	err.status = status;
+	err.code = code;
+	return err;
 };
-
-// Token mint address (ZNS token address)
-const tokenMintAddress = new solanaWeb3.PublicKey(config.solana.tokenMintAddress);
-
-const giveTokensAfterPurchase = async (amount, receiverSolanaAddress) => {
-	try {
-		await initConnection();
-
-		const senderKey = Uint8Array.from(JSON.parse(config.solana.sender));
-		const senderWallet = solanaWeb3.Keypair.fromSecretKey(senderKey);
-
-		// Compute Budget Program Instruction (to increase gas fees)
-		const computeBudgetInstruction = solanaWeb3.ComputeBudgetProgram.setComputeUnitPrice({
-			microLamports: 100000, // Adjust this value to set a higher priority fee
-		});
-
-		// Get or create the sender's associated token account (Option B: manual SPL, no bigint-buffer)
-		const senderTokenAccount = await splManual.getOrCreateAssociatedTokenAccount(
-			connection,
-			senderWallet,
-			tokenMintAddress,
-			senderWallet.publicKey
-		);
-
-		// Convert amount to smallest unit (8 decimals for ZNS token)
-		// If amount is already in smallest unit, don't convert again
-		const amountToSend =
-			typeof amount === "number" && amount < 1000
-				? Math.round(amount * 10 ** 8) // Convert from tokens to smallest unit
-				: Math.round(amount); // Already in smallest unit
-
-		if (senderTokenAccount.amount < amountToSend) {
-			throw new Error("Insufficient balance in sender's token account.");
-		}
-
-		// Receiver's public key
-		const receiverPublicKey = new solanaWeb3.PublicKey(receiverSolanaAddress);
-
-		// Get or create the receiver's associated token account
-		const receiverTokenAccount = await splManual.getOrCreateAssociatedTokenAccount(
-			connection,
-			senderWallet, // Payer (sender pays for account creation if needed)
-			tokenMintAddress,
-			receiverPublicKey
-		);
-
-		// Create the token transfer instruction
-		const transferInstruction = splManual.createTransferCheckedInstruction(
-			senderTokenAccount.address, // Sender's token account
-			tokenMintAddress, // Token mint address
-			receiverTokenAccount.address, // Receiver's token account
-			senderWallet.publicKey, // Owner of the sender's token account
-			amountToSend, // Amount to send (in smallest unit)
-			8 // Decimals of the token
-		);
-
-		const transferTransaction = new solanaWeb3.Transaction().add(computeBudgetInstruction, transferInstruction);
-
-		const transferSignature = await sendWithRetry(connection, transferTransaction, [senderWallet]);
-
-		return transferSignature;
-	} catch (error) {
-		console.error("Error sending token:", { error });
-		throw error;
-	}
-};
-
-// sendWithRetry is imported from Core/solana-tx.js (HTTP-only polling, no WebSocket signatureSubscribe)
 
 const addReferralReward = async (tagObject, authUser, domain = "zelf") => {
 	if (!tagObject) return null;
@@ -124,7 +66,7 @@ const addPurchaseReward = async (authUser, domain = "zelf", tagPrice = 0) => {
 			ethAddress: authUser.ethAddress || "",
 			solanaAddress: authUser.solanaAddress || "",
 			tagPrice: tagPrice,
-			tokenAmount: 250, // Math.round(tagPrice / config.token.rewardPrice),
+			tokenAmount: 250, // whole ZNS (Math.round(tagPrice / config.token.rewardPrice))
 			status: "pending",
 			attempts: 0,
 			payload: {},
@@ -139,113 +81,175 @@ const addPurchaseReward = async (authUser, domain = "zelf", tagPrice = 0) => {
 	}
 };
 
-const releaseReferralRewards = async (authUser) => {
-	let referralRewards = null;
-	let firstGroup = null;
+/** The record's reward in whole ZNS. Never base units. */
+const _purchaseRewardTokens = (record) => {
+	const tokens = Number(record?.tokenAmount);
+	return Number.isFinite(tokens) && tokens > 0 ? tokens : null;
+};
 
-	try {
-		referralRewards = await MongoORM.groupAggregate(ReferralRewardModel, {
-			wheres: { status: "pending" }, // Match condition
-			groupBy: "referralTagName", // Group by field
-			sum: "tagPrice", // Field to sum
-			includeFields: ["referralTagName", "referralSolanaAddress", "status"],
-		});
+const _summary = (record, changes = {}) => ({
+	_id: record._id,
+	tagName: record.tagName,
+	domain: record.domain,
+	solanaAddress: record.solanaAddress,
+	tokenAmount: record.tokenAmount,
+	status: record.status,
+	attempts: record.attempts,
+	payload: record.payload,
+	...changes,
+});
 
-		// Ensure there is at least one group to process
-		if (!referralRewards || referralRewards.length === 0) {
-			return { nothingToProcess: true };
+/**
+ * Settles purchase rewards left "processing" from the signature stored before their broadcast.
+ * Confirmed -> completed. Failed on chain or expired (nothing moved) -> pending again, or failed
+ * once the attempts are used up. Still able to land -> left alone, so it is never re-signed.
+ * Records without a stored signature are left for a person.
+ */
+const _settleProcessingPurchaseRewards = async () => {
+	const processing = await PurchaseRewardModel.find({ status: "processing" });
+
+	for (const record of processing) {
+		const signature = record.payload?.transferSignature;
+
+		if (!signature) continue;
+
+		let outcome;
+
+		try {
+			outcome = await RewardTransfer.getRewardTransferOutcome({ signature, lastValidBlockHeight: record.payload.lastValidBlockHeight });
+		} catch (error) {
+			console.error("Purchase reward reconciliation failed:", signature, error?.message || error);
+			continue;
 		}
 
-		firstGroup = referralRewards[0];
+		let $set;
 
-		// Calculate reward tokens: 5% of total purchase amount
-		const rewardTokens = Math.round(firstGroup.totalSum * 0.05 * 100) / 100; // 5% with 2 decimal places
-
-		// Send tokens using proper parameters
-		await giveTokensAfterPurchase(rewardTokens, firstGroup.referralSolanaAddress);
-
-		// Update all records in this group with a single updateMany
-		await ReferralRewardModel.updateMany(
-			{
-				referralTagName: firstGroup._id, // Match the grouped field
-				status: "pending", // Ensure only pending rewards are updated
-			},
-			{
-				$set: {
-					status: "completed",
-					completedAt: new Date(),
+		if (outcome.state === "confirmed") {
+			$set = {
+				status: "completed",
+				completedAt: new Date(),
+				payload: { ...record.payload, signature, requiresReconciliation: false, error: null, reconciledAt: new Date().toISOString() },
+			};
+		} else if (outcome.state === "failed" || outcome.state === "expired") {
+			$set = {
+				status: record.attempts >= MAX_PURCHASE_REWARD_ATTEMPTS ? "failed" : "pending",
+				payload: {
+					...record.payload,
+					requiresReconciliation: false,
+					error: outcome.state === "expired" ? "reward_transfer_expired" : outcome.error || "reward_transfer_failed",
+					reconciledAt: new Date().toISOString(),
 				},
-				$inc: { attempts: 1 }, // Increment the attempts counter
-			}
-		);
-
-		return firstGroup;
-	} catch (error) {
-		console.error("Error releasing referral reward:", error);
-
-		if (referralRewards.length) {
-			await ReferralRewardModel.updateMany(
-				{
-					referralTagName: firstGroup._id, // Match the grouped field
-					status: "pending", // Ensure only pending rewards are updated
-				},
-				{
-					$set: {},
-					$inc: { attempts: 1 }, // Increment the attempts counter
-				}
-			);
+			};
+		} else {
+			continue;
 		}
 
-		throw error; // Re-throw for higher-level error handling if needed
+		await PurchaseRewardModel.updateOne({ _id: record._id, status: "processing", "payload.transferSignature": signature }, { $set });
 	}
 };
 
 /**
- * release purchase rewards
- * @param {Object} authUser
- * @returns
- * @author Miguel Trevino
+ * Releases the oldest pending Tags purchase reward (super admin, one record per call).
+ * 1. Settle "processing" records from the chain.
+ * 2. Reserve the next "pending" record atomically (a concurrent call cannot take the same one)
+ *    and drop the previous attempt's signature in the same update.
+ * 3. Store the signature, then broadcast one signed transaction of `tokenAmount` whole ZNS.
+ * 4. Confirmed -> completed with the signature. Not confirmed yet -> stays "processing" and is
+ *    settled by a later call (`pending: true`). Failed on chain -> pending again (502). Nothing
+ *    broadcast -> pending again (503).
+ * @returns {Promise<Object>} The record summary, or { nothingToProcess: true }
  */
-const releasePurchaseRewards = async (authUser) => {
-	const purchaseReward = await MongoORM.buildQuery({ where_status: "pending", findOne: true }, PurchaseRewardModel, null);
+const releasePurchaseRewards = async () => {
+	await _settleProcessingPurchaseRewards();
 
-	if (!purchaseReward) {
-		return { nothingToProcess: true };
+	const purchaseReward = await PurchaseRewardModel.findOneAndUpdate(
+		{ status: "pending" },
+		{ $set: { status: "processing" }, $unset: { "payload.transferSignature": "", "payload.lastValidBlockHeight": "" } },
+		{ sort: { createdAt: 1 }, new: true }
+	);
+
+	if (!purchaseReward) return { nothingToProcess: true };
+
+	const reserved = { _id: purchaseReward._id, status: "processing" };
+	const attempts = (purchaseReward.attempts || 0) + 1;
+	const payload = { ...(purchaseReward.payload || {}) };
+
+	if ((purchaseReward.attempts || 0) >= MAX_PURCHASE_REWARD_ATTEMPTS) {
+		await PurchaseRewardModel.updateOne(reserved, { $set: { status: "failed", completedAt: new Date() } });
+		return _summary(purchaseReward, { status: "failed" });
 	}
 
-	// if attempts is 5 then mark it as failed
-	if (purchaseReward.attempts === 5) {
-		purchaseReward.status = "failed";
+	const tokens = _purchaseRewardTokens(purchaseReward);
 
-		purchaseReward.completedAt = new Date();
-
-		await purchaseReward.save();
-
-		return purchaseReward;
+	if (!tokens) {
+		const failedPayload = { ...payload, error: "invalid_reward_amount", requiresReconciliation: false };
+		await PurchaseRewardModel.updateOne(reserved, { $set: { status: "failed", payload: failedPayload } });
+		return _summary(purchaseReward, { status: "failed", payload: failedPayload });
 	}
+
+	let storedSignature = null;
+	let transfer;
 
 	try {
-		const signature = await giveTokensAfterPurchase(250, purchaseReward.solanaAddress);
+		transfer = await RewardTransfer.sendRewardTransfer(tokens, purchaseReward.solanaAddress, {
+			onSigned: async ({ signature, lastValidBlockHeight }) => {
+				Object.assign(payload, { transferSignature: signature, lastValidBlockHeight, tokenAmount: tokens, requiresReconciliation: true, error: null });
 
-		purchaseReward.status = "completed";
-		purchaseReward.completedAt = new Date();
-		purchaseReward.attempts += 1;
-		purchaseReward.payload = { signature };
+				// Only while this call still holds the reservation; otherwise nothing is broadcast.
+				const stored = await PurchaseRewardModel.updateOne(reserved, { $set: { payload } });
 
-		await purchaseReward.save();
+				if (stored.modifiedCount !== 1) throw new Error("reward_reservation_lost");
 
-		return purchaseReward;
+				storedSignature = signature;
+			},
+		});
 	} catch (error) {
-		console.error("Error releasing purchase reward:", error);
+		console.error("Error releasing purchase reward:", error?.message || error);
 
-		purchaseReward.status = "pending";
+		if (storedSignature) {
+			// Not expected (the sender does not throw after the signature is stored). The transfer
+			// may be on the network: keep the reservation for reconciliation.
+			payload.error = error?.message || "reward_transfer_unknown";
+			await PurchaseRewardModel.updateOne(reserved, { $set: { attempts, payload } });
+			return _summary(purchaseReward, { attempts, payload, pending: true, signature: storedSignature });
+		}
 
-		purchaseReward.attempts += 1;
+		if (error?.message === "reward_reservation_lost") throw _rewardError(409, "reward_claim_in_progress");
 
-		await purchaseReward.save();
+		// Nothing reached the network: release the reservation so a later call retries it.
+		const status = attempts >= MAX_PURCHASE_REWARD_ATTEMPTS ? "failed" : "pending";
+		Object.assign(payload, { error: error?.message || "reward_transfer_not_sent", requiresReconciliation: false });
+		delete payload.transferSignature;
+		delete payload.lastValidBlockHeight;
+		await PurchaseRewardModel.updateOne(reserved, { $set: { status, attempts, payload } });
 
-		throw error; // Re-throw for higher-level error handling if needed
+		throw _rewardError(503, "reward_transfer_not_sent");
 	}
+
+	const settled = { ...reserved, "payload.transferSignature": transfer.signature };
+
+	if (transfer.state === "confirmed") {
+		Object.assign(payload, { signature: transfer.signature, requiresReconciliation: false, error: null });
+		await PurchaseRewardModel.updateOne(settled, { $set: { status: "completed", completedAt: new Date(), attempts, payload } });
+		return _summary(purchaseReward, { status: "completed", attempts, payload, signature: transfer.signature });
+	}
+
+	if (transfer.state === "failed") {
+		// A transaction that failed on chain moved nothing: safe to retry.
+		console.error("Purchase reward transfer failed on chain:", transfer.signature, transfer.error);
+		Object.assign(payload, { error: transfer.error || "reward_transfer_failed", requiresReconciliation: false });
+		await PurchaseRewardModel.updateOne(settled, {
+			$set: { status: attempts >= MAX_PURCHASE_REWARD_ATTEMPTS ? "failed" : "pending", attempts, payload },
+		});
+		throw _rewardError(502, "reward_transfer_failed");
+	}
+
+	// Unknown yet: stays reserved with its signature; a later call settles it from the chain.
+	console.warn("Purchase reward transfer not confirmed yet, kept for reconciliation:", transfer.signature, transfer.error || "");
+	payload.error = transfer.error || null;
+	await PurchaseRewardModel.updateOne(settled, { $set: { attempts, payload } });
+
+	return _summary(purchaseReward, { attempts, payload, pending: true, signature: transfer.signature });
 };
 
 const getPurchaseReward = async (tagName, afterDate) => {
@@ -274,7 +278,6 @@ module.exports = {
 	getPurchaseReward,
 	addReferralReward,
 	addPurchaseReward,
-	releaseReferralRewards,
 	releasePurchaseRewards,
-	giveTokensAfterPurchase,
+	MAX_PURCHASE_REWARD_ATTEMPTS,
 };

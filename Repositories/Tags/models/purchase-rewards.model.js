@@ -24,7 +24,8 @@ const PurchaseRewardSchema = new Schema({
 		type: String,
 		required: true,
 	},
-	status: requiredEnumField(String, ["pending", "completed", "failed"], "pending"),
+	// "processing": reserved by a release whose transfer signature is stored before broadcast.
+	status: requiredEnumField(String, ["pending", "processing", "completed", "failed"], "pending"),
 	attempts: requiredField(Number),
 	ipfsHash: requiredField(String),
 	arweaveId: requiredField(String),
