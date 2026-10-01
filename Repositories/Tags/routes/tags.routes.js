@@ -37,7 +37,8 @@ module.exports = (server) => {
 
     server.post(`${PATH}/decrypt`, Middleware.decryptValidation, Controller.decryptTag); // [x]
 
-    server.post(`${PATH}/revenue-cat`, Middleware.revenueCatWebhookValidation, Controller.revenueCatWebhook);
+    // Retired: answers 410 for every caller and points to POST /api/zelf-ids/revenue-cat.
+    server.post(`${PATH}/revenue-cat`, Controller.revenueCatWebhook);
 
     server.post(`${PATH}/purchase-rewards`, Middleware.referralRewardsValidation, Controller.purchaseRewards);
 

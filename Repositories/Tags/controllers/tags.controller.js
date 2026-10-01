@@ -1,5 +1,5 @@
 const Module = require("../modules/tags.module");
-const RevenueCatModule = require("../modules/revenue-cat.module");
+const RewardRoutesController = require("./reward-routes.controller");
 const { updateOldTagObject } = require("../modules/my-tags.module");
 const TagsRecoveryModule = require("../modules/tags-recovery.module");
 const TagsOfflineModule = require("../modules/tags-offline.module");
@@ -323,61 +323,16 @@ const decryptTag = async (ctx) => {
 };
 
 /**
- * RevenueCat webhook
- * @param {Object} ctx - Koa context
- * @returns {Object} - Webhook results
+ * RevenueCat webhook: retired on /api/tags (410), Zelf IDs use POST /api/zelf-ids/revenue-cat.
+ * Purchase rewards: releases the oldest pending Tags purchase reward.
+ * Referral rewards: retired (410), paid per referral by POST /api/my-tags/referrals/claim.
+ * See reward-routes.controller.js.
  */
-const revenueCatWebhook = async (ctx) => {
-    try {
-        const data = await RevenueCatModule.revenueCatWebhook(ctx.request.body);
+const revenueCatWebhook = RewardRoutesController.tagsRevenueCatRetired;
 
-        ctx.body = { data };
-    } catch (error) {
-        const _exception = errorHandler(error, ctx);
+const purchaseRewards = RewardRoutesController.purchaseRewards;
 
-        ctx.status = _exception.status;
-
-        ctx.body = { message: _exception.message, code: _exception.code };
-    }
-};
-
-/**
- * Purchase rewards
- * @param {Object} ctx - Koa context
- * @returns {Object} - Rewards results
- */
-const purchaseRewards = async (ctx) => {
-    try {
-        const data = await RevenueCatModule.purchaseRewards(ctx.request.body);
-
-        ctx.body = { data };
-    } catch (error) {
-        const _exception = errorHandler(error, ctx);
-
-        ctx.status = _exception.status;
-
-        ctx.body = { message: _exception.message, code: _exception.code };
-    }
-};
-
-/**
- * Referral rewards
- * @param {Object} ctx - Koa context
- * @returns {Object} - Rewards results
- */
-const referralRewards = async (ctx) => {
-    try {
-        const data = await RevenueCatModule.referralRewards(ctx.request.body);
-
-        ctx.body = { data };
-    } catch (error) {
-        const _exception = errorHandler(error, ctx);
-
-        ctx.status = _exception.status;
-
-        ctx.body = { message: _exception.message, code: _exception.code };
-    }
-};
+const referralRewards = RewardRoutesController.referralRewardsRetired;
 
 /**
  * Delete tag from IPFS

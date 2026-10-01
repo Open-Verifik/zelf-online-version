@@ -1,5 +1,6 @@
 const Module = require("../modules/zelf-id.module");
 const RevenueCatModule = require("../../Tags/modules/revenue-cat.module");
+const RewardRoutesController = require("../../Tags/controllers/reward-routes.controller");
 const { updateOldTagObject } = require("../../Tags/modules/my-tags.module");
 const ZelfIdRecoveryModule = require("../modules/zelf-id-recovery.module");
 const TagsSearchModule = require("../../Tags/modules/tags-search.module");
@@ -270,33 +271,12 @@ const revenueCatWebhook = async (ctx) => {
     }
 };
 
-const purchaseRewards = async (ctx) => {
-    try {
-        const data = await RevenueCatModule.purchaseRewards(ctx.request.body);
+// RevenueCatModule has no purchaseRewards/referralRewards, so these always failed. Purchase
+// rewards release the oldest pending Tags purchase reward; referral rewards answer 410 (paid per
+// referral by POST /api/my-tags/referrals/claim). See Tags reward-routes.controller.js.
+const purchaseRewards = RewardRoutesController.purchaseRewards;
 
-        ctx.body = { data };
-    } catch (error) {
-        const _exception = errorHandler(error, ctx);
-
-        ctx.status = _exception.status;
-
-        ctx.body = { message: _exception.message, code: _exception.code };
-    }
-};
-
-const referralRewards = async (ctx) => {
-    try {
-        const data = await RevenueCatModule.referralRewards(ctx.request.body);
-
-        ctx.body = { data };
-    } catch (error) {
-        const _exception = errorHandler(error, ctx);
-
-        ctx.status = _exception.status;
-
-        ctx.body = { message: _exception.message, code: _exception.code };
-    }
-};
+const referralRewards = RewardRoutesController.referralRewardsRetired;
 
 const deleteTag = async (ctx) => {
     try {

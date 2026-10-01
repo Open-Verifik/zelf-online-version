@@ -87,9 +87,9 @@ Each domain has the following configuration:
 - `POST /v2/preview` - Preview tag
 - `POST /preview-zelfproof` - Preview zelf proof
 - `POST /v2/decrypt` - Decrypt tag
-- `POST /revenue-cat` - RevenueCat webhook
-- `POST /purchase-rewards` - Release purchase rewards
-- `POST /referral-rewards` - Release referral rewards
+- `POST /revenue-cat` - Retired: 410, use `POST /api/zelf-ids/revenue-cat`
+- `POST /purchase-rewards` - Release the oldest pending purchase reward (super admin; 202 while its transfer is unconfirmed)
+- `POST /referral-rewards` - Retired: 410, referral rewards are claimed per referral with `POST /api/my-tags/referrals/claim`
 - `PUT /:tagName` - Update tag lease duration
 
 ### User Tags API (`/api/my-tags`)
