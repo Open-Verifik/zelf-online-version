@@ -22,6 +22,7 @@ const {
 	isUnpaidReservation,
 	FREE_EXPIRATION_YEARS,
 	getZelfIdPrice,
+	getZelfIdCheckoutPrice,
 } = require("../../Repositories/ZelfID/modules/zelf-id-plan.module");
 
 const licenseQuote = (price, extras = {}) => ({
@@ -227,6 +228,40 @@ describe("zelf-id-plan.module", () => {
 		});
 		expect(withoutPlanTables._lookupTablePrice(withoutPlanTables._pricingTableForPlan("premium"), 8, "1")).toBe(24);
 		expect(withoutPlanTables._lookupTablePrice(withoutPlanTables._pricingTableForPlan("unlimited"), 8, "1")).toBe(24);
+	});
+
+	test("getZelfIdCheckoutPrice charges the plan the payment stamps", () => {
+		const tables = {
+			default: { "6-15": { 1: 24 }, 5: { 1: 30 } },
+			premium: { "6-15": { 1: 28 }, 5: { 1: 30 } },
+			unlimited: { "6-15": { 1: 99 }, 5: { 1: 150 } },
+		};
+		const domainConfig = {
+			getPrice: (tagName, duration, referralTagName, options = {}) => {
+				const length = String(tagName).split(".")[0].length;
+				const key = length >= 6 && length <= 15 ? "6-15" : length;
+				return licenseQuote(tables[options.plan || "default"][key][`${duration}`], { duration: `${duration}`, length });
+			},
+		};
+
+		// No plan from the client: long names pay premium (what buildMetadata stamps), not the default table.
+		const noPlan = getZelfIdCheckoutPrice({ tagName: "zid12345.zelf", duration: "1", domainConfig });
+		expect(noPlan).toMatchObject({ price: 28, plan: "premium" });
+		expect(resolveUpgradePlan({ tagName: "zid12345.zelf" })).toBe(noPlan.plan);
+
+		expect(getZelfIdCheckoutPrice({ tagName: "zid12345.zelf", duration: "1", domainConfig, requestedPlan: "unlimited" })).toMatchObject({
+			price: 99,
+			plan: "unlimited",
+		});
+
+		// Short names are unlimited only, even when the client asks for premium.
+		expect(getZelfIdCheckoutPrice({ tagName: "abcde", duration: "1", domainConfig, requestedPlan: "premium" })).toMatchObject({
+			price: 150,
+			plan: "unlimited",
+		});
+
+		// The lease/search quote for a long name stays on the free (default) table.
+		expect(getZelfIdPrice({ tagName: "zid12345.zelf", duration: "1", domainConfig })).toMatchObject({ price: 24, plan: "free" });
 	});
 
 	test("getZelfIdPrice requires a license getPrice", () => {
