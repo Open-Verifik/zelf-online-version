@@ -89,6 +89,8 @@ const createMetadataAndPublicData = async (type, data, authToken) => {
             typePayload.metadata = {
                 password: `${data.password}`,
                 username: `${data.username}`,
+                // Notes are private: keep them inside the encrypted metadata (CSV "extra").
+                ...(normalizeOptionalString(data.notes) ? { notes: `${data.notes}` } : {}),
             };
 
             typePayload.publicData = stampV4PublicData(
@@ -416,6 +418,8 @@ const storePasswordsBulk = async (data, authToken) => {
 
     const success = [];
     const failed = [];
+    // Two batches sent in the same minute would otherwise reuse `${tag}_H{h}M{m}_${index}`.
+    const batchTag = Date.now().toString(36);
 
     for (let index = 0; index < passwords.length; index++) {
         const item = passwords[index];
@@ -431,7 +435,7 @@ const storePasswordsBulk = async (data, authToken) => {
         }
 
         try {
-            const stored = await _storePasswordRecord(item, authToken, sharedContext, `${index}`);
+            const stored = await _storePasswordRecord(item, authToken, sharedContext, `${batchTag}_${index}`);
             success.push({
                 index,
                 ...stored,

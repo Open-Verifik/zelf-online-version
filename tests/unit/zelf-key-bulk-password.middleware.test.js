@@ -25,6 +25,25 @@ describe("ZelfKeys bulk password middleware", () => {
         expect(ctx.status).toBeUndefined();
     });
 
+    it("lets a batch with one invalid row through so the module reports it per row", async () => {
+        const ctx = {
+            request: {
+                body: {
+                    ...basePayload,
+                    passwords: [...basePayload.passwords, { website: "https://no-user.example", username: "", password: "x" }],
+                },
+            },
+        };
+        let nextCalled = false;
+
+        await Middleware.storePasswordsBulkValidation(ctx, async () => {
+            nextCalled = true;
+        });
+
+        expect(nextCalled).toBe(true);
+        expect(ctx.status).toBeUndefined();
+    });
+
     it("rejects an empty passwords array", async () => {
         const ctx = {
             request: {
