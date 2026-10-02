@@ -23,6 +23,14 @@ const {
  * and .hold states while maintaining compatibility with existing ZNS logic.
  */
 
+/** Record types stored by Zelf Keys (see Repositories/ZelfKeys). */
+const ZELF_KEYS_RECORD_TYPES = new Set(["password", "notes", "note", "credit_card", "payment-card", "contact", "zotp"]);
+
+const isZelfKeysRecord = (item = {}) => {
+	const keyvalues = item.keyvalues || item.metadata?.keyvalues || {};
+	return ZELF_KEYS_RECORD_TYPES.has(String(keyvalues.type || "").toLowerCase());
+};
+
 /**
  * Get tag data from IPFS
  * @param {Object} data - Search parameters
@@ -55,6 +63,9 @@ const get = async (data) => {
 			const byName = await IPFS.filter("name", tagName, { throwOnError: true });
 			const lowerTag = tagName.toLowerCase();
 			result = (byName || []).filter((item) => {
+				// Zelf Keys items are pinned as `<zelfName>_<suffix>` too; they are not the tag.
+				if (isZelfKeysRecord(item)) return false;
+
 				const n = String(item.name || "").toLowerCase();
 				return (
 					n === lowerTag ||
