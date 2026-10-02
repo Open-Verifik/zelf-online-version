@@ -67,7 +67,7 @@ const getTokensFromRouteScan = async (address) => {
         const { data } = await instance.get(`https://api.routescan.io/v2/network/mainnet/evm/43114/address/${address}/erc20-holdings`,
             { params: { limit: 100, ...(next ? { next } : {}) }, timeout: 8000 });
         if (!Array.isArray(data.items)) throw new Error("invalid_avalanche_holdings");
-        tokens.push(...data.items.map(mapRouteScanHolding));
+        tokens.push(...data.items.map(mapRouteScanHolding).filter(Boolean));
         next = data.link?.nextToken;
         if (!next) return { balance: String(tokens.reduce((sum, token) => sum + token.fiatBalance, 0)), total: tokens.length, tokens };
     }
@@ -99,6 +99,7 @@ const getTokensFromGlacier = async (params, query) => {
 	try {
 		const total = await instance.get(`https://cdn.routescan.io/api/blockchain/all/address/${params.id}?ecosystem=avalanche`, {
 			headers: { "user-agent": generateRandomUserAgent() },
+			timeout: 5000,
 		});
 
 		erc20Count = total.data.erc20Count ?? erc20Count;
