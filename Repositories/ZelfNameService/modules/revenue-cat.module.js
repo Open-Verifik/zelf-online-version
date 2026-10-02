@@ -3,6 +3,23 @@ const TagsModule = require("../../Tags/modules/tags.module");
 const moment = require("moment");
 const myTagsModule = require("../../Tags/modules/my-tags.module");
 
+/**
+ * Acknowledge an event this webhook does not act on.
+ *
+ * RevenueCat retries anything that is not 2xx (6 attempts), so answering 4xx/5xx
+ * for events we never handle only produced retries and noise: EXPIRATION,
+ * BILLING_ISSUE, SUBSCRIPTION_EXTENDED, TEST... and Zelf Keys subscription events
+ * sent without `zelfName` (the apps check the plan with RevenueCat entitlements and
+ * do not send attributes when subscribing).
+ */
+const _ignoreEvent = (event, reason) => {
+	console.info({ revenueCatWebhookIgnored: reason, type: event.type, id: event.id });
+
+	return { ignored: true, reason, type: event.type };
+};
+
+const _hasZelfName = (event) => Boolean(event.subscriber_attributes?.zelfName?.value);
+
 const webhookHandler = async (payload) => {
 	// we going to check for the event and confirm the information
 	const event = payload.event;
@@ -14,18 +31,18 @@ const webhookHandler = async (payload) => {
 
 		case "RENEWAL":
 		case "INITIAL_PURCHASE":
+			if (!_hasZelfName(event)) return _ignoreEvent(event, "zelf_name_missing");
+
 			return await _handleZelfKeysSubscriptionWebhook(event);
 
 		case "CANCELLATION":
+			if (!_hasZelfName(event)) return _ignoreEvent(event, "zelf_name_missing");
+
 			return await _handleZelfKeysSubscriptionCancellationWebhook(event);
 
 		default:
-			break;
+			return _ignoreEvent(event, "unhandled_event_type");
 	}
-
-	const error = new Error("webhook_failed");
-	error.status = 500;
-	throw error;
 };
 
 /**
