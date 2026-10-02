@@ -13,6 +13,7 @@ const TagWalletBalancesModule = require("../../Tags/modules/tag-wallet-balances.
 const MyZelfIdModule = require("../modules/my-zelf-id.module");
 const ZelfIdsOfflineModule = require("../modules/zelf-ids-offline.module");
 const ZelfIdsStripeModule = require("../modules/zelf-ids-stripe.module");
+const ZelfIdsRevenueCatModule = require("../modules/zelf-ids-revenue-cat.module");
 
 /**
  * Keep full pin name (e.g. user.zelfpay) for IPFS lookup; middleware only supplies registry TLD + local name.
@@ -253,7 +254,11 @@ const decryptTag = async (ctx) => {
 
 const revenueCatWebhook = async (ctx) => {
     try {
-        const data = await RevenueCatModule.revenueCatWebhook(ctx.request.body);
+        // The Tags revenue-cat module has no `revenueCatWebhook` export, so this
+        // route always failed. Zelf IDs use their own v4 handler.
+        const data = await ZelfIdsRevenueCatModule.confirmRevenueCatPurchase(ctx.request.body.event, {
+            allowSandbox: configuration.env !== "production",
+        });
 
         ctx.body = { data };
     } catch (error) {

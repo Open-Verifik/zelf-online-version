@@ -130,6 +130,22 @@ const getZelfIdPrice = ({ tagName, duration = "1", referralTagName = "", domainC
 };
 
 /**
+ * Checkout quote: priced with the same paid plan the payment will stamp.
+ * Without an explicit plan a long name pays (and is stamped) premium, never
+ * the Tags default table; short names always pay unlimited.
+ * @param {Object} [params] - same as `getZelfIdPrice`
+ * @returns {Object}
+ */
+const getZelfIdCheckoutPrice = ({ tagName, duration = "1", referralTagName = "", domainConfig, requestedPlan } = {}) =>
+    getZelfIdPrice({
+        tagName,
+        duration,
+        referralTagName,
+        domainConfig,
+        requestedPlan: resolvePaidPlan({ tagName, requestedPlan }),
+    });
+
+/**
  * Plan at lease time. Long names start `free` unless they pay later.
  * Short names that confirm immediately (`$0` after referral) still get `unlimited`.
  * @param {Object} params
@@ -399,6 +415,7 @@ module.exports = {
     allowedPlansForName,
     resolvePaidPlan,
     getZelfIdPrice,
+    getZelfIdCheckoutPrice,
     resolveZelfIdPlan,
     resolveComplimentaryPlan,
     resolveUpgradePlan,

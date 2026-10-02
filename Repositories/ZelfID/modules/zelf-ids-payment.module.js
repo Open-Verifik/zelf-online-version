@@ -25,7 +25,7 @@ const {
     resolveUpgradePlan,
     normalizePaymentDuration,
     getCanonicalMainnetName,
-    getZelfIdPrice,
+    getZelfIdCheckoutPrice,
 } = require("./zelf-id-plan.module");
 const ZelfIdPartsModule = require("./zelf-id-parts.module");
 
@@ -458,7 +458,10 @@ const getPaymentOptions = async (tagName, domain, duration, authUser, requestOpt
     const tagObject = tagData.tagObject;
     const requestedPlan = requestOptions.requestedPlan || requestOptions.plan;
     const normalizedDuration = normalizePaymentDuration(duration);
-    const priceDetails = getZelfIdPrice({
+    // Price with the plan this payment stamps (premium by default for long names).
+    // `getZelfIdPrice` without a plan read the Tags default table, so a long name
+    // paid the default price and was still stamped premium.
+    const priceDetails = getZelfIdCheckoutPrice({
         tagName,
         duration: normalizedDuration,
         referralTagName: tagObject.publicData.referralTagName,

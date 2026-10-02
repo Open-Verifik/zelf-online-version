@@ -1,4 +1,4 @@
-const { string, validate, stringEnum } = require("../../../Core/JoiUtils");
+const { string, number, validate, stringEnum } = require("../../../Core/JoiUtils");
 const jwt = require("jsonwebtoken");
 const moment = require("moment");
 const config = require("../../../Core/config");
@@ -74,6 +74,48 @@ const paymentSchemas = {
     stripeSession: {
         sessionId: string().required(),
     },
+    revenueCatEvent: {
+        type: string().required(),
+        id: string().required(),
+        product_id: string().required(),
+        transaction_id: string().required(),
+        environment: string().required(),
+        price: number().allow(null),
+    },
+};
+
+/**
+ * RevenueCat calls this with the Authorization header set in its dashboard.
+ * In production only the RevenueCat client JWT (REVENUECAT_ALLOWED_EMAIL) may
+ * call it: session tokens are free to mint, and the event extends a Zelf ID.
+ */
+const revenueCatWebhookValidation = async (ctx, next) => {
+    const { clientId, email } = ctx.state.user || {};
+    const allowedEmail = config.revenueCat?.allowedEmail;
+
+    if (config.env === "production" && (!clientId || !allowedEmail || email !== allowedEmail)) {
+        ctx.status = 403;
+        ctx.body = { validationError: "Access forbidden" };
+        return;
+    }
+
+    const event = ctx.request.body?.event;
+
+    if (!event || typeof event !== "object") {
+        ctx.status = 409;
+        ctx.body = { validationError: "Missing event payload" };
+        return;
+    }
+
+    const valid = validate(paymentSchemas.revenueCatEvent, event);
+
+    if (valid.error) {
+        ctx.status = 409;
+        ctx.body = { validationError: valid.error.message };
+        return;
+    }
+
+    await next();
 };
 
 const paymentOptionsValidation = async (ctx, next) => {
@@ -202,7 +244,7 @@ module.exports = {
     previewZelfProofValidation: TagsMiddleware.previewZelfProofValidation,
     previewZelfIdQrValidation: TagsMiddleware.previewZelfIdQrValidation,
     decryptValidation: TagsMiddleware.decryptValidation,
-    revenueCatWebhookValidation: TagsMiddleware.revenueCatWebhookValidation,
+    revenueCatWebhookValidation,
     referralRewardsValidation: TagsMiddleware.referralRewardsValidation,
     purchaseRewardsValidation: TagsMiddleware.purchaseRewardsValidation,
     walletBalancesValidation: TagsMiddleware.walletBalancesValidation,
