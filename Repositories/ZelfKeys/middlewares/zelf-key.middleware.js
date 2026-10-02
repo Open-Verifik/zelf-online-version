@@ -37,11 +37,9 @@ const schemas = {
 		faceBase64: string().required(),
 		masterPassword: string().optional().allow(""),
 		removePGP: boolean().optional(),
-		passwords: array()
-			.items(object(passwordCredentialSchema))
-			.min(1)
-			.max(BULK_PASSWORDS_MAX)
-			.required(),
+		// Rows are validated one by one in the module, so a bad row comes back in
+		// `failed[]` with its index instead of rejecting the whole batch with 409.
+		passwords: array().items(object().unknown(true)).min(1).max(BULK_PASSWORDS_MAX).required(),
 	},
 	zotp: {
 		username: string().required(),
