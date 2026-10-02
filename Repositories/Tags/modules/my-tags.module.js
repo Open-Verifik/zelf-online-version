@@ -3,7 +3,7 @@ const config = require("../../../Core/config");
 const { searchTag } = require("./tags.module");
 const TagsSearchModule = require("./tags-search.module");
 const moment = require("moment");
-const { getDomainConfig } = require("../config/supported-domains");
+const { getDomainConfig, loadDynamicDomains } = require("../config/supported-domains");
 const jwt = require("jsonwebtoken");
 const bitcoinModule = require("../../bitcoin/modules/bitcoin-scrapping.module");
 const ETHModule = require("../../etherscan/modules/etherscan-scrapping.module");
@@ -16,7 +16,7 @@ const { parseTagPayAmount, coerceInitiatedAtUnix, filterSessionInboundTransactio
 const { verifySmartContractPayment, throwPaymentConfirmationTagNotFound } = require("./tag-smart-contract-payment.module");
 
 const ReferralRewardModel = require("../models/referral-rewards.model");
-const TagsTokenModule = require("./tags-token.module");
+const RewardTransfer = require("./referral-reward-transfer");
 const IPFS = require("../../../Core/ipfs");
 const TagsArweaveModule = require("./tags-arweave.module");
 const LicenseModule = require("../../License/modules/license.module");
@@ -499,21 +499,27 @@ const sendEmailReceipt = async (tagName, domain, network, email, token) => {
     );
 };
 
+const _claimError = (status, code) => {
+    const err = new Error(code);
+    err.status = status;
+    err.code = code;
+    return err;
+};
+
 /**
- * 1. Create reward record if not found (status "pending").
- * 2. Call giveTokensAfterPurchase to send ZNS.
- * 3. On success: set status "completed", receipt fields (completedAt, payload, attempts++), save. Return { signature, rewardAmount }.
- * 4. On uncertain transfer failure: retain the pending lock until reconciliation.
- * @param {Object|null} rewardRecord - Existing record or null to create one
- * @param {string} friendFullTagName - Friend's full tag (e.g. one5024.sui)
- * @param {string} friendDomain - Friend's domain
- * @param {string} referralTagName - Referrer's full tag (e.g. miguel.zelf)
- * @param {string} domain - Referrer's domain
- * @param {Object} referrerTagRecord - Referrer's tag from IPFS (publicData.solanaAddress, publicData.ethAddress = who we reward)
- * @param {Object} friendRecord - IPFS/Arweave record for the friend's tag
- * @param {number} rewardAmount - ZNS amount to send
- * @returns {Promise<{ signature: string, rewardAmount: number }>}
- * @throws {Error} "token_transfer_failed" when giveTokensAfterPurchase fails (record stays pending for reconciliation, attempts incremented)
+ * Pays a referral reward behind the Mongo reservation, so it can never be paid twice.
+ * 1. Reserve: create the record as "processing", or move a "failed" one to "processing" (the
+ *    conditional update loses against a concurrent claim).
+ * 2. Store the transfer signature and last valid block height, then broadcast one signed
+ *    transaction (account creation + transfer).
+ * 3. Settle:
+ *    - nothing broadcast -> "failed" (retryable), 503 reward_transfer_not_sent
+ *    - failed on chain -> "failed" (retryable), 502 reward_transfer_failed
+ *    - unknown after the wait -> stays "processing"; _reconcileReferralReward settles it
+ *      from the stored signature, and the caller answers 202 reward_transfer_pending
+ *    - confirmed -> "completed" with the signature. The IPFS/Arweave receipt is written in
+ *      the background: a slow upload must not turn a paid claim into a gateway timeout.
+ * @returns {Promise<{ signature: string, rewardAmount: number, ipfsCid: null, pending?: boolean }>}
  */
 const _sendReferralRewardAndUpdateRecord = async (
     rewardRecord,
@@ -562,46 +568,83 @@ const _sendReferralRewardAndUpdateRecord = async (
     if (rewardRecord.isNew) {
         await rewardRecord.save();
     } else {
+        // Drop the previous attempt's signature in the same update: a reconciliation reading
+        // it would otherwise release this new reservation while its transfer is in flight.
         const locked = await ReferralRewardModel.updateOne(
-            { _id: rewardRecord._id, status: "failed" }, { $set: { status: "processing" } }
+            { _id: rewardRecord._id, status: "failed" },
+            { $set: { status: "processing" }, $unset: { "payload.transferSignature": "", "payload.lastValidBlockHeight": "" } }
         );
         if (locked.modifiedCount !== 1) throw new Error("reward_claim_in_progress");
         rewardRecord.status = "processing";
     }
 
     // 2. Send ZNS to referrer's Solana address (from their tag in IPFS)
-    let signature;
+    let storedSignature = null;
+    let transfer;
 
     try {
-        signature = await TagsTokenModule.giveTokensAfterPurchase(rewardAmount, referrerSolanaAddress);
+        transfer = await RewardTransfer.sendRewardTransfer(rewardAmount, referrerSolanaAddress, {
+            onSigned: async ({ signature, lastValidBlockHeight }) => {
+                rewardRecord.payload = {
+                    ...rewardRecord.payload,
+                    transferSignature: signature,
+                    lastValidBlockHeight,
+                    rewardAmount,
+                    requiresReconciliation: true,
+                    error: null,
+                };
+                await rewardRecord.save();
+                storedSignature = signature;
+            },
+        });
     } catch (error) {
         console.error("Error sending referral reward:", error);
 
-        // A timeout may happen after broadcast. Keep the claim locked until its
-        // outcome is reconciled; retrying blindly can transfer the reward twice.
-        rewardRecord.status = "processing";
-
-        rewardRecord.payload = { ...rewardRecord.payload, error: error?.message || "token_transfer_failed", requiresReconciliation: true };
-
         rewardRecord.attempts += 1;
 
+        if (storedSignature) {
+            // Not expected (the sender does not throw after the signature is stored), but if it
+            // does the transfer may be on the network: keep the reservation for reconciliation.
+            rewardRecord.payload = { ...rewardRecord.payload, error: error?.message || "reward_transfer_unknown" };
+            await rewardRecord.save();
+            return { pending: true, signature: storedSignature, rewardAmount, ipfsCid: null };
+        }
+
+        // Nothing reached the network: release the reservation so the claim can be retried.
+        rewardRecord.status = "failed";
+        rewardRecord.payload = { ...rewardRecord.payload, error: error?.message || "reward_transfer_not_sent", requiresReconciliation: false };
         await rewardRecord.save();
 
-        const err = new Error("token_transfer_failed");
-
-        err.status = 502;
-
-        throw err;
+        throw _claimError(503, "reward_transfer_not_sent");
     }
+
+    rewardRecord.attempts += 1;
+
+    if (transfer.state === "failed") {
+        console.error("Referral reward transfer failed on chain:", transfer.signature, transfer.error);
+        rewardRecord.status = "failed";
+        rewardRecord.payload = { ...rewardRecord.payload, error: transfer.error || "reward_transfer_failed", requiresReconciliation: false };
+        await rewardRecord.save();
+        throw _claimError(502, "reward_transfer_failed");
+    }
+
+    if (transfer.state !== "confirmed") {
+        console.warn("Referral reward transfer not confirmed yet, kept for reconciliation:", transfer.signature, transfer.error || "");
+        rewardRecord.payload = { ...rewardRecord.payload, error: transfer.error || null };
+        await rewardRecord.save();
+        return { pending: true, signature: transfer.signature, rewardAmount, ipfsCid: null };
+    }
+
+    const { signature } = transfer;
 
     // Record the on-chain signature before IPFS. A receipt outage must not pay twice.
     rewardRecord.status = "completed";
-    rewardRecord.payload = { ...rewardRecord.payload, signature, rewardAmount };
-    rewardRecord.attempts += 1;
+    rewardRecord.completedAt = new Date();
+    rewardRecord.payload = { ...rewardRecord.payload, signature, rewardAmount, requiresReconciliation: false, error: null };
     await rewardRecord.save();
 
     // 3. Success: store receipt in IPFS and update MongoDB
-    const ipfsCid = await _storeReferralRewardReceipt({
+    _storeReferralRewardReceipt({
         rewardRecord,
         friendFullTagName,
         friendDomain,
@@ -613,9 +656,58 @@ const _sendReferralRewardAndUpdateRecord = async (
         referrerEthAddress,
         friendRecord,
         rewardType,
-    });
+    }).catch((error) => console.error("Error storing referral reward receipt:", error));
 
-    return { signature, rewardAmount, ipfsCid };
+    return { signature, rewardAmount, ipfsCid: null };
+};
+
+/**
+ * Settles a "processing" claim from the transfer signature stored before its broadcast.
+ * Older claims without a stored signature are left as they are: only a person can decide them.
+ * @param {Object} record - TagsReferralReward document (updated in place when settled)
+ */
+const _reconcileReferralReward = async (record) => {
+    const signature = record?.payload?.transferSignature;
+
+    if (record?.status !== "processing" || !signature) return record;
+
+    let outcome;
+
+    try {
+        outcome = await RewardTransfer.getRewardTransferOutcome({ signature, lastValidBlockHeight: record.payload.lastValidBlockHeight });
+    } catch (error) {
+        console.error("Referral reward reconciliation failed:", signature, error?.message || error);
+        return record;
+    }
+
+    let status;
+    let payload;
+
+    if (outcome.state === "confirmed") {
+        status = "completed";
+        payload = { ...record.payload, signature, requiresReconciliation: false, error: null, reconciledAt: new Date().toISOString() };
+    } else if (outcome.state === "failed" || outcome.state === "expired") {
+        status = "failed";
+        payload = {
+            ...record.payload,
+            requiresReconciliation: false,
+            error: outcome.state === "expired" ? "reward_transfer_expired" : outcome.error || "reward_transfer_failed",
+            reconciledAt: new Date().toISOString(),
+        };
+    } else {
+        return record;
+    }
+
+    const $set = status === "completed" ? { status, payload, completedAt: new Date() } : { status, payload };
+
+    const result = await ReferralRewardModel.updateOne({ _id: record._id, status: "processing", "payload.transferSignature": signature }, { $set });
+
+    if (result.modifiedCount === 1) {
+        record.status = status;
+        record.payload = payload;
+    }
+
+    return record;
 };
 
 /**
@@ -744,6 +836,44 @@ const _storeReferralRewardReceipt = async ({
 };
 
 /**
+ * Domain config for the referral endpoints, waiting for the license cache when it is empty.
+ * That cache expires every two hours and refills in the background; until the refill lands
+ * getDomainConfig returns null, the storage searches read null as "storage disabled", and the
+ * referral list came back empty with HTTP 200 (#514, 2026-10-01 21:00-21:02 UTC).
+ * @param {string} domain
+ * @returns {Promise<Object>} Domain config
+ * @throws 400 domain_not_supported, or 503 domain_config_unavailable when the licenses cannot be loaded
+ */
+const _requireDomainConfig = async (domain) => {
+    const name = String(domain || "").replace(/^\./, "").trim().toLowerCase();
+
+    if (!name) throw new Error("400:domain_not_supported");
+
+    const cached = getDomainConfig(name);
+
+    if (cached) return cached;
+
+    let loaded = null;
+
+    try {
+        loaded = await loadDynamicDomains(null, false);
+    } catch (error) {
+        console.error("Referral domain config reload failed:", error?.message || error);
+    }
+
+    const domainConfig = getDomainConfig(name);
+
+    if (domainConfig) return domainConfig;
+
+    if (loaded && Object.keys(loaded).length) throw new Error("400:domain_not_supported");
+
+    const err = new Error("domain_config_unavailable");
+    err.status = 503;
+    err.code = "domain_config_unavailable";
+    throw err;
+};
+
+/**
  * Step 1: Verify referral exists in IPFS/Arweave and return the friend's record.
  * @param {string} referralTagName - Full referrer tag (e.g. miguel.zelf)
  * @param {string} friendFullTagName - Full friend tag to find (e.g. one5024.sui)
@@ -754,7 +884,7 @@ const _storeReferralRewardReceipt = async ({
  * @throws {Error} "referral_not_found" if no record matches friendFullTagName
  */
 const _findReferralRecordInStorage = async (referralTagName, friendFullTagName, friendDomain, rewardType, authUser) => {
-    const domainConfig = getDomainConfig(friendDomain);
+    const domainConfig = await _requireDomainConfig(friendDomain);
 
     const ipfsRecords = await TagsSearchModule.searchIPFS(
         {
@@ -855,6 +985,7 @@ const _readReferralReward = async (friendFullTagName, referralTagName, rewardTyp
     // Do not let a storage failure authorize a second payment.
     const receipts = (await Promise.all(keys.map((key) => IPFS.filter("rewardPrimaryKey", `referral_${key}_${referralTagName}`, { throwOnError: true })))).flat();
     const records = await ReferralRewardModel.find({ tagName: { $in: keys }, referralTagName });
+    for (const record of records) await _reconcileReferralReward(record);
     const ipfsReward = receipts.find(Boolean);
     const mongoRecord = records.find((record) => record.status === "completed" || record.payload?.signature)
         || records.find((record) => ["pending", "processing"].includes(record.status)) || records[0];
@@ -888,9 +1019,7 @@ const claimReferralReward = async (tagName, domain, friendTagName, friendDomain,
 
     const normalizedDomain = (domain || "").replace(/^\./, "").trim().toLowerCase();
 
-    const domainConfig = getDomainConfig(normalizedDomain);
-
-    if (!domainConfig) throw new Error("400:domain_not_supported");
+    const domainConfig = await _requireDomainConfig(normalizedDomain);
 
     const referrerTagData = await searchTag({ tagName: referralTagName, domain: normalizedDomain }, {});
 
@@ -913,6 +1042,7 @@ const claimReferralReward = async (tagName, domain, friendTagName, friendDomain,
         signature,
         rewardAmount: amount,
         ipfsCid,
+        pending,
     } = await _sendReferralRewardAndUpdateRecord(
         rewardRecord,
         friendFullTagName,
@@ -924,6 +1054,9 @@ const claimReferralReward = async (tagName, domain, friendTagName, friendDomain,
         rewardAmount,
         rewardType
     );
+
+    // Broadcast but not confirmed yet: the reservation stays "processing" and the list settles it.
+    if (pending) return { success: false, pending: true, status: "processing", message: "reward_transfer_pending", rewardAmount: amount, signature };
 
     return { success: true, rewardAmount: amount, signature, ipfsCid };
 };
@@ -938,7 +1071,8 @@ const claimReferralReward = async (tagName, domain, friendTagName, friendDomain,
 const getMyReferrals = async (tagName, domain, authUser) => {
     const referralTagName = tagName.includes(".") ? tagName : `${tagName}.${domain}`;
 
-    const domainConfig = getDomainConfig(domain);
+    // Never answer "no referrals" because the domain config was momentarily missing (#514).
+    const domainConfig = await _requireDomainConfig(domain);
 
     const ipfsRecords = await TagsSearchModule.searchIPFS(
         {

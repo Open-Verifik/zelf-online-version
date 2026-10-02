@@ -134,6 +134,9 @@ const claimReferralReward = async (ctx) => {
 
         const data = await Module.claimReferralReward(tagName, domain, friendTagName, friendDomain, ctx.state.user, rewardType);
 
+        // Broadcast but not confirmed yet: accepted, settled later from the stored signature.
+        if (data?.pending) ctx.status = 202;
+
         ctx.body = { data };
     } catch (error) {
         const _exception = errorHandler(error, ctx);
