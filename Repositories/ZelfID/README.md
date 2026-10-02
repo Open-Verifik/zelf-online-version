@@ -33,8 +33,8 @@ Registered in `Routes/protected-repositories.js`.
 | POST | `/preview-zelf-id-qr` | `zelfProofQRCode`, `os` |
 | POST | `/decrypt` | `tagName`, `domain`, `faceBase64`, `os` |
 | POST | `/revenue-cat` | RevenueCat `event` object |
-| POST | `/purchase-rewards` | — |
-| POST | `/referral-rewards` | — |
+| POST | `/purchase-rewards` | — (super admin; releases the oldest pending Tags purchase reward, 202 while its transfer is unconfirmed) |
+| POST | `/referral-rewards` | — (super admin; 410, referral rewards are claimed per referral with `POST /api/my-tags/referrals/claim`) |
 
 `os`: `DESKTOP` | `ANDROID` | `IOS`. New leases stamp `origin: "online"` and short `v: 4`. Short unpaid holds last 5 hours; longer names lease as `free` and upgrade on payment.
 

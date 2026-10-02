@@ -27,13 +27,21 @@ const tokenAccountData = (amount) => {
 	data.writeBigUInt64LE(BigInt(amount), 64);
 	return data;
 };
+const mintAccount = (decimals) => {
+	const data = Buffer.alloc(82);
+	data.writeUInt8(decimals, 44);
+	return { data, owner: spl.TOKEN_PROGRAM_ID };
+};
+/** The mint answers with its layout; every other address is the rewards wallet token account. */
+const accounts = ({ balance = 75_607 * 1e8, decimals = 8 } = {}) => async (address) =>
+	address.equals(mockMint) ? mintAccount(decimals) : { data: tokenAccountData(balance) };
 
 let calls;
 
 beforeEach(() => {
 	calls = [];
 	Object.assign(mockConnection, {
-		getAccountInfo: jest.fn(async () => ({ data: tokenAccountData(75_607 * 1e8) })),
+		getAccountInfo: jest.fn(accounts()),
 		getLatestBlockhash: jest.fn(async () => ({ blockhash: solanaWeb3.Keypair.generate().publicKey.toBase58(), lastValidBlockHeight: 1000 })),
 		sendRawTransaction: jest.fn(async (raw) => {
 			calls.push("send");
@@ -77,7 +85,7 @@ describe("sendRewardTransfer", () => {
 	});
 
 	test("an empty rewards wallet fails before signing", async () => {
-		mockConnection.getAccountInfo.mockResolvedValue({ data: tokenAccountData(5 * 1e8) });
+		mockConnection.getAccountInfo.mockImplementation(accounts({ balance: 5 * 1e8 }));
 		const onSigned = jest.fn();
 
 		await expect(RewardTransfer.sendRewardTransfer(10, RECEIVER, { onSigned })).rejects.toThrow("rewards_wallet_insufficient_balance");
@@ -149,6 +157,62 @@ test("amounts are whole ZNS, including rewards of 1000 ZNS or more", () => {
 	expect(RewardTransfer.toBaseUnits(10)).toBe(1_000_000_000);
 	expect(RewardTransfer.toBaseUnits(1500)).toBe(150_000_000_000);
 	expect(RewardTransfer.toBaseUnits(1.25)).toBe(125_000_000);
+	expect(RewardTransfer.toBaseUnits(250, 8)).toBe(25_000_000_000);
+	expect(RewardTransfer.toBaseUnits(1500, 6)).toBe(1_500_000_000);
 	expect(() => RewardTransfer.toBaseUnits(0)).toThrow("invalid_reward_amount");
 	expect(() => RewardTransfer.toBaseUnits("abc")).toThrow("invalid_reward_amount");
+	expect(() => RewardTransfer.toBaseUnits(null)).toThrow("invalid_reward_amount");
+	expect(() => RewardTransfer.toBaseUnits(true)).toThrow("invalid_reward_amount");
+	expect(() => RewardTransfer.toBaseUnits(10, 8.5)).toThrow("invalid_mint_decimals");
+});
+
+describe("mint decimals (2026-10-01 audit)", () => {
+	const freshModule = () => {
+		let fresh;
+		jest.isolateModules(() => {
+			fresh = require("../../Repositories/Tags/modules/referral-reward-transfer");
+		});
+		return fresh;
+	};
+
+	test("a reward of 1000 ZNS or more is sent in full, converted with the mint decimals", async () => {
+		const result = await RewardTransfer.sendRewardTransfer(1500, RECEIVER, { onSigned: async () => {}, pollIntervalMs: 1 });
+
+		const sent = solanaWeb3.Transaction.from(mockConnection.sendRawTransaction.mock.calls[0][0]);
+		const transfer = sent.instructions[2];
+		expect(result.state).toBe("confirmed");
+		expect(transfer.data.readBigUInt64LE(1)).toBe(150_000_000_000n);
+		expect(transfer.data.readUInt8(9)).toBe(8);
+	});
+
+	test("the decimals come from the mint account, not from a constant", async () => {
+		mockConnection.getAccountInfo.mockImplementation(accounts({ decimals: 6, balance: 10_000 * 1e6 }));
+		const fresh = freshModule();
+
+		await fresh.sendRewardTransfer(250, RECEIVER, { onSigned: async () => {}, pollIntervalMs: 1 });
+
+		const transfer = solanaWeb3.Transaction.from(mockConnection.sendRawTransaction.mock.calls[0][0]).instructions[2];
+		expect(transfer.data.readBigUInt64LE(1)).toBe(250_000_000n);
+		expect(transfer.data.readUInt8(9)).toBe(6);
+	});
+
+	test("an unreadable mint fails before anything is signed", async () => {
+		mockConnection.getAccountInfo.mockImplementation(async () => ({ data: tokenAccountData(1) }));
+		const fresh = freshModule();
+		const onSigned = jest.fn();
+
+		await expect(fresh.sendRewardTransfer(10, RECEIVER, { onSigned })).rejects.toThrow("reward_mint_unreadable");
+		expect(onSigned).not.toHaveBeenCalled();
+		expect(mockConnection.sendRawTransaction).not.toHaveBeenCalled();
+	});
+
+	test("the mint is read once per process", async () => {
+		const fresh = freshModule();
+
+		await fresh.sendRewardTransfer(10, RECEIVER, { onSigned: async () => {}, pollIntervalMs: 1 });
+		await fresh.sendRewardTransfer(10, RECEIVER, { onSigned: async () => {}, pollIntervalMs: 1 });
+
+		const mintReads = mockConnection.getAccountInfo.mock.calls.filter(([address]) => address.equals(mockMint));
+		expect(mintReads).toHaveLength(1);
+	});
 });

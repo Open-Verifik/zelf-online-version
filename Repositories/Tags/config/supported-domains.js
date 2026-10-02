@@ -9,6 +9,28 @@ const { asLicenseJson, mergeLicenseMap, preferLicense } = require("../../License
 // Initialize cache for dynamic domains with 2 hour TTL (see cache/manager.js stdTTL)
 const domainsCache = initCacheInstance();
 
+const CACHE_KEY = "official-licenses";
+
+/** After a reload fails or comes back empty, background lookups wait this long before retrying. */
+const RELOAD_RETRY_MS = 30 * 1000;
+
+/**
+ * Stale-while-revalidate state, per process (each pm2 worker has its own).
+ * When the cache entry expires, lookups keep the last licenses this worker saw while ONE
+ * reload refreshes them: handing out the empty static list made every endpoint answer
+ * "domain not supported" or empty data until the reload landed.
+ */
+let lastKnownDomains = null;
+let reloadInFlight = null;
+let nextBackgroundReloadAt = 0;
+
+const _hasDomains = (domains) => Boolean(domains && typeof domains === "object" && Object.keys(domains).length > 0);
+
+const _rememberDomains = (domains) => {
+    if (_hasDomains(domains)) lastKnownDomains = domains;
+    return domains;
+};
+
 /**
  * Supported Domains Configuration
  * This file defines all supported domain types and their configurations using Domain class instances
@@ -234,12 +256,11 @@ const getDomainLimits = (domain) => {
  */
 const loadCache = () => {
     try {
-        const cached = domainsCache.get("official-licenses");
+        const cached = domainsCache.get(CACHE_KEY);
 
-        if (cached) {
-            console.info("Loading dynamic domains from memory cache");
-            return cached;
-        }
+        // An empty map is a miss: it must never hide the last known licenses.
+        if (_hasDomains(cached)) return _rememberDomains(cached);
+
         return null;
     } catch (error) {
         console.error("Error loading from cache:", error);
@@ -257,10 +278,12 @@ const upsertCachedDomain = (licenseData) => {
 
     try {
         const key = String(licenseData.name).toLowerCase();
-        const cached = loadCache() || {};
+        // After expiry start from the last known map, or the cache would hold this domain only.
+        const cached = loadCache() || { ...(lastKnownDomains || {}) };
         const chosen = asLicenseJson(preferLicense(cached[key], licenseData));
         cached[key] = new Domain(chosen);
-        domainsCache.set("official-licenses", cached);
+        domainsCache.set(CACHE_KEY, cached);
+        _rememberDomains(cached);
     } catch (error) {
         console.error("Error upserting cached domain:", error);
     }
@@ -271,16 +294,14 @@ const upsertCachedDomain = (licenseData) => {
  * @param {Object} domains - Domain objects to cache
  */
 const saveCache = (domains) => {
+    // Never replace known licenses with an empty map (e.g. Pinata answering an empty list).
+    if (!_hasDomains(domains)) return;
+
     try {
-        // Check if we need to update the cache (avoid unnecessary operations)
-        const existingCache = loadCache();
-
-        if (existingCache && JSON.stringify(existingCache) === JSON.stringify(domains)) {
-            return;
-        }
-
-        // Save to memory cache with automatic expiration
-        domainsCache.set("official-licenses", domains);
+        // Always set, even when the data is identical: set() is what restarts the TTL. Skipping
+        // identical saves made the licenses expire two hours after their last change.
+        domainsCache.set(CACHE_KEY, domains);
+        _rememberDomains(domains);
     } catch (error) {
         console.error("Error saving to cache:", error);
     }
@@ -330,49 +351,83 @@ const loadDynamicDomains = async (licenses = null, force = false) => {
         }
     }
 
-    // If no licenses provided or processing failed, try fetching from IPFS
-    try {
-        // Fetch from IPFS
-        const officialLicenses = await IPFS.get({ key: "type", value: "license" });
+    // If no licenses provided or processing failed, reload from IPFS (one shared reload)
+    return _reloadFromIpfs();
+};
 
-        const dynamicDomains = {};
+/**
+ * Reloads the licenses from IPFS. Concurrent callers share the reload in flight instead of
+ * each starting their own. Never rejects: on failure, or when nothing comes back, it resolves
+ * with the last known domains (or null when this process never loaded any).
+ * @returns {Promise<Object|null>}
+ */
+const _reloadFromIpfs = () => {
+    if (reloadInFlight) return reloadInFlight;
 
-        const incoming = [];
-        for (const license of officialLicenses) {
-            try {
-                const licenseData = await _loadLicenseJSON(license.url);
-                if (licenseData.name) incoming.push(licenseData);
-            } catch (error) {
-                console.error(`Error loading license ${license.id}:`, error.message);
+    const reload = (async () => {
+        try {
+            const officialLicenses = await IPFS.get({ key: "type", value: "license" });
+
+            const incoming = [];
+            for (const license of officialLicenses || []) {
+                try {
+                    const licenseData = await _loadLicenseJSON(license.url);
+                    if (licenseData.name) incoming.push(licenseData);
+                } catch (error) {
+                    console.error(`Error loading license ${license.id}:`, error.message);
+                }
             }
+
+            // Nothing came back (Pinata hiccup): not a successful reload. Keep the last known
+            // licenses without restarting their TTL, and retry soon.
+            if (!incoming.length) {
+                console.warn("License reload returned no licenses; keeping the last known licenses");
+                nextBackgroundReloadAt = Date.now() + RELOAD_RETRY_MS;
+                return loadCache() || lastKnownDomains;
+            }
+
+            const existingJson = {};
+            for (const [name, domain] of Object.entries(loadCache() || lastKnownDomains || {})) {
+                existingJson[name] = asLicenseJson(domain);
+            }
+            const merged = mergeLicenseMap(existingJson, incoming);
+
+            const dynamicDomains = {};
+            for (const [name, license] of Object.entries(merged)) {
+                dynamicDomains[name] = new Domain(license);
+            }
+
+            saveCache(dynamicDomains);
+            nextBackgroundReloadAt = 0;
+
+            console.info(`Loaded ${Object.keys(dynamicDomains).length} dynamic domains from IPFS successfully`);
+
+            return dynamicDomains;
+        } catch (error) {
+            console.error("Error loading dynamic domains from IPFS:", error?.message || error);
+            nextBackgroundReloadAt = Date.now() + RELOAD_RETRY_MS;
+
+            const fallback = loadCache() || lastKnownDomains;
+            if (fallback) console.warn("Using the last known domains as fallback");
+
+            return fallback || null;
         }
+    })();
 
-        const existingJson = {};
-        for (const [name, domain] of Object.entries(loadCache() || {})) {
-            existingJson[name] = asLicenseJson(domain);
-        }
-        const merged = mergeLicenseMap(existingJson, incoming);
-        for (const [name, license] of Object.entries(merged)) {
-            dynamicDomains[name] = new Domain(license);
-        }
+    reloadInFlight = reload;
+    const clear = () => {
+        if (reloadInFlight === reload) reloadInFlight = null;
+    };
+    reload.then(clear, clear);
 
-        saveCache(dynamicDomains);
+    return reload;
+};
 
-        console.info(`Loaded ${Object.keys(dynamicDomains).length} dynamic domains from IPFS successfully`);
+/** Starts a background reload unless one is running or a recent one just failed. */
+const _refreshInBackground = () => {
+    if (reloadInFlight || Date.now() < nextBackgroundReloadAt) return;
 
-        return dynamicDomains;
-    } catch (error) {
-        console.error("Error loading dynamic domains from IPFS:", error);
-
-        // Try to return cached data as fallback
-        const fallbackCache = loadCache();
-        if (fallbackCache) {
-            console.warn("Using cached domains as fallback");
-            return fallbackCache;
-        }
-
-        return null;
-    }
+    _reloadFromIpfs().catch((error) => console.error("Background fetch of domains failed:", error));
 };
 
 const getSupportedDomains = (licenses = null) => {
@@ -383,7 +438,7 @@ const getSupportedDomains = (licenses = null) => {
 
         if (licenseList && licenseList.length > 0) {
             const existingJson = {};
-            for (const [name, domain] of Object.entries(loadCache() || {})) {
+            for (const [name, domain] of Object.entries(loadCache() || lastKnownDomains || {})) {
                 existingJson[name] = asLicenseJson(domain);
             }
             const merged = mergeLicenseMap(existingJson, licenseList);
@@ -403,17 +458,14 @@ const getSupportedDomains = (licenses = null) => {
             return { ...SUPPORTED_DOMAINS, ...cachedDomains };
         }
 
-        // If no cache and no licenses provided, trigger async fetch in background
-        // but return static domains immediately for this call
-        // The cache will be populated for subsequent calls
-        loadDynamicDomains(null, false).catch((error) => {
-            console.error("Background fetch of domains failed:", error);
-        });
+        // Expired (or never loaded): refresh in the background and keep answering with the last
+        // known licenses meanwhile. Only a process that never loaded any gets the static list.
+        _refreshInBackground();
     } catch (error) {
         console.warn("Error loading dynamic domains:", error.message);
     }
 
-    return SUPPORTED_DOMAINS;
+    return lastKnownDomains ? { ...SUPPORTED_DOMAINS, ...lastKnownDomains } : SUPPORTED_DOMAINS;
 };
 
 const isWalrusStorageSupported = (domain, app) => {
