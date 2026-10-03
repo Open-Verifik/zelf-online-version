@@ -61,6 +61,23 @@ const withExplorerRetry = async (fn, { attempts = 3, label = "BlockDAG API" } = 
     throw lastError;
 };
 
+/**
+ * Per-step deadlines for the wallet endpoints. The apps give each network ~8 s, so a
+ * slow upstream must not hold the whole response.
+ */
+const EXPLORER_STEP_TIMEOUT_MS = 4000;
+const RPC_STEP_TIMEOUT_MS = 5000;
+const ADDRESS_STEP_TIMEOUT_MS = 5000;
+
+/** Rejects with `<label> timeout after <ms>ms` when `promise` takes longer than `ms`. */
+const withDeadline = (promise, ms, label) => {
+    let timer;
+    const deadline = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
+    });
+    return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+};
+
 // BlockDAG JSON-RPC — public endpoint only (dapps-rpc.bdagscan.com is broken / blocked).
 // Optional BLOCKDAG_MAIN_RPC_URL may still override; if it differs from rpcUrl we try it once then fall back.
 const BLOCKDAG_PUBLIC_RPC = "https://rpc.bdagscan.com";
@@ -174,12 +191,13 @@ const apiForTransactionDetails = "https://api.bdagscan.com/v1/api/transaction/ge
  */
 
 // Helper function to get address balance and details from API
-const getAddressBalanceFromAPI = async (address) => {
+const getAddressBalanceFromAPI = async (address, { attempts = 3, timeout } = {}) => {
     try {
         return await withExplorerRetry(
             async () => {
                 const response = await instance.get(`${apiForAddressBalance}${address}`, {
                     headers: explorerApiHeaders(),
+                    ...(timeout ? { timeout } : {}),
                 });
 
                 if (response.data && response.data.status === 200 && response.data.data) {
@@ -192,7 +210,7 @@ const getAddressBalanceFromAPI = async (address) => {
                 }
                 throw new Error("Invalid API response");
             },
-            { label: "BlockDAG API balance" }
+            { label: "BlockDAG API balance", attempts }
         );
     } catch (error) {
         console.error("BlockDAG API balance fetch failed:", error.message);
@@ -201,7 +219,7 @@ const getAddressBalanceFromAPI = async (address) => {
 };
 
 // Helper function to get address transactions from API
-const getAddressTransactionsFromAPI = async (address, page = 1, limit = 20, exportData = false) => {
+const getAddressTransactionsFromAPI = async (address, page = 1, limit = 20, exportData = false, { attempts = 3, timeout } = {}) => {
     try {
         return await withExplorerRetry(
             async () => {
@@ -213,6 +231,7 @@ const getAddressTransactionsFromAPI = async (address, page = 1, limit = 20, expo
                         export: exportData,
                     },
                     headers: explorerApiHeaders(),
+                    ...(timeout ? { timeout } : {}),
                 });
 
                 if (response.data && response.data.status === 200) {
@@ -221,7 +240,7 @@ const getAddressTransactionsFromAPI = async (address, page = 1, limit = 20, expo
                 }
                 throw new Error("Invalid API response");
             },
-            { label: "BlockDAG API transactions" }
+            { label: "BlockDAG API transactions", attempts }
         );
     } catch (error) {
         console.error("BlockDAG API transactions fetch failed:", error.message);
@@ -416,11 +435,21 @@ const fetchTransactionsFromRPC = async (address) => {
 
     if (!response || response.error) {
         const errorCode = response?.error?.code;
+
+        // -32601 es "method not found". `getAddressTxs` no es un metodo del estandar
+        // JSON-RPC de EVM y la red no lo expone, asi que este camino se toma siempre.
+        // Antes se logueaba "Returning empty transactions" pero igual se lanzaba, con
+        // lo cual el fallo se propagaba y tumbaba toda la consulta de la red: el saldo
+        // tampoco se mostraba, aunque se hubiera obtenido sin problema.
+        //
+        // Devolver una lista vacia degrada de forma correcta: la wallet muestra el
+        // saldo y el historial queda vacio, en vez de no mostrar nada.
         if (errorCode === -32601) {
-            console.log(`BlockDAG RPC: getAddressTxs method not available. Returning empty transactions.`);
-        } else {
-            console.error("RPC error:", response?.data?.error || "Unknown error");
+            console.log("BlockDAG: el nodo no expone getAddressTxs; historial vacio.");
+            return [];
         }
+
+        console.error("RPC error:", response?.data?.error || "Unknown error");
         throw new Error(response?.data?.error?.message || "RPC request failed");
     }
 
@@ -444,27 +473,36 @@ const getLatestBlock = async () => {
  * @returns {Promise<Object>} Object containing balance and transaction stats
  */
 const fetchBdagBalance = async (address) => {
-    try {
-        return await getAddressBalanceFromAPI(address);
-    } catch (apiError) {
-        console.log("BlockDAG API balance fetch failed, trying RPC:", apiError.message);
-        try {
-            const data = await requestRPC("eth_getBalance", [address, "latest"]);
-            const balance = data.result ? (parseInt(data.result, 16) / Math.pow(10, 18)).toString() : "0";
-            return {
-                balance,
-                firstTransaction: null,
-                lastTransaction: null,
-            };
-        } catch (error) {
-            console.error("BlockDAG RPC balance fetch failed:", error.message);
-            return {
-                balance: "0",
-                firstTransaction: null,
-                lastTransaction: null,
-            };
-        }
+    // The explorer API (api.bdagscan.com) can hang for minutes. With 3 attempts of 15 s
+    // it took ~46 s before falling back to the RPC, longer than any client waits.
+    // Ask both at once: the RPC answers the balance in ~0.1 s, and the explorer only
+    // adds first/last transaction when it answers within its short deadline.
+    const [explorer, rpc] = await Promise.allSettled([
+        withDeadline(
+            getAddressBalanceFromAPI(address, { attempts: 1, timeout: EXPLORER_STEP_TIMEOUT_MS }),
+            EXPLORER_STEP_TIMEOUT_MS,
+            "BlockDAG API balance"
+        ),
+        withDeadline(requestRPC("eth_getBalance", [address, "latest"]), RPC_STEP_TIMEOUT_MS, "BlockDAG RPC balance"),
+    ]);
+
+    if (explorer.status === "fulfilled" && explorer.value) return explorer.value;
+
+    if (rpc.status === "fulfilled" && rpc.value?.result) {
+        return {
+            balance: (parseInt(rpc.value.result, 16) / Math.pow(10, 18)).toString(),
+            firstTransaction: null,
+            lastTransaction: null,
+        };
     }
+
+    console.error(
+        "BlockDAG balance unavailable:",
+        explorer.reason?.message || "explorer empty",
+        "/",
+        rpc.reason?.message || "rpc empty"
+    );
+    return { balance: "0", firstTransaction: null, lastTransaction: null };
 };
 
 /**
@@ -537,53 +575,24 @@ const createNativeBdagToken = (address, balance, price, fiatBalance) => {
 };
 
 /**
- * Create error transaction object
- * @param {string} address - Wallet address
- * @param {string} errorMessage - Error message
- * @returns {Object} Error transaction object
- */
-const createErrorTransaction = (address, errorMessage) => {
-    return [
-        {
-            hash: "0x" + "0".repeat(64),
-            method: "Error",
-            block: "N/A",
-            age: "N/A",
-            date: "N/A",
-            from: address,
-            traffic: "ERROR",
-            to: address,
-            fiatAmount: "0.00",
-            amount: "0",
-            asset: "BDAG",
-            txnFee: "0",
-            note: `Transaction fetch failed: ${errorMessage}`,
-        },
-    ];
-};
-
-/**
- * Fetch transactions for an address with timeout
- * @param {string} address - Address to fetch transactions for
- * @returns {Promise<Array>} Array of transactions
+ * Latest transactions for the wallet history: one short attempt against the explorer.
+ * The RPC has no address-history method (`getAddressTxs` is not exposed), so when the
+ * explorer is down the list is empty and `available` is false. It used to return a fake
+ * "Error" transaction that the apps rendered as a real movement.
+ * @param {string} address
+ * @returns {Promise<{ transactions: Array, available: boolean }>}
  */
 const fetchAddressTransactions = async (address) => {
     try {
-        const transactionTimeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error("Transaction fetch timeout")), 6000);
-        });
-
-        const transactionDataPromise = getTransactionsList({
-            address,
-            page: "0",
-            show: "20",
-        });
-
-        const transactionsData = await Promise.race([transactionDataPromise, transactionTimeoutPromise]);
-        return transactionsData.transactions || [];
+        const apiTransactions = await withDeadline(
+            getAddressTransactionsFromAPI(address, 1, 20, false, { attempts: 1, timeout: ADDRESS_STEP_TIMEOUT_MS }),
+            ADDRESS_STEP_TIMEOUT_MS,
+            "BlockDAG API transactions"
+        );
+        return { transactions: apiTransactions.map((tx) => transformApiTransaction(tx, address)), available: true };
     } catch (error) {
-        console.error("Transaction fetch failed:", error.message);
-        return createErrorTransaction(address, error.message);
+        console.warn("BlockDAG history unavailable:", error.message);
+        return { transactions: [], available: false };
     }
 };
 
@@ -636,6 +645,11 @@ const buildAddressResponse = (
 
 /**
  * Get comprehensive address information for BlockDAG
+ *
+ * Balance, price, tokens and history run in parallel, each with its own deadline, so
+ * the answer arrives in ~5 s at worst. It used to run them one after another behind a
+ * 30 s cap: with the explorer hanging it always took 30 s and the apps, which wait ~8 s,
+ * showed BlockDAG as failed (#580).
  * @param {Object} query - Query parameters containing address
  * @returns {Object} Address data with balance, tokens, and transactions
  */
@@ -643,46 +657,36 @@ const getAddress = async (query) => {
     try {
         const { address } = query;
 
-        // Add overall timeout to prevent hanging
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error("BlockDAG API timeout after 30 seconds")), 30000);
-        });
+        const [bdagData, bdagPrice, tokensData, history] = await Promise.all([
+            fetchBdagBalance(address),
+            fetchBDAGPrice(),
+            withDeadline(fetchAddressTokens(address), ADDRESS_STEP_TIMEOUT_MS, "BlockDAG tokens").catch((error) => {
+                console.warn(error.message);
+                return { tokens: [], totalFiatBalance: 0 };
+            }),
+            fetchAddressTransactions(address),
+        ]);
 
-        const dataPromise = (async () => {
-            // Fetch balance first (API call)
-            const bdagData = await fetchBdagBalance(address);
+        const bdagBalance = bdagData.balance;
+        const fiatBalance = parseFloat(bdagBalance) * parseFloat(bdagPrice);
 
-            // Fetch price and tokens in parallel
-            const [bdagPrice, tokensData] = await Promise.all([fetchBDAGPrice(), fetchAddressTokens(address)]);
+        const tokens = [...tokensData.tokens];
+        tokens.unshift(createNativeBdagToken(address, bdagBalance, bdagPrice, fiatBalance));
 
-            const bdagBalance = bdagData.balance;
-
-            // Calculate fiat balance
-            const fiatBalance = parseFloat(bdagBalance) * parseFloat(bdagPrice);
-
-            // Add native BDAG token to tokens array
-            const tokens = [...tokensData.tokens];
-            const nativeBdagToken = createNativeBdagToken(address, bdagBalance, bdagPrice, fiatBalance);
-            tokens.unshift(nativeBdagToken);
-
-            // Fetch transactions
-            const transactions = await fetchAddressTransactions(address);
-
-            // Build and return response
-            return buildAddressResponse(
+        return {
+            ...buildAddressResponse(
                 address,
                 bdagBalance,
                 bdagPrice,
                 fiatBalance,
                 tokens,
-                transactions,
+                history.transactions,
                 tokensData.totalFiatBalance,
                 bdagData.firstTransaction,
                 bdagData.lastTransaction
-            );
-        })();
-
-        return await Promise.race([dataPromise, timeoutPromise]);
+            ),
+            transactionsUnavailable: !history.available,
+        };
     } catch (error) {
         console.error("BlockDAG getAddress error:", error.message || "Unknown error");
         return {
