@@ -152,14 +152,6 @@ const _syncOfflineTag = async (tagRecord, tagKey, syncPublicData, sync, password
 };
 
 /**
- * 409 for requests that can't succeed by retrying. Without a status these answered 500
- * and the apps retried lease-offline on every wallet load (App Store iOS 2.20.6: one user
- * ~20 times in 4 minutes); the apps treat 409 as final.
- * @param {string} message
- */
-const conflict = (message) => Object.assign(new Error(message), { status: 409 });
-
-/**
  * lease offline tag
  * @param {Object} params
  * @param {Object} authUser
@@ -205,14 +197,14 @@ const leaseOfflineTag = async (params, authUser) => {
 
     if (!tagNameFromProof) {
         console.log("Could not resolve tag name from zelfProof publicData", preview.publicData);
-        throw conflict("tag_not_found_in_zelfProof");
+        throw new Error("tag_not_found_in_zelfProof");
     }
 
     const normalizedProofTagName = _normalizeTagName(tagNameFromProof, resolvedDomain);
     const normalizedTagName = _normalizeTagName(tagName, resolvedDomain);
 
     if (normalizedProofTagName !== normalizedTagName) {
-        throw conflict("tag_does_not_match_in_zelfProof");
+        throw new Error("tag_does_not_match_in_zelfProof");
     }
 
     const findExistingTag = await searchTag({ tagName: normalizedProofTagName, domain, domainConfig, environment: "all" }, authUser);
@@ -225,7 +217,7 @@ const leaseOfflineTag = async (params, authUser) => {
         return await _syncOfflineTag(findExistingTag, tagKey, syncPublicData, sync, password);
     }
 
-    if (findExistingTag.tagObject) throw conflict("tag_purchased_already");
+    if (findExistingTag.tagObject) throw new Error("tag_purchased_already");
 
     const { price, reward, discount, discountType } = domainConfig.getPrice(
         tagName,
